@@ -2,7 +2,8 @@ const MongodbMemoryServer = require('mongodb-memory-server').MongoMemoryServer;
 const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
-let server;
+
+const path = require("path");
 
 beforeAll(async () => {
     jest.setTimeout(50000);
@@ -10,13 +11,20 @@ beforeAll(async () => {
 
     const uri = await mongoMemoryServerInstance.getConnectionString();
     await mongoose.connect(uri,{ useNewUrlParser: true });
-    server = require("../server");
-
+    let Server = require("../server");
+    global.server = new Server({
+        folders:{
+            config: path.resolve("./config"),
+            controllers: path.resolve("./controllers"),
+            views: path.resolve("./views"),
+            public: path.resolve("./public"),
+        }
+    });
 });
 
 afterAll(async () => {
     await mongoose.disconnect();
     await mongoMemoryServerInstance.stop();
-    server.app.httpServer.die();
+    global.server.app.httpServer.die();
 
 });
