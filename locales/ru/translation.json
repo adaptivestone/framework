@@ -1,0 +1,6 @@
+{
+  "auth": {
+    "passwordProvided": "Нужно ввести пароль",
+    "emailProvided": "Нужно указать Email"
+  }
+}

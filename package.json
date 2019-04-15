@@ -1,0 +1,44 @@
+{
+  "name": "ads-framework",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon ./index.js",
+    "test": "jest"
+  },
+  "jest": {
+    "setupFilesAfterEnv": [
+      "./tests/setup.js"
+    ],
+    "testEnvironment": "node"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^3.0.5",
+    "body-parser": "^1.18.3",
+    "cors": "^2.8.5",
+    "dotenv": "^7.0.0",
+    "email-templates": "^3.6.1",
+    "express": "^4.16.4",
+    "formidable": "^1.2.1",
+    "i18next": "^11.10.2",
+    "i18next-express-middleware": "^1.7.3",
+    "i18next-node-fs-backend": "^2.1.2",
+    "moment-timezone": "^0.5.23",
+    "mongoose": "^5.5.0",
+    "nodemailer": "^4.7.0",
+    "nodemailer-sendmail-transport": "^1.0.2",
+    "nodemailer-stub-transport": "^1.1.0",
+    "pug": "^2.0.3",
+    "socket.io": "^2.2.0",
+    "validator": "^9.4.1",
+    "winston": "^2.4.4"
+  },
+  "devDependencies": {
+    "jest": "^24.7.1",
+    "mongodb-memory-server": "^4.2.2",
+    "nodemon": "^1.18.11"
+  }
+}

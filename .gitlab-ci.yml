@@ -1,0 +1,10 @@
+image: node:lts
+
+stages:
+  - test
+
+test:
+  stage: test
+  script:
+    - npm i
+    - npm test
