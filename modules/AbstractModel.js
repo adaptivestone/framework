@@ -11,7 +11,7 @@ class AbstractModel extends Base{
         this.mongooseSchema.statics.getSuper = ()=>this;
         this.initHooks();
         this.mongooseModel = mongoose.model(this.constructor.name, this.mongooseSchema);
-        if (!mongoose.connection.readyState && process.env.NODE_ENV !== 'test'){//do not connect on test
+        if (!mongoose.connection.readyState){//do not connect on test
             mongoose.connect(this.app.getConfig("mongo").connectionString,{ useNewUrlParser: true }).then(()=>{
                 this.logger.info("Mongo connection success");
             },error=>{

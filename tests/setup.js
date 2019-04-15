@@ -9,8 +9,8 @@ beforeAll(async () => {
     jest.setTimeout(50000);
     mongoMemoryServerInstance = new MongodbMemoryServer();
 
-    const uri = await mongoMemoryServerInstance.getConnectionString();
-    await mongoose.connect(uri,{ useNewUrlParser: true });
+    process.env.MONGO_DSN = await mongoMemoryServerInstance.getConnectionString();
+    //await mongoose.connect(uri,{ useNewUrlParser: true });
     let Server = require("../server");
     global.server = new Server({
         folders:{
@@ -18,13 +18,17 @@ beforeAll(async () => {
             controllers: path.resolve("./controllers"),
             views: path.resolve("./views"),
             public: path.resolve("./public"),
+            models: path.resolve("./models")
         }
     });
 });
 
 afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoMemoryServerInstance.stop();
     global.server.app.httpServer.die();
+    setTimeout(async()=>{
+        await mongoose.disconnect();
+        await mongoMemoryServerInstance.stop();
+    },500)
+   
 
 });

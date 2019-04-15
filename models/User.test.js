@@ -1,4 +1,3 @@
-
 test('can create user', async () => {
     let user = await  global.server.app.getModel("User").create({
         email: "test@test.com",
