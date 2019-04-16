@@ -9,8 +9,7 @@ beforeAll(async () => {
     jest.setTimeout(50000);
     mongoMemoryServerInstance = new MongodbMemoryServer();
 
-    process.env.MONGO_DSN = await mongoMemoryServerInstance.getConnectionString();
-    //await mongoose.connect(uri,{ useNewUrlParser: true });
+    let connectionStringMongo = await mongoMemoryServerInstance.getConnectionString();
     let Server = require("../server");
     global.server = new Server({
         folders:{
@@ -21,6 +20,11 @@ beforeAll(async () => {
             models: path.resolve("./models")
         }
     });
+    global.server.updateConfig("mongo",{connectionString:connectionStringMongo});
+    global.server.updateConfig("http",{port:0});// allow to use random
+    global.server.updateConfig("mail",{transport:"stub"});
+    
+    await global.server.startServer();
 });
 
 afterAll(async () => {

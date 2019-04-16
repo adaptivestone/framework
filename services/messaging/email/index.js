@@ -15,8 +15,8 @@ const Base = require("../../../modules/Base");
 // const i18next = require('i18next');
 
 class Mail extends Base {
-    constructor(template, templateData, i18n) {
-        super();
+    constructor(app,template, templateData, i18n) {
+        super(app);
         this.template = template;
         this.templateData = templateData;
         this.i18n = i18n;
@@ -30,7 +30,6 @@ class Mail extends Base {
      * @return {Promise}
      */
     async send(to, from = mailConfig.from) {
-
         let transportConfig = mailConfig.transports[mailConfig.transport];
         let transport = mailTransports[mailConfig.transport];
         let transporter = nodemailer.createTransport(transport(transportConfig));

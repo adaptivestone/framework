@@ -11,7 +11,8 @@
     "setupFilesAfterEnv": [
       "./tests/setup.js"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "verbose": true
   },
   "author": "",
   "license": "ISC",
@@ -30,7 +31,6 @@
     "mongoose": "^5.5.0",
     "nodemailer": "^4.7.0",
     "nodemailer-sendmail-transport": "^1.0.2",
-    "nodemailer-stub-transport": "^1.1.0",
     "pug": "^2.0.3",
     "socket.io": "^2.2.0",
     "validator": "^9.4.1",
@@ -39,6 +39,9 @@
   "devDependencies": {
     "jest": "^24.7.1",
     "mongodb-memory-server": "^4.2.2",
-    "nodemon": "^1.18.11"
+    "nodemailer-stub": "^1.0.1",
+    "nodemailer-stub-transport": "^1.1.0",
+    "nodemon": "^1.18.11",
+    "supertest": "^4.0.2"
   }
 }

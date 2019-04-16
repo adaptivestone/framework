@@ -86,8 +86,7 @@ class Auth extends AbstractController {
                 first: req.body.firstName,
                 last: req.body.lastName,
                 nick: req.body.nickName
-            },
-            timeZone:req.body.timeZone,
+            }
         });
         try {
             await user.sendVerificationEmail(req.i18n);

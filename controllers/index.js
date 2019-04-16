@@ -15,7 +15,8 @@ class ControllerManager extends Base {
     
     let filterIndexFile = (controller) => {
        return (controller[0] === controller[0].toUpperCase()) &&
-        (controller[0] !== ".");
+        (controller[0] !== ".") && 
+        (!controller.includes(".test.js"));
     }
 
     internalFiles = internalFiles.filter(filterIndexFile);
@@ -38,6 +39,10 @@ class ControllerManager extends Base {
       new controllerModule(this.app);
     }
   }
+
+  static get loggerGroup(){
+    return 'controller'
+}
 }
 
 module.exports = ControllerManager;

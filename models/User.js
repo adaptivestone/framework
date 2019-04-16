@@ -63,7 +63,7 @@ class User extends AbstractModel {
         if (!data) {
             return false;
         }
-        let same = await bcrypt.compare(password + this.getSuper().someSecretSalt, data.password);
+        let same = await bcrypt.compare(password + data.constructor.getSuper().someSecretSalt, data.password);
 
         if (!same) {
             return false;
@@ -74,7 +74,7 @@ class User extends AbstractModel {
     async generateToken() {
         let timestamp = new Date();
         timestamp.setDate(timestamp.getDate() + 30);
-        let token = await bcrypt.hash(this.email + Date.now(), this.getSuper().saltRounds);
+        let token = await bcrypt.hash(this.email + Date.now(), this.constructor.getSuper().saltRounds);
         this.sessionTokens.push({token: token, valid: timestamp});
         await this.save();
         return {token: token, valid: timestamp};
@@ -154,6 +154,7 @@ class User extends AbstractModel {
     async sendPasswordRecoveryEmail(i18n) {
         let passwordRecoveryToken = await User.generateUserPasswordRecoveryToken(this);
         const mail = new Mailer(
+            this.constructor.getSuper().app,
             'recovery',
             {
                 link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
@@ -163,25 +164,24 @@ class User extends AbstractModel {
         );
         return mail.send(this.email);
     }
-    static generateUserVerificationToken(userMongoose) {
-        return new Promise((resolve, reject) => {
-            let date = new Date();
-            date.setDate(date.getDate() + 14);
-            bcrypt.hash(userMongoose.email + Date.now(), this.getSuper().saltRounds, (err, token) => {
-                if (err) {
-                    this.logger.error("Hash 2 error ", err);
-                    reject(err);
-                    return;
-                }
-                userMongoose.verificationTokens = [];
-                userMongoose.verificationTokens.push({
-                    until: date,
-                    token: token
-                });
-                userMongoose.save();
-                resolve({token: token, until: date.getTime()});
-            });
-        })
+    static async generateUserVerificationToken(userMongoose) {
+        let date = new Date();
+        date.setDate(date.getDate() + 14);
+        let token = await bcrypt.hash(userMongoose.email + Date.now(), userMongoose.constructor.getSuper().saltRounds)
+            // if (err) {
+            //     this.logger.error("Hash 2 error ", err);
+            //     reject(err);
+            //     return;
+            // }
+        userMongoose.verificationTokens = [];
+        userMongoose.verificationTokens.push({
+            until: date,
+            token: token
+        });
+        userMongoose.save();
+        return {token: token, until: date.getTime()};
+            
+        
     }
 
     static getUserByVerificationToken(verificationToken) {
@@ -208,6 +208,7 @@ class User extends AbstractModel {
     async sendVerificationEmail(i18n) {
         let verificationToken = await User.generateUserVerificationToken(this);
         const mail = new Mailer(
+            this.constructor.getSuper().app,
             'verification',
             {
                 link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,

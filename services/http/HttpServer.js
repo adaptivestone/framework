@@ -42,8 +42,13 @@ class HttpServer extends Base{
 
         this.httpServer = http.Server(this.express);
       
-        this.httpServer.listen(httpConfig.port,httpConfig.hostname,  ()=> {
-            this.logger.info(`App started and listening on port ${httpConfig.port}`);
+        let listener = this.httpServer.listen(httpConfig.port,httpConfig.hostname,  ()=> {
+            this.logger.info(`App started and listening on port ${listener.address().port}`);
+            if (listener.address().port !== httpConfig.port){//in case we using port 0
+                this.app.updateConfig("http",{port:listener.address().port});
+                this.logger.info(`Updating http config to use new port`);
+
+            }
             
         });
     }

@@ -10,14 +10,17 @@ class Server {
     this.config = config;
     this.app = {
       getConfig: this.getConfig.bind(this),
-      getModel: this.getModel.bind(this)
+      getModel: this.getModel.bind(this),
+      updateConfig: this.updateConfig.bind(this)
     };
 
     this.cache = {
         configs: new Map(),
         models: new Map()
     }
+  }
 
+  async startServer(){
     this.addErrorHandling();
 
     //TODO config 
@@ -28,7 +31,8 @@ class Server {
 
     this.app.controllerManager = new ControllerManager(this.app);
 
-    this.app.controllerManager.initControllers(this.config).then(()=>this.app.httpServer.add404Page())
+    await this.app.controllerManager.initControllers(this.config);
+    this.app.httpServer.add404Page();
   }
 
   addErrorHandling(){
@@ -49,6 +53,20 @@ class Server {
         this.cache.configs.set(configName, this.getFileWithExtendingInhirence("config",configName));
     }
     return  this.cache.configs.get(configName);
+  }
+
+  /**
+   * Primary designed for tests when we need to update some configs before start testing
+   * Should be called before any initialization was done
+   * @TODO send event to all inited components to update config
+   * @param {String} configName 
+   * @param {Object} config 
+   */
+  updateConfig(configName, config){
+    const conf = this.getConfig(configName);
+    const newConf = Object.assign(conf, config);
+    this.cache.configs.set(configName,newConf);
+    return newConf;
   }
 
   getModel(modelName){

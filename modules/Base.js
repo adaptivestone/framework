@@ -10,6 +10,10 @@ class Base {
     _loggerFilter(level, msg, meta){
         return `(${process.pid}) \x1B[32m[${this.constructor.loggerGroup+this.constructor.name}]\x1B[39m ${msg}`;
     }
+
+    static get loggerGroup(){
+        return 'Base_please_overwrite_'
+    }
 }
 
 module.exports = Base;
