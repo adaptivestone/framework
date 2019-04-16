@@ -1,6 +1,6 @@
 let express;
 const request = require("supertest");
-const userEmail = "test@test.com";
+const userEmail = "testing@test.com";
 const userPassword = "SuperNiceSecret123$";
 
 beforeAll(() => {

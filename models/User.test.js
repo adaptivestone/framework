@@ -1,20 +1,26 @@
+const userEmail = "testing@test.com";
+const userPassword = "SuperNiceSecret123$";
+
 test('can create user', async () => {
     let user = await  global.server.app.getModel("User").create({
-        email: "test@test.com",
-        password: "test"
+        email: userEmail,
+        password: userPassword,
+        name: {
+            nick: "nickname"   
+        }
     });
 });
 
 test('passwords should be hashed', async () => {
     let user = await  global.server.app.getModel("User").findOne({
-        email: "test@test.com",
+        email: userEmail,
     });
-    expect(user.password !== "test").toBeTruthy();
+    expect(user.password !== userPassword).toBeTruthy();
 });
 
 test('passwords should not be changed on other fields save', async () => {
     let user = await  global.server.app.getModel("User").findOne({
-        email: "test@test.com",
+        email: userEmail,
     });
     let psw = user.password;
     user.email = "rrrr";

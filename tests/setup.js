@@ -23,6 +23,17 @@ beforeAll(async () => {
     global.server.updateConfig("mongo",{connectionString:connectionStringMongo});
     global.server.updateConfig("http",{port:0});// allow to use random
     global.server.updateConfig("mail",{transport:"stub"});
+
+    let User =  global.server.app.getModel("User");
+    user = await User.create({
+        email: "test@test.com",
+        password: "testPassword",
+        isVerified:true,
+        name: {
+            nick: "testUserNickName"   
+        }
+    });
+    global.authToken = await user.generateToken()
     
     await global.server.startServer();
 });
