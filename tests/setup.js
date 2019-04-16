@@ -8,16 +8,17 @@ const path = require("path");
 beforeAll(async () => {
     jest.setTimeout(50000);
     mongoMemoryServerInstance = new MongodbMemoryServer();
+    process.env.LOG_LEVEL = "error";
 
     let connectionStringMongo = await mongoMemoryServerInstance.getConnectionString();
     let Server = require("../server");
     global.server = new Server({
         folders:{
-            config: path.resolve("./config"),
-            controllers: path.resolve("./controllers"),
-            views: path.resolve("./views"),
-            public: path.resolve("./public"),
-            models: path.resolve("./models")
+            config: process.env.TEST_FOLDER_CONFIG ||path.resolve("./config"),
+            controllers: process.env.TEST_FOLDER_CONTROLLERS || path.resolve("./controllers"),
+            views: process.env.TEST_FOLDER_VIEWS || path.resolve("./views"),
+            public: process.env.TEST_FOLDER_PUBLIC || path.resolve("./public"),
+            models: process.env.TEST_FOLDER_MODELS || path.resolve("./models")
         }
     });
     global.server.updateConfig("mongo",{connectionString:connectionStringMongo});
