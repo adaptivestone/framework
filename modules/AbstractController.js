@@ -5,6 +5,8 @@ const PrepareAppInfo  = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken  = require('../services/http/middleware/GetUserByToken');
 const Auth  = require('../services/http/middleware/Auth');
 
+const validator = require("validator");
+
 class AbstractController extends Base{
     constructor(app) {
         super(app);
@@ -45,6 +47,29 @@ class AbstractController extends Base{
         }
         this.app.httpServer.express.use(path, this.router);
         this.app.controllers[controllerName.toLowerCase()] = this;
+    }
+
+    validate(obj,rules){
+        let errors = {};
+        for (let name in rules){
+            let validationResult = false;
+            if (typeof rules[name][0] === 'function'){
+                validationResult = rules[name][0](obj[name]);
+            } else if (typeof validator[rules[name][0]] === 'function') {//use from validator then
+                validationResult = validator[rules[name][0]](obj[name]);
+            } else {
+                this.logger.warn(`No rule found for ${name}. Swith to existing checking`);
+                validationResult = !!obj[name];
+            }
+            if (!validationResult){
+                errors[name] = rules[name][1];
+            }
+
+        }
+        if (Object.entries(errors).length === 0 && errors.constructor === Object){
+            return false;
+        }
+        return errors;
     }
     static get loggerGroup(){
         return 'controller'
