@@ -78,12 +78,14 @@ class HttpServer extends Base{
                 backend: {
                     backends:[
                         BackendFS,
-                        BackendFS,
+                      //  BackendFS,
                     ],
-                    backendOptions:[{
-                        loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
-                        addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
-                    }, {
+                    backendOptions:[
+                        //{
+                      //  loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
+                     //   addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
+                   // },
+                     {
                         loadPath: folderConfig.folders.locales + '/{{lng}}/{{ns}}.json',
                         addPath: folderConfig.folders.locales + '/{{lng}}/{{ns}}.missing.json'
                     }]
