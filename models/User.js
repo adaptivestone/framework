@@ -86,7 +86,6 @@ class User extends AbstractModel {
             name: this.name,
             email: this.email,
             _id: this._id,
-            defaultWallet: this.defaultWallet,
             isVerified: this.isVerified,
             permissions: this.permissions,
             locale: this.locale
