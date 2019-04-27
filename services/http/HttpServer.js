@@ -6,8 +6,8 @@ const cors = require('cors');
 
 const i18next = require('i18next');
 const i18nextMiddleware = require('i18next-express-middleware');
-const Backend = require('i18next-node-fs-backend');
-
+const BackendFS = require('i18next-node-fs-backend');
+const Backend = require('i18next-chained-backend');
 
 const Base = require('../../modules/Base');
 
@@ -22,7 +22,7 @@ class HttpServer extends Base{
             this.logger.info(`Request is  ${req.url}`);
             next();
         });
-        this.enableI18N();
+        this.enableI18N(folderConfig);
 
         const httpConfig = this.app.getConfig("http");
         this.express.use(cors({
@@ -52,7 +52,7 @@ class HttpServer extends Base{
             
         });
     }
-    enableI18N(){
+    enableI18N(folderConfig){
         let I18NConfig = this.app.getConfig("i18n");
         if (!I18NConfig.enabled){
             return;
@@ -76,12 +76,22 @@ class HttpServer extends Base{
             .use(lngDetector)
             .init({
                 backend: {
-                    loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
-                    addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json'
+                    backends:[
+                        BackendFS,
+                        BackendFS,
+                    ],
+                    backendOptions:[{
+                        loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
+                        addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
+                    }, {
+                        loadPath: folderConfig.folders.locales + '/{{lng}}/{{ns}}.json',
+                        addPath: folderConfig.folders.locales + '/{{lng}}/{{ns}}.missing.json'
+                    }]
+                    
                 },
                 fallbackLng: I18NConfig.fallbackLng,
                 preload: I18NConfig.preload,
-                saveMissing: false,
+                saveMissing: true,
                 debug:false,
                 detection:{
                     //caches: ['cookie'],
