@@ -11,7 +11,8 @@ class Server {
     this.app = {
       getConfig: this.getConfig.bind(this),
       getModel: this.getModel.bind(this),
-      updateConfig: this.updateConfig.bind(this)
+      updateConfig: this.updateConfig.bind(this),
+      folderConfig: this.config.folderConfig
     };
 
     this.cache = {

@@ -1,4 +1,5 @@
 "use strict";
+const fs = require("fs");
 const EmailTemplate = require('email-templates');
 const nodemailer = require('nodemailer');
 
@@ -15,7 +16,17 @@ const Base = require("../../../modules/Base");
 class Mail extends Base {
     constructor(app,template, templateData, i18n) {
         super(app);
-        this.template = template;
+        if(!path.isAbsolute(template)){
+            if (this.app.folderConfig || fs.existsSync(this.app.folderConfig + "/" +path.basename(template))) {
+                this.template = this.app.folderConfig + "/" +path.basename(template)
+            } else
+            if (fs.existsSync(__dirname+'/templates/' + path.basename(template))) {
+                this.template = __dirname+'/templates/' + path.basename(template)
+            }
+            else {
+                console.log("not found")
+            }
+        }
         this.templateData = templateData;
         this.i18n = i18n;
         this.locale = this.i18n.language;
@@ -43,11 +54,6 @@ class Mail extends Base {
         const email = new EmailTemplate({
             message: {
                 from: from
-            },
-            views: {
-                root: path.isAbsolute(this.template)
-                        ? [path.dirname(this.template), path.basename(this.template)]
-                        : path.resolve(__dirname+'/templates')
             },
             send: true,
             preview:false,
