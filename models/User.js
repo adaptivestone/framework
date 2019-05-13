@@ -113,25 +113,23 @@ class User extends AbstractModel {
             return resolve(data);
         });
     }
-    static generateUserPasswordRecoveryToken(userMongoose){
-        return new Promise((resolve, reject) => {
-            let date = new Date();
-            date.setDate(date.getDate() + 14);
-            bcrypt.hash(userMongoose.email + Date.now(), this.getSuper().saltRounds, (err, token) => {
-                if (err) {
-                    this.logger.error("Hash 2 error ", err);
-                    reject(err);
-                    return;
-                }
-                userMongoose.passwordRecoveryTokens = [];
-                userMongoose.passwordRecoveryTokens.push({
-                    until: date,
-                    token: token
-                });
-                userMongoose.save();
-                resolve({token: token, until: date.getTime()});
-            });
-        })
+    static async generateUserPasswordRecoveryToken(userMongoose){
+        let date = new Date();
+        date.setDate(date.getDate() + 14);
+        let token = await bcrypt.hash(userMongoose.email + Date.now(), userMongoose.constructor.getSuper().saltRounds);
+            //       if (err) {
+            //     this.logger.error("Hash 2 error ", err);
+            //     reject(err);
+            //     return;
+            // }
+        userMongoose.passwordRecoveryTokens = [];
+        userMongoose.passwordRecoveryTokens.push({
+            until: date,
+            token: token
+        });
+        await userMongoose.save();
+        return {token: token, until: date.getTime()};
+        
     }
     static getUserByPasswordRecoveryToken(passwordRecoveryToken) {
         return new Promise(async (resolve, reject) => {
