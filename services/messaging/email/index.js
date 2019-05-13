@@ -24,6 +24,7 @@ class Mail extends Base {
                 this.template = __dirname+'/templates/' + path.basename(template)
             }
             else {
+                this.template = __dirname+'/templates/emptyTemplate';
                 console.log("not found")
             }
         }
