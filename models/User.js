@@ -136,7 +136,6 @@ class User extends AbstractModel {
     static getUserByPasswordRecoveryToken(passwordRecoveryToken) {
         return new Promise(async (resolve, reject) => {
             let data = await this.findOne({passwordRecoveryTokens: {$elemMatch: {token: passwordRecoveryToken}}});
-            console.log(data);
             if (!data) {
                 reject(false);
                 return;
