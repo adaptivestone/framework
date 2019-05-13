@@ -1,6 +1,7 @@
 "use strict";
 const AbstractModel = require("./../modules/AbstractModel");
 const bcrypt = require('bcrypt');
+const path = require("path");
 
 
 const Mailer = require('../services/messaging').email;
@@ -203,9 +204,10 @@ class User extends AbstractModel {
 
     async sendVerificationEmail(i18n) {
         let verificationToken = await User.generateUserVerificationToken(this);
+        let file  = path.resolve("./services/messaging/email/templates/verification");
         const mail = new Mailer(
             this.constructor.getSuper().app,
-            'verification',
+            file,
             {
                 link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
                 editor: this.name.nick,
