@@ -12,7 +12,7 @@ class Server {
       getConfig: this.getConfig.bind(this),
       getModel: this.getModel.bind(this),
       updateConfig: this.updateConfig.bind(this),
-      folderConfig: this.config.folderConfig
+      foldersConfig: this.config.folders
     };
 
     this.cache = {

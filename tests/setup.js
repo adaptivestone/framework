@@ -19,7 +19,7 @@ beforeAll(async () => {
             views: process.env.TEST_FOLDER_VIEWS || path.resolve("./views"),
             public: process.env.TEST_FOLDER_PUBLIC || path.resolve("./public"),
             models: process.env.TEST_FOLDER_MODELS || path.resolve("./models"),
-            email: process.env.TEST_FOLDER_EMAIL || path.resolve("./services/messaging/email/templates")
+            emails: process.env.TEST_FOLDER_EMAIL || path.resolve("./services/messaging/email/templates")
         }
     });
     global.server.updateConfig("mongo",{connectionString:connectionStringMongo});

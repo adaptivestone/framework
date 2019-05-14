@@ -17,8 +17,8 @@ class Mail extends Base {
     constructor(app,template, templateData, i18n) {
         super(app);
         if(!path.isAbsolute(template)){
-            if (this.app.folderConfig && fs.existsSync(this.app.folderConfig + "/" +path.basename(template))) {
-                this.template = this.app.folderConfig + "/" +path.basename(template)
+            if (fs.existsSync(this.app.foldersConfig.emails + "/" +path.basename(template))) {
+                this.template = this.app.foldersConfig.emails+ "/" +path.basename(template)
             } else
             if (fs.existsSync(__dirname+'/templates/' + path.basename(template))) {
                 this.template = __dirname+'/templates/' + path.basename(template)
