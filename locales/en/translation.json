@@ -1,6 +1,23 @@
 {
   "auth": {
+    "userProvided": "User not specified",
     "passwordProvided": "Password must be provided",
-    "emailProvided": "Email must be provided"
+    "emailProvided": "Email must be provided",
+    "nickNameValid": "Nick name is not valid,only a-z,A-Z,0-9",
+    "passwordValid": "Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>",
+    "emailValid": "Email is not valid",
+    "errorUPValid": "User/password not valid",
+    "messageSome": "Some server problem. Please try later",
+    "errorUExist": "User with such email isn't registered on this site",
+    "errorUAlready": "That user already exists",
+    "nicknameExists": "User with such nickname already exists",
+    "noAccessRights": "No access rights"
+
+  },
+  "email":{
+    "verify": "Verify email",
+    "notVerified":"Your email is not verified",
+    "registered":"User with such an email already registered",
+    "alreadyVerifiedOrWrongToken":"Your email is already verified or your verification token is wrong"
   }
 }
