@@ -1,9 +1,8 @@
 "use strict";
+const fs = require("fs");
 const EmailTemplate = require('email-templates');
 const nodemailer = require('nodemailer');
-const mailConfig = require('../../../config/mail');
-const serverDomain = require('../../../config/http').myDomain;
-const siteDomain = require('../../../config/http').siteDomain;
+
 const mailTransports = {
         sendMail: require('nodemailer-sendmail-transport'),
         stub: require('nodemailer-stub-transport'),
@@ -17,7 +16,18 @@ const Base = require("../../../modules/Base");
 class Mail extends Base {
     constructor(app,template, templateData, i18n) {
         super(app);
-        this.template = template;
+        if(!path.isAbsolute(template)){
+            if (fs.existsSync(this.app.foldersConfig.emails + "/" +path.basename(template))) {
+                this.template = this.app.foldersConfig.emails+ "/" +path.basename(template)
+            } else
+            if (fs.existsSync(__dirname+'/templates/' + path.basename(template))) {
+                this.template = __dirname+'/templates/' + path.basename(template)
+            }
+            else {
+                this.template = __dirname+'/templates/emptyTemplate';
+                this.logger.error("not found")
+            }
+        }
         this.templateData = templateData;
         this.i18n = i18n;
         this.locale = this.i18n.language;
@@ -29,17 +39,22 @@ class Mail extends Base {
      * @param [from = mailConfig.from]
      * @return {Promise}
      */
-    async send(to, from = mailConfig.from) {
+    async send(to, from) {
+        const mailConfig = this.app.getConfig("mail");
+        if (!from){
+            from = mailConfig.from;
+        }
+        const siteDomain = this.app.getConfig("http").siteDomain;
         let transportConfig = mailConfig.transports[mailConfig.transport];
         let transport = mailTransports[mailConfig.transport];
         let transporter = nodemailer.createTransport(transport(transportConfig));
 
+
+
+
         const email = new EmailTemplate({
             message: {
                 from: from
-            },
-            views: {
-                root: path.resolve(__dirname+'/templates')
             },
             send: true,
             preview:false,
@@ -54,7 +69,7 @@ class Mail extends Base {
                 locals: Object.assign(
                     {
                         locale:this.locale,
-                        serverDomain:serverDomain,
+                        serverDomain:mailConfig.myDomain,
                         siteDomain:siteDomain,
                         t: this.i18n.t.bind(this.i18n),
                     },

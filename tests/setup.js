@@ -18,7 +18,8 @@ beforeAll(async () => {
             controllers: process.env.TEST_FOLDER_CONTROLLERS || path.resolve("./controllers"),
             views: process.env.TEST_FOLDER_VIEWS || path.resolve("./views"),
             public: process.env.TEST_FOLDER_PUBLIC || path.resolve("./public"),
-            models: process.env.TEST_FOLDER_MODELS || path.resolve("./models")
+            models: process.env.TEST_FOLDER_MODELS || path.resolve("./models"),
+            emails: process.env.TEST_FOLDER_EMAIL || path.resolve("./services/messaging/email/templates")
         }
     });
     global.server.updateConfig("mongo",{connectionString:connectionStringMongo});
@@ -34,7 +35,7 @@ beforeAll(async () => {
             nick: "testUserNickName"   
         }
     });
-    global.authToken = await user.generateToken()
+    global.authToken = await user.generateToken();
     
     await global.server.startServer();
 });
