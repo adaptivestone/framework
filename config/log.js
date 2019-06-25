@@ -1,16 +1,33 @@
 const winston = require('winston');
-//TODO normal config
-//{ error: 0, warn: 1, info: 2, verbose: 3, debug: 4, silly: 5 }
- let container = new winston.Container({
-     console: {
-         level: process.env.LOG_LEVEL || 'silly',
-         colorize: true,
-         label: 'Default Logger',
-         timestamp:true
-     }
-  });
 
-module.exports = container;
+let alignColorsAndTime = winston.format.combine(
+    winston.format.colorize({
+        all:true
+    }),
+    winston.format.label({
+        label:'Default Logger'
+    }),
+    winston.format.timestamp({
+        format:"YY-MM-DD HH:MM:SS"
+    }),
+    winston.format.printf(
+        info => ` ${info.label}  ${info.timestamp}  ${info.level} : ${info.message}`
+    )
+);
+
+const logger = winston.createLogger({
+    level:  "debug",
+    // level: process.env.LOG_LEVEL || 'silly',
+    transports: [
+        new (winston.transports.Console)({
+            format: winston.format.combine(winston.format.colorize(),
+                alignColorsAndTime)
+        })
+    ],
+});
+
+
+module.exports = logger;
 
 
 
