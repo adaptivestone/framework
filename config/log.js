@@ -2,10 +2,10 @@ module.exports = [
     {
         transport:'winston-sentry-log',
         transportOptions:{
-            dsn: "https://******@sentry.io/12345",
+            dsn: process.env.SENTRY_DSN,
             level: "info"
         },
-        enable: process.env.ENABLE_LOGGER_SENTRY || true
+        enable: process.env.ENABLE_LOGGER_SENTRY || false
     },
     {
         transport:'console',

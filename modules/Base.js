@@ -1,5 +1,4 @@
 const winston = require('winston');
-const Sentry = require('winston-sentry-log');
 class Base {
     constructor(app){
         this.app = app;
@@ -16,7 +15,7 @@ class Base {
             }),
             winston.format.timestamp(),
             winston.format.printf(
-                info => ` ${info.label}  ${info.timestamp}  ${info.level} : ${info.message}`
+                info => `(${process.pid}) ${info.label}  ${info.timestamp}  ${info.level} : ${info.message}`
             )
         );
 
@@ -38,7 +37,7 @@ class Base {
             }
         }
         logger = new winston.createLogger({
-            level:"warn",
+            level:"debug",
             transports: transports
         });
 
