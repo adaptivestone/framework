@@ -37,7 +37,7 @@ class Base {
             }
         }
         logger = new winston.createLogger({
-            level:"debug",
+            level:"silly",
             transports: transports
         });
 
