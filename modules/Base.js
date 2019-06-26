@@ -26,7 +26,7 @@ class Base {
         let transports = [];
         for (let log of logConfig){
             if(log.enable){
-                if(log.transport === 'console' && log.enable){
+                if(log.transport === 'console'){
                     transports.push(new (winston.transports.Console)({
                         format: winston.format.combine(winston.format.colorize(),
                             alignColorsAndTime)
@@ -38,7 +38,7 @@ class Base {
             }
         }
         logger = new winston.createLogger({
-            level:"debug",
+            level:"warn",
             transports: transports
         });
 
