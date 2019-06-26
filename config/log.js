@@ -5,7 +5,7 @@ module.exports = [
             dsn: "https://******@sentry.io/12345",
             level: "info"
         },
-        logLevel: process.env.LOG_LEVEL || 'silly'
+        enable: process.env.ENABLE_LOGGER_SENTRY || true
     },
     {
         transport:'console',
@@ -13,7 +13,7 @@ module.exports = [
             level: 'error',
             message: 'Public error to share'
         },
-        logLevel: process.env.LOG_LEVEL || 'silly'
+        enable: true
     }
 ];
 

@@ -23,26 +23,26 @@ class Base {
         let logConfig = this.app.getConfig("log");
 
         let logger;
-        let logLevel;
         let transports = [];
         for (let log of logConfig){
-             if(log.transport === 'console'){
-                 logLevel = log.logLevel;
-                 transports.push(new (winston.transports.Console)({
-                     format: winston.format.combine(winston.format.colorize(),
-                         alignColorsAndTime)
-                 }));
-             }else {
-                 let tr = require(log.transport);
-                 logLevel = log.logLevel;
-                 transports.push(new tr(log.transportOptions));
-             }
-
+            if(log.enable){
+                if(log.transport === 'console' && log.enable){
+                    transports.push(new (winston.transports.Console)({
+                        format: winston.format.combine(winston.format.colorize(),
+                            alignColorsAndTime)
+                    }));
+                }else {
+                    let tr = require(log.transport);
+                    transports.push(new tr(log.transportOptions));
+                }
+            }
         }
         logger = new winston.createLogger({
-            level:logLevel,
+            level:"debug",
             transports: transports
         });
+
+
 
 
         return logger;
