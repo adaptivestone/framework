@@ -1,12 +1,12 @@
+const winston = require('winston');
+const Sentry = require('winston-sentry-log');
 class Base {
     constructor(app){
         this.app = app;
-        this.logger = this.constructor.getLogger(this.constructor.loggerGroup+this.constructor.name);
+        this.logger = this.getLogger(this.constructor.loggerGroup+this.constructor.name);
     }
 
-    static getLogger(label){
-        const winston = require('winston');
-        console.log(this.constructor.loggerGroup);
+    getLogger(label){
         let alignColorsAndTime = winston.format.combine(
             winston.format.colorize({
                 all:true
@@ -14,23 +14,37 @@ class Base {
             winston.format.label({
                 label:` \x1B[32m[${label}]\x1B[39m`
             }),
-            winston.format.timestamp({
-                format:"YY-MM-DD HH:MM:SS"
-            }),
+            winston.format.timestamp(),
             winston.format.printf(
                 info => ` ${info.label}  ${info.timestamp}  ${info.level} : ${info.message}`
             )
         );
-        const logger = winston.createLogger({
-            level:  "debug",
-            // level: process.env.LOG_LEVEL || 'silly',
-            transports: [
-                new (winston.transports.Console)({
-                    format: winston.format.combine(winston.format.colorize(),
-                        alignColorsAndTime)
-                })
-            ],
+
+        let logConfig = this.app.getConfig("log");
+
+        let logger;
+        let logLevel;
+        let transports = [];
+        for (let log of logConfig){
+             if(log.transport === 'console'){
+                 logLevel = log.logLevel;
+                 transports.push(new (winston.transports.Console)({
+                     format: winston.format.combine(winston.format.colorize(),
+                         alignColorsAndTime)
+                 }));
+             }else {
+                 let tr = require(log.transport);
+                 logLevel = log.logLevel;
+                 transports.push(new tr(log.transportOptions));
+             }
+
+        }
+        logger = new winston.createLogger({
+            level:logLevel,
+            transports: transports
         });
+
+
         return logger;
     }
 

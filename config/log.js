@@ -1,33 +1,21 @@
-const winston = require('winston');
-
-let alignColorsAndTime = winston.format.combine(
-    winston.format.colorize({
-        all:true
-    }),
-    winston.format.label({
-        label:'Default Logger'
-    }),
-    winston.format.timestamp({
-        format:"YY-MM-DD HH:MM:SS"
-    }),
-    winston.format.printf(
-        info => ` ${info.label}  ${info.timestamp}  ${info.level} : ${info.message}`
-    )
-);
-
-const logger = winston.createLogger({
-    level:  "debug",
-    // level: process.env.LOG_LEVEL || 'silly',
-    transports: [
-        new (winston.transports.Console)({
-            format: winston.format.combine(winston.format.colorize(),
-                alignColorsAndTime)
-        })
-    ],
-});
-
-
-module.exports = logger;
+module.exports = [
+    {
+        transport:'winston-sentry-log',
+        transportOptions:{
+            dsn: "https://******@sentry.io/12345",
+            level: "info"
+        },
+        logLevel: process.env.LOG_LEVEL || 'silly'
+    },
+    {
+        transport:'console',
+        transportOptions:{
+            level: 'error',
+            message: 'Public error to share'
+        },
+        logLevel: process.env.LOG_LEVEL || 'silly'
+    }
+];
 
 
 
