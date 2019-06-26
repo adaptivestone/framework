@@ -89,7 +89,6 @@ class Auth extends AbstractController {
             }
         });
         try {
-            this.logger.error('test');
             await user.sendVerificationEmail(req.i18n);
             return res.status(200).json({success: true});
         } catch (e) {
