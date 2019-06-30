@@ -27,6 +27,7 @@ class Base {
             if(log.enable){
                 if(log.transport === 'console'){
                     transports.push(new (winston.transports.Console)({
+                        level :log.transportOptions.level,
                         format: winston.format.combine(winston.format.colorize(),
                             alignColorsAndTime)
                     }));

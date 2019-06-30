@@ -5,6 +5,8 @@ stages:
 
 test:
   stage: test
+  variables:
+   LOGGER_CONSOLE_LEVEL: "error"
   script:
     - npm i
     - npm test

@@ -5,13 +5,12 @@ module.exports = [
             dsn: process.env.SENTRY_DSN,
             level: "info"
         },
-        enable: process.env.ENABLE_LOGGER_SENTRY || false
+        enable: process.env.LOGGER_SENTRY_ENABLE || false
     },
     {
         transport:'console',
         transportOptions:{
-            level: 'error',
-            message: 'Public error to share'
+            level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
         },
         enable: true
     }
