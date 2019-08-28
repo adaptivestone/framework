@@ -41,7 +41,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-    global.server.app.httpServer.die();
+    global.server && global.server.app.httpServer.die();
     setTimeout(async()=>{
         await mongoose.disconnect();
         await mongoMemoryServerInstance.stop();
