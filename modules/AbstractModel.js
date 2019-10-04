@@ -16,7 +16,8 @@ class AbstractModel extends Base{
                 this.app.getConfig("mongo").connectionString,
                 {
                     useNewUrlParser: true,
-                    useCreateIndex: true
+                    useCreateIndex: true,
+                    useUnifiedTopology: true
                 }).then(()=>{
                 this.logger.info("Mongo connection success");
             },error=>{
