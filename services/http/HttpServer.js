@@ -19,7 +19,7 @@ class HttpServer extends Base{
         this.express.set('views', [folderConfig.folders.views,__dirname+'/../../views']);
         this.express.set('view engine', 'pug');
         this.express.use((req,res,next)=>{
-            this.logger.info(`Request is  [${req.method} ]${req.url}`);
+            this.logger.info(`Request is  [${req.method}] ${req.url}`);
             next();
         });
         this.enableI18N(folderConfig);
