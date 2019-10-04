@@ -2,8 +2,20 @@ const winston = require('winston');
 class Base {
     constructor(app){
         this.app = app;
-        this.logger = this.getLogger(this.constructor.loggerGroup+this.constructor.name);
+        this._realLogger = null;
     }
+
+    /**
+     * Optimzation to lazy load logger. It will be inited only on request
+     */
+    get logger(){
+        if (!this._realLogger){
+            this._realLogger = this.getLogger(this.constructor.loggerGroup+this.constructor.name);
+        }
+        return this._realLogger;
+    }
+
+
 
     getLogger(label){
         let alignColorsAndTime = winston.format.combine(
