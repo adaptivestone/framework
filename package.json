@@ -1,5 +1,5 @@
 {
-  "name": "ads-framework",
+  "name": "@adaptivestone/framework",
   "version": "1.2.0",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
