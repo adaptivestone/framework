@@ -1,4 +1,4 @@
 module.exports = {
-    saltRounds:10,
-    someSecretSalt: "gdfg45667_%%^trterte"
-}
+  saltRounds: 10,
+  someSecretSalt: 'gdfg45667_%%^trterte',
+};

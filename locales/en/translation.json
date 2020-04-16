@@ -12,12 +12,11 @@
     "errorUAlready": "That user already exists",
     "nicknameExists": "User with such nickname already exists",
     "noAccessRights": "No access rights"
-
   },
-  "email":{
+  "email": {
     "verify": "Verify email",
-    "notVerified":"Your email is not verified",
-    "registered":"User with such an email already registered",
-    "alreadyVerifiedOrWrongToken":"Your email is already verified or your verification token is wrong"
+    "notVerified": "Your email is not verified",
+    "registered": "User with such an email already registered",
+    "alreadyVerifiedOrWrongToken": "Your email is already verified or your verification token is wrong"
   }
 }

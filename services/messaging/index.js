@@ -1,4 +1,3 @@
 module.exports = {
-    email:require("./email")
+  email: require('./email'),
 };
-

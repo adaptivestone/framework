@@ -1,3 +1,3 @@
 module.exports = {
-    connectionString: process.env.MONGO_DSN
+  connectionString: process.env.MONGO_DSN,
 };
