@@ -1,5 +1,5 @@
-const AbstractController = require('../modules/AbstractController');
 const validator = require('validator');
+const AbstractController = require('../modules/AbstractController');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 

@@ -13,7 +13,7 @@ class ControllerManager extends Base {
       fs.readdir(folderConfig.folders.controllers),
     ]);
 
-     const filterIndexFile = (controller) => {
+    const filterIndexFile = (controller) => {
       return (
         controller[0] === controller[0].toUpperCase() &&
         controller[0] !== '.' &&
@@ -23,18 +23,19 @@ class ControllerManager extends Base {
 
     internalFiles = internalFiles.filter(filterIndexFile);
     externalFiles = externalFiles.filter(filterIndexFile);
-    for (let file of internalFiles) {
+    for (const file of internalFiles) {
       if (externalFiles.includes(file)) {
         this.logger.verbose(
           `Skipping register INTERNAL controller ${file} as it override by EXTERNAL ONE`,
         );
-        continue;
+      } else {
+        const controllerModule = require(__dirname + '/' + file);
+        new controllerModule(this.app);
       }
-      let controllerModule = require(__dirname + '/' + file);
-      new controllerModule(this.app);
+
     }
 
-    for (let file of externalFiles) {
+    for (const file of externalFiles) {
       let controllerModule = require(folderConfig.folders.controllers +
         '/' +
         file);

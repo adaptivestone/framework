@@ -1,86 +1,93 @@
-let express;
 const request = require('supertest');
+
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 
-beforeAll(() => {
-  express = global.server.app.httpServer.express;
-});
+describe('autentification', () => {
+  describe('registration', () => {
+    it('code NOT able to create user with wrong email', async () => {
+      expect.assertions(1);
+      const { status } = await request(global.server.app.httpServer.express)
+        .post('/auth/register')
+        .send({
+          email: 'bad email',
+          password: userPassword,
+          nickName: 'test',
+        });
+      expect(status).toBe(400);
+    });
 
-describe('REGISTRATION', () => {
-  test('NOT able to create user with wrong email', async () => {
-    return request(express)
-      .post('/auth/register')
-      .send({
-        email: 'bad email',
-        password: userPassword,
-        nickName: 'test',
-      })
-      .expect(400);
+    it('can create user', async () => {
+      expect.assertions(2);
+      const { status, body } = await request(
+        global.server.app.httpServer.express,
+      )
+        .post('/auth/register')
+        .send({
+          email: userEmail,
+          password: userPassword,
+          nickName: 'test',
+        });
+      expect(status).toBe(200);
+      expect(body.success).toBe(true);
+    });
+
+    it('can NOT create SAME user', async () => {
+      expect.assertions(1);
+      const { status } = await request(global.server.app.httpServer.express)
+        .post('/auth/register')
+        .send({
+          email: userEmail,
+          password: userPassword,
+          nickName: 'test',
+        });
+      expect(status).toBe(400);
+    });
   });
 
-  test('can create user', async () => {
-    return request(express)
-      .post('/auth/register')
-      .send({
-        email: userEmail,
-        password: userPassword,
-        nickName: 'test',
-      })
-      .expect(200, {
-        success: true,
-      });
-  });
+  describe('login', () => {
+    it('can NOT login with normal creds and not Verifyed email', async () => {
+      expect.assertions(1);
+      const { status } = await request(global.server.app.httpServer.express)
+        .post('/auth/login')
+        .send({
+          email: userEmail,
+          password: userPassword,
+        });
+      expect(status).toBe(400);
+    });
 
-  test('can NOT create SAME user', async () => {
-    return request(express)
-      .post('/auth/register')
-      .send({
-        email: userEmail,
-        password: userPassword,
-        nickName: 'test',
-      })
-      .expect(400);
-  });
-});
+    it('can NOT login with WRONG creds', async () => {
+      expect.assertions(1);
+      const { status } = await request(global.server.app.httpServer.express)
+        .post('/auth/login')
+        .send({
+          email: 'test@test.by',
+          password: 'noPassword$',
+        });
+      expect(status).toBe(400);
+    });
 
-describe('LOGIN', () => {
-  test('can NOT login with normal creds and not Verifyed email', async () => {
-    return request(express)
-      .post('/auth/login')
-      .send({
-        email: userEmail,
-        password: userPassword,
-      })
-      .expect(400);
-  });
+    it('can  login with normal creds and  verifyed email', async () => {
+      expect.assertions(3);
 
-  test('can NOT login with WRONG creds ', async () => {
-    return request(express)
-      .post('/auth/login')
-      .send({
-        email: 'test@test.by',
-        password: 'noPassword$',
-      })
-      .expect(400);
-  });
+      const user = await global.server.app
+        .getModel('User')
+        .findOne({ email: userEmail });
+      user.isVerified = true;
+      await user.save();
 
-  test('can  login with normal creds and  verifyed email', async () => {
-    let user = await global.server.app
-      .getModel('User')
-      .findOne({ email: userEmail });
-    user.isVerified = true;
-    await user.save();
-    return request(express)
-      .post('/auth/login')
-      .send({
-        email: userEmail,
-        password: userPassword,
-      })
-      .expect(200)
-      .then((responce) => {
-        expect(responce.body.success).toBe(true);
-        expect(responce.body.token).toBeDefined();
-      });
+      const { status, body } = await request(
+        global.server.app.httpServer.express,
+      )
+        .post('/auth/login')
+        .send({
+          email: userEmail,
+          password: userPassword,
+        });
+      expect(status).toBe(200);
+      expect(body.success).toBe(true);
+      expect(body.token).toBeDefined();
+    });
   });
 });

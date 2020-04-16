@@ -15,7 +15,7 @@ class AbstractModel extends Base {
       this.mongooseSchema,
     );
     if (!mongoose.connection.readyState) {
-      //do not connect on test
+      // do not connect on test
       mongoose
         .connect(this.app.getConfig('mongo').connectionString, {
           useNewUrlParser: true,
@@ -36,6 +36,9 @@ class AbstractModel extends Base {
   static get loggerGroup() {
     return 'model';
   }
-  initHooks() {}
+
+  initHooks() {
+    this.logger.verbose("Model have no hooks")
+  }
 }
 module.exports = AbstractModel;

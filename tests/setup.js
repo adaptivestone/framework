@@ -1,3 +1,4 @@
+/* eslint-disable jest/require-top-level-describe */
 const MongodbMemoryServer = require('mongodb-memory-server').MongoMemoryServer;
 const mongoose = require('mongoose');
 
@@ -6,9 +7,7 @@ let mongoMemoryServerInstance;
 const path = require('path');
 const Server = require('../server');
 
-// eslint-disable-next-line no-undef
 beforeAll(async () => {
-  // eslint-disable-next-line no-undef
   jest.setTimeout(50000);
   mongoMemoryServerInstance = new MongodbMemoryServer();
   process.env.LOG_LEVEL = 'error';
@@ -47,10 +46,10 @@ beforeAll(async () => {
   await global.server.startServer();
 });
 
-// eslint-disable-next-line no-undef
 afterAll(async () => {
-  // eslint-disable-next-line no-unused-expressions
-  global.server && global.server.app.httpServer.die();
+  if (global.server) {
+    global.server.app.httpServer.die();
+  }
   setTimeout(async () => {
     await mongoose.disconnect();
     await mongoMemoryServerInstance.stop();

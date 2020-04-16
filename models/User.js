@@ -1,6 +1,6 @@
-'use strict';
-const AbstractModel = require('./../modules/AbstractModel');
 const bcrypt = require('bcrypt');
+
+const AbstractModel = require('../modules/AbstractModel');
 
 const Mailer = require('../services/messaging').email;
 
@@ -20,6 +20,7 @@ class User extends AbstractModel {
     });
   }
 
+  // eslint-disable-next-line class-methods-use-this
   get modelSchema() {
     return {
       avatar: {
@@ -58,11 +59,11 @@ class User extends AbstractModel {
   }
 
   static async getUserByEmailAndPassword(email, password) {
-    let data = await this.findOne({ email: email });
+    const data = await this.findOne({ email });
     if (!data) {
       return false;
     }
-    let same = await bcrypt.compare(
+    const same = await bcrypt.compare(
       password + data.constructor.getSuper().someSecretSalt,
       data.password,
     );
@@ -74,15 +75,15 @@ class User extends AbstractModel {
   }
 
   async generateToken() {
-    let timestamp = new Date();
+    const timestamp = new Date();
     timestamp.setDate(timestamp.getDate() + 30);
-    let token = await bcrypt.hash(
+    const token = await bcrypt.hash(
       this.email + Date.now(),
       this.constructor.getSuper().saltRounds,
     );
-    this.sessionTokens.push({ token: token, valid: timestamp });
+    this.sessionTokens.push({ token, valid: timestamp });
     await this.save();
-    return { token: token, valid: timestamp };
+    return { token, valid: timestamp };
   }
 
   getPublic() {
@@ -98,30 +99,29 @@ class User extends AbstractModel {
   }
 
   static async hashPassword(password) {
-    return await bcrypt.hash(
+    return bcrypt.hash(
       password + this.getSuper().someSecretSalt,
       this.getSuper().saltRounds,
     );
   }
 
   static async getUserByToken(token) {
-    let data = await this.findOne({ 'sessionTokens.token': token });
+    const data = await this.findOne({ 'sessionTokens.token': token });
     return data || false;
   }
 
-  static getUserByEmail(email) {
-    return new Promise(async (resolve, reject) => {
-      let data = await this.findOne({ email: email });
-      if (!data) {
-        return resolve(false);
-      }
-      return resolve(data);
-    });
+  static async getUserByEmail(email) {
+    const data = await this.findOne({ email });
+    if (!data) {
+      return false;
+    }
+    return data;
   }
+
   static async generateUserPasswordRecoveryToken(userMongoose) {
-    let date = new Date();
+    const date = new Date();
     date.setDate(date.getDate() + 14);
-    let token = await bcrypt.hash(
+    const token = await bcrypt.hash(
       userMongoose.email + Date.now(),
       userMongoose.constructor.getSuper().saltRounds,
     );
@@ -136,11 +136,12 @@ class User extends AbstractModel {
       token: token,
     });
     await userMongoose.save();
-    return { token: token, until: date.getTime() };
+    return { token, until: date.getTime() };
   }
+
   static getUserByPasswordRecoveryToken(passwordRecoveryToken) {
     return new Promise(async (resolve, reject) => {
-      let data = await this.findOne({
+      const data = await this.findOne({
         passwordRecoveryTokens: {
           $elemMatch: { token: passwordRecoveryToken },
         },
@@ -149,7 +150,7 @@ class User extends AbstractModel {
         reject(false);
         return;
       }
-      //TODO token expiration and remove that token
+      // TODO token expiration and remove that token
 
       data.passwordRecoveryTokens.pop();
 
@@ -157,8 +158,9 @@ class User extends AbstractModel {
       resolve(data);
     });
   }
+
   async sendPasswordRecoveryEmail(i18n) {
-    let passwordRecoveryToken = await User.generateUserPasswordRecoveryToken(
+    const passwordRecoveryToken = await User.generateUserPasswordRecoveryToken(
       this,
     );
     const mail = new Mailer(
@@ -172,10 +174,11 @@ class User extends AbstractModel {
     );
     return mail.send(this.email);
   }
+
   static async generateUserVerificationToken(userMongoose) {
-    let date = new Date();
+    const date = new Date();
     date.setDate(date.getDate() + 14);
-    let token = await bcrypt.hash(
+    const token = await bcrypt.hash(
       userMongoose.email + Date.now(),
       userMongoose.constructor.getSuper().saltRounds,
     );
@@ -187,22 +190,22 @@ class User extends AbstractModel {
     userMongoose.verificationTokens = [];
     userMongoose.verificationTokens.push({
       until: date,
-      token: token,
+      token,
     });
     userMongoose.save();
-    return { token: token, until: date.getTime() };
+    return { token, until: date.getTime() };
   }
 
   static getUserByVerificationToken(verificationToken) {
     return new Promise(async (resolve, reject) => {
-      let data = await this.findOne({
+      const data = await this.findOne({
         verificationTokens: { $elemMatch: { token: verificationToken } },
       });
       if (!data) {
         reject(false);
         return;
       }
-      //TODO token expiration and remove that token
+      // TODO token expiration and remove that token
 
       data.verificationTokens.pop();
 
@@ -219,7 +222,7 @@ class User extends AbstractModel {
   }
 
   async sendVerificationEmail(i18n) {
-    let verificationToken = await User.generateUserVerificationToken(this);
+    const verificationToken = await User.generateUserVerificationToken(this);
     const mail = new Mailer(
       this.constructor.getSuper().app,
       'verification',
