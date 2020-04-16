@@ -1,4 +1,3 @@
-'use strict';
 require('dotenv').config();
 const HttpServer = require('./services/http/HttpServer');
 const WebSocket = require('./services/connectors/socket');
