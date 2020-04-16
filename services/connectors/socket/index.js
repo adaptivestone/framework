@@ -1,4 +1,3 @@
-'use strict';
 const Socketio = require('socket.io');
 const AbstractConnector = require('../../../modules/AbstractConnector');
 

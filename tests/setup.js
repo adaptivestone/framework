@@ -4,14 +4,16 @@ const mongoose = require('mongoose');
 let mongoMemoryServerInstance;
 
 const path = require('path');
+const Server = require('../server');
 
+// eslint-disable-next-line no-undef
 beforeAll(async () => {
+  // eslint-disable-next-line no-undef
   jest.setTimeout(50000);
   mongoMemoryServerInstance = new MongodbMemoryServer();
   process.env.LOG_LEVEL = 'error';
 
-  let connectionStringMongo = await mongoMemoryServerInstance.getConnectionString();
-  let Server = require('../server');
+  const connectionStringMongo = await mongoMemoryServerInstance.getConnectionString();
   global.server = new Server({
     folders: {
       config: process.env.TEST_FOLDER_CONFIG || path.resolve('./config'),
@@ -31,8 +33,8 @@ beforeAll(async () => {
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
 
-  let User = global.server.app.getModel('User');
-  user = await User.create({
+  const User = global.server.app.getModel('User');
+  const user = await User.create({
     email: 'test@test.com',
     password: 'testPassword',
     isVerified: true,
@@ -45,7 +47,9 @@ beforeAll(async () => {
   await global.server.startServer();
 });
 
+// eslint-disable-next-line no-undef
 afterAll(async () => {
+  // eslint-disable-next-line no-unused-expressions
   global.server && global.server.app.httpServer.die();
   setTimeout(async () => {
     await mongoose.disconnect();

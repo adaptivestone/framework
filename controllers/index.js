@@ -13,7 +13,7 @@ class ControllerManager extends Base {
       fs.readdir(folderConfig.folders.controllers),
     ]);
 
-    let filterIndexFile = (controller) => {
+     const filterIndexFile = (controller) => {
       return (
         controller[0] === controller[0].toUpperCase() &&
         controller[0] !== '.' &&
