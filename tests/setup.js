@@ -10,7 +10,7 @@ const Server = require('../server');
 beforeAll(async () => {
   jest.setTimeout(50000);
   mongoMemoryServerInstance = new MongodbMemoryServer();
-  process.env.LOG_LEVEL = 'error';
+  process.env.LOGGER_CONSOLE_LEVEL = 'error';
 
   const connectionStringMongo = await mongoMemoryServerInstance.getConnectionString();
   global.server = new Server({

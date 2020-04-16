@@ -3,7 +3,7 @@ const request = require('supertest');
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 
-describe('autentification', () => {
+describe('auth', () => {
   describe('registration', () => {
     it('code NOT able to create user with wrong email', async () => {
       expect.assertions(1);

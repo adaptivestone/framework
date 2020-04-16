@@ -1,5 +1,3 @@
-'use strict';
-
 const AbstractMiddleware = require('./AbstractMiddleware');
 
 class GetUserByToken extends AbstractMiddleware {
