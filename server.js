@@ -22,10 +22,10 @@ class Server {
   async startServer() {
     this.addErrorHandling();
 
-    //TODO config
+    // TODO config
     this.app.httpServer = new HttpServer(this.app, this.config);
 
-    //TODO config
+    // TODO config
     this.app.webSocket = new WebSocket(this.app);
 
     this.app.controllerManager = new ControllerManager(this.app);

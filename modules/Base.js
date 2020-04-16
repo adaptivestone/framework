@@ -1,4 +1,6 @@
+/* eslint-disable no-underscore-dangle */
 const winston = require('winston');
+
 class Base {
   constructor(app) {
     this.app = app;
@@ -18,7 +20,7 @@ class Base {
   }
 
   getLogger(label) {
-    let alignColorsAndTime = winston.format.combine(
+    const alignColorsAndTime = winston.format.combine(
       winston.format.colorize({
         all: true,
       }),
@@ -32,11 +34,10 @@ class Base {
       ),
     );
 
-    let logConfig = this.app.getConfig('log');
+    const logConfig = this.app.getConfig('log');
 
-    let logger;
-    let transports = [];
-    for (let log of logConfig) {
+    const transports = [];
+    for (const log of logConfig) {
       if (log.enable) {
         if (log.transport === 'console') {
           transports.push(
@@ -49,17 +50,17 @@ class Base {
             }),
           );
         } else {
-          let tr = require(log.transport);
-          transports.push(new tr(log.transportOptions));
+          const Tr = require(log.transport);
+          transports.push(new Tr(log.transportOptions));
         }
       }
     }
-    logger = new winston.createLogger({
-      level: 'silly',
-      transports: transports,
-    });
 
-    return logger;
+
+    return new winston.createLogger({
+      level: 'silly',
+      transports,
+    });;
   }
 
   static get loggerGroup() {

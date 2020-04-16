@@ -1,5 +1,3 @@
-'use strict';
-
 const Base = require('../../../modules/Base');
 
 class AbstractMiddleware extends Base {

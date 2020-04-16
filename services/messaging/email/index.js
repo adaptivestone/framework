@@ -1,11 +1,12 @@
-'use strict';
 const fs = require('fs');
 const EmailTemplate = require('email-templates');
 const nodemailer = require('nodemailer');
+const sendMail = require('nodemailer-sendmail-transport');
+const stub = require('nodemailer-stub-transport');
 
 const mailTransports = {
-  sendMail: require('nodemailer-sendmail-transport'),
-  stub: require('nodemailer-stub-transport'),
+  sendMail ,
+  stub,
   smtp: (data) => data,
 };
 const path = require('path');
@@ -19,11 +20,11 @@ class Mail extends Base {
     if (!path.isAbsolute(template)) {
       if (
         fs.existsSync(
-          this.app.foldersConfig.emails + '/' + path.basename(template),
+          `${this.app.foldersConfig.emails}/${path.basename(template)}`,
         )
       ) {
         this.template =
-          this.app.foldersConfig.emails + '/' + path.basename(template);
+        `${this.app.foldersConfig.emails}/${path.basename(template)}`;
       } else if (
         fs.existsSync(__dirname + '/templates/' + path.basename(template))
       ) {
@@ -47,41 +48,40 @@ class Mail extends Base {
   async send(to, from) {
     const mailConfig = this.app.getConfig('mail');
     if (!from) {
+      // eslint-disable-next-line no-param-reassign
       from = mailConfig.from;
     }
-    const siteDomain = this.app.getConfig('http').siteDomain;
-    let transportConfig = mailConfig.transports[mailConfig.transport];
-    let transport = mailTransports[mailConfig.transport];
-    let transporter = nodemailer.createTransport(transport(transportConfig));
+    const {siteDomain} = this.app.getConfig('http');
+    const transportConfig = mailConfig.transports[mailConfig.transport];
+    const transport = mailTransports[mailConfig.transport];
+    const transporter = nodemailer.createTransport(transport(transportConfig));
 
     const email = new EmailTemplate({
       message: {
-        from: from,
+        from,
       },
       send: true,
       preview: false,
       transport: transporter,
     });
 
-    return await email.send({
+    return email.send({
       template: this.template,
       message: {
-        to: to,
+        to,
       },
-      locals: Object.assign(
-        {
-          locale: this.locale,
+      locals: {
+        locale: this.locale,
           serverDomain: mailConfig.myDomain,
-          siteDomain: siteDomain,
+          siteDomain,
           t: this.i18n.t.bind(this.i18n),
-        },
-        this.templateData,
-      ),
+        ...this.templateData,
+      },
     });
   }
 
   render() {
-    //TODO for debug
+    // TODO for debug
   }
 
   static get loggerGroup() {

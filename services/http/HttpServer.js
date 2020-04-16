@@ -1,6 +1,6 @@
-'use strict';
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
@@ -17,7 +17,7 @@ class HttpServer extends Base {
     this.express = express();
     this.express.set('views', [
       folderConfig.folders.views,
-      __dirname + '/../../views',
+      path.join(__dirname, '../../views'),
     ]);
     this.express.set('view engine', 'pug');
     this.express.use((req, res, next) => {
@@ -31,22 +31,24 @@ class HttpServer extends Base {
       cors({
         origin: httpConfig.corsDomains,
       }),
-    ); //todo whitelist
+    ); // todo whitelist
     this.express.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
     this.express.use(bodyParser.json({ limit: '50mb' }));
     this.express.use(express.static(folderConfig.folders.public));
     this.express.use(express.static('./public'));
 
+    // As exprress will check numbersof arguments
+    // eslint-disable-next-line no-unused-vars
     this.express.use((err, req, res, next) => {
-      //error handling
+      // error handling
       console.error(err.stack);
-      //TODO
+      // TODO
       res.status(500).send('Something broke!');
     });
 
     this.httpServer = http.Server(this.express);
 
-    let listener = this.httpServer.listen(
+    const listener = this.httpServer.listen(
       httpConfig.port,
       httpConfig.hostname,
       () => {
@@ -54,28 +56,31 @@ class HttpServer extends Base {
           `App started and listening on port ${listener.address().port}`,
         );
         if (listener.address().port !== httpConfig.port) {
-          //in case we using port 0
+          // in case we using port 0
           this.app.updateConfig('http', { port: listener.address().port });
           this.logger.info(`Updating http config to use new port`);
         }
       },
     );
   }
+
   enableI18N(folderConfig) {
-    let I18NConfig = this.app.getConfig('i18n');
+    const I18NConfig = this.app.getConfig('i18n');
     if (!I18NConfig.enabled) {
       return;
     }
-    let lngDetector = new i18nextMiddleware.LanguageDetector();
+    const lngDetector = new i18nextMiddleware.LanguageDetector();
     lngDetector.addDetector({
       name: 'xLang',
-      lookup: function (req, res, options) {
-        let lng = req.get('X-Lang');
+      // eslint-disable-next-line no-unused-vars
+      lookup: (req, res, options) => {
+        const lng = req.get('X-Lang');
         if (lng) {
           return lng;
         }
       },
-      cacheUserLanguage: function (req, res, lng, options) {},
+      // eslint-disable-next-line no-unused-vars
+      cacheUserLanguage: (req, res, lng, options) => {},
     });
     this.logger.info('Enabling i18n support');
     i18next
@@ -88,14 +93,13 @@ class HttpServer extends Base {
             //  BackendFS,
           ],
           backendOptions: [
-            //{
+            // {
             //  loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
             //   addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
             // },
             {
-              loadPath: folderConfig.folders.locales + '/{{lng}}/{{ns}}.json',
-              addPath:
-                folderConfig.folders.locales + '/{{lng}}/{{ns}}.missing.json',
+              loadPath: `${folderConfig.folders.locales}/{{lng}}/{{ns}}.json`,
+              addPath: `${folderConfig.folders.locales}/{{lng}}/{{ns}}.missing.json`,
             },
           ],
         },
@@ -104,13 +108,13 @@ class HttpServer extends Base {
         saveMissing: true,
         debug: false,
         detection: {
-          //caches: ['cookie'],
+          // caches: ['cookie'],
           order: ['xLang'],
         },
       });
     this.express.use(i18nextMiddleware.handle(i18next));
     this.express.use(function (req, res, next) {
-      //fix ru-Ru, en-US, etc
+      // f ix ru-Ru, en-US, etc
       if (res.locals.language.length !== 2) {
         res.locals.language = res.locals.language.split('-')[0];
       }
@@ -120,7 +124,7 @@ class HttpServer extends Base {
 
   add404Page() {
     this.express.use((req, res, next) => {
-      //error handling
+      // error handling
       res.status(404).render('404');
     });
   }

@@ -34,14 +34,14 @@ class WebSocket extends AbstractConnector {
         data,
       )}'`,
     );
-    let users = await this.getSocketsByUsers(to);
-    for (let user of users) {
+    const users = await this.getSocketsByUsers(to);
+    for (const user of users) {
       // this.logger.info(`emmit data to user ${user}`);
       user.emit(type, data);
     }
   }
 
-  /***
+  /**
    * Get connected users
    * @param ids array|string
    * @returns [<sockets>]

@@ -1,30 +1,33 @@
-'use strict';
+/* eslint-disable no-restricted-syntax */
+/* eslint-disable guard-for-in */
 const express = require('express');
+const validator = require('validator');
+
 const Base = require('./Base');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
 
-const validator = require('validator');
 
 class AbstractController extends Base {
   constructor(app) {
     super(app);
     this.router = express.Router();
-    let routes = this.routes;
-    let controllerName = this.constructor.name;
+    const {routes} = this;
+    const controllerName = this.constructor.name;
+    // eslint-disable-next-line prefer-const
     for (let [path, middleware] of this.constructor.middleware) {
       if (!Array.isArray(middleware)) {
         middleware = [middleware];
       }
-      for (let m of middleware) {
-        this.router.use(path, new m(this.app).getMiddleware());
+      for (const M of middleware) {
+        this.router.use(path, new M(this.app).getMiddleware());
       }
     }
 
-    for (let verb in routes) {
+    for (const verb in routes) {
       if (this.router[verb]) {
-        for (let path in routes[verb]) {
+        for (const path in routes[verb]) {
           let fn = routes[verb][path];
           if (typeof fn === 'string') {
             fn = this[fn];
@@ -44,20 +47,20 @@ class AbstractController extends Base {
     }
     let path = '/';
     if (this.constructor.isUseControllerNameForRouting) {
-      path = '/' + controllerName.toLowerCase();
+      path = `/${controllerName.toLowerCase()}`;
     }
     this.app.httpServer.express.use(path, this.router);
     this.app.controllers[controllerName.toLowerCase()] = this;
   }
 
   validate(obj, rules) {
-    let errors = {};
-    for (let name in rules) {
+    const errors = {};
+    for (const name in rules) {
       let validationResult = false;
       if (typeof rules[name][0] === 'function') {
         validationResult = rules[name][0](obj[name]);
       } else if (typeof validator[rules[name][0]] === 'function') {
-        //use from validator then
+        // use from validator then
         validationResult = validator[rules[name][0]](obj[name]);
       } else {
         this.logger.warn(
@@ -74,9 +77,11 @@ class AbstractController extends Base {
     }
     return errors;
   }
+
   static get loggerGroup() {
     return 'controller';
   }
+
   static get middleware() {
     return new Map([['/', [PrepareAppInfo, GetUserByToken, Auth]]]);
   }
