@@ -33,7 +33,7 @@ beforeAll(async () => {
   global.server.updateConfig('mail', { transport: 'stub' });
 
   const User = global.server.app.getModel('User');
-  const user = await User.create({
+  global.user = await User.create({
     email: 'test@test.com',
     password: 'testPassword',
     isVerified: true,
@@ -41,7 +41,7 @@ beforeAll(async () => {
       nick: 'testUserNickName',
     },
   });
-  global.authToken = await user.generateToken();
+  global.authToken = await global.user.generateToken();
 
   await global.server.startServer();
 });

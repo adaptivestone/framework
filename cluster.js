@@ -12,10 +12,11 @@ if (cluster.isMaster) {
   cluster.on('exit', (worker, code, signal) => {
     // eslint-disable-next-line no-console
     console.log(
-      `Worker \x1B[45m'
-        ${worker.process.pid}
-        '\x1B[49m \x1B[41m †††† died †††† \x1B[49m. Code:'
-        ${signal || code}. Restarting...`,
+      `Worker \x1B[45m ${
+        worker.process.pid
+      } \x1B[49m \x1B[41m †††† died †††† \x1B[49m. Code: ${
+        signal || code
+      }. Restarting...`,
     );
     cluster.fork();
   });
