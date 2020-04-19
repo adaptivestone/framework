@@ -11,6 +11,9 @@ const Backend = require('i18next-chained-backend');
 
 const Base = require('../../modules/Base');
 
+/**
+ * HTTP server based on Express
+ */
 class HttpServer extends Base {
   constructor(app, folderConfig) {
     super(app);
@@ -55,15 +58,27 @@ class HttpServer extends Base {
         this.logger.info(
           `App started and listening on port ${listener.address().port}`,
         );
-        if (listener.address().port !== httpConfig.port) {
+        if (+listener.address().port !== +httpConfig.port) {
           // in case we using port 0
           this.app.updateConfig('http', { port: listener.address().port });
-          this.logger.info(`Updating http config to use new port`);
+          this.logger.info(`Updating http config to use new port ${listener.address().port}. Old was ${httpConfig.port} `);
         }
       },
     );
   }
 
+  /**
+   *  Enable support for i18n
+   * @param {object} folderConfig config
+   * @param {object} folderConfig.folders folder config
+   * @param {string} folderConfig.folders.config path to folder with config files
+   * @param {string} folderConfig.folders.models path to folder with moidels files
+   * @param {string} folderConfig.folders.controllers path to folder with controllers files
+   * @param {string} folderConfig.folders.views path to folder with view files
+   * @param {string} folderConfig.folders.public path to folder with public files
+   * @param {string} folderConfig.folders.locales path to folder with locales files
+   * @param {string} folderConfig.folders.emails path to folder with emails files
+   */
   enableI18N(folderConfig) {
     const I18NConfig = this.app.getConfig('i18n');
     if (!I18NConfig.enabled) {
@@ -113,15 +128,18 @@ class HttpServer extends Base {
         },
       });
     this.express.use(i18nextMiddleware.handle(i18next));
-    this.express.use(function (req, res, next) {
+    this.express.use( (req, res, next) => {
       // f ix ru-Ru, en-US, etc
       if (res.locals.language.length !== 2) {
-        res.locals.language = res.locals.language.split('-')[0];
+        [res.locals.language] = res.locals.language.split('-');
       }
       next();
     });
   }
 
+  /**
+   * Add handle for 404 error
+   */
   add404Page() {
     this.express.use((req, res, next) => {
       // error handling
@@ -133,8 +151,12 @@ class HttpServer extends Base {
     return 'service';
   }
 
+  /**
+   * Stop http server (mostly for unit testing)
+   */
   die() {
     this.httpServer.close();
   }
 }
+
 module.exports = HttpServer;

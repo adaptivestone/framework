@@ -2,6 +2,9 @@
 const winston = require('winston');
 
 class Base {
+  /**
+   * @param {import('../Server')} app  //TODO change to *.d.ts as this is a Server, not app
+   */
   constructor(app) {
     this.app = app;
     this._realLogger = null;
@@ -19,6 +22,10 @@ class Base {
     return this._realLogger;
   }
 
+  /**
+   * Get winston loger for given label
+   * @param {sting} label name of logger
+   */
   getLogger(label) {
     const alignColorsAndTime = winston.format.combine(
       winston.format.colorize({
@@ -50,6 +57,7 @@ class Base {
             }),
           );
         } else {
+          // eslint-disable-next-line global-require, import/no-dynamic-require
           const Tr = require(log.transport);
           transports.push(new Tr(log.transportOptions));
         }
@@ -57,12 +65,15 @@ class Base {
     }
 
 
-    return new winston.createLogger({
+    return winston.createLogger({
       level: 'silly',
       transports,
     });;
   }
 
+  /**
+   * Return logger group. Just to have all logs groupped logically
+   */
   static get loggerGroup() {
     return 'Base_please_overwrite_';
   }
