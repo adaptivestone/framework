@@ -1,12 +1,21 @@
 const fs = require('fs').promises;
 const Base = require('../modules/Base');
 
+/**
+ * Class do autoloading a http comntrollers
+ */
 class ControllerManager extends Base {
   constructor(app) {
     super(app);
     this.app.controllers = {};
   }
 
+  /**
+   * Load controllers
+   * @param {object} folderConfig
+   * @param {object} folderConfig.folders  server folder config
+   * @param {string} folderConfig.controllers  controller folder path
+   */
   async initControllers(folderConfig) {
     let [internalFiles, externalFiles] = await Promise.all([
       fs.readdir(__dirname),
@@ -23,23 +32,26 @@ class ControllerManager extends Base {
 
     internalFiles = internalFiles.filter(filterIndexFile);
     externalFiles = externalFiles.filter(filterIndexFile);
+    const controllersToLoad = [];
     for (const file of internalFiles) {
       if (externalFiles.includes(file)) {
         this.logger.verbose(
           `Skipping register INTERNAL controller ${file} as it override by EXTERNAL ONE`,
         );
       } else {
-        const controllerModule = require(__dirname + '/' + file);
-        new controllerModule(this.app);
+        controllersToLoad.push(`${__dirname}/${file}`);
       }
-
     }
 
     for (const file of externalFiles) {
-      let controllerModule = require(folderConfig.folders.controllers +
-        '/' +
-        file);
-      new controllerModule(this.app);
+      controllersToLoad.push(`${folderConfig.folders.controllers}/${file}`);
+    }
+
+    for (const controller of controllersToLoad) {
+      // eslint-disable-next-line global-require, import/no-dynamic-require
+      const ControllerModule = require(controller);
+      const contollerName = ControllerModule.constructor.name.toLowerCase();
+      this.app.controllers[contollerName] = new ControllerModule(this.app);
     }
   }
 

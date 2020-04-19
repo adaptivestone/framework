@@ -50,7 +50,6 @@ class AbstractController extends Base {
       path = `/${controllerName.toLowerCase()}`;
     }
     this.app.httpServer.express.use(path, this.router);
-    this.app.controllers[controllerName.toLowerCase()] = this;
   }
 
   validate(obj, rules) {
