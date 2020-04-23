@@ -1,3 +1,6 @@
+#### 1.2.7
+Add abilty to return error from custom validation functions
+
 #### 1.2.6
 Validator documentation (jsdoc) update
 Validator support pass parameneters to validator

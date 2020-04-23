@@ -62,6 +62,7 @@ class AbstractController extends Base {
     /**
    * Internal validation method for params validation.
    * You can pass own function or use validator.js functions
+   * From own function you can return a bool then will be treater as rule pass or not. At that case error message will be used from default error. But you also can provide error as output. Where only one arrya element will be an error message
    * @param {object} obj object with params to validate
    * @param {object} rules validation rules. rule name should match parameter name
    * @example
@@ -101,6 +102,10 @@ class AbstractController extends Base {
       let validationResult = false;
       if (typeof rules[name][0] === 'function') {
         validationResult = rules[name][0](obj[name]);
+        if ( Object.prototype.toString.call(validationResult) === '[object Array]'){
+          [errors[name]] = validationResult;
+          validationResult = false;
+        }
       } else if (typeof validator[rules[name][0]] === 'function') {
         // use from validator then
         validationResult = validator[rules[name][0]](obj[name]);
@@ -119,7 +124,7 @@ class AbstractController extends Base {
         );
         validationResult = !!obj[name];
       }
-      if (!validationResult) {
+      if (!validationResult && ! errors[name]) {
         [,errors[name]] = rules[name];
       }
     }
