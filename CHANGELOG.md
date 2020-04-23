@@ -1,3 +1,7 @@
+#### 1.2.6
+Validator documentation (jsdoc) update
+Validator support pass parameneters to validator
+
 #### 1.2.5
 Fix problem with test (user should be global on tests)
 
