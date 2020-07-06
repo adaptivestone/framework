@@ -5,7 +5,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const i18next = require('i18next');
-const i18nextMiddleware = require('i18next-express-middleware');
+const i18nextMiddleware = require('i18next-http-middleware');
 const BackendFS = require('i18next-node-fs-backend');
 const Backend = require('i18next-chained-backend');
 

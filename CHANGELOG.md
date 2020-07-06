@@ -1,3 +1,7 @@
+
+#### 1.2.8
+Update deps 
+
 #### 1.2.7
 Add abilty to return error from custom validation functions
 
