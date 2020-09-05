@@ -1,3 +1,6 @@
+#### 1.3.0
+Models now support optional callback that will executed on connection ready. If mongo already connected then callback will be executed immediately 
+
 #### 1.2.9
 Update deps 
 

@@ -2,7 +2,11 @@ const mongoose = require('mongoose');
 const Base = require('./Base');
 
 class AbstractModel extends Base {
-  constructor(app) {
+    /**
+   * @param {import('../Server')} app  //TODO change to *.d.ts as this is a Server, not app
+   * @param function callback optional callback when connection ready
+   */
+  constructor(app, callback = ()=>{}) {
     super(app);
     this.mongooseSchema = mongoose.Schema(this.modelSchema);
     this.mongooseSchema.set('timestamps', true);
@@ -25,11 +29,14 @@ class AbstractModel extends Base {
         .then(
           () => {
             this.logger.info('Mongo connection success');
+            callback();
           },
           (error) => {
             this.logger.error("Can't install mongodb connection", error);
           },
         );
+    } else {
+      callback();
     }
   }
 
