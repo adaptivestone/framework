@@ -36,9 +36,10 @@ class Server {
 
   /**
    * Start server (http + websocket + init all http and websocet ralated functions)
+   * @param <Promise>callbackBefore404 code that should be executed before adding page 404
    * @returns {Promise}
    */
-  async startServer() {
+  async startServer(callbackBefore404 = async ()=> Promise.resolve()) {
     this.addErrorHandling();
 
     // TODO config
@@ -50,6 +51,7 @@ class Server {
     this.app.controllerManager = new ControllerManager(this.app);
 
     await this.app.controllerManager.initControllers(this.config);
+    await callbackBefore404();
     this.app.httpServer.add404Page();
   }
 
