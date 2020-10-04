@@ -1,5 +1,8 @@
+#### 2.0.0
+[BREAKING] Change config format of log config. Now configs can be only objects
+
 #### 1.5.0
-[NEW] Support for enviroument configs (config.js and config.{NODE_ENV}.js) with ovewrite
+[NEW] Support for environment configs (config.js and config.{NODE_ENV}.js) with ovewrite
 [UPDATE] deps update
 
 #### 1.4.0

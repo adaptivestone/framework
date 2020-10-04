@@ -41,7 +41,7 @@ class Base {
       ),
     );
 
-    const logConfig = this.app.getConfig('log');
+    const logConfig = this.app.getConfig('log').transports;
 
     const transports = [];
     for (const log of logConfig) {

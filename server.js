@@ -79,7 +79,7 @@ class Server {
    * Support cache and updating confing into cache
    * Also will update config based on NODE_ENV. If config.js and config.production.js
    * and NODE_ENV is production then we will load base config (config.js) and the load
-   * enviroument config (config.production.js) and overwrite base config options
+   * environment config (config.production.js) and overwrite base config options
    * @see updateConfig
    * @param {String} configName name on config file to load
    * @returns {Object} config object. Structure depends of config file
@@ -88,10 +88,11 @@ class Server {
     if (!this.cache.configs.has(configName)) {
       let envConfig = {};
       if (process.env.NODE_ENV) {
-        envConfig = this.getFileWithExtendingInhirence(
-          'config',
-          `${configName}.${process.env.NODE_ENV}.js`,
-        ) || envConfig;
+        envConfig =
+          this.getFileWithExtendingInhirence(
+            'config',
+            `${configName}.${process.env.NODE_ENV}.js`,
+          ) || envConfig;
       }
 
       this.cache.configs.set(
@@ -145,8 +146,10 @@ class Server {
     } catch (e) {
       try {
         file = require(`./${fileType}/${fileName}`);
-      } catch (e2){
-        console.warn(`Config for enviroument not found '${fileName}'. This is a normal`)
+      } catch (e2) {
+        console.warn(
+          `Config not found '${fileName}'. This can be a normal (in case this an environment config)`,
+        );
         file = false;
       }
     }

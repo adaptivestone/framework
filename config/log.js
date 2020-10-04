@@ -1,17 +1,19 @@
-module.exports = [
-  {
-    transport: 'winston-sentry-log',
-    transportOptions: {
-      dsn: process.env.SENTRY_DSN,
-      level: 'info',
+module.exports = {
+  transports: [
+    {
+      transport: 'winston-sentry-log',
+      transportOptions: {
+        dsn: process.env.SENTRY_DSN,
+        level: 'info',
+      },
+      enable: process.env.LOGGER_SENTRY_ENABLE || false,
     },
-    enable: process.env.LOGGER_SENTRY_ENABLE || false,
-  },
-  {
-    transport: 'console',
-    transportOptions: {
-      level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
+    {
+      transport: 'console',
+      transportOptions: {
+        level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
+      },
+      enable: true,
     },
-    enable: true,
-  },
-];
+  ],
+};
