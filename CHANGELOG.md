@@ -1,5 +1,9 @@
+#### 1.5.0
+[NEW] Support for enviroument configs (config.js and config.{NODE_ENV}.js) with ovewrite
+[UPDATE] deps update
+
 #### 1.4.0
-Abitily to pass additiona parameter to server that will be executed before adding page 404
+Abitily to pass additional parameter to server that will be executed before adding page 404
 
 #### 1.3.0
 Models now support optional callback that will executed on connection ready. If mongo already connected then callback will be executed immediately 

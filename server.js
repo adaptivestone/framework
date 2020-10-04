@@ -1,4 +1,6 @@
 require('dotenv').config();
+const merge = require('deepmerge');
+
 const HttpServer = require('./services/http/HttpServer');
 const WebSocket = require('./services/connectors/socket');
 const ControllerManager = require('./controllers/index');
@@ -39,7 +41,7 @@ class Server {
    * @param <Promise>callbackBefore404 code that should be executed before adding page 404
    * @returns {Promise}
    */
-  async startServer(callbackBefore404 = async ()=> Promise.resolve()) {
+  async startServer(callbackBefore404 = async () => Promise.resolve()) {
     this.addErrorHandling();
 
     // TODO config
@@ -75,15 +77,29 @@ class Server {
   /**
    * Return config from {configName} (file name) on config folder.
    * Support cache and updating confing into cache
+   * Also will update config based on NODE_ENV. If config.js and config.production.js
+   * and NODE_ENV is production then we will load base config (config.js) and the load
+   * enviroument config (config.production.js) and overwrite base config options
    * @see updateConfig
    * @param {String} configName name on config file to load
    * @returns {Object} config object. Structure depends of config file
    */
   getConfig(configName) {
     if (!this.cache.configs.has(configName)) {
+      let envConfig = {};
+      if (process.env.NODE_ENV) {
+        envConfig = this.getFileWithExtendingInhirence(
+          'config',
+          `${configName}.${process.env.NODE_ENV}.js`,
+        ) || envConfig;
+      }
+
       this.cache.configs.set(
         configName,
-        this.getFileWithExtendingInhirence('config', configName),
+        merge(
+          this.getFileWithExtendingInhirence('config', configName),
+          envConfig,
+        ),
       );
     }
     return this.cache.configs.get(configName);
@@ -127,7 +143,12 @@ class Server {
     try {
       file = require(this.config.folders[fileType] + '/' + fileName);
     } catch (e) {
-      file = require(`./${fileType}/${fileName}`);
+      try {
+        file = require(`./${fileType}/${fileName}`);
+      } catch (e2){
+        console.warn(`Config for enviroument not found '${fileName}'. This is a normal`)
+        file = false;
+      }
     }
     return file;
   }
