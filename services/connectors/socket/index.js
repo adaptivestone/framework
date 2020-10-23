@@ -4,7 +4,6 @@ const AbstractConnector = require('../../../modules/AbstractConnector');
 class WebSocket extends AbstractConnector {
   constructor(app) {
     super(app);
-    this.app = app;
     this.sockets = [];
     this.io = new Socketio(this.app.httpServer.httpServer, {
       transports: ['websocket', 'polling'],
