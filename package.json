@@ -26,7 +26,7 @@
     "cors": "^2.8.5",
     "deepmerge": "^4.2.2",
     "dotenv": "^8.2.0",
-    "email-templates": "^7.1.1",
+    "email-templates": "^7.1.2",
     "express": "^4.17.1",
     "formidable": "^1.2.2",
     "i18next": "^19.8.2",
@@ -55,7 +55,7 @@
     "lint-staged": "^10.4.1",
     "mongodb-memory-server": "^6.9.2",
     "nodemon": "^2.0.5",
-    "supertest": "^5.0.0"
+    "supertest": "^6.0.0"
   },
   "husky": {
     "hooks": {

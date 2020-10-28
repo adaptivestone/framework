@@ -1,12 +1,15 @@
+#### 2.0.1
+[NEW] Added config to websocket
+
 #### 2.0.0
 [BREAKING] Change config format of log config. Now configs can be only objects
 
 #### 1.5.0
-[NEW] Support for environment configs (config.js and config.{NODE_ENV}.js) with ovewrite
+[NEW] Support for environment configs (config.js and config.{NODE_ENV}.js) with overwrite
 [UPDATE] deps update
 
 #### 1.4.0
-Abitily to pass additional parameter to server that will be executed before adding page 404
+Ability to pass additional parameter to server that will be executed before adding page 404
 
 #### 1.3.0
 Models now support optional callback that will executed on connection ready. If mongo already connected then callback will be executed immediately 
@@ -22,7 +25,7 @@ Add abilty to return error from custom validation functions
 
 #### 1.2.6
 Validator documentation (jsdoc) update
-Validator support pass parameneters to validator
+Validator support pass parameters to validator
 
 #### 1.2.5
 Fix problem with test (user should be global on tests)
