@@ -48,7 +48,9 @@ class Server {
     this.app.httpServer = new HttpServer(this.app, this.config);
 
     // TODO config
-    this.app.webSocket = new WebSocket(this.app);
+    if (this.getConfig('websocket').enabled) {
+      this.app.webSocket = new WebSocket(this.app);
+    }
 
     this.app.controllerManager = new ControllerManager(this.app);
 
@@ -142,9 +144,11 @@ class Server {
   getFileWithExtendingInhirence(fileType, fileName) {
     let file;
     try {
-      file = require(this.config.folders[fileType] + '/' + fileName);
+      // eslint-disable-next-line global-require, import/no-dynamic-require
+      file = require(`${this.config.folders[fileType]}/${fileName}`);
     } catch (e) {
       try {
+        // eslint-disable-next-line global-require, import/no-dynamic-require
         file = require(`./${fileType}/${fileName}`);
       } catch (e2) {
         console.warn(

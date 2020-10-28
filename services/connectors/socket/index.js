@@ -6,7 +6,7 @@ class WebSocket extends AbstractConnector {
     super(app);
     this.sockets = [];
     this.io = new Socketio(this.app.httpServer.httpServer, {
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'], // no polling to avoid handshake problem
     });
     this.io.on('connection', (socket) => {
       socket.on('add_user', async (token) => {
