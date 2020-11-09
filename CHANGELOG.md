@@ -1,3 +1,6 @@
+#### un released
+[UPDATE] socket.io v3
+
 #### 2.0.1
 [NEW] Added config to websocket
 

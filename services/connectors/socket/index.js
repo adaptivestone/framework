@@ -5,7 +5,7 @@ class WebSocket extends AbstractConnector {
   constructor(app) {
     super(app);
     this.sockets = [];
-    this.io = new Socketio(this.app.httpServer.httpServer, {
+    this.io = Socketio(this.app.httpServer.httpServer, {
       transports: ['websocket'], // no polling to avoid handshake problem
     });
     this.io.on('connection', (socket) => {
