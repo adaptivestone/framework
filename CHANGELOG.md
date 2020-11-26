@@ -1,5 +1,6 @@
-#### un released
+#### 2.0.2 released
 [UPDATE] socket.io v3
+[UPDATE] deps update
 
 #### 2.0.1
 [NEW] Added config to websocket
