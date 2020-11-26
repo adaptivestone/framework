@@ -64,11 +64,10 @@ class Base {
       }
     }
 
-
     return winston.createLogger({
       level: 'silly',
       transports,
-    });;
+    });
   }
 
   /**

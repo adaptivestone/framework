@@ -61,7 +61,11 @@ class HttpServer extends Base {
         if (+listener.address().port !== +httpConfig.port) {
           // in case we using port 0
           this.app.updateConfig('http', { port: listener.address().port });
-          this.logger.info(`Updating http config to use new port ${listener.address().port}. Old was ${httpConfig.port} `);
+          this.logger.info(
+            `Updating http config to use new port ${
+              listener.address().port
+            }. Old was ${httpConfig.port} `,
+          );
         }
       },
     );
@@ -93,6 +97,7 @@ class HttpServer extends Base {
         if (lng) {
           return lng;
         }
+        return false;
       },
       // eslint-disable-next-line no-unused-vars
       cacheUserLanguage: (req, res, lng, options) => {},
@@ -128,7 +133,7 @@ class HttpServer extends Base {
         },
       });
     this.express.use(i18nextMiddleware.handle(i18next));
-    this.express.use( (req, res, next) => {
+    this.express.use((req, res, next) => {
       // f ix ru-Ru, en-US, etc
       if (res.locals.language.length !== 2) {
         [res.locals.language] = res.locals.language.split('-');
@@ -141,7 +146,7 @@ class HttpServer extends Base {
    * Add handle for 404 error
    */
   add404Page() {
-    this.express.use((req, res, next) => {
+    this.express.use((req, res) => {
       // error handling
       res.status(404).render('404');
     });

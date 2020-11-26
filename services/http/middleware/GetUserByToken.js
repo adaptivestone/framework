@@ -1,9 +1,8 @@
-
 const AbstractMiddleware = require('./AbstractMiddleware');
 
 class GetUserByToken extends AbstractMiddleware {
   async middleware(req, res, next) {
-    let { token}  = req.body;
+    let { token } = req.body;
     if (!token) {
       token = req.get('Authorization');
       if (!token || token === 'null') {

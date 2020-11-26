@@ -53,8 +53,8 @@ class Auth extends AbstractController {
       .json({ success: true, token: token, user: user.getPublic() });
   }
 
-  async postRegister(req, res, next) {
-    let errors = {};
+  async postRegister(req, res) {
+    const errors = {};
     if (!req.body.email) {
       errors.email = [req.i18n.t('auth.emailProvided')];
     } else if (
@@ -72,9 +72,9 @@ class Auth extends AbstractController {
       errors.password = [req.i18n.t('auth.passwordValid')];
     }
     if (Object.keys(errors).length) {
-      return res.status(400).json({ errors: errors });
+      return res.status(400).json({ errors });
     }
-    let User = req.appInfo.app.getModel('User');
+    const User = req.appInfo.app.getModel('User');
     let user = await User.getUserByEmail(req.body.email);
     if (user) {
       return res.status(400).json({ error: req.i18n.t('email.registered') });
@@ -101,12 +101,12 @@ class Auth extends AbstractController {
     }
   }
 
-  postLogout(req, res, next) {
+  postLogout(req, res) {
     //todo remove token
     return res.status(200).json({ success: true });
   }
 
-  async verifyUser(req, res, next) {
+  async verifyUser(req, res) {
     const User = req.appInfo.app.getModel('User');
     let user;
     try {
@@ -114,12 +114,10 @@ class Auth extends AbstractController {
         req.query.verification_token,
       );
     } catch (e) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          error: req.i18n.t('email.alreadyVerifiedOrWrongToken'),
-        });
+      return res.status(400).json({
+        success: false,
+        error: req.i18n.t('email.alreadyVerifiedOrWrongToken'),
+      });
     }
     this.logger.debug(`Verify user user is :${user}`);
     if (user) {
@@ -128,7 +126,7 @@ class Auth extends AbstractController {
       return res.status(200).json({ success: true });
     }
   }
-  async sendPasswordRecoveryEmail(req, res, next) {
+  async sendPasswordRecoveryEmail(req, res) {
     let User = req.appInfo.app.getModel('User');
     try {
       const user = await User.getUserByEmail(req.body.email);

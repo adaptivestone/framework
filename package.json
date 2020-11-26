@@ -8,8 +8,10 @@
     "url": "https://gitlab.com/adaptivestone/framework"
   },
   "scripts": {
-    "dev": "nodemon ./cluster.js",
-    "test": "jest"
+    "dev": "nodemon ./index.js",
+    "prod": "nodemon ./cluster.js",
+    "test": "jest",
+    "codestyle": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'"
   },
   "jest": {
     "setupFilesAfterEnv": [
@@ -38,6 +40,7 @@
     "nodemailer": "^6.4.16",
     "nodemailer-sendmail-transport": "^1.0.2",
     "nodemailer-stub-transport": "^1.1.0",
+    "prettier": "^2.2.0",
     "pug": "^3.0.0",
     "socket.io": "^3.0.3",
     "validator": "^13.1.17",
@@ -63,7 +66,7 @@
     }
   },
   "lint-staged": {
-    "src/**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
+    "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
       "prettier --write"
     ]
   }

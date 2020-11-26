@@ -1,12 +1,29 @@
 image: node:14
 
 stages:
+  - install
+  - codeStyle
   - test
+
+
+install:
+  stage: install
+  script:
+    - npm i
+  artifacts:
+    paths:
+    -  node_modules/
+    expire_in: 10 day
+
+prettier:
+  stage: codeStyle
+  script:
+    - npm run codestyle
 
 test:
   stage: test
   variables:
    LOGGER_CONSOLE_LEVEL: "error"
   script:
-    - npm i
     - npm test
+

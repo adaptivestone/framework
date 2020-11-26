@@ -5,7 +5,7 @@ const sendMail = require('nodemailer-sendmail-transport');
 const stub = require('nodemailer-stub-transport');
 
 const mailTransports = {
-  sendMail ,
+  sendMail,
   stub,
   smtp: (data) => data,
 };
@@ -23,14 +23,15 @@ class Mail extends Base {
           `${this.app.foldersConfig.emails}/${path.basename(template)}`,
         )
       ) {
-        this.template =
-        `${this.app.foldersConfig.emails}/${path.basename(template)}`;
+        this.template = `${this.app.foldersConfig.emails}/${path.basename(
+          template,
+        )}`;
       } else if (
-        fs.existsSync(__dirname + '/templates/' + path.basename(template))
+        fs.existsSync(`${__dirname}/templates/${path.basename(template)}`)
       ) {
-        this.template = __dirname + '/templates/' + path.basename(template);
+        this.template = `${__dirname}/templates/${path.basename(template)}`;
       } else {
-        this.template = __dirname + '/templates/emptyTemplate';
+        this.template = `${__dirname}/templates/emptyTemplate`;
         this.logger.error('not found');
       }
     }
@@ -51,7 +52,7 @@ class Mail extends Base {
       // eslint-disable-next-line no-param-reassign
       from = mailConfig.from;
     }
-    const {siteDomain} = this.app.getConfig('http');
+    const { siteDomain } = this.app.getConfig('http');
     const transportConfig = mailConfig.transports[mailConfig.transport];
     const transport = mailTransports[mailConfig.transport];
     const transporter = nodemailer.createTransport(transport(transportConfig));
@@ -72,9 +73,9 @@ class Mail extends Base {
       },
       locals: {
         locale: this.locale,
-          serverDomain: mailConfig.myDomain,
-          siteDomain,
-          t: this.i18n.t.bind(this.i18n),
+        serverDomain: mailConfig.myDomain,
+        siteDomain,
+        t: this.i18n.t.bind(this.i18n),
         ...this.templateData,
       },
     });

@@ -2,11 +2,11 @@ const mongoose = require('mongoose');
 const Base = require('./Base');
 
 class AbstractModel extends Base {
-    /**
+  /**
    * @param {import('../Server')} app  //TODO change to *.d.ts as this is a Server, not app
    * @param function callback optional callback when connection ready
    */
-  constructor(app, callback = ()=>{}) {
+  constructor(app, callback = () => {}) {
     super(app);
     this.mongooseSchema = mongoose.Schema(this.modelSchema);
     this.mongooseSchema.set('timestamps', true);
@@ -45,7 +45,7 @@ class AbstractModel extends Base {
   }
 
   initHooks() {
-    this.logger.verbose("Model have no hooks")
+    this.logger.verbose('Model have no hooks');
   }
 }
 module.exports = AbstractModel;
