@@ -1,3 +1,7 @@
+#### 2.1.1
+
+[UPDATE] deps update
+
 #### 2.1.0
 
 [DEV] added codestyle checker
