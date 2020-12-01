@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Base = require('./modules/Base');
 const Server = require('./server');
 
@@ -15,13 +16,11 @@ class Cli extends Base {
       this.server.app.foldersConfig.commands,
     );
 
-    const command = process.argv[2]?.toLocaleLowerCase();
+    const command = process.argv[2]?.toLowerCase();
 
     for (const command of commandsToLoad) {
       const c = command.split('/');
-      this.commands[
-        c[c.length - 1].split('.')[0].toLocaleLowerCase()
-      ] = command;
+      this.commands[c[c.length - 1].split('.')[0].toLowerCase()] = command;
     }
     if (!command) {
       console.log('Please provide command name');
