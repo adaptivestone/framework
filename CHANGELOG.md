@@ -1,6 +1,7 @@
-#### NEXT
+#### 2.1.0
 
 [DEV] added codestyle checker
+[NEW] Initial CLI module
 
 #### 2.0.2 released
 

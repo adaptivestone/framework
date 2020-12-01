@@ -1,4 +1,5 @@
 /* eslint-disable no-underscore-dangle */
+const fs = require('fs').promises;
 const winston = require('winston');
 
 class Base {
@@ -68,6 +69,39 @@ class Base {
       level: 'silly',
       transports,
     });
+  }
+
+  async loadFilesWithInheritance(internalFolder, externalFolder) {
+    let [internalFiles, externalFiles] = await Promise.all([
+      fs.readdir(internalFolder),
+      fs.readdir(externalFolder),
+    ]);
+
+    const filterIndexFile = (fileName) => {
+      return (
+        fileName[0] === fileName[0].toUpperCase() &&
+        fileName[0] !== '.' &&
+        !fileName.includes('.test.js')
+      );
+    };
+
+    internalFiles = internalFiles.filter(filterIndexFile);
+    externalFiles = externalFiles.filter(filterIndexFile);
+    const filesToLoad = [];
+    for (const file of internalFiles) {
+      if (externalFiles.includes(file)) {
+        this.logger.verbose(
+          `Skipping register INTERNAL file ${file} as it override by EXTERNAL ONE`,
+        );
+      } else {
+        filesToLoad.push(`${internalFolder}/${file}`);
+      }
+    }
+
+    for (const file of externalFiles) {
+      filesToLoad.push(`${externalFolder}/${file}`);
+    }
+    return filesToLoad;
   }
 
   /**
