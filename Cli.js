@@ -45,6 +45,7 @@ class Cli extends Base {
     const c = new Command(this.app, this.commands);
 
     await c.run();
+    await mongoose.disconnect();
   }
 }
 

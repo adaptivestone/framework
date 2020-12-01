@@ -1,3 +1,7 @@
+#### 2.1.2
+
+[UPDATE] disconnect of mongoose when command was finished
+
 #### 2.1.1
 
 [UPDATE] deps update
