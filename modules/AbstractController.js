@@ -36,6 +36,9 @@ class AbstractController extends Base {
         for (const path in routes[verb]) {
           let fn = routes[verb][path];
           if (typeof fn === 'string') {
+            this.logger.warn(
+              'Setting routes as string deprecated. Please set it as a function',
+            );
             fn = this[fn];
           }
           if (typeof fn !== 'function') {
@@ -44,8 +47,14 @@ class AbstractController extends Base {
             );
             continue;
           }
+
+          let fnName = routes[verb][path];
+          if (typeof fnName === 'function') {
+            fnName = fnName.name;
+          }
+
           this.logger.verbose(
-            `Controller '${controllerName}' register function '${routes[verb][path]}'  for method '${verb}' and path '${path}'`,
+            `Controller '${controllerName}' register function '${fnName}'  for method '${verb}' and path '${path}'`,
           );
           this.router[verb](path, fn.bind(this));
         }
