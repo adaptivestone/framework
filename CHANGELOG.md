@@ -1,3 +1,7 @@
+#### 2.2.1
+
+[FIX] fix test as part of docker image update. This just a mongo-memory-server problems
+
 #### 2.2.0
 
 [DEPRECATED] Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
