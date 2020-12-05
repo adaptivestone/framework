@@ -1,3 +1,4 @@
+const path = require('path');
 const Base = require('../modules/Base');
 
 /**
@@ -16,16 +17,26 @@ class ControllerManager extends Base {
    * @param {string} folderConfig.controllers  controller folder path
    */
   async initControllers(folderConfig) {
-    const controllersToLoad = await this.loadFilesWithInheritance(
+    const controllersToLoad = await this.getFilesPathWithInheritance(
       __dirname,
       folderConfig.folders.controllers,
     );
 
     for (const controller of controllersToLoad) {
       // eslint-disable-next-line global-require, import/no-dynamic-require
-      const ControllerModule = require(controller);
-      const contollerName = ControllerModule.constructor.name.toLowerCase();
-      this.app.controllers[contollerName] = new ControllerModule(this.app);
+      const ControllerModule = require(controller.path);
+      const contollerName = ControllerModule.name.toLowerCase();
+      let prefix = path.dirname(controller.file);
+      if (prefix === '.') {
+        prefix = '';
+      }
+      const controllePath = prefix
+        ? `${contollerName}/${contollerName}`
+        : contollerName;
+      this.app.controllers[controllePath] = new ControllerModule(
+        this.app,
+        prefix,
+      );
     }
   }
 

@@ -11,7 +11,7 @@ class Cli extends Base {
   }
 
   async run() {
-    const commandsToLoad = await this.loadFilesWithInheritance(
+    const commandsToLoad = await this.getFilesPathWithInheritance(
       `${__dirname}/commands`,
       this.server.app.foldersConfig.commands,
     );
@@ -19,8 +19,9 @@ class Cli extends Base {
     const command = process.argv[2]?.toLowerCase();
 
     for (const command of commandsToLoad) {
-      const c = command.split('/');
-      this.commands[c[c.length - 1].split('.')[0].toLowerCase()] = command;
+      const c = command.file.replace('.js', '');
+
+      this.commands[c.toLowerCase()] = command.path;
     }
     if (!command) {
       console.log('Please provide command name');
@@ -45,6 +46,10 @@ class Cli extends Base {
 
     await c.run();
     await mongoose.disconnect();
+  }
+
+  static get loggerGroup() {
+    return 'CLI_';
   }
 }
 

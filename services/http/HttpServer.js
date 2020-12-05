@@ -24,7 +24,13 @@ class HttpServer extends Base {
     ]);
     this.express.set('view engine', 'pug');
     this.express.use((req, res, next) => {
-      this.logger.info(`Request is  [${req.method}] ${req.url}`);
+      const startTime = Date.now();
+      const text = `Request is  [${req.method}] ${req.url}`;
+      this.logger.info(text);
+      res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        this.logger.info(`Finished ${text}. Duration ${duration} ms`);
+      });
       next();
     });
     this.enableI18N(folderConfig);

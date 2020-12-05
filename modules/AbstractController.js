@@ -16,34 +16,56 @@ const Auth = require('../services/http/middleware/Auth');
  * In most cases you will want to have a 'home' route that not include controller name. For this case please check 'isUseControllerNameForRouting'
  */
 class AbstractController extends Base {
-  constructor(app) {
+  constructor(app, prefix) {
+    const time = Date.now();
     super(app);
+    this.prefix = prefix;
     this.router = express.Router();
     const { routes } = this;
-    const controllerName = this.constructor.name;
+
+    const expressPath = this.getExpressPath();
+
+    const middlewaresInfo = [];
+
     // eslint-disable-next-line prefer-const
     for (let [path, middleware] of this.constructor.middleware) {
       if (!Array.isArray(middleware)) {
         middleware = [middleware];
       }
       for (const M of middleware) {
+        const fullPath = `/${expressPath}/${path}`
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
+        middlewaresInfo.push({
+          name: M.name,
+          method: 'ANY',
+          path,
+          fullPath,
+        });
+
         this.router.use(path, new M(this.app).getMiddleware());
       }
     }
+
+    const routesInfo = [];
 
     for (const verb in routes) {
       if (this.router[verb]) {
         for (const path in routes[verb]) {
           let fn = routes[verb][path];
           if (typeof fn === 'string') {
-            this.logger.warn(
-              'Setting routes as string deprecated. Please set it as a function',
-            );
             fn = this[fn];
+            this.logger.warn(
+              'Using string as a controller callback deprecated. Please use function instead',
+            );
           }
           if (typeof fn !== 'function') {
             this.logger.error(
-              `Can't resolve function '${routes[verb][path]}' for controller '${controllerName}'`,
+              `Can't resolve function '${
+                routes[verb][path]
+              }' for controller '${this.getConstructorName()}'`,
             );
             continue;
           }
@@ -52,20 +74,49 @@ class AbstractController extends Base {
           if (typeof fnName === 'function') {
             fnName = fnName.name;
           }
+          const fullPath = `/${expressPath}/${path}`
+            .split('//')
+            .join('/')
+            .split('//')
+            .join('/');
 
-          this.logger.verbose(
-            `Controller '${controllerName}' register function '${fnName}'  for method '${verb}' and path '${path}'`,
-          );
+          routesInfo.push({
+            name: fnName,
+            method: verb,
+            path,
+            fullPath,
+          });
+          // this.logger.verbose(
+          //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
+          // );
           this.router[verb](path, fn.bind(this));
         }
       }
     }
-    let path = '/';
-    if (this.constructor.isUseControllerNameForRouting) {
-      path = `/${controllerName.toLowerCase()}`;
-    }
-    this.app.httpServer.express.use(path, this.router);
-    this.app.controllers[controllerName.toLowerCase()] = this;
+
+    const text = [
+      '',
+      `Controller '${this.getConstructorName()}' registered.`,
+      'Middlewares:',
+    ];
+
+    middlewaresInfo.forEach((m) => {
+      text.push(
+        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Function: '${m.name}'`,
+      );
+    });
+    text.push('Callbacks:');
+
+    routesInfo.forEach((m) => {
+      text.push(
+        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Callback: '${m.name}'`,
+      );
+    });
+    text.push(`Time: ${Date.now() - time} ms`);
+
+    this.logger.verbose(text.join('\n'));
+
+    this.app.httpServer.express.use(expressPath, this.router);
   }
 
   /**
@@ -161,6 +212,28 @@ class AbstractController extends Base {
    */
   static get isUseControllerNameForRouting() {
     return true;
+  }
+
+  /**
+   * Get constructor name that can include preix
+   */
+  getConstructorName() {
+    if (this.prefix) {
+      return `${this.prefix.charAt(0).toUpperCase()}${this.prefix.slice(1)}/${
+        this.constructor.name
+      }`;
+    }
+    return this.constructor.name;
+  }
+
+  /**
+   * Get express path with inheritance of path
+   */
+  getExpressPath() {
+    if (!this.constructor.isUseControllerNameForRouting) {
+      return '/';
+    }
+    return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
   }
 
   static get loggerGroup() {

@@ -1,3 +1,12 @@
+#### 2.2.0
+
+[DEPRECATED] Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
+[UPDATE] deps update
+[UPDATE] https logs now contains request time
+[NEW] Ability to put controllers into folders with path inheritance
+[NEW] Ability to replace expressPath on controller - getExpressPath() methos
+[NEW] Ability to put commands into folders with path inheritance
+
 #### 2.1.2
 
 [UPDATE] disconnect of mongoose when command was finished
