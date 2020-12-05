@@ -163,7 +163,7 @@ class Server {
 
         if (
           !process.env.LOGGER_CONSOLE_LEVEL ||
-          levels.indexOf(process.env.LOGGER_CONSOLE_LEVEL) < 1
+          levels.indexOf(process.env.LOGGER_CONSOLE_LEVEL) > 0 // as a warn level
         ) {
           console.warn(
             `Config not found '${fileName}'. This can be a normal (in case this an environment config)`,
