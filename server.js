@@ -151,9 +151,25 @@ class Server {
         // eslint-disable-next-line global-require, import/no-dynamic-require
         file = require(`./${fileType}/${fileName}`);
       } catch (e2) {
-        console.warn(
-          `Config not found '${fileName}'. This can be a normal (in case this an environment config)`,
-        );
+        const levels = [
+          'error',
+          'warn',
+          'info',
+          'http',
+          'verbose',
+          'debug',
+          'silly',
+        ];
+
+        if (
+          !process.env.LOGGER_CONSOLE_LEVEL ||
+          levels.indexOf(process.env.LOGGER_CONSOLE_LEVEL) < 1
+        ) {
+          console.warn(
+            `Config not found '${fileName}'. This can be a normal (in case this an environment config)`,
+          );
+        }
+
         file = false;
       }
     }
