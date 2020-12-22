@@ -1,6 +1,8 @@
 #### 2.2.1
 
 [FIX] fix test as part of docker image update. This just a mongo-memory-server problems
+[NEW] add config to configure language detecting order and types
+[UPDATE] deps update
 
 #### 2.2.0
 

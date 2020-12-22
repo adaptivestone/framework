@@ -135,8 +135,9 @@ class HttpServer extends Base {
         debug: false,
         detection: {
           // caches: ['cookie'],
-          order: ['xLang'],
+          order: I18NConfig.langDetectionOders || ['xLang'],
         },
+        lookupQuerystring: I18NConfig.lookupQuerystring,
       });
     this.express.use(i18nextMiddleware.handle(i18next));
     this.express.use((req, res, next) => {
