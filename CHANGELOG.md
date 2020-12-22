@@ -1,3 +1,7 @@
+#### 2.2.3
+
+[FIX] fix language detection
+
 #### 2.2.2
 
 [FIX] fix test as part of docker image update. This just a mongo-memory-server problems
