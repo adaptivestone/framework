@@ -25,10 +25,14 @@ class AbstractModel extends Base {
           useNewUrlParser: true,
           useCreateIndex: true,
           useUnifiedTopology: true,
+          useFindAndModify: false,
         })
         .then(
           () => {
             this.logger.info('Mongo connection success');
+            this.app.events.on('die', () => {
+              mongoose.disconnect();
+            });
             callback();
           },
           (error) => {

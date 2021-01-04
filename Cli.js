@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const Base = require('./modules/Base');
 const Server = require('./server');
 
@@ -18,10 +17,10 @@ class Cli extends Base {
 
     const command = process.argv[2]?.toLowerCase();
 
-    for (const command of commandsToLoad) {
-      const c = command.file.replace('.js', '');
+    for (const com of commandsToLoad) {
+      const c = com.file.replace('.js', '');
 
-      this.commands[c.toLowerCase()] = command.path;
+      this.commands[c.toLowerCase()] = com.path;
     }
     if (!command) {
       console.log('Please provide command name');
@@ -41,11 +40,12 @@ class Cli extends Base {
       return;
     }
 
+    // eslint-disable-next-line global-require, import/no-dynamic-require
     const Command = require(this.commands[command]);
     const c = new Command(this.app, this.commands);
 
     await c.run();
-    await mongoose.disconnect();
+    this.app.events.emit('die');
   }
 
   static get loggerGroup() {

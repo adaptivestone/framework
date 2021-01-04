@@ -1,9 +1,7 @@
+/* eslint-disable global-require */
 require('dotenv').config();
 const merge = require('deepmerge');
-
-const HttpServer = require('./services/http/HttpServer');
-const WebSocket = require('./services/connectors/socket');
-const ControllerManager = require('./controllers/index');
+const EventEmitter = require('events');
 
 /**
  * Main framework class.
@@ -28,6 +26,7 @@ class Server {
       getModel: this.getModel.bind(this),
       updateConfig: this.updateConfig.bind(this),
       foldersConfig: this.config.folders,
+      events: new EventEmitter(),
     };
 
     this.cache = {
@@ -42,6 +41,9 @@ class Server {
    * @returns {Promise}
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
+    const HttpServer = require('./services/http/HttpServer'); // Speed optimisation
+    const WebSocket = require('./services/connectors/socket'); // Speed optimisation
+    const ControllerManager = require('./controllers/index'); // Speed optimisation
     this.addErrorHandling();
 
     // TODO config
