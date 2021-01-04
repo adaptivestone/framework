@@ -1,3 +1,7 @@
+#### 2.2.5
+
+[FIX] Fix disconnecting problems with replica set
+
 #### 2.2.4
 
 [UPDATE] Internal update for speed up cli init

@@ -30,8 +30,11 @@ class AbstractModel extends Base {
         .then(
           () => {
             this.logger.info('Mongo connection success');
-            this.app.events.on('die', () => {
-              mongoose.disconnect();
+            this.app.events.on('die', async () => {
+              for (const c of mongoose.connections) {
+                c.close(true);
+              }
+              // await mongoose.disconnect(); // TODO it have problems with replica-set
             });
             callback();
           },
