@@ -8,7 +8,7 @@ class Cli extends Base {
     super(server.app);
     this.server = server;
     this.commands = {};
-    this.args = parseArgs(process.argv.slice(2));
+    this.args = parseArgs(process.argv.slice(3));
   }
 
   async run() {
