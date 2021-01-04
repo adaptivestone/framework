@@ -1,3 +1,7 @@
+#### 2.2.4
+
+[UPDATE] Internal update for speed up cli init
+
 #### 2.2.3
 
 [FIX] fix language detection
