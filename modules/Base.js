@@ -1,7 +1,6 @@
 /* eslint-disable no-underscore-dangle */
 const fs = require('fs').promises;
 const { join } = require('path');
-const winston = require('winston');
 
 class Base {
   /**
@@ -36,6 +35,8 @@ class Base {
    * @param {sting} label name of logger
    */
   getLogger(label) {
+    // eslint-disable-next-line global-require
+    const winston = require('winston'); // speed up optimisation
     const alignColorsAndTime = winston.format.combine(
       winston.format.colorize({
         all: true,
