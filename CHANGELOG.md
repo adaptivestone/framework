@@ -1,3 +1,7 @@
+#### 2.2.6
+
+[NEW] CLI command receiving parsed arguments
+
 #### 2.2.5
 
 [FIX] Fix disconnecting problems with replica set

@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "2.2.5",
+  "version": "2.2.6",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "repository": {
@@ -35,6 +35,7 @@
     "i18next-chained-backend": "^2.0.1",
     "i18next-http-middleware": "^3.0.6",
     "i18next-node-fs-backend": "^2.1.3",
+    "minimist": "^1.2.5",
     "moment-timezone": "^0.5.32",
     "mongoose": "^5.11.9",
     "nodemailer": "^6.4.17",

@@ -1,3 +1,4 @@
+const parseArgs = require('minimist');
 const Base = require('./modules/Base');
 const Server = require('./server');
 
@@ -7,6 +8,7 @@ class Cli extends Base {
     super(server.app);
     this.server = server;
     this.commands = {};
+    this.args = parseArgs(process.argv.slice(2));
   }
 
   async run() {
@@ -42,7 +44,7 @@ class Cli extends Base {
 
     // eslint-disable-next-line global-require, import/no-dynamic-require
     const Command = require(this.commands[command]);
-    const c = new Command(this.app, this.commands);
+    const c = new Command(this.app, this.commands, this.args);
 
     await c.run();
     this.app.events.emit('die');
