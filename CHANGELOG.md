@@ -1,3 +1,7 @@
+#### 2.3.0
+
+[NEW] Migration/create migration/migrate commands
+
 #### 2.2.6
 
 [NEW] CLI command receiving parsed arguments
