@@ -1,3 +1,7 @@
+#### 2.3.1
+
+[FIX] Fix parsing token
+
 #### 2.3.0
 
 [NEW] Migration/create migration/migrate commands

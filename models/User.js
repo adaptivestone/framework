@@ -59,12 +59,12 @@ class User extends AbstractModel {
   }
 
   static async getUserByEmailAndPassword(email, password) {
-    const data = await this.findOne({ email });
+    const data = await this.findOne({ email: String(email) });
     if (!data) {
       return false;
     }
     const same = await bcrypt.compare(
-      password + data.constructor.getSuper().someSecretSalt,
+      String(password) + data.constructor.getSuper().someSecretSalt,
       data.password,
     );
 
@@ -91,6 +91,7 @@ class User extends AbstractModel {
       avatar: this.avatar,
       name: this.name,
       email: this.email,
+      // eslint-disable-next-line no-underscore-dangle
       _id: this._id,
       isVerified: this.isVerified,
       permissions: this.permissions,
@@ -100,18 +101,18 @@ class User extends AbstractModel {
 
   static async hashPassword(password) {
     return bcrypt.hash(
-      password + this.getSuper().someSecretSalt,
+      String(password) + this.getSuper().someSecretSalt,
       this.getSuper().saltRounds,
     );
   }
 
   static async getUserByToken(token) {
-    const data = await this.findOne({ 'sessionTokens.token': token });
+    const data = await this.findOne({ 'sessionTokens.token': String(token) });
     return data || false;
   }
 
   static async getUserByEmail(email) {
-    const data = await this.findOne({ email });
+    const data = await this.findOne({ email: String(email) });
     if (!data) {
       return false;
     }
@@ -133,7 +134,7 @@ class User extends AbstractModel {
     userMongoose.passwordRecoveryTokens = [];
     userMongoose.passwordRecoveryTokens.push({
       until: date,
-      token: token,
+      token,
     });
     await userMongoose.save();
     return { token, until: date.getTime() };
@@ -143,7 +144,7 @@ class User extends AbstractModel {
     return new Promise(async (resolve, reject) => {
       const data = await this.findOne({
         passwordRecoveryTokens: {
-          $elemMatch: { token: passwordRecoveryToken },
+          $elemMatch: { token: String(passwordRecoveryToken) },
         },
       });
       if (!data) {
@@ -199,7 +200,9 @@ class User extends AbstractModel {
   static getUserByVerificationToken(verificationToken) {
     return new Promise(async (resolve, reject) => {
       const data = await this.findOne({
-        verificationTokens: { $elemMatch: { token: verificationToken } },
+        verificationTokens: {
+          $elemMatch: { token: String(verificationToken) },
+        },
       });
       if (!data) {
         reject(false);
@@ -215,8 +218,12 @@ class User extends AbstractModel {
   }
 
   removeVerificationToken(verificationToken) {
-    this.mongooseModel.update(
-      { verificationTokens: { $elemMatch: { token: verificationToken } } },
+    this.mongooseModel.updateOne(
+      {
+        verificationTokens: {
+          $elemMatch: { token: String(verificationToken) },
+        },
+      },
       { $pop: { verificationTokens: 1 } },
     );
   }
