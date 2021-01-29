@@ -1,3 +1,7 @@
+#### 2.3.2
+
+[FIX] Fix controllers order to load
+
 #### 2.3.1
 
 [FIX] Fix parsing token
