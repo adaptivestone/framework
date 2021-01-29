@@ -4,3 +4,4 @@
 .eslintrc.js
 .gitignore
 .prettierrc
+.editorconfig

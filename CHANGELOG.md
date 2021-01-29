@@ -1,3 +1,7 @@
+#### 2.3.3
+
+[UPDATE] deps update
+
 #### 2.3.2
 
 [FIX] Fix controllers order to load
