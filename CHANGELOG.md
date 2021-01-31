@@ -1,3 +1,8 @@
+#### 2.3.4
+
+[NEW] Add webResources option to email service
+[UPDATE] deps update
+
 #### 2.3.3
 
 [UPDATE] deps update

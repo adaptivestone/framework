@@ -17,4 +17,8 @@ module.exports = {
     },
   },
   transport: 'smtp',
+  webResources: {
+    // https://github.com/jrit/web-resource-inliner path to find resources
+    relativeTo: 'build',
+  },
 };

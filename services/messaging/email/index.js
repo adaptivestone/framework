@@ -64,6 +64,9 @@ class Mail extends Base {
       send: true,
       preview: false,
       transport: transporter,
+      juiceResources: {
+        webResources: mailConfig.webResources,
+      },
     });
 
     return email.send({
