@@ -133,6 +133,10 @@ class Server {
   getModel(modelName) {
     if (!this.cache.models.has(modelName)) {
       const Model = this.getFileWithExtendingInhirence('models', modelName);
+      if (!Model) {
+        console.error(`Model not found: ${modelName}`);
+        return false;
+      }
       this.cache.models.set(modelName, new Model(this.app).mongooseModel);
     }
     return this.cache.models.get(modelName);

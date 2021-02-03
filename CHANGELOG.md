@@ -1,3 +1,8 @@
+#### 2.3.5
+
+[NEW] Add command DropIndex
+[UPDATE] deps update
+
 #### 2.3.4
 
 [NEW] Add webResources option to email service

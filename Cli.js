@@ -46,7 +46,11 @@ class Cli extends Base {
     const Command = require(this.commands[command]);
     const c = new Command(this.app, this.commands, this.args);
 
-    await c.run();
+    try {
+      await c.run();
+    } catch (e) {
+      this.logger.error(e.stack);
+    }
     this.app.events.emit('die');
   }
 
