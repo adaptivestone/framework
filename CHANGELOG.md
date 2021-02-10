@@ -1,3 +1,8 @@
+#### 2.3.6
+
+[UPDATE] deps update
+[FIX] test fix
+
 #### 2.3.5
 
 [NEW] Add command DropIndex
