@@ -7,16 +7,16 @@ class Auth extends AbstractController {
   get routes() {
     return {
       post: {
-        '/login': 'postLogin',
-        '/register': 'postRegister',
-        '/logout': 'postLogout',
-        '/verify': 'verifyUser',
-        '/send-recovery-email': 'sendPasswordRecoveryEmail',
-        '/recover-password': 'recoverPassword',
-        '/send-verification': 'sendVerification',
+        '/login': this.postLogin,
+        '/register': this.postRegister,
+        '/logout': this.postLogout,
+        '/verify': this.verifyUser,
+        '/send-recovery-email': this.sendPasswordRecoveryEmail,
+        '/recover-password': this.recoverPassword,
+        '/send-verification': this.sendVerification,
       },
       get: {
-        '/login': 'postLogin',
+        '/login': this.postLogin,
       },
     };
   }

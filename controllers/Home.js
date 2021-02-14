@@ -6,7 +6,7 @@ class Home extends AbstractController {
   get routes() {
     return {
       get: {
-        '/': 'home',
+        '/': this.home,
       },
     };
   }
@@ -18,6 +18,7 @@ class Home extends AbstractController {
   static get isUseControllerNameForRouting() {
     return false;
   }
+
   static get middleware() {
     return new Map([['/', [PrepareAppInfo, GetUserByToken]]]);
   }
