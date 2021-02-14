@@ -21,8 +21,8 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(req, res, next) {
-    let errors = {};
+  async postLogin(req, res) {
+    const errors = {};
     if (!req.body.email) {
       errors.email = [req.i18n.t('auth.emailProvided')];
     }
@@ -31,10 +31,10 @@ class Auth extends AbstractController {
     }
 
     if (Object.keys(errors).length) {
-      return res.status(400).json({ errors: errors });
+      return res.status(400).json({ errors });
     }
-    let User = req.appInfo.app.getModel('User');
-    let user = await User.getUserByEmailAndPassword(
+    const User = this.app.getModel('User');
+    const user = await User.getUserByEmailAndPassword(
       req.body.email,
       req.body.password,
     );
@@ -46,15 +46,15 @@ class Auth extends AbstractController {
         .status(400)
         .json({ error: req.i18n.t('email.notVerified'), notVerified: true });
     }
-    let token = await user.generateToken();
+    const token = await user.generateToken();
 
     return res
       .status(200)
-      .json({ success: true, token: token, user: user.getPublic() });
+      .json({ success: true, token, user: user.getPublic() });
   }
 
-  async postRegister(req, res, next) {
-    let errors = {};
+  async postRegister(req, res) {
+    const errors = {};
     if (!req.body.email) {
       errors.email = [req.i18n.t('auth.emailProvided')];
     } else if (
@@ -72,9 +72,9 @@ class Auth extends AbstractController {
       errors.password = [req.i18n.t('auth.passwordValid')];
     }
     if (Object.keys(errors).length) {
-      return res.status(400).json({ errors: errors });
+      return res.status(400).json({ errors });
     }
-    let User = req.appInfo.app.getModel('User');
+    const User = req.appInfo.app.getModel('User');
     let user = await User.getUserByEmail(req.body.email);
     if (user) {
       return res.status(400).json({ error: req.i18n.t('email.registered') });
@@ -102,11 +102,11 @@ class Auth extends AbstractController {
   }
 
   postLogout(req, res, next) {
-    //todo remove token
+    // todo remove token
     return res.status(200).json({ success: true });
   }
 
-  async verifyUser(req, res, next) {
+  async verifyUser(req, res) {
     const User = req.appInfo.app.getModel('User');
     let user;
     try {
@@ -120,14 +120,20 @@ class Auth extends AbstractController {
       });
     }
     this.logger.debug(`Verify user user is :${user}`);
-    if (user) {
-      user.isVerified = true;
-      await user.save();
-      return res.status(200).json({ success: true });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        error: req.i18n.t('email.alreadyVerifiedOrWrongToken'),
+      });
     }
+
+    user.isVerified = true;
+    await user.save();
+    return res.status(200).json({ success: true });
   }
-  async sendPasswordRecoveryEmail(req, res, next) {
-    let User = req.appInfo.app.getModel('User');
+
+  async sendPasswordRecoveryEmail(req, res) {
+    const User = req.appInfo.app.getModel('User');
     try {
       const user = await User.getUserByEmail(req.body.email);
       if (!user) {
@@ -144,16 +150,17 @@ class Auth extends AbstractController {
         .json({ success: false, error: req.i18n.t('auth.errorUExist') });
     }
   }
-  async recoverPassword(req, res, next) {
+
+  async recoverPassword(req, res) {
     let user;
-    const User = req.appInfo.app.getModel('User');
+    const User = this.app.getModel('User');
 
     const errors = {};
     if (!req.query.password.match(/^[a-zA-Z0-9!@#$%ˆ&*()_+\-{}[\]<>]+$/)) {
       errors.password = [req.i18n.t('auth.passwordValid')];
     }
     if (Object.keys(errors).length) {
-      return res.status(400).json({ errors: errors });
+      return res.status(400).json({ errors });
     }
     try {
       user = await User.getUserByPasswordRecoveryToken(
@@ -170,14 +177,14 @@ class Auth extends AbstractController {
       user.isVerified = true;
       await user.save();
       return res.status(200).json({ success: true });
-    } else {
-      return res
-        .status(400)
-        .json({ success: false, error: req.i18n.t('password.wrongToken') });
     }
+    return res
+      .status(400)
+      .json({ success: false, error: req.i18n.t('password.wrongToken') });
   }
-  async sendVerification(req, res, next) {
-    const User = req.appInfo.app.getModel('User');
+
+  async sendVerification(req, res) {
+    const User = this.app.getModel('User');
     const user = await User.getUserByEmail(req.body.email);
     if (!user) {
       return res
@@ -187,6 +194,7 @@ class Auth extends AbstractController {
     await user.sendVerificationEmail(req.i18n);
     return res.status(200).json({ success: true });
   }
+
   static get middleware() {
     return new Map([['/', [PrepareAppInfo, GetUserByToken]]]);
   }
