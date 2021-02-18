@@ -1,3 +1,8 @@
+#### 2.3.7
+
+[UPDATE] deps update
+[NEW] add 'global.testSetup.userCreate' functuon for testing
+
 #### 2.3.6
 
 [UPDATE] deps update

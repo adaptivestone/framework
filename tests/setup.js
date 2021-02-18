@@ -34,16 +34,26 @@ beforeAll(async () => {
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
 
-  const User = global.server.app.getModel('User');
-  global.user = await User.create({
-    email: 'test@test.com',
-    password: 'testPassword',
-    isVerified: true,
-    name: {
-      nick: 'testUserNickName',
-    },
-  });
-  global.authToken = await global.user.generateToken();
+  if (!global.testSetup?.userCreate) {
+    const User = global.server.app.getModel('User');
+
+    global.user = await User.create({
+      email: 'test@test.com',
+      password: 'testPassword',
+      isVerified: true,
+      name: {
+        nick: 'testUserNickName',
+      },
+    }).catch((e) => {
+      console.error(e);
+      console.info(
+        'That error can happens in case you have custom user model. Please use global.testSetup.userCreate to overwrite default user creating',
+      );
+    });
+    global.authToken = await global.user.generateToken();
+  } else {
+    global.testSetup.userCreate();
+  }
 
   await global.server.startServer();
 });
