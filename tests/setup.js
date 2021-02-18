@@ -34,7 +34,7 @@ beforeAll(async () => {
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
 
-  if (!global.testSetup?.userCreate) {
+  if (global.testSetup?.disableUserCreate) {
     const User = global.server.app.getModel('User');
 
     global.user = await User.create({
@@ -47,12 +47,17 @@ beforeAll(async () => {
     }).catch((e) => {
       console.error(e);
       console.info(
-        'That error can happens in case you have custom user model. Please use global.testSetup.userCreate to overwrite default user creating',
+        'That error can happens in case you have custom user model. Please use global.testSetup.disableUserCreate flag to skip user creating',
       );
     });
     global.authToken = await global.user.generateToken();
-  } else {
-    global.testSetup.userCreate();
+  }
+
+  if (
+    global.testSetup?.beforeAll &&
+    typeof global.testSetup?.beforeAll === 'function'
+  ) {
+    await global.testSetup?.beforeAll();
   }
 
   await global.server.startServer();
@@ -63,6 +68,13 @@ afterAll(async () => {
     global.server.app.httpServer.die();
   }
   setTimeout(async () => {
+    if (
+      global.testSetup?.afterAll &&
+      typeof global.testSetup?.afterAll === 'function'
+    ) {
+      await global.testSetup?.afterAll();
+    }
+
     await mongoose.disconnect();
     await mongoMemoryServerInstance.stop();
   }, 500);

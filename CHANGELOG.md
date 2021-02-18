@@ -1,7 +1,11 @@
+#### 2.3.8
+
+[NEW] add 'global.testSetup.beforeAll' 'global.testSetup.afterAll' functions and 'global.testSetup.disableUserCreate' flag for testing testing
+
 #### 2.3.7
 
 [UPDATE] deps update
-[NEW] add 'global.testSetup.userCreate' functuon for testing
+[NEW] add 'global.testSetup.userCreate' function for testing
 
 #### 2.3.6
 
