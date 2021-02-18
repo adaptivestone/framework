@@ -1,3 +1,7 @@
+#### 2.3.9
+
+[FIX] test fix
+
 #### 2.3.8
 
 [NEW] add 'global.testSetup.beforeAll' 'global.testSetup.afterAll' functions and 'global.testSetup.disableUserCreate' flag for testing testing

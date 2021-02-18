@@ -34,7 +34,11 @@ beforeAll(async () => {
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
 
-  if (global.testSetup?.disableUserCreate) {
+  if (!global.testSetup) {
+    global.testSetup = {};
+  }
+
+  if (!global.testSetup.disableUserCreate) {
     const User = global.server.app.getModel('User');
 
     global.user = await User.create({
@@ -53,11 +57,8 @@ beforeAll(async () => {
     global.authToken = await global.user.generateToken();
   }
 
-  if (
-    global.testSetup?.beforeAll &&
-    typeof global.testSetup?.beforeAll === 'function'
-  ) {
-    await global.testSetup?.beforeAll();
+  if (typeof global.testSetup.beforeAll === 'function') {
+    await global.testSetup.beforeAll();
   }
 
   await global.server.startServer();
@@ -68,11 +69,8 @@ afterAll(async () => {
     global.server.app.httpServer.die();
   }
   setTimeout(async () => {
-    if (
-      global.testSetup?.afterAll &&
-      typeof global.testSetup?.afterAll === 'function'
-    ) {
-      await global.testSetup?.afterAll();
+    if (typeof global.testSetup.afterAll === 'function') {
+      await global.testSetup.afterAll();
     }
 
     await mongoose.disconnect();
