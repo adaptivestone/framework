@@ -1,6 +1,7 @@
 #### 2.3.13
 
 [UPDATE] testing now with mongoDB Replica
+[UPDATE] refactor CLI
 
 #### 2.3.12
 
