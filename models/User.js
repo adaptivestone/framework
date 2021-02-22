@@ -40,13 +40,20 @@ class User extends AbstractModel {
           minlength: 3,
           maxlength: 255,
           type: String,
-          unique: true,
+          index: {
+            unique: true,
+            partialFilterExpression: { 'name.nick': { $type: 'string' } },
+          },
         },
       },
       password: String,
       email: {
         type: String,
         maxlength: 255,
+        index: {
+          unique: true,
+          partialFilterExpression: { email: { $type: 'string' } },
+        },
       },
       sessionTokens: [{ token: String, valid: Date }],
       verificationTokens: [{ until: Date, token: String }],
@@ -140,24 +147,21 @@ class User extends AbstractModel {
     return { token, until: date.getTime() };
   }
 
-  static getUserByPasswordRecoveryToken(passwordRecoveryToken) {
-    return new Promise(async (resolve, reject) => {
-      const data = await this.findOne({
-        passwordRecoveryTokens: {
-          $elemMatch: { token: String(passwordRecoveryToken) },
-        },
-      });
-      if (!data) {
-        reject(false);
-        return;
-      }
-      // TODO token expiration and remove that token
-
-      data.passwordRecoveryTokens.pop();
-
-      await data.save();
-      resolve(data);
+  static async getUserByPasswordRecoveryToken(passwordRecoveryToken) {
+    const data = await this.findOne({
+      passwordRecoveryTokens: {
+        $elemMatch: { token: String(passwordRecoveryToken) },
+      },
     });
+    if (!data) {
+      return Promise.reject(new Error('User not exists'));
+    }
+    // TODO token expiration and remove that token
+
+    data.passwordRecoveryTokens.pop();
+
+    const result = await data.save();
+    return result;
   }
 
   async sendPasswordRecoveryEmail(i18n) {
@@ -193,28 +197,25 @@ class User extends AbstractModel {
       until: date,
       token,
     });
-    userMongoose.save();
+    await userMongoose.save();
     return { token, until: date.getTime() };
   }
 
-  static getUserByVerificationToken(verificationToken) {
-    return new Promise(async (resolve, reject) => {
-      const data = await this.findOne({
-        verificationTokens: {
-          $elemMatch: { token: String(verificationToken) },
-        },
-      });
-      if (!data) {
-        reject(false);
-        return;
-      }
-      // TODO token expiration and remove that token
-
-      data.verificationTokens.pop();
-
-      await data.save();
-      resolve(data);
+  static async getUserByVerificationToken(verificationToken) {
+    const data = await this.findOne({
+      verificationTokens: {
+        $elemMatch: { token: String(verificationToken) },
+      },
     });
+    if (!data) {
+      return Promise.reject(new Error('User not exists'));
+    }
+    // TODO token expiration and remove that token
+
+    data.verificationTokens.pop();
+
+    const result = await data.save();
+    return result;
   }
 
   removeVerificationToken(verificationToken) {
