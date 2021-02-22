@@ -1,3 +1,8 @@
+#### 2.3.10
+
+[UPDATE] update user model indexes to allow null email and nick
+[UPDATE] deps update
+
 #### 2.3.9
 
 [FIX] test fix
