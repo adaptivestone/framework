@@ -1,3 +1,7 @@
+#### 2.3.11
+
+[UPDATE] refactor CLI for testing
+
 #### 2.3.10
 
 [UPDATE] update user model indexes to allow null email and nick

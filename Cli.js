@@ -11,19 +11,27 @@ class Cli extends Base {
     this.args = parseArgs(process.argv.slice(3));
   }
 
-  async run() {
+  async loadCommands() {
+    if (Object.keys(this.commands).length) {
+      return true;
+    }
     const commandsToLoad = await this.getFilesPathWithInheritance(
       `${__dirname}/commands`,
       this.server.app.foldersConfig.commands,
     );
-
-    const command = process.argv[2]?.toLowerCase();
-
     for (const com of commandsToLoad) {
       const c = com.file.replace('.js', '');
 
       this.commands[c.toLowerCase()] = com.path;
     }
+    return true;
+  }
+
+  async run() {
+    await this.loadCommands();
+
+    const command = process.argv[2]?.toLowerCase();
+
     if (!command) {
       console.log('Please provide command name');
       console.log(
