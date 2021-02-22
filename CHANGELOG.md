@@ -1,3 +1,7 @@
+#### 2.3.12
+
+[UPDATE] tesing update
+
 #### 2.3.11
 
 [UPDATE] refactor CLI for testing

@@ -26,6 +26,10 @@ beforeAll(async () => {
       emails:
         process.env.TEST_FOLDER_EMAIL ||
         path.resolve('./services/messaging/email/templates'),
+      locales: process.env.TEST_FOLDER_LOCALES || path.resolve('./locales'),
+      commands: process.env.TEST_FOLDER_COMMANDS || path.resolve('./commands'),
+      migrations:
+        process.env.TEST_FOLDER_MIGRATIONS || path.resolve('./migrations'),
     },
   });
   global.server.updateConfig('mongo', {
