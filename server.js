@@ -24,6 +24,7 @@ class Server {
     this.app = {
       getConfig: this.getConfig.bind(this),
       getModel: this.getModel.bind(this),
+      runCliCommand: this.runCliCommand.bind(this),
       updateConfig: this.updateConfig.bind(this),
       foldersConfig: this.config.folders,
       events: new EventEmitter(),
@@ -33,6 +34,8 @@ class Server {
       configs: new Map(),
       models: new Map(),
     };
+
+    this.cli = false;
   }
 
   /**
@@ -140,6 +143,19 @@ class Server {
       this.cache.models.set(modelName, new Model(this.app).mongooseModel);
     }
     return this.cache.models.get(modelName);
+  }
+
+  /**
+   * Run cli command into framework (http, ws, etc)
+   * @param {String} commandName name of command to load
+   * @param {Object} args list of arguments to pass into command
+   */
+  async runCliCommand(commandName, args) {
+    if (!this.cli) {
+      const BaseCli = require('./modules/BaseCli'); // Speed optimisation
+      this.cli = new BaseCli(this);
+    }
+    return this.cli.run(commandName, args);
   }
 
   /**

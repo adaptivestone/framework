@@ -1,6 +1,10 @@
+#### 2.3.13
+
+[UPDATE] testing now with mongoDB Replica
+
 #### 2.3.12
 
-[UPDATE] tesing update
+[UPDATE] testing update
 
 #### 2.3.11
 

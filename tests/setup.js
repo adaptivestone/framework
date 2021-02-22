@@ -1,19 +1,19 @@
 /* eslint-disable jest/require-top-level-describe */
-const MongodbMemoryServer = require('mongodb-memory-server').MongoMemoryServer;
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
-
 const path = require('path');
 const Server = require('../server');
 
 beforeAll(async () => {
   jest.setTimeout(50000);
-  mongoMemoryServerInstance = new MongodbMemoryServer({
-    binary: { version: '4.4.2' },
+  mongoMemoryServerInstance = new MongoMemoryReplSet({
+    binary: { version: '4.4.3' },
+    replSet: { storageEngine: 'wiredTiger' },
   });
+  await mongoMemoryServerInstance.waitUntilRunning();
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
-
   const connectionStringMongo = await mongoMemoryServerInstance.getUri();
   global.server = new Server({
     folders: {
@@ -37,14 +37,11 @@ beforeAll(async () => {
   });
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
-
   if (!global.testSetup) {
     global.testSetup = {};
   }
-
   if (!global.testSetup.disableUserCreate) {
     const User = global.server.app.getModel('User');
-
     global.user = await User.create({
       email: 'test@test.com',
       password: 'testPassword',
@@ -60,14 +57,11 @@ beforeAll(async () => {
     });
     global.authToken = await global.user.generateToken();
   }
-
   if (typeof global.testSetup.beforeAll === 'function') {
     await global.testSetup.beforeAll();
   }
-
   await global.server.startServer();
 });
-
 afterAll(async () => {
   if (global.server) {
     global.server.app.httpServer.die();
@@ -76,7 +70,6 @@ afterAll(async () => {
     if (typeof global.testSetup.afterAll === 'function') {
       await global.testSetup.afterAll();
     }
-
     await mongoose.disconnect();
     await mongoMemoryServerInstance.stop();
   }, 500);
