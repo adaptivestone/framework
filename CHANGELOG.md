@@ -1,3 +1,7 @@
+#### 2.3.14
+
+[FIX] fix validate controller method for non strings
+
 #### 2.3.13
 
 [UPDATE] testing now with mongoDB Replica

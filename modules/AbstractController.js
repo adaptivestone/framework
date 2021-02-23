@@ -177,7 +177,7 @@ class AbstractController extends Base {
       ) {
         // use from validator then
         validationResult = validator[rules[name][0][0]](
-          obj[name],
+          `${obj[name]}`,
           rules[name][0][1],
         );
       } else {
