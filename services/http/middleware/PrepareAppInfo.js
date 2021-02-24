@@ -1,6 +1,6 @@
 const AbstractMiddleware = require('./AbstractMiddleware');
 
-class GetUserByToken extends AbstractMiddleware {
+class PrepareAppInfo extends AbstractMiddleware {
   async middleware(req, res, next) {
     if (!req.appInfo) {
       req.appInfo = {
@@ -11,4 +11,4 @@ class GetUserByToken extends AbstractMiddleware {
   }
 }
 
-module.exports = GetUserByToken;
+module.exports = PrepareAppInfo;
