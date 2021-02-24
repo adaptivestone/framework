@@ -229,7 +229,7 @@ class AbstractController extends Base {
    * Be default path apply to ANY' method, but you can preattach 'METHOD' into patch to scope patch to this METHOD
    * @example
    * return new Map([
-   *    ['/', [PrepareAppInfo, GetUserByToken]] // for any method for this controller
+   *    ['/*', [PrepareAppInfo, GetUserByToken]] // for any method for this controller
    *    ['POST/', [Auth]] // for POST method
    *    ['/superSecretMethod', [OnlySuperSecretUsers]] // route with ANY method
    *    ['PUT/superSecretMathod', [OnlySuperSecretAdmin]] // route with PUT method

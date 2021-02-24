@@ -1,3 +1,7 @@
+#### 2.4.1
+
+[FIX] updated test because of previous breaking changes
+
 #### 2.4.0
 
 [BREAKING] possible that bug fix of middleware can affect your code. Previous route middleware was GLOBAL (router.use) now in router level only (route.any). Previous Home controller (/ route be default) middleware affect ANY routes on app. Right now that fixed.
@@ -6,7 +10,7 @@
 
 ```javascript
   static get middleware() {
-    return new Map([['GET/', [PrepareAppInfo, GetUserByToken]]]);
+    return new Map([['GET/*', [PrepareAppInfo, GetUserByToken]]]);
   }
 ```
 

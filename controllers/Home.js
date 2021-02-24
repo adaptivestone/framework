@@ -20,7 +20,7 @@ class Home extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/', [PrepareAppInfo, GetUserByToken]]]);
+    return new Map([['/*', [PrepareAppInfo, GetUserByToken]]]);
   }
 }
 
