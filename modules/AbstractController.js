@@ -33,64 +33,90 @@ class AbstractController extends Base {
         middleware = [middleware];
       }
       for (const M of middleware) {
-        const fullPath = `/${expressPath}/${path}`
+        let method = 'all';
+        let realPath = path;
+        if (!realPath.startsWith('/')) {
+          method = realPath.split('/')[0]?.toLowerCase();
+          if (!method) {
+            this.logger.error(`Method not found for ${realPath}`);
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+          realPath = realPath.substring(method.length);
+        }
+        if (typeof this.router[method] !== 'function') {
+          this.logger.error(
+            `Method ${method} not exist for middleware. Please check your codebase`,
+          );
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
           .split('//')
           .join('/')
           .split('//')
           .join('/');
         middlewaresInfo.push({
           name: M.name,
-          method: 'ANY',
-          path,
+          method: method.toUpperCase(),
+          path: realPath,
           fullPath,
         });
 
-        this.router.use(path, new M(this.app).getMiddleware());
+        this.router[method](realPath, new M(this.app).getMiddleware());
       }
     }
 
     const routesInfo = [];
 
     for (const verb in routes) {
-      if (this.router[verb]) {
-        for (const path in routes[verb]) {
-          let fn = routes[verb][path];
-          if (typeof fn === 'string') {
-            fn = this[fn];
-            this.logger.warn(
-              'Using string as a controller callback deprecated. Please use function instead',
-            );
-          }
-          if (typeof fn !== 'function') {
-            this.logger.error(
-              `Can't resolve function '${
-                routes[verb][path]
-              }' for controller '${this.getConstructorName()}'`,
-            );
-            continue;
-          }
-
-          let fnName = routes[verb][path];
-          if (typeof fnName === 'function') {
-            fnName = fnName.name;
-          }
-          const fullPath = `/${expressPath}/${path}`
-            .split('//')
-            .join('/')
-            .split('//')
-            .join('/');
-
-          routesInfo.push({
-            name: fnName,
-            method: verb,
-            path,
-            fullPath,
-          });
-          // this.logger.verbose(
-          //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
-          // );
-          this.router[verb](path, fn.bind(this));
+      if (typeof this.router[verb] !== 'function') {
+        this.logger.error(
+          `Method ${verb} not exist for router. Please check your codebase`,
+        );
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+      for (const path in routes[verb]) {
+        let fn = routes[verb][path];
+        if (typeof fn === 'string') {
+          fn = this[fn];
+          this.logger.warn(
+            'Using string as a controller callback deprecated. Please use function instead',
+          );
         }
+        if (typeof fn !== 'function') {
+          this.logger.error(
+            `Can't resolve function '${
+              routes[verb][path]
+            }' for controller '${this.getConstructorName()}'`,
+          );
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+
+        let fnName = routes[verb][path];
+        if (typeof fnName === 'function') {
+          fnName = fnName.name;
+        }
+
+        const fullPath = `/${expressPath}/${path}`
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
+
+        routesInfo.push({
+          name: fnName,
+          method: verb.toUpperCase(),
+          path,
+          fullPath,
+        });
+        // this.logger.verbose(
+        //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
+        // );
+
+        this.router[verb](path, fn.bind(this));
       }
     }
 
@@ -198,8 +224,16 @@ class AbstractController extends Base {
 
   /**
    * Array of middlewares to append for route
-   * You should provide path and then array of middlewares to apply. Order is matter.
-   * // TODO support for methods also
+   * You should provide path relative to controller and then array of middlewares to apply.
+   * Order is matter.
+   * Be default path apply to ANY' method, but you can preattach 'METHOD' into patch to scope patch to this METHOD
+   * @example
+   * return new Map([
+   *    ['/', [PrepareAppInfo, GetUserByToken]] // for any method for this controller
+   *    ['POST/', [Auth]] // for POST method
+   *    ['/superSecretMethod', [OnlySuperSecretUsers]] // route with ANY method
+   *    ['PUT/superSecretMathod', [OnlySuperSecretAdmin]] // route with PUT method
+   * ]);
    */
   static get middleware() {
     return new Map([['/', [PrepareAppInfo, GetUserByToken, Auth]]]);

@@ -1,3 +1,15 @@
+#### 2.4.0
+
+[BREAKING] possible that bug fix of middleware can affect your code. Previous route middleware was GLOBAL (router.use) now in router level only (route.any). Previous Home controller (/ route be default) middleware affect ANY routes on app. Right now that fixed.
+
+[NEW] Controller middleware now support methods. Previous only ALL was supported. Possible to start router with any method that supported by Express and middleware will be scoped by this method. If middleware route started from "/" then ALL method will be used (like previous bahaviour)
+
+```javascript
+  static get middleware() {
+    return new Map([['GET/', [PrepareAppInfo, GetUserByToken]]]);
+  }
+```
+
 #### 2.3.14
 
 [FIX] fix validate controller method for non strings
