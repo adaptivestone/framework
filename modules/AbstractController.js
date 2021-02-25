@@ -35,6 +35,11 @@ class AbstractController extends Base {
       for (const M of middleware) {
         let method = 'all';
         let realPath = path;
+        if (typeof realPath !== 'string') {
+          this.logger.error(`Path not a string ${realPath}. Please check it`);
+          // eslint-disable-next-line no-continue
+          continue;
+        }
         if (!realPath.startsWith('/')) {
           method = realPath.split('/')[0]?.toLowerCase();
           if (!method) {
