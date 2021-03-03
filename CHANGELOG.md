@@ -1,3 +1,8 @@
+#### 2.4.2
+
+[FIX] abstract controlled middleware
+[UPDATE] deps update
+
 #### 2.4.1
 
 [FIX] updated test because of previous breaking changes

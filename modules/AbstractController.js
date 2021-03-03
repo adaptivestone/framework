@@ -241,7 +241,7 @@ class AbstractController extends Base {
    * ]);
    */
   static get middleware() {
-    return new Map([['/', [PrepareAppInfo, GetUserByToken, Auth]]]);
+    return new Map([['/*', [PrepareAppInfo, GetUserByToken, Auth]]]);
   }
 
   /**
