@@ -1,3 +1,7 @@
+#### 2.4.3
+
+[UPDATE] deps update
+
 #### 2.4.2
 
 [FIX] abstract controlled middleware
