@@ -69,7 +69,7 @@ class Server {
    */
   // eslint-disable-next-line class-methods-use-this
   addErrorHandling() {
-    process.on('uncaughtException', console.log);
+    process.on('uncaughtException', console.error);
     process.on('unhandledRejection', function (reason, p) {
       console.log(
         'Possibly Unhandled Rejection at: Promise ',
@@ -140,7 +140,14 @@ class Server {
         console.error(`Model not found: ${modelName}`);
         return false;
       }
-      this.cache.models.set(modelName, new Model(this.app).mongooseModel);
+      try {
+        const model = new Model(this.app);
+
+        this.cache.models.set(modelName, model.mongooseModel);
+      } catch (e) {
+        console.error(`Problem with model ${modelName}, ${e.message}`);
+        console.error(e);
+      }
     }
     return this.cache.models.get(modelName);
   }

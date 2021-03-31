@@ -121,7 +121,13 @@ class AbstractController extends Base {
         //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
         // );
 
-        this.router[verb](path, fn.bind(this));
+        this.router[verb](path, (req, res, next) => fn.call(this, req, res, next).catch((e) => {
+            this.logger.error(e);
+            return res.status(500).json({
+              succes: false,
+              message: 'Platform error. Please check later or contact support',
+            });
+          }));
       }
     }
 
