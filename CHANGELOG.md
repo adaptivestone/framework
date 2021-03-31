@@ -7,7 +7,7 @@
     return {
       post: {
         '/': {
-          hadler: this.postSample,
+          handler: this.postSample,
           request: yup.object().shape({
             count: yup.number().max(100)required(),
           })
@@ -23,7 +23,7 @@
     // on success validate we pass here.
     // {count: "5000"}
     console.log(req.appInfo.request)
-    // {count: 5000} -> cated to number
+    // {count: 5000} -> casted to number
   }
 ```
 
