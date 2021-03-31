@@ -1,3 +1,32 @@
+#### 2.5.0
+
+[NEW] new route handler format with request validations and casting (yup based)
+
+```javascript
+  get routes() {
+    return {
+      post: {
+        '/': {
+          hadler: this.postSample,
+          request: yup.object().shape({
+            count: yup.number().max(100)required(),
+          })
+        }
+      }
+    }
+  }
+  // send request with data  {count: "5000"}
+  // will produce error with status 400 and {errors: {count:['Text error']}}
+
+
+  postSample(req,res) =>{
+    // on success validate we pass here.
+    // {count: "5000"}
+    console.log(req.appInfo.request)
+    // {count: 5000} -> cated to number
+  }
+```
+
 #### 2.4.4
 
 [UPDATE] deps update

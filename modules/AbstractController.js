@@ -83,24 +83,32 @@ class AbstractController extends Base {
         continue;
       }
       for (const path in routes[verb]) {
-        let fn = routes[verb][path];
-        if (typeof fn === 'string') {
-          fn = this[fn];
-          this.logger.warn(
-            'Using string as a controller callback deprecated. Please use function instead',
-          );
-        }
-        if (typeof fn !== 'function') {
-          this.logger.error(
-            `Can't resolve function '${
-              routes[verb][path]
-            }' for controller '${this.getConstructorName()}'`,
-          );
-          // eslint-disable-next-line no-continue
-          continue;
+        let routeObject = routes[verb][path];
+        if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
+          routeObject = {
+            handler: routeObject,
+            request: null,
+          };
+
+          if (typeof routeObject.handler === 'string') {
+            routeObject.handler = this[routeObject];
+            this.logger.warn(
+              'Using string as a controller callback deprecated. Please use function instead',
+            );
+          }
+
+          if (typeof routeObject.handler !== 'function') {
+            this.logger.error(
+              `Can't resolve function '${
+                routeObject.handler
+              }' for controller '${this.getConstructorName()}'`,
+            );
+            // eslint-disable-next-line no-continue
+            continue;
+          }
         }
 
-        let fnName = routes[verb][path];
+        let fnName = routeObject.handler;
         if (typeof fnName === 'function') {
           fnName = fnName.name;
         }
@@ -121,15 +129,36 @@ class AbstractController extends Base {
         //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
         // );
 
-        this.router[verb](path, (req, res, next) =>
-          fn.call(this, req, res, next).catch((e) => {
+        this.router[verb](path, async (req, res, next) => {
+          if (routeObject.request) {
+            if (typeof routeObject.request.validate !== 'function') {
+              this.logger.error('request.validate should be a function');
+            }
+            if (typeof routeObject.request.cast !== 'function') {
+              this.logger.error('request.cast should be a function');
+            }
+
+            try {
+              await routeObject.request.validate(req.body);
+            } catch (e) {
+              this.logger.error(`Request validation failed: ${e.errors}`);
+
+              return res.status(400).json({
+                errors: {
+                  [e.path]: e.errors,
+                },
+              });
+            }
+            req.appInfo.request = routeObject.request.cast(req.body);
+          }
+          return routeObject.handler.call(this, req, res, next).catch((e) => {
             this.logger.error(e);
             return res.status(500).json({
               succes: false,
               message: 'Platform error. Please check later or contact support',
             });
-          }),
-        );
+          });
+        });
       }
     }
 
