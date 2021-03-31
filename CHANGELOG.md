@@ -3,6 +3,7 @@
 [UPDATE] deps update
 [NEW] controller unhandled rejection now handled with default error
 [NEW] handle error with wrong model name
+
 #### 2.4.3
 
 [UPDATE] deps update
