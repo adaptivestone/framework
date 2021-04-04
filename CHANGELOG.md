@@ -1,3 +1,8 @@
+#### 2.5.1
+
+[UPDATE] deps update
+[FIX] fix error logging on unhadled rejection
+
 #### 2.5.0
 
 [NEW] new route handler format with request validations and casting (yup based)

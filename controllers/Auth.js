@@ -96,7 +96,7 @@ class Auth extends AbstractController {
       await user.sendVerificationEmail(req.i18n);
       return res.status(200).json({ success: true });
     } catch (e) {
-      this.logger.error(e);
+      this.logger.error(e.message);
       return res.status(500).json({ success: false });
     }
   }
@@ -144,7 +144,7 @@ class Auth extends AbstractController {
       await user.sendPasswordRecoveryEmail(req.i18n);
       return res.status(200).json({ success: true });
     } catch (e) {
-      this.logger.error(e);
+      this.logger.error(e.message);
       return res
         .status(400)
         .json({ success: false, error: req.i18n.t('auth.errorUExist') });
