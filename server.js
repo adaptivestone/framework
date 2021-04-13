@@ -28,6 +28,9 @@ class Server {
       updateConfig: this.updateConfig.bind(this),
       foldersConfig: this.config.folders,
       events: new EventEmitter(),
+      get cache() {
+        return this.getCache();
+      },
     };
 
     this.cache = {
@@ -163,6 +166,18 @@ class Server {
       this.cli = new BaseCli(this);
     }
     return this.cli.run(commandName, args);
+  }
+
+  /**
+   * Get internal cache service
+   * @returns
+   */
+  getCache() {
+    if (!this.cacheService) {
+      const Cache = require('./services/cache/Cache'); // Speed optimisation
+      this.cacheService = new Cache(this.app);
+    }
+    return this.cacheService;
   }
 
   /**
