@@ -1,3 +1,8 @@
+#### 2.6.1
+
+[FIX] fix error on cache system
+[UPDATE] stripUnknown=true by default on casting
+
 #### 2.6.0
 
 [UPDATE] deps update

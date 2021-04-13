@@ -149,7 +149,9 @@ class AbstractController extends Base {
                 },
               });
             }
-            req.appInfo.request = routeObject.request.cast(req.body);
+            req.appInfo.request = routeObject.request.cast(req.body, {
+              stripUnknown: true,
+            });
           }
           return routeObject.handler.call(this, req, res, next).catch((e) => {
             this.logger.error(e.message);

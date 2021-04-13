@@ -21,6 +21,7 @@ class Server {
    */
   constructor(config) {
     this.config = config;
+    const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),
       getModel: this.getModel.bind(this),
@@ -29,7 +30,7 @@ class Server {
       foldersConfig: this.config.folders,
       events: new EventEmitter(),
       get cache() {
-        return this.getCache();
+        return that.getCache();
       },
     };
 
