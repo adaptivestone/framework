@@ -1,3 +1,7 @@
+#### 2.6.2
+
+[UPDATE] normalize auth config
+
 #### 2.6.1
 
 [FIX] fix error on cache system

@@ -1,4 +1,4 @@
 module.exports = {
   saltRounds: 10,
-  someSecretSalt: 'gdfg45667_%%^trterte',
+  saltSecret: process.env.AUTH_SALT || 'gdfg45667_%%^trterte',
 };

@@ -9,7 +9,17 @@ class User extends AbstractModel {
     super(app);
     const authConfig = this.app.getConfig('auth');
     this.saltRounds = authConfig.saltRounds;
-    this.someSecretSalt = authConfig.someSecretSalt;
+    this.saltSecret = authConfig.saltSecret;
+  }
+
+  /**
+   * @deprecated
+   */
+  get someSecretSalt() {
+    this.logger.warn(
+      'someSecretSalt deprecatred and will be removed in future release. Please use "this.saltSecret" instead ',
+    );
+    return this.saltSecret;
   }
 
   initHooks() {
@@ -71,7 +81,7 @@ class User extends AbstractModel {
       return false;
     }
     const same = await bcrypt.compare(
-      String(password) + data.constructor.getSuper().someSecretSalt,
+      String(password) + data.constructor.getSuper().saltSecret,
       data.password,
     );
 
@@ -108,7 +118,7 @@ class User extends AbstractModel {
 
   static async hashPassword(password) {
     return bcrypt.hash(
-      String(password) + this.getSuper().someSecretSalt,
+      String(password) + this.getSuper().saltSecret,
       this.getSuper().saltRounds,
     );
   }
