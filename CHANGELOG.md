@@ -1,3 +1,8 @@
+#### 2.6.3
+
+[UPDATE] update deps
+[UPDATE] update hadling exeption loggin
+
 #### 2.6.2
 
 [UPDATE] normalize auth config

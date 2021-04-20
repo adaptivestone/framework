@@ -155,6 +155,7 @@ class AbstractController extends Base {
           }
           return routeObject.handler.call(this, req, res, next).catch((e) => {
             this.logger.error(e.message);
+            console.error(e);
             return res.status(500).json({
               succes: false,
               message: 'Platform error. Please check later or contact support',
