@@ -1,7 +1,7 @@
 #### 2.6.3
 
 [UPDATE] update deps
-[UPDATE] update hadling exeption loggin
+[UPDATE] update handling exceptions loging
 
 #### 2.6.2
 
