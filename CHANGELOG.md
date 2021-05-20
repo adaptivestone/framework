@@ -1,3 +1,8 @@
+#### 2.6.5
+
+[UPDATE] update deps
+[UPDATE] optimize deps
+
 #### 2.6.4
 
 [UPDATE] update deps

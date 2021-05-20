@@ -153,6 +153,7 @@ class AbstractController extends Base {
               stripUnknown: true,
             });
           }
+          // todo check for promise
           return routeObject.handler.call(this, req, res, next).catch((e) => {
             this.logger.error(e.message);
             console.error(e);

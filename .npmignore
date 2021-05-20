@@ -4,3 +4,4 @@
 .gitignore
 .prettierrc
 .editorconfig
+.husky
