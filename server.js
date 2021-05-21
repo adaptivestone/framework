@@ -55,8 +55,6 @@ class Server {
     // TODO config
     this.app.httpServer = new HttpServer(this.app, this.config);
 
-
-
     this.app.controllerManager = new ControllerManager(this.app);
 
     await this.app.controllerManager.initControllers(this.config);
