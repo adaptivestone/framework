@@ -1,9 +1,11 @@
 module.exports = {
   transports: [
     {
-      transport: 'winston-sentry-log',
+      transport: 'winston-transport-sentry-node',
       transportOptions: {
-        dsn: process.env.SENTRY_DSN,
+        sentry: {
+          dsn: process.env.SENTRY_DSN,
+        },
         level: 'info',
       },
       enable: process.env.LOGGER_SENTRY_ENABLE || false,

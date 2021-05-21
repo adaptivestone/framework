@@ -1,3 +1,7 @@
+#### 2.7.0
+
+[UPDATE] change winston sentry transport
+
 #### 2.6.5
 
 [UPDATE] update deps

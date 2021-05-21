@@ -53,6 +53,14 @@ class Base {
 
     const logConfig = this.app.getConfig('log').transports;
 
+    function IsConstructor(f) {
+      try {
+        Reflect.construct(String, [], f);
+      } catch (e) {
+        return false;
+      }
+      return true;
+    }
     const transports = [];
     for (const log of logConfig) {
       if (log.enable) {
@@ -68,7 +76,17 @@ class Base {
           );
         } else {
           // eslint-disable-next-line global-require, import/no-dynamic-require
-          const Tr = require(log.transport);
+          let Tr = require(log.transport);
+          if (!IsConstructor(Tr) && Tr.default) {
+            Tr = Tr.default;
+          } else {
+            console.error(
+              `${log.transport} not a constructor. Please check it`,
+            );
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+
           transports.push(new Tr(log.transportOptions));
         }
       }
