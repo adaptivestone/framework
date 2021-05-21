@@ -49,17 +49,13 @@ class Server {
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
     const HttpServer = require('./services/http/HttpServer'); // Speed optimisation
-    const WebSocket = require('./services/connectors/socket'); // Speed optimisation
     const ControllerManager = require('./controllers/index'); // Speed optimisation
     this.addErrorHandling();
 
     // TODO config
     this.app.httpServer = new HttpServer(this.app, this.config);
 
-    // TODO config
-    if (this.getConfig('websocket').enabled) {
-      this.app.webSocket = new WebSocket(this.app);
-    }
+
 
     this.app.controllerManager = new ControllerManager(this.app);
 

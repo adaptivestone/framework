@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "repository": {
@@ -43,7 +43,6 @@
     "prettier": "^2.3.0",
     "pug": "^3.0.2",
     "redis": "^3.1.2",
-    "socket.io": "^4.1.2",
     "validator": "^13.6.0",
     "winston": "^3.3.3",
     "winston-transport-sentry-node": "^1.0.2"

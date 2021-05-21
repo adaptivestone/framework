@@ -1,3 +1,7 @@
+#### 2.7.1
+
+[REMOVE] remove unused websocket
+
 #### 2.7.0
 
 [UPDATE] change winston sentry transport
