@@ -8,7 +8,6 @@ const Server = require('../server');
 
 jest.setTimeout(1000000);
 beforeAll(async () => {
-
   mongoMemoryServerInstance = new MongoMemoryReplSet({
     binary: { version: '4.4.6' },
     replSet: { storageEngine: 'wiredTiger' },
