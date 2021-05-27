@@ -1,6 +1,11 @@
+#### 2.7.3
+
+[UPDATE] replace i18next-node-fs-backend to i18next-fs-backend (drop in replacement)
+
 #### 2.7.2
 
 [UPDATE] update deps
+
 #### 2.7.1
 
 [REMOVE] remove unused websocket
