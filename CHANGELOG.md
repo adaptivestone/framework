@@ -1,3 +1,6 @@
+#### 2.7.2
+
+[UPDATE] update deps
 #### 2.7.1
 
 [REMOVE] remove unused websocket

@@ -6,10 +6,11 @@ let mongoMemoryServerInstance;
 const path = require('path');
 const Server = require('../server');
 
+jest.setTimeout(1000000);
 beforeAll(async () => {
-  jest.setTimeout(1000000);
+
   mongoMemoryServerInstance = new MongoMemoryReplSet({
-    binary: { version: '4.4.3' },
+    binary: { version: '4.4.6' },
     replSet: { storageEngine: 'wiredTiger' },
   });
   await mongoMemoryServerInstance.waitUntilRunning();
