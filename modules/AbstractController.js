@@ -13,7 +13,7 @@ const Auth = require('../services/http/middleware/Auth');
  * Place you cintroller into controller folder and it be inited in auto way.
  * By default name of route will be controller name not file name. But please name it in same ways.
  * You can overwrite base controllers byt creating controllers with tha same file name (yes file name, not class name)
- * In most cases you will want to have a 'home' route that not include controller name. For this case please check 'isUseControllerNameForRouting'
+ * In most cases you will want to have a 'home' route that not include controller name. For this case please check 'getExpressPath'
  */
 class AbstractController extends Base {
   constructor(app, prefix) {
@@ -141,11 +141,13 @@ class AbstractController extends Base {
             try {
               await routeObject.request.validate(req.body);
             } catch (e) {
-              this.logger.error(`Request validation failed: ${e.errors}`);
+              // translate it
+              const errors = e.errors.map((err) => req.i18n.t(err));
+              this.logger.error(`Request validation failed: ${errors}`);
 
               return res.status(400).json({
                 errors: {
-                  [e.path]: e.errors,
+                  [e.path]: errors,
                 },
               });
             }
@@ -153,7 +155,24 @@ class AbstractController extends Base {
               stripUnknown: true,
             });
           }
-          // todo check for promise
+          req.body = new Proxy(req.body, {
+            get: (target, prop) => {
+              this.logger.warn(
+                'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
+              );
+              return target[prop];
+            },
+          });
+
+          if (routeObject.handler.constructor.name !== 'AsyncFunction') {
+            const error =
+              "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
+            this.logger.error(error);
+            return res.status(500).json({
+              succes: false,
+              message: 'Platform error. Please check later or contact support',
+            });
+          }
           return routeObject.handler.call(this, req, res, next).catch((e) => {
             this.logger.error(e.message);
             console.error(e);
@@ -197,6 +216,7 @@ class AbstractController extends Base {
    * From own function you can return a bool then will be treater as rule pass or not. At that case error message will be used from default error. But you also can provide error as output. Where only one arrya element will be an error message
    * @param {object} obj object with params to validate
    * @param {object} rules validation rules. rule name should match parameter name
+   * @deprecated
    * @example
    * // We can pass own function
    * validate({
@@ -229,6 +249,9 @@ class AbstractController extends Base {
    *    })
    */
   validate(obj, rules) {
+    this.logger.warn(
+      'Validate deprecated. Please do not use it. Will be revomed it future release',
+    );
     const errors = {};
     for (const name in rules) {
       let validationResult = false;
@@ -289,8 +312,12 @@ class AbstractController extends Base {
    * Part of abstract contorller.
    * When you do not need controller name to append in route then return false here.
    * Useful for home(root) controllers
+   * @deprecated please use getExpressPath instead
    */
   static get isUseControllerNameForRouting() {
+    console.warn(
+      'isUseControllerNameForRouting is DEPRECATED. Please use getExpressPath instead',
+    );
     return true;
   }
 

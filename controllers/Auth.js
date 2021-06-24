@@ -1,4 +1,4 @@
-const validator = require('validator');
+const yup = require('yup');
 const AbstractController = require('../modules/AbstractController');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
@@ -7,13 +7,49 @@ class Auth extends AbstractController {
   get routes() {
     return {
       post: {
-        '/login': this.postLogin,
-        '/register': this.postRegister,
+        '/login': {
+          handler: this.postLogin,
+          request: yup.object().shape({
+            email: yup.string().email().required('auth.emailProvided'), // if not provided then error will be generated
+            password: yup.string().required('auth.passwordProvided'), // possible to provide values from translation
+          }),
+        },
+        '/register': {
+          handler: this.postRegister,
+          request: yup.object().shape({
+            email: yup
+              .string()
+              .email('auth.emailValid')
+              .required('auth.emailProvided'),
+            password: yup
+              .string()
+              .matches(
+                /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
+                'auth.passwordValid',
+              )
+              .required('auth.passwordProvided'),
+            nickName: yup
+              .string()
+              .matches(/^[a-zA-Z0-9_\-.]+$/, 'auth.nickNameValid'),
+            firstName: yup.string(),
+            lastName: yup.string(),
+          }),
+        },
         '/logout': this.postLogout,
         '/verify': this.verifyUser,
         '/send-recovery-email': this.sendPasswordRecoveryEmail,
-        '/recover-password': this.recoverPassword,
-        '/send-verification': this.sendVerification,
+        '/recover-password': {
+          handler: this.recoverPassword,
+          request: yup
+            .object()
+            .shape({ email: yup.string().email().required() }),
+        },
+        '/send-verification': {
+          handler: this.sendVerification,
+          request: yup
+            .object()
+            .shape({ email: yup.string().email().required() }),
+        },
       },
       get: {
         '/login': this.postLogin,
@@ -22,21 +58,10 @@ class Auth extends AbstractController {
   }
 
   async postLogin(req, res) {
-    const errors = {};
-    if (!req.body.email) {
-      errors.email = [req.i18n.t('auth.emailProvided')];
-    }
-    if (!req.body.password) {
-      errors.password = [req.i18n.t('auth.passwordProvided')];
-    }
-
-    if (Object.keys(errors).length) {
-      return res.status(400).json({ errors });
-    }
     const User = this.app.getModel('User');
     const user = await User.getUserByEmailAndPassword(
-      req.body.email,
-      req.body.password,
+      req.body.email, // we do a request casting
+      req.appInfo.request.password, // we do a request casting
     );
     if (!user) {
       return res.status(400).json({ error: req.i18n.t('auth.errorUPValid') });
@@ -54,42 +79,22 @@ class Auth extends AbstractController {
   }
 
   async postRegister(req, res) {
-    const errors = {};
-    if (!req.body.email) {
-      errors.email = [req.i18n.t('auth.emailProvided')];
-    } else if (
-      !validator.isEmail(req.body.email, { allow_utf8_local_part: false })
-    ) {
-      errors.email = [req.i18n.t('auth.emailValid')];
-    }
-    if (!req.body.password) {
-      errors.password = [req.i18n.t('auth.passwordProvided')];
-    }
-    if (!req.body.nickName.match(/^[a-zA-Z0-9_\-.]+$/)) {
-      errors.nickName = [req.i18n.t('auth.nickNameValid')];
-    }
-    if (!req.body.password.match(/^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/)) {
-      errors.password = [req.i18n.t('auth.passwordValid')];
-    }
-    if (Object.keys(errors).length) {
-      return res.status(400).json({ errors });
-    }
     const User = req.appInfo.app.getModel('User');
-    let user = await User.getUserByEmail(req.body.email);
+    let user = await User.getUserByEmail(req.appInfo.request.email);
     if (user) {
       return res.status(400).json({ error: req.i18n.t('email.registered') });
     }
-    user = await User.findOne({ 'name.nick': req.body.nickName });
+    user = await User.findOne({ 'name.nick': req.appInfo.request.nickName });
     if (user) {
       return res.status(400).json({ error: req.i18n.t('auth.nicknameExists') });
     }
     user = await User.create({
-      email: req.body.email,
-      password: req.body.password,
+      email: req.appInfo.request.email,
+      password: req.appInfo.request.password,
       name: {
-        first: req.body.firstName,
-        last: req.body.lastName,
-        nick: req.body.nickName,
+        first: req.appInfo.request.firstName,
+        last: req.appInfo.request.lastName,
+        nick: req.appInfo.request.nickName,
       },
     });
     try {
@@ -101,7 +106,8 @@ class Auth extends AbstractController {
     }
   }
 
-  postLogout(req, res, next) {
+  // eslint-disable-next-line class-methods-use-this
+  postLogout(req, res) {
     // todo remove token
     return res.status(200).json({ success: true });
   }
@@ -135,7 +141,7 @@ class Auth extends AbstractController {
   async sendPasswordRecoveryEmail(req, res) {
     const User = req.appInfo.app.getModel('User');
     try {
-      const user = await User.getUserByEmail(req.body.email);
+      const user = await User.getUserByEmail(req.appInfo.request.email);
       if (!user) {
         return res
           .status(400)
@@ -185,7 +191,7 @@ class Auth extends AbstractController {
 
   async sendVerification(req, res) {
     const User = this.app.getModel('User');
-    const user = await User.getUserByEmail(req.body.email);
+    const user = await User.getUserByEmail(req.appInfo.request.email);
     if (!user) {
       return res
         .status(400)

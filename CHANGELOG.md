@@ -1,3 +1,11 @@
+#### 2.8.0
+
+[UPDATE] change controllers to reflect latest changes
+[UPDATE] add warning when using 'req.body' directly
+[BREAKING] Possible breaking. AsyncFunction now required for router handler (it always was but without checking of code)
+[DEPRECATE] usage of 'validator' of controllers
+[DEPRECATE] usage of 'isUseControllerNameForRouting' of controllers.
+
 #### 2.7.4
 
 [UPDATE] update deps

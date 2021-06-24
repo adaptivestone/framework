@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "2.7.4",
+  "version": "2.8.0",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "repository": {
@@ -45,7 +45,8 @@
     "redis": "^3.1.2",
     "validator": "^13.6.0",
     "winston": "^3.3.3",
-    "winston-transport-sentry-node": "^1.0.2"
+    "winston-transport-sentry-node": "^1.0.2",
+    "yup": "^0.32.9"
   },
   "devDependencies": {
     "eslint": "^7.29.0",

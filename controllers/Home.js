@@ -11,12 +11,14 @@ class Home extends AbstractController {
     };
   }
 
-  async home(req, res, next) {
+  // eslint-disable-next-line class-methods-use-this
+  async home(req, res) {
     res.render('home');
   }
 
-  static get isUseControllerNameForRouting() {
-    return false;
+  // eslint-disable-next-line class-methods-use-this
+  getExpressPath() {
+    return '/';
   }
 
   static get middleware() {
