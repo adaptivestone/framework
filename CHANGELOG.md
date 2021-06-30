@@ -1,3 +1,8 @@
+#### 2.8.1
+
+[UPDATE] update deps
+[FIX] update AUTH controller
+
 #### 2.8.0
 
 [UPDATE] change controllers to reflect latest changes
