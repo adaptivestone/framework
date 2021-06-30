@@ -1,3 +1,7 @@
+#### 2.8.3
+
+[FIX] update recovery email templte
+
 #### 2.8.2
 
 [FIX] update AUTH controller
