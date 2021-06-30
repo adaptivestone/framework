@@ -37,13 +37,13 @@ class Auth extends AbstractController {
         },
         '/logout': this.postLogout,
         '/verify': this.verifyUser,
-        '/send-recovery-email': this.sendPasswordRecoveryEmail,
-        '/recover-password': {
-          handler: this.recoverPassword,
+        '/send-recovery-email': {
+          handler: this.sendPasswordRecoveryEmail,
           request: yup
             .object()
             .shape({ email: yup.string().email().required() }),
         },
+        '/recover-password': this.recoverPassword,
         '/send-verification': {
           handler: this.sendVerification,
           request: yup
