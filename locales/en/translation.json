@@ -17,6 +17,10 @@
     "verify": "Verify email",
     "notVerified": "Your email is not verified",
     "registered": "User with such an email already registered",
-    "alreadyVerifiedOrWrongToken": "Your email is already verified or your verification token is wrong"
+    "alreadyVerifiedOrWrongToken": "Your email is already verified or your verification token is wrong",
+    "greeating": "Dear user",
+    "passwordChanged": "Password changed",
+    "passwordRecovery": "Recovery password",
+    "emailConfirm": "Email confirmation"
   }
 }
