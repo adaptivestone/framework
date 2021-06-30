@@ -1,6 +1,10 @@
+#### 2.9.0
+
+[BREAKING] Auth controller update
+
 #### 2.8.3
 
-[FIX] update recovery email templte
+[FIX] update recovery email template
 
 #### 2.8.2
 

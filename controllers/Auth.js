@@ -43,7 +43,19 @@ class Auth extends AbstractController {
             .object()
             .shape({ email: yup.string().email().required() }),
         },
-        '/recover-password': this.recoverPassword,
+        '/recover-password': {
+          handler: this.recoverPassword,
+          request: yup.object().shape({
+            password: yup
+              .string()
+              .matches(
+                /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
+                'auth.passwordValid',
+              )
+              .required(),
+            passwordRecoveryToken: yup.string().required(),
+          }),
+        },
         '/send-verification': {
           handler: this.sendVerification,
           request: yup
@@ -51,16 +63,13 @@ class Auth extends AbstractController {
             .shape({ email: yup.string().email().required() }),
         },
       },
-      get: {
-        '/login': this.postLogin,
-      },
     };
   }
 
   async postLogin(req, res) {
     const User = this.app.getModel('User');
     const user = await User.getUserByEmailAndPassword(
-      req.body.email, // we do a request casting
+      req.appInfo.request.email, // we do a request casting
       req.appInfo.request.password, // we do a request casting
     );
     if (!user) {
@@ -158,35 +167,27 @@ class Auth extends AbstractController {
   }
 
   async recoverPassword(req, res) {
-    let user;
     const User = this.app.getModel('User');
+    const user = await User.getUserByPasswordRecoveryToken(
+      req.appInfo.request.passwordRecoveryToken,
+    ).catch((e) => {
+      this.logger.error(e.message);
+      // eslint-disable-next-line no-console
+      console.log(e);
+    });
 
-    const errors = {};
-    if (!req.query.password.match(/^[a-zA-Z0-9!@#$%ˆ&*()_+\-{}[\]<>]+$/)) {
-      errors.password = [req.i18n.t('auth.passwordValid')];
-    }
-    if (Object.keys(errors).length) {
-      return res.status(400).json({ errors });
-    }
-    try {
-      user = await User.getUserByPasswordRecoveryToken(
-        req.query.password_recovery_token,
-      );
-    } catch (e) {
+    if (!user) {
       return res
         .status(400)
         .json({ success: false, error: req.i18n.t('password.wrongToken') });
     }
+
     this.logger.debug(`Password recovery user is :${user}`);
-    if (user) {
-      user.password = req.query.password;
-      user.isVerified = true;
-      await user.save();
-      return res.status(200).json({ success: true });
-    }
-    return res
-      .status(400)
-      .json({ success: false, error: req.i18n.t('password.wrongToken') });
+
+    user.password = req.appInfo.request.password;
+    user.isVerified = true;
+    await user.save();
+    return res.status(200).json({ success: true });
   }
 
   async sendVerification(req, res) {
