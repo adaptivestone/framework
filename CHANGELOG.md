@@ -1,3 +1,7 @@
+#### 2.9.1
+
+[UPDATE] update deps
+
 #### 2.9.0
 
 [BREAKING] Auth controller update

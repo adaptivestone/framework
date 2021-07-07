@@ -315,9 +315,6 @@ class AbstractController extends Base {
    * @deprecated please use getExpressPath instead
    */
   static get isUseControllerNameForRouting() {
-    console.warn(
-      'isUseControllerNameForRouting is DEPRECATED. Please use getExpressPath instead',
-    );
     return true;
   }
 
@@ -338,6 +335,9 @@ class AbstractController extends Base {
    */
   getExpressPath() {
     if (!this.constructor.isUseControllerNameForRouting) {
+      console.warn(
+        'isUseControllerNameForRouting is DEPRECATED. Please use getExpressPath instead',
+      );
       return '/';
     }
     return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
