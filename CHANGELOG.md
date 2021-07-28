@@ -1,3 +1,8 @@
+#### 2.9.2
+
+[UPDATE] update deps
+[FIX] fix auth nick
+
 #### 2.9.1
 
 [UPDATE] update deps

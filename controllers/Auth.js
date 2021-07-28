@@ -93,10 +93,15 @@ class Auth extends AbstractController {
     if (user) {
       return res.status(400).json({ error: req.i18n.t('email.registered') });
     }
-    user = await User.findOne({ 'name.nick': req.appInfo.request.nickName });
-    if (user) {
-      return res.status(400).json({ error: req.i18n.t('auth.nicknameExists') });
+    if (req.appInfo.request.nickName) {
+      user = await User.findOne({ 'name.nick': req.appInfo.request.nickName });
+      if (user) {
+        return res
+          .status(400)
+          .json({ error: req.i18n.t('auth.nicknameExists') });
+      }
     }
+
     user = await User.create({
       email: req.appInfo.request.email,
       password: req.appInfo.request.password,
