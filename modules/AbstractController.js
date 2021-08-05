@@ -61,6 +61,11 @@ class AbstractController extends Base {
           .join('/')
           .split('//')
           .join('/');
+        let MiddlewareFunction = M;
+        let middlewareParams = [];
+        if (Array.isArray(M)) {
+          [MiddlewareFunction, middlewareParams] = M;
+        }
         middlewaresInfo.push({
           name: M.name,
           method: method.toUpperCase(),
@@ -68,7 +73,10 @@ class AbstractController extends Base {
           fullPath,
         });
 
-        this.router[method](realPath, new M(this.app).getMiddleware());
+        this.router[method](
+          realPath,
+          new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
+        );
       }
     }
 

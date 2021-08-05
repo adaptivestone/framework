@@ -1,3 +1,22 @@
+#### 2.10.0
+
+[UPDATE] update deps
+[NEW] ability to pass parameters to middleware
+
+```javascript
+  static get middleware() {
+    return new Map([
+      ['POST/login', [
+        PrepareAppInfo,
+        GetUserByToken,
+        [RoleMiddleware, { roles: ['admin'] ]}]
+      ]]
+    ]);
+  }
+```
+
+All this params goes to constructor as a second paramater
+
 #### 2.9.2
 
 [UPDATE] update deps
