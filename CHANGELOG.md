@@ -1,3 +1,7 @@
+#### 2.11.0
+
+[NEW] Added env variable HTTP_HOST for configure host to listen
+
 #### 2.10.0
 
 [UPDATE] update deps

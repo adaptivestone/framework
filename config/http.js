@@ -1,6 +1,6 @@
 module.exports = {
   port: process.env.HTTP_PORT || 3300,
-  hostname: '0.0.0.0',
+  hostname: process.env.HTTP_HOST || '0.0.0.0',
   // if you watn to use 'all' domains please copy this file to your app
   // and set "corsDomains: '*'" (not a mistake, string instead of array)
   corsDomains: ['http://localhost:3000'],
