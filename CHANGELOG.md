@@ -1,3 +1,47 @@
+#### 2.12.0
+
+[UPDATE] update deps
+[NEW] Rate limited middleware
+
+As rate limited we using https://github.com/animir/node-rate-limiter-flexible
+
+```javascript
+  static get middleware() {
+    return new Map([
+      ['POST/login', [
+        PrepareAppInfo,
+        GetUserByToken,
+        RateLimiter
+      ]]
+    ]);
+  }
+```
+
+Be default rate key generated based on Route, IP and userID. But you can adjust it vie config (global) or via middleware parameters (see v 2.10.0)
+
+Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memory' backend activated
+
+```javascript
+  static get middleware() {
+    return new Map([
+      [
+        'POST/login',
+        [
+          PrepareAppInfo,
+          GetUserByToken,
+          [
+            RateLimiter,
+            {
+              consumeKeyComponents: { ip: false },
+              limiterOptions: { points: 5 },
+            },
+          ],
+        ],
+      ],
+    ]);
+  }
+```
+
 #### 2.11.0
 
 [NEW] Added env variable HTTP_HOST for configure host to listen
@@ -10,7 +54,7 @@
 ```javascript
   static get middleware() {
     return new Map([
-      ['POST/login', [
+      ['POST/someUrl', [
         PrepareAppInfo,
         GetUserByToken,
         [RoleMiddleware, { roles: ['admin'] ]}]
