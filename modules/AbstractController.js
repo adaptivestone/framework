@@ -62,7 +62,7 @@ class AbstractController extends Base {
           .split('//')
           .join('/');
         let MiddlewareFunction = M;
-        let middlewareParams = [];
+        let middlewareParams = {};
         if (Array.isArray(M)) {
           [MiddlewareFunction, middlewareParams] = M;
         }

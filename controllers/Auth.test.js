@@ -90,4 +90,23 @@ describe('auth', () => {
       expect(body.token).toBeDefined();
     });
   });
+  describe('rate limiter', () => {
+    it('we  should receive 429 on rate limit exceeded', async () => {
+      expect.assertions(1);
+      const resultsPromise = [];
+
+      for (let i = 0; i < 11; i += 1) {
+        resultsPromise.push(
+          request(global.server.app.httpServer.express)
+            .post('/auth/logout')
+            .send({}),
+        );
+      }
+
+      const results = await Promise.all(resultsPromise);
+      const statuses = results.map((res) => res.status);
+
+      expect(statuses.indexOf(429)).not.toBe(-1);
+    });
+  });
 });

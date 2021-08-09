@@ -2,6 +2,7 @@ const yup = require('yup');
 const AbstractController = require('../modules/AbstractController');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
+const RateLimiter = require('../services/http/middleware/RateLimiter');
 
 class Auth extends AbstractController {
   get routes() {
@@ -121,7 +122,7 @@ class Auth extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  postLogout(req, res) {
+  async postLogout(req, res) {
     // todo remove token
     return res.status(200).json({ success: true });
   }
@@ -208,7 +209,7 @@ class Auth extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/*', [PrepareAppInfo, GetUserByToken]]]);
+    return new Map([['/*', [PrepareAppInfo, GetUserByToken, RateLimiter]]]);
   }
 }
 
