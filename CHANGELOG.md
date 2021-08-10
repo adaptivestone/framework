@@ -1,3 +1,19 @@
+#### 2.14.0
+
+[NEW] Add Sequence. It provide ability to easily generate sequences for given types. It save to use on distributed environments
+
+```javascript
+const SequenceModel = this.app.getModel('Sequence');
+// will be 1
+const someTypeSequence = await SequenceModel.getSequence('someType');
+// will be 2
+const someTypeSequence2 = await SequenceModel.getSequence('someType');
+// will be 1 as type is another
+const someAnotherTypeSequence = await SequenceModel.getSequence(
+  'someAnotherType',
+);
+```
+
 #### 2.13.1
 
 [FIX] fix documentation about not using req.appInfo.request, but using req.body for RateLimiter
