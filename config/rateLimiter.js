@@ -11,5 +11,6 @@ module.exports = {
     ip: true, // include ip to key generation
     route: true, // include route to key generation
     user: true, // include user id to key generation (if user exits)
+    request: [], // what should be included from request (req.appInfo.request) if it presented
   },
 };

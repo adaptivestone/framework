@@ -58,7 +58,7 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   gerenateConsumeKey(req) {
-    const { ip, route, user } = this.finalOptions.consumeKeyComponents;
+    const { ip, route, user, request } = this.finalOptions.consumeKeyComponents;
 
     const key = [];
     if (ip) {
@@ -69,6 +69,14 @@ class RateLimiter extends AbstractMiddleware {
     }
     if (user && req.appInfo?.user) {
       key.push(req.appInfo?.user.id);
+    }
+
+    if (request && request.length) {
+      request.forEach((val) => {
+        if (req.appInfo.request && req.appInfo.request[val]) {
+          key.push(req.appInfo.request[val]);
+        }
+      });
     }
 
     return key.join('_');

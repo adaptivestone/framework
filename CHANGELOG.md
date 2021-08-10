@@ -1,3 +1,19 @@
+#### 2.13.0
+
+[NEW] Rate limited middleware - ability to include request components (req.appInfo.request) for key generation
+
+```javascript
+  static get middleware() {
+    return new Map([
+      ['POST/login', [
+        PrepareAppInfo,
+        GetUserByToken,
+        [RateLimiter,{consumeKeyComponents: { ip: false, request:['email','phone'] }}]
+      ]]
+    ]);
+  }
+```
+
 #### 2.12.0
 
 [UPDATE] update deps
