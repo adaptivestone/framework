@@ -1,6 +1,10 @@
+#### 2.13.1
+
+[FIX] fix documentation about not using req.appInfo.request, but using req.body for RateLimiter
+
 #### 2.13.0
 
-[NEW] Rate limited middleware - ability to include request components (req.appInfo.request) for key generation
+[NEW] Rate limited middleware - ability to include request components (req.body) for key generation. Please not that you have no access to req.appInfo.request on this stage
 
 ```javascript
   static get middleware() {
