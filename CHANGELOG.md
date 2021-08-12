@@ -1,3 +1,7 @@
+#### 2.15.1
+
+[FIX] fix config problem
+
 #### 2.15.0
 
 [UPDATE] update deps
