@@ -77,6 +77,7 @@ class Auth extends AbstractController {
       return res.status(400).json({ error: req.i18n.t('auth.errorUPValid') });
     }
     const { isAuthWithVefificationFlow } = this.app.getConfig('Auth');
+    console.log(`isAuthWithVefificationFlow ${isAuthWithVefificationFlow}`);
     if (isAuthWithVefificationFlow && !user.isVerified) {
       return res
         .status(400)
