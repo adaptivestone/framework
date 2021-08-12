@@ -90,7 +90,7 @@ class Server {
    * @returns {Object} config object. Structure depends of config file
    */
   getConfig(name) {
-    const configName = name.toLowerCase();
+    const configName = name.charAt(0).toUpperCase() + name.slice(1);
     if (!this.cache.configs.has(configName)) {
       let envConfig = {};
       if (process.env.NODE_ENV) {
@@ -120,7 +120,7 @@ class Server {
    * @param {Object} config
    */
   updateConfig(configName, config) {
-    const confName = configName.toLowerCase();
+    const confName = configName.charAt(0).toUpperCase() + configName.slice(1);
     const conf = this.getConfig(confName);
     const newConf = Object.assign(conf, config);
     this.cache.configs.set(confName, newConf);
