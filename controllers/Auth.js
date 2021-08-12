@@ -76,8 +76,7 @@ class Auth extends AbstractController {
     if (!user) {
       return res.status(400).json({ error: req.i18n.t('auth.errorUPValid') });
     }
-    const { isAuthWithVefificationFlow } = this.app.getConfig('Auth');
-    console.log(`isAuthWithVefificationFlow ${isAuthWithVefificationFlow}`);
+    const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow && !user.isVerified) {
       return res
         .status(400)
@@ -115,7 +114,7 @@ class Auth extends AbstractController {
       },
     });
 
-    const { isAuthWithVefificationFlow } = this.app.getConfig('Auth');
+    const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
       const answer = await user.sendVerificationEmail(req.i18n).catch((e) => {
         this.logger.error(e.message);

@@ -113,7 +113,7 @@ describe('auth', () => {
           password: userPassword,
         });
 
-      global.server.app.updateConfig('Auth', {
+      global.server.app.updateConfig('auth', {
         isAuthWithVefificationFlow: false,
       });
 

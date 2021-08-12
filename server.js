@@ -86,10 +86,11 @@ class Server {
    * and NODE_ENV is production then we will load base config (config.js) and the load
    * environment config (config.production.js) and overwrite base config options
    * @see updateConfig
-   * @param {String} configName name on config file to load
+   * @param {String} name name on config file to load
    * @returns {Object} config object. Structure depends of config file
    */
-  getConfig(configName) {
+  getConfig(name) {
+    const configName = name.toLowerCase();
     if (!this.cache.configs.has(configName)) {
       let envConfig = {};
       if (process.env.NODE_ENV) {
@@ -119,9 +120,10 @@ class Server {
    * @param {Object} config
    */
   updateConfig(configName, config) {
-    const conf = this.getConfig(configName);
+    const confName = configName.toLowerCase();
+    const conf = this.getConfig(confName);
     const newConf = Object.assign(conf, config);
-    this.cache.configs.set(configName, newConf);
+    this.cache.configs.set(confName, newConf);
     return newConf;
   }
 
