@@ -111,9 +111,9 @@ describe('auth', () => {
           password: userPassword,
         });
 
-      global.server.app.updateConfig('Auth', {
-        isAuthWithVefificationFlow: false,
-      });
+      // global.server.app.updateConfig('Auth', {
+      //   isAuthWithVefificationFlow: false,
+      // });
 
       const { status: status3, body } = await request(
         global.server.app.httpServer.express,
