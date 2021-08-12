@@ -91,7 +91,9 @@ describe('auth', () => {
       expect(body.success).toBe(true);
       expect(body.token).toBeDefined();
     });
+  });
 
+  describe('isAuthWithVefificationFlow auth option', () => {
     it('can login with normal creds and  NOT verifyed email is option isAuthWithVefificationFlow is set', async () => {
       expect.assertions(5);
 
@@ -111,9 +113,9 @@ describe('auth', () => {
           password: userPassword,
         });
 
-      // global.server.app.updateConfig('Auth', {
-      //   isAuthWithVefificationFlow: false,
-      // });
+      global.server.app.updateConfig('Auth', {
+        isAuthWithVefificationFlow: false,
+      });
 
       const { status: status3, body } = await request(
         global.server.app.httpServer.express,
@@ -123,6 +125,7 @@ describe('auth', () => {
           email: userEmail2,
           password: userPassword,
         });
+
       expect(status).toBe(201);
       expect(status2).toBe(400);
       expect(status3).toBe(200);
