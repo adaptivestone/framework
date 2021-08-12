@@ -14,6 +14,7 @@ module.exports = {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
+      connectionTimeout: 10000, // timeout to 10 seconds
     },
   },
   transport: 'smtp',

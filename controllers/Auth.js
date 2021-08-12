@@ -76,7 +76,8 @@ class Auth extends AbstractController {
     if (!user) {
       return res.status(400).json({ error: req.i18n.t('auth.errorUPValid') });
     }
-    if (!user.isVerified) {
+    const { isAuthWithVefificationFlow } = this.app.getConfig('Auth');
+    if (isAuthWithVefificationFlow && !user.isVerified) {
       return res
         .status(400)
         .json({ error: req.i18n.t('email.notVerified'), notVerified: true });
@@ -112,13 +113,17 @@ class Auth extends AbstractController {
         nick: req.appInfo.request.nickName,
       },
     });
-    try {
-      await user.sendVerificationEmail(req.i18n);
-      return res.status(200).json({ success: true });
-    } catch (e) {
-      this.logger.error(e.message);
-      return res.status(500).json({ success: false });
+
+    const { isAuthWithVefificationFlow } = this.app.getConfig('Auth');
+    if (isAuthWithVefificationFlow) {
+      const answer = await user.sendVerificationEmail(req.i18n).catch((e) => {
+        this.logger.error(e.message);
+      });
+      if (!answer) {
+        return res.status(500).json({ success: false });
+      }
     }
+    return res.status(201).json({ success: true });
   }
 
   // eslint-disable-next-line class-methods-use-this

@@ -1,3 +1,9 @@
+#### 2.15.0
+
+[UPDATE] update deps
+[NEW] Ability to configure Auth flow with 'isAuthWithVefificationFlow' option.
+[BREAKING] Register not return status 201 instead of 200
+
 #### 2.14.0
 
 [NEW] Add Sequence. It provide ability to easily generate sequences for given types. It save to use on distributed environments
