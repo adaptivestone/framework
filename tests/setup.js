@@ -72,5 +72,5 @@ afterAll(async () => {
     }
     await mongoose.disconnect();
     await mongoMemoryServerInstance.stop();
-  }, 500);
+  }, 2000);
 });

@@ -1,3 +1,8 @@
+#### 2.15.4
+
+[UPDATE] update deps
+[UPDATE] update tests timeout
+
 #### 2.15.0
 
 [UPDATE] update deps
