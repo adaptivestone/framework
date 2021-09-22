@@ -3,9 +3,6 @@ const fs = require('fs').promises;
 const { join } = require('path');
 
 class Base {
-  /**
-   * @param {import('../Server')} app  //TODO change to *.d.ts as this is a Server, not app
-   */
   constructor(app) {
     this.app = app;
     this._realLogger = null;

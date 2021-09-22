@@ -1,3 +1,8 @@
+#### 2.16.0
+
+[UPDATE] update deps
+[NEW] begin adding type script definitions
+
 #### 2.15.4
 
 [UPDATE] update deps

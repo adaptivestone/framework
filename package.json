@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "2.15.4",
+  "version": "2.16.0",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "repository": {

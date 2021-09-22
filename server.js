@@ -32,6 +32,8 @@ class Server {
       get cache() {
         return that.getCache();
       },
+      httpServer: null,
+      controllerManager: null,
     };
 
     this.cache = {
