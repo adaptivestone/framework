@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "2.16.0",
+  "version": "2.17.0",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "repository": {
@@ -31,7 +31,7 @@
     "dotenv": "^10.0.0",
     "email-templates": "^8.0.7",
     "express": "^4.17.1",
-    "i18next": "^20.3.5",
+    "i18next": "^21.2.4",
     "i18next-chained-backend": "^3.0.2",
     "i18next-fs-backend": "^1.1.1",
     "i18next-http-middleware": "^3.1.4",
@@ -46,7 +46,7 @@
     "redis": "^3.1.2",
     "validator": "^13.6.0",
     "winston": "^3.3.3",
-    "winston-transport-sentry-node": "^1.0.2",
+    "winston-transport-sentry-node": "^2.0.0",
     "yup": "^0.32.9"
   },
   "devDependencies": {

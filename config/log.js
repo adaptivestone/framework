@@ -6,7 +6,7 @@ module.exports = {
         sentry: {
           dsn: process.env.SENTRY_DSN,
         },
-        level: 'info',
+        level: process.env.LOGGER_SENTRY_LEVEL || 'info',
       },
       enable: process.env.LOGGER_SENTRY_ENABLE || false,
     },
@@ -15,7 +15,7 @@ module.exports = {
       transportOptions: {
         level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
       },
-      enable: true,
+      enable: process.env.LOGGER_CONSOLE_ENABLE || true,
     },
   ],
 };

@@ -1,3 +1,10 @@
+### 2.17.0
+
+[UPDATE] update deps
+[NEW] new env variable LOGGER_SENTRY_LEVEL (default=info)
+[NEW] new env variable LOGGER_CONSOLE_ENABLE (default=true)
+[BREAKING] on translation we changed i18next. Please convert files if you have plurals inside it https://i18next.github.io/i18next-v4-format-converter-web/
+
 #### 2.16.0
 
 [UPDATE] update deps
