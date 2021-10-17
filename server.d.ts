@@ -6,6 +6,7 @@ import EventEmitter from 'events';
 import { Model as MongooseModel, Schema } from 'mongoose';
 
 import BaseCli from './modules/BaseCli';
+import Cache from './services/cache/Cache';
 
 type ServerConfig = {
   folders: ExpandDeep<TFolderConfig>;
@@ -20,10 +21,11 @@ declare class Server {
     updateConfig: Server['updateConfig'];
     foldersConfig: Server['config'];
     events: EventEmitter;
-    get cache(): Server['cache'];
+    get cache(): Server['cacheService'];
     httpServer: null;
     controllerManager: null;
   };
+  cacheService: Cache;
 
   cache: {
     configs: Map<string, {}>;
