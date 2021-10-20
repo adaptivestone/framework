@@ -4,7 +4,7 @@ module.exports = {
       transport: 'winston-transport-sentry-node',
       transportOptions: {
         sentry: {
-          dsn: process.env.SENTRY_DSN,
+          dsn: process.env.LOGGER_SENTRY_DSN || process.env.SENTRY_DSN,
         },
         level: process.env.LOGGER_SENTRY_LEVEL || 'info',
       },
