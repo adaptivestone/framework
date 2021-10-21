@@ -136,6 +136,11 @@ class Server {
    * @returns {import('mongoose').Model}
    */
   getModel(modelName) {
+    if (modelName.endsWith('s')) {
+      console.warn(
+        `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
+      );
+    }
     if (!this.cache.models.has(modelName)) {
       const Model = this.getFileWithExtendingInhirence('models', modelName);
       if (!Model) {
