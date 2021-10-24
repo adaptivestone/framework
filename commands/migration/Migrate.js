@@ -2,6 +2,10 @@
 const AbstractCommand = require('../../modules/AbstractCommand');
 
 class Migrate extends AbstractCommand {
+  static get description() {
+    return 'Run all pending migrations';
+  }
+
   async run() {
     const files = await this.getFilesPathWithInheritance(
       `${__dirname}/../../migrations`,
