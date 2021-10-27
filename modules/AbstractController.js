@@ -1,13 +1,13 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
-const express = require("express");
-const validator = require("validator");
-const cloneDeep = require("lodash/cloneDeep");
+const express = require('express');
+const validator = require('validator');
+const cloneDeep = require('lodash/cloneDeep');
 
-const Base = require("./Base");
-const PrepareAppInfo = require("../services/http/middleware/PrepareAppInfo");
-const GetUserByToken = require("../services/http/middleware/GetUserByToken");
-const Auth = require("../services/http/middleware/Auth");
+const Base = require('./Base');
+const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
+const GetUserByToken = require('../services/http/middleware/GetUserByToken');
+const Auth = require('../services/http/middleware/Auth');
 
 /**
  * Abstract controller. You shoul extend any controller from them.
@@ -54,7 +54,7 @@ class AbstractController extends Base {
 
       for (const M of middleware) {
         let realPath = fullRoute;
-        const method = realPath.split("/")[0]?.toLowerCase();
+        const method = realPath.split('/')[0]?.toLowerCase();
         if (!method) {
           this.logger.error(`Method not found for ${realPath}`);
           // eslint-disable-next-line no-continue
@@ -63,10 +63,10 @@ class AbstractController extends Base {
         realPath = realPath.substring(method.length);
 
         const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
-          .split("//")
-          .join("/")
-          .split("//")
-          .join("/");
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
         let MiddlewareFunction = M;
         let middlewareParams = {};
         if (Array.isArray(M)) {
@@ -82,7 +82,7 @@ class AbstractController extends Base {
 
         this.router[method](
           realPath,
-          new MiddlewareFunction(this.app, middlewareParams).getMiddleware()
+          new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
         );
       }
     }
@@ -97,15 +97,15 @@ class AbstractController extends Base {
         middleware = [middleware];
       }
       for (const M of middleware) {
-        let method = "all";
+        let method = 'all';
         let realPath = path;
-        if (typeof realPath !== "string") {
+        if (typeof realPath !== 'string') {
           this.logger.error(`Path not a string ${realPath}. Please check it`);
           // eslint-disable-next-line no-continue
           continue;
         }
-        if (!realPath.startsWith("/")) {
-          method = realPath.split("/")[0]?.toLowerCase();
+        if (!realPath.startsWith('/')) {
+          method = realPath.split('/')[0]?.toLowerCase();
           if (!method) {
             this.logger.error(`Method not found for ${realPath}`);
             // eslint-disable-next-line no-continue
@@ -113,18 +113,18 @@ class AbstractController extends Base {
           }
           realPath = realPath.substring(method.length);
         }
-        if (typeof this.router[method] !== "function") {
+        if (typeof this.router[method] !== 'function') {
           this.logger.error(
-            `Method ${method} not exist for middleware. Please check your codebase`
+            `Method ${method} not exist for middleware. Please check your codebase`,
           );
           // eslint-disable-next-line no-continue
           continue;
         }
         const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
-          .split("//")
-          .join("/")
-          .split("//")
-          .join("/");
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
         let MiddlewareFunction = M;
         let middlewareParams = {};
         if (Array.isArray(M)) {
@@ -140,15 +140,15 @@ class AbstractController extends Base {
 
         this.router[method](
           realPath,
-          new MiddlewareFunction(this.app, middlewareParams).getMiddleware()
+          new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
         );
       }
     }
 
     for (const verb in routes) {
-      if (typeof this.router[verb] !== "function") {
+      if (typeof this.router[verb] !== 'function') {
         this.logger.error(
-          `Method ${verb} not exist for router. Please check your codebase`
+          `Method ${verb} not exist for router. Please check your codebase`,
         );
         // eslint-disable-next-line no-continue
         continue;
@@ -156,25 +156,25 @@ class AbstractController extends Base {
       for (const path in routes[verb]) {
         let routeObject = routes[verb][path];
         routeObjectClone = cloneDeep(routeObject);
-        if (Object.prototype.toString.call(routeObject) !== "[object Object]") {
+        if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
             handler: routeObject,
             request: null,
             middleware: null,
           };
 
-          if (typeof routeObject.handler === "string") {
+          if (typeof routeObject.handler === 'string') {
             routeObject.handler = this[routeObject];
             this.logger.warn(
-              "Using string as a controller callback deprecated. Please use function instead"
+              'Using string as a controller callback deprecated. Please use function instead',
             );
           }
 
-          if (typeof routeObject.handler !== "function") {
+          if (typeof routeObject.handler !== 'function') {
             this.logger.error(
               `Can't resolve function '${
                 routeObject.handler
-              }' for controller '${this.getConstructorName()}'`
+              }' for controller '${this.getConstructorName()}'`,
             );
             // eslint-disable-next-line no-continue
             continue;
@@ -182,15 +182,15 @@ class AbstractController extends Base {
         }
 
         let fnName = routeObject.handler;
-        if (typeof fnName === "function") {
+        if (typeof fnName === 'function') {
           fnName = fnName.name;
         }
 
         const fullPath = `/${expressPath}/${path}`
-          .split("//")
-          .join("/")
-          .split("//")
-          .join("/");
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
 
         routesInfo.push({
           name: fnName,
@@ -204,11 +204,11 @@ class AbstractController extends Base {
 
         this.router[verb](path, async (req, res, next) => {
           if (routeObject.request) {
-            if (typeof routeObject.request.validate !== "function") {
-              this.logger.error("request.validate should be a function");
+            if (typeof routeObject.request.validate !== 'function') {
+              this.logger.error('request.validate should be a function');
             }
-            if (typeof routeObject.request.cast !== "function") {
-              this.logger.error("request.cast should be a function");
+            if (typeof routeObject.request.cast !== 'function') {
+              this.logger.error('request.cast should be a function');
             }
 
             try {
@@ -231,19 +231,19 @@ class AbstractController extends Base {
           req.body = new Proxy(req.body, {
             get: (target, prop) => {
               this.logger.warn(
-                'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" '
+                'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
               );
               return target[prop];
             },
           });
 
-          if (routeObject.handler.constructor.name !== "AsyncFunction") {
+          if (routeObject.handler.constructor.name !== 'AsyncFunction') {
             const error =
               "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
             this.logger.error(error);
             return res.status(500).json({
               succes: false,
-              message: "Platform error. Please check later or contact support",
+              message: 'Platform error. Please check later or contact support',
             });
           }
           return routeObject.handler.call(this, req, res, next).catch((e) => {
@@ -251,7 +251,7 @@ class AbstractController extends Base {
             console.error(e);
             return res.status(500).json({
               succes: false,
-              message: "Platform error. Please check later or contact support",
+              message: 'Platform error. Please check later or contact support',
             });
           });
         });
@@ -259,26 +259,26 @@ class AbstractController extends Base {
     }
 
     const text = [
-      "",
+      '',
       `Controller '${this.getConstructorName()}' registered.`,
-      "Middlewares:",
+      'Middlewares:',
     ];
 
     middlewaresInfo.forEach((m) => {
       text.push(
-        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Function: '${m.name}'`
+        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Function: '${m.name}'`,
       );
     });
-    text.push("Callbacks:");
+    text.push('Callbacks:');
 
     routesInfo.forEach((m) => {
       text.push(
-        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Callback: '${m.name}'`
+        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Callback: '${m.name}'`,
       );
     });
     text.push(`Time: ${Date.now() - time} ms`);
 
-    this.logger.verbose(text.join("\n"));
+    this.logger.verbose(text.join('\n'));
     if (!this.app.httpServer) {
       const fields = [];
       if (routeObjectClone.request) {
@@ -375,34 +375,34 @@ class AbstractController extends Base {
    */
   validate(obj, rules) {
     this.logger.warn(
-      "Validate deprecated. Please do not use it. Will be revomed it future release"
+      'Validate deprecated. Please do not use it. Will be revomed it future release',
     );
     const errors = {};
     for (const name in rules) {
       let validationResult = false;
-      if (typeof rules[name][0] === "function") {
+      if (typeof rules[name][0] === 'function') {
         validationResult = rules[name][0](obj[name]);
         if (
-          Object.prototype.toString.call(validationResult) === "[object Array]"
+          Object.prototype.toString.call(validationResult) === '[object Array]'
         ) {
           [errors[name]] = validationResult;
           validationResult = false;
         }
-      } else if (typeof validator[rules[name][0]] === "function") {
+      } else if (typeof validator[rules[name][0]] === 'function') {
         // use from validator then
         validationResult = validator[rules[name][0]](obj[name]);
       } else if (
-        Object.prototype.toString.call(rules[name][0]) === "[object Array]" &&
-        typeof validator[rules[name][0][0]] === "function"
+        Object.prototype.toString.call(rules[name][0]) === '[object Array]' &&
+        typeof validator[rules[name][0][0]] === 'function'
       ) {
         // use from validator then
         validationResult = validator[rules[name][0][0]](
           `${obj[name]}`,
-          rules[name][0][1]
+          rules[name][0][1],
         );
       } else {
         this.logger.warn(
-          `No rule found for ${name}. Swith to existing checking`
+          `No rule found for ${name}. Swith to existing checking`,
         );
         validationResult = !!obj[name];
       }
@@ -430,7 +430,7 @@ class AbstractController extends Base {
    * ]);
    */
   static get middleware() {
-    return new Map([["/*", [PrepareAppInfo, GetUserByToken, Auth]]]);
+    return new Map([['/*', [PrepareAppInfo, GetUserByToken, Auth]]]);
   }
 
   /**
@@ -461,15 +461,15 @@ class AbstractController extends Base {
   getExpressPath() {
     if (!this.constructor.isUseControllerNameForRouting) {
       console.warn(
-        "isUseControllerNameForRouting is DEPRECATED. Please use getExpressPath instead"
+        'isUseControllerNameForRouting is DEPRECATED. Please use getExpressPath instead',
       );
-      return "/";
+      return '/';
     }
-    return `/${this.getConstructorName().toLowerCase()}`.replace("//", "/");
+    return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
   }
 
   static get loggerGroup() {
-    return "controller";
+    return 'controller';
   }
 }
 
