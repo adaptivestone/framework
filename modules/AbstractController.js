@@ -2,7 +2,6 @@
 /* eslint-disable guard-for-in */
 const express = require('express');
 const validator = require('validator');
-const cloneDeep = require('lodash/cloneDeep');
 
 const Base = require('./Base');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
@@ -23,67 +22,10 @@ class AbstractController extends Base {
     this.prefix = prefix;
     this.router = express.Router();
     const { routes } = this;
+
     const expressPath = this.getExpressPath();
 
-    const routeMiddlewares = new Set();
-    Object.entries(routes).forEach( ([method, methodRoutes]) => {
-      Object.entries(methodRoutes).forEach(([route, routeParam]) => {
-        if (routeParam.middleware) {
-          const fullRoute = method.toUpperCase() + route
-          if (!routeMiddlewares.has(fullRoute)) {
-            routeMiddlewares.add({fullRoute, middleware: routeParam.middleware})
-          } else {
-            routeMiddlewares.add(fullRoute, [...routeMiddlewares.get(fullRoute), ...routeParam.middleware])
-          }
-        }
-      })
-    })
-
-    const routeMiddlewaresReg = []
-
-    for (let {fullRoute, middleware} of routeMiddlewares) {
-      if (!Array.isArray(middleware)) {
-        middleware = [middleware];
-      }
-
-      for (const M of middleware) {
-        let realPath = fullRoute;
-        const method = realPath.split('/')[0]?.toLowerCase();
-        if (!method) {
-          this.logger.error(`Method not found for ${realPath}`);
-          // eslint-disable-next-line no-continue
-          continue;
-        }
-        realPath = realPath.substring(method.length);
-
-        const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
-        .split('//')
-        .join('/')
-        .split('//')
-        .join('/');
-      let MiddlewareFunction = M;
-      let middlewareParams = {};
-      if (Array.isArray(M)) {
-        [MiddlewareFunction, middlewareParams] = M;
-      }
-      routeMiddlewaresReg.push({
-        name: MiddlewareFunction.name,
-        method: method.toUpperCase(),
-        path: realPath,
-        fullPath,
-        params: middlewareParams
-      });
-
-      this.router[method](
-        realPath,
-        new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
-      );
-      }
-    }
-
     const middlewaresInfo = [];
-    const routesInfo = [];
-    let routeObjectClone = {}
 
     // eslint-disable-next-line prefer-const
     for (let [path, middleware] of this.constructor.middleware) {
@@ -125,11 +67,10 @@ class AbstractController extends Base {
           [MiddlewareFunction, middlewareParams] = M;
         }
         middlewaresInfo.push({
-          name: MiddlewareFunction.name,
+          name: M.name,
           method: method.toUpperCase(),
           path: realPath,
           fullPath,
-          params: middlewareParams
         });
 
         this.router[method](
@@ -139,7 +80,7 @@ class AbstractController extends Base {
       }
     }
 
-
+    const routesInfo = [];
 
     for (const verb in routes) {
       if (typeof this.router[verb] !== 'function') {
@@ -151,12 +92,10 @@ class AbstractController extends Base {
       }
       for (const path in routes[verb]) {
         let routeObject = routes[verb][path];
-        routeObjectClone = cloneDeep(routeObject);
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
             handler: routeObject,
             request: null,
-            middleware: null
           };
 
           if (typeof routeObject.handler === 'string') {
@@ -275,62 +214,9 @@ class AbstractController extends Base {
     text.push(`Time: ${Date.now() - time} ms`);
 
     this.logger.verbose(text.join('\n'));
-    if (!this.app.httpServer) {
 
-      const fields = []
-      if (routeObjectClone.request) {
-        const reqFields = routeObjectClone.request.fields
-        const entries = Object.entries(reqFields);
-        entries.forEach(([key, value]) => {
-          const field = {}
-           field.name = key
-           field.type = value.type
-           if (value.exclusiveTests) {
-            field.isRequired = value.exclusiveTests.required
-           }
-
-           if (value.fields) {
-            field.fields = []
-            const entries = Object.entries(value.fields);
-            entries.forEach(([key, value]) => {
-              field.fields.push({
-                name: key,
-                type: value.type
-              })
-            }
-            )
-          }
-          fields.push(field)
-        })
-      }
-
-      this.app.documentation.push({
-        contollerName: this.getConstructorName(),
-        routesInfo: routesInfo.map( route => ({
-          [route.fullPath]: {
-              method: route.method,
-              name: route.name,
-              fields,
-              routeMiddlewares: routeMiddlewaresReg.map( middleware => {
-                if ( route.fullPath.toUpperCase() === middleware.fullPath.toUpperCase()) {
-                  return ({
-                    name: middleware.name,
-                    params: middleware.params
-                  })
-                }
-              }),
-              globalMiddlewares: [...new Set(middlewaresInfo.map( middleware => middleware.name))]
-          }
-        })),
-      })
-    }
-    else {
-      this.app.httpServer.express.use(expressPath, this.router);
-    }
-
+    this.app.httpServer.express.use(expressPath, this.router);
   }
-
-
 
   /**
    * Internal validation method for params validation.
