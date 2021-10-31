@@ -10,6 +10,10 @@ const mongoose = require('mongoose');
 const AbstractMiddleware = require('./AbstractMiddleware');
 
 class RateLimiter extends AbstractMiddleware {
+  static get description() {
+    return 'Rate limiter middleware. Limit mount of request. Please refer to documentation';
+  }
+
   constructor(app, params) {
     super(app);
     const limiterOptions = this.app.getConfig('rateLimiter');
