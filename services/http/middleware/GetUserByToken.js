@@ -2,7 +2,7 @@ const AbstractMiddleware = require('./AbstractMiddleware');
 
 class GetUserByToken extends AbstractMiddleware {
   static get description() {
-    return 'Grab token and try to parsse user from it. It user exist will add req.appInfo.user variable';
+    return 'Grab a token and try to parse the user from it. It user exist will add req.appInfo.user variable';
   }
 
   async middleware(req, res, next) {

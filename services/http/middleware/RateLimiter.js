@@ -11,7 +11,7 @@ const AbstractMiddleware = require('./AbstractMiddleware');
 
 class RateLimiter extends AbstractMiddleware {
   static get description() {
-    return 'Rate limiter middleware. Limit mount of request. Please refer to documentation';
+    return 'Rate limiter middleware. Limit amount of request. Please refer to documentation';
   }
 
   constructor(app, params) {

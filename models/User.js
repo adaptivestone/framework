@@ -69,6 +69,7 @@ class User extends AbstractModel {
       verificationTokens: [{ until: Date, token: String }],
       passwordRecoveryTokens: [{ until: Date, token: String }],
       permissions: [],
+      roles: [],
       isVerified: { type: Boolean, default: false },
       locale: { type: String, default: 'en' },
       languages: [String],

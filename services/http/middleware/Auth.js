@@ -2,7 +2,7 @@ const AbstractMiddleware = require('./AbstractMiddleware');
 
 class AuthMiddleware extends AbstractMiddleware {
   static get description() {
-    return 'Allow to pass only if user provided. Please use any middleware that provide user instance before';
+    return 'Allow to pass only if the user provided. Please use any middleware that provide user instance before';
   }
 
   async middleware(req, res, next) {

@@ -2,6 +2,7 @@
 
 [UPDATE] update deps
 [UPDATE] replace body-parser with express.json
+[NEW] role middleware
 
 ### 2.17.0
 
