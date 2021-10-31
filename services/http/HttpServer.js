@@ -1,7 +1,6 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
-const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const i18next = require('i18next');
@@ -41,8 +40,8 @@ class HttpServer extends Base {
         origin: httpConfig.corsDomains,
       }),
     ); // todo whitelist
-    this.express.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-    this.express.use(bodyParser.json({ limit: '50mb' }));
+    this.express.use(express.urlencoded({ limit: '50mb', extended: true }));
+    this.express.use(express.json({ limit: '50mb' }));
     this.express.use(express.static(folderConfig.folders.public));
     this.express.use(express.static('./public'));
 
