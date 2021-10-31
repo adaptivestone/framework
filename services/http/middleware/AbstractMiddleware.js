@@ -1,6 +1,11 @@
 const Base = require('../../../modules/Base');
 
 class AbstractMiddleware extends Base {
+  constructor(app, params) {
+    super(app);
+    this.params = params;
+  }
+
   static get description() {
     return ' Middleware description. Please provide own';
   }

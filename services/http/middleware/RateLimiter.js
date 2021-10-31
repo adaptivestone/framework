@@ -15,7 +15,7 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   constructor(app, params) {
-    super(app);
+    super(app, params);
     const limiterOptions = this.app.getConfig('rateLimiter');
     this.finalOptions = merge(limiterOptions, params);
 
