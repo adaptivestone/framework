@@ -1,3 +1,8 @@
+### 2.18.0
+
+[UPDATE] update deps
+[UPDATE] replace body-parser with express.json
+
 ### 2.17.0
 
 [UPDATE] update deps
