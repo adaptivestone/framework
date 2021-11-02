@@ -57,6 +57,10 @@ class Cache extends Base {
     this.promiseMapping.delete(key);
     return result;
   }
+
+  static get loggerGroup() {
+    return 'Cache_';
+  }
 }
 
 module.exports = Cache;
