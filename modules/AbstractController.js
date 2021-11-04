@@ -1,7 +1,9 @@
+/* eslint-disable array-callback-return */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
 const express = require('express');
 const validator = require('validator');
+// eslint-disable-next-line import/no-extraneous-dependencies
 const cloneDeep = require('lodash/cloneDeep');
 
 const Base = require('./Base');
@@ -47,6 +49,7 @@ class AbstractController extends Base {
 
     const routeMiddlewaresReg = [];
 
+    // eslint-disable-next-line prefer-const
     for (let { fullRoute, middleware } of routeMiddlewares) {
       if (!Array.isArray(middleware)) {
         middleware = [middleware];
@@ -78,12 +81,13 @@ class AbstractController extends Base {
           path: realPath,
           fullPath,
           params: middlewareParams,
+          MiddlewareFunction,
         });
 
-        this.router[method](
-          realPath,
-          new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
-        );
+        // this.router[method](
+        //   realPath,
+        //   new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
+        // );
       }
     }
 
@@ -154,6 +158,9 @@ class AbstractController extends Base {
         continue;
       }
       for (const path in routes[verb]) {
+        const routeAdditionalMiddlewares = routeMiddlewaresReg.filter(
+          (middleware) => middleware.path === path,
+        );
         let routeObject = routes[verb][path];
         routeObjectClone = cloneDeep(routeObject);
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
@@ -202,59 +209,74 @@ class AbstractController extends Base {
         //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
         // );
 
-        this.router[verb](path, async (req, res, next) => {
-          if (routeObject.request) {
-            if (typeof routeObject.request.validate !== 'function') {
-              this.logger.error('request.validate should be a function');
-            }
-            if (typeof routeObject.request.cast !== 'function') {
-              this.logger.error('request.cast should be a function');
-            }
+        let additionalMiddlewares;
+        if (routeAdditionalMiddlewares.length > 0) {
+          additionalMiddlewares = Array.from(
+            routeAdditionalMiddlewares,
+            ({ MiddlewareFunction, params }) =>
+              new MiddlewareFunction(this.app, params).getMiddleware(),
+          );
+        }
 
-            try {
-              await routeObject.request.validate(req.body);
-            } catch (e) {
-              // translate it
-              const errors = e.errors.map((err) => req.i18n.t(err));
-              this.logger.error(`Request validation failed: ${errors}`);
+        this.router[verb](
+          path,
+          additionalMiddlewares || [],
+          async (req, res, next) => {
+            if (routeObject.request) {
+              if (typeof routeObject.request.validate !== 'function') {
+                this.logger.error('request.validate should be a function');
+              }
+              if (typeof routeObject.request.cast !== 'function') {
+                this.logger.error('request.cast should be a function');
+              }
 
-              return res.status(400).json({
-                errors: {
-                  [e.path]: errors,
-                },
+              try {
+                await routeObject.request.validate(req.body);
+              } catch (e) {
+                // translate it
+                const errors = e.errors.map((err) => req.i18n.t(err));
+                this.logger.error(`Request validation failed: ${errors}`);
+
+                return res.status(400).json({
+                  errors: {
+                    [e.path]: errors,
+                  },
+                });
+              }
+              req.appInfo.request = routeObject.request.cast(req.body, {
+                stripUnknown: true,
               });
             }
-            req.appInfo.request = routeObject.request.cast(req.body, {
-              stripUnknown: true,
+            req.body = new Proxy(req.body, {
+              get: (target, prop) => {
+                this.logger.warn(
+                  'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
+                );
+                return target[prop];
+              },
             });
-          }
-          req.body = new Proxy(req.body, {
-            get: (target, prop) => {
-              this.logger.warn(
-                'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
-              );
-              return target[prop];
-            },
-          });
 
-          if (routeObject.handler.constructor.name !== 'AsyncFunction') {
-            const error =
-              "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
-            this.logger.error(error);
-            return res.status(500).json({
-              succes: false,
-              message: 'Platform error. Please check later or contact support',
+            if (routeObject.handler.constructor.name !== 'AsyncFunction') {
+              const error =
+                "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
+              this.logger.error(error);
+              return res.status(500).json({
+                succes: false,
+                message:
+                  'Platform error. Please check later or contact support',
+              });
+            }
+            return routeObject.handler.call(this, req, res, next).catch((e) => {
+              this.logger.error(e.message);
+              console.error(e);
+              return res.status(500).json({
+                succes: false,
+                message:
+                  'Platform error. Please check later or contact support',
+              });
             });
-          }
-          return routeObject.handler.call(this, req, res, next).catch((e) => {
-            this.logger.error(e.message);
-            console.error(e);
-            return res.status(500).json({
-              succes: false,
-              message: 'Platform error. Please check later or contact support',
-            });
-          });
-        });
+          },
+        );
       }
     }
 
@@ -294,7 +316,9 @@ class AbstractController extends Base {
 
           if (value.fields) {
             field.fields = [];
+            // eslint-disable-next-line no-shadow
             const entries = Object.entries(value.fields);
+            // eslint-disable-next-line no-shadow
             entries.forEach(([key, value]) => {
               field.fields.push({
                 name: key,
@@ -306,29 +330,43 @@ class AbstractController extends Base {
         });
       }
 
+      let additionalMiddlewareNames = [];
       this.app.documentation.push({
         contollerName: this.getConstructorName(),
-        routesInfo: routesInfo.map((route) => ({
-          [route.fullPath]: {
-            method: route.method,
-            name: route.name,
-            fields,
-            routeMiddlewares: routeMiddlewaresReg.map((middleware) => {
-              if (
-                route.fullPath.toUpperCase() ===
-                middleware.fullPath.toUpperCase()
-              ) {
-                return {
-                  name: middleware.name,
-                  params: middleware.params,
-                };
-              }
-            }),
-            globalMiddlewares: [
-              ...new Set(middlewaresInfo.map((middleware) => middleware.name)),
-            ],
-          },
-        })),
+        routesInfo: routesInfo.map((route) => {
+          additionalMiddlewareNames = [];
+          return {
+            [route.fullPath]: {
+              method: route.method,
+              name: route.name,
+              fields,
+              routeMiddlewares: routeMiddlewaresReg
+                // eslint-disable-next-line consistent-return
+                .map((middleware) => {
+                  if (
+                    route.fullPath.toUpperCase() ===
+                    middleware.fullPath.toUpperCase()
+                  ) {
+                    additionalMiddlewareNames.push(middleware.name);
+                    return {
+                      name: middleware.name,
+                      params: middleware.params,
+                    };
+                  }
+                })
+                .filter(Boolean),
+              globalMiddlewares: [
+                ...new Set(
+                  middlewaresInfo
+                    .map((middleware) => middleware.name)
+                    .filter(
+                      (item) => !additionalMiddlewareNames.includes(item),
+                    ),
+                ),
+              ],
+            },
+          };
+        }),
       });
     } else {
       this.app.httpServer.express.use(expressPath, this.router);
