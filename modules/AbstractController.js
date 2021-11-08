@@ -4,7 +4,7 @@
 const express = require('express');
 const validator = require('validator');
 // eslint-disable-next-line import/no-extraneous-dependencies
-const cloneDeep = require('lodash/cloneDeep');
+const merge = require('deepmerge');
 
 const Base = require('./Base');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
@@ -162,7 +162,7 @@ class AbstractController extends Base {
           (middleware) => middleware.path === path,
         );
         let routeObject = routes[verb][path];
-        routeObjectClone = cloneDeep(routeObject);
+        routeObjectClone = merge({}, routeObject);
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
             handler: routeObject,
