@@ -1,6 +1,9 @@
+/* eslint-disable array-callback-return */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
 const express = require('express');
+
+const merge = require('deepmerge');
 
 const Base = require('./Base');
 const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
@@ -21,10 +24,75 @@ class AbstractController extends Base {
     this.prefix = prefix;
     this.router = express.Router();
     const { routes } = this;
-
     const expressPath = this.getExpressPath();
 
+    const routeMiddlewares = new Set();
+    Object.entries(routes).forEach(([method, methodRoutes]) => {
+      Object.entries(methodRoutes).forEach(([route, routeParam]) => {
+        if (routeParam.middleware) {
+          const fullRoute = method.toUpperCase() + route;
+          if (!routeMiddlewares.has(fullRoute)) {
+            routeMiddlewares.add({
+              fullRoute,
+              middleware: routeParam.middleware,
+            });
+          } else {
+            routeMiddlewares.add(fullRoute, [
+              ...routeMiddlewares.get(fullRoute),
+              ...routeParam.middleware,
+            ]);
+          }
+        }
+      });
+    });
+
+    const routeMiddlewaresReg = [];
+
+    // eslint-disable-next-line prefer-const
+    for (let { fullRoute, middleware } of routeMiddlewares) {
+      if (!Array.isArray(middleware)) {
+        middleware = [middleware];
+      }
+
+      for (const M of middleware) {
+        let realPath = fullRoute;
+        const method = realPath.split('/')[0]?.toLowerCase();
+        if (!method) {
+          this.logger.error(`Method not found for ${realPath}`);
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        realPath = realPath.substring(method.length);
+
+        const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
+        let MiddlewareFunction = M;
+        let middlewareParams = {};
+        if (Array.isArray(M)) {
+          [MiddlewareFunction, middlewareParams] = M;
+        }
+        routeMiddlewaresReg.push({
+          name: MiddlewareFunction.name,
+          method: method.toUpperCase(),
+          path: realPath,
+          fullPath,
+          params: middlewareParams,
+          MiddlewareFunction,
+        });
+
+        // this.router[method](
+        //   realPath,
+        //   new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
+        // );
+      }
+    }
+
     const middlewaresInfo = [];
+    const routesInfo = [];
+    let routeObjectClone = {};
 
     // eslint-disable-next-line prefer-const
     for (let [path, middleware] of this.constructor.middleware) {
@@ -66,10 +134,11 @@ class AbstractController extends Base {
           [MiddlewareFunction, middlewareParams] = M;
         }
         middlewaresInfo.push({
-          name: M.name,
+          name: MiddlewareFunction.name,
           method: method.toUpperCase(),
           path: realPath,
           fullPath,
+          params: middlewareParams,
         });
 
         this.router[method](
@@ -78,8 +147,6 @@ class AbstractController extends Base {
         );
       }
     }
-
-    const routesInfo = [];
 
     for (const verb in routes) {
       if (typeof this.router[verb] !== 'function') {
@@ -90,11 +157,16 @@ class AbstractController extends Base {
         continue;
       }
       for (const path in routes[verb]) {
+        const routeAdditionalMiddlewares = routeMiddlewaresReg.filter(
+          (middleware) => middleware.path === path,
+        );
         let routeObject = routes[verb][path];
+        routeObjectClone = merge({}, routeObject);
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
             handler: routeObject,
             request: null,
+            middleware: null,
           };
 
           if (typeof routeObject.handler !== 'function') {
@@ -129,59 +201,74 @@ class AbstractController extends Base {
         //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
         // );
 
-        this.router[verb](path, async (req, res, next) => {
-          if (routeObject.request) {
-            if (typeof routeObject.request.validate !== 'function') {
-              this.logger.error('request.validate should be a function');
-            }
-            if (typeof routeObject.request.cast !== 'function') {
-              this.logger.error('request.cast should be a function');
-            }
+        let additionalMiddlewares;
+        if (routeAdditionalMiddlewares.length > 0) {
+          additionalMiddlewares = Array.from(
+            routeAdditionalMiddlewares,
+            ({ MiddlewareFunction, params }) =>
+              new MiddlewareFunction(this.app, params).getMiddleware(),
+          );
+        }
 
-            try {
-              await routeObject.request.validate(req.body);
-            } catch (e) {
-              // translate it
-              const errors = e.errors.map((err) => req.i18n.t(err));
-              this.logger.error(`Request validation failed: ${errors}`);
+        this.router[verb](
+          path,
+          additionalMiddlewares || [],
+          async (req, res, next) => {
+            if (routeObject.request) {
+              if (typeof routeObject.request.validate !== 'function') {
+                this.logger.error('request.validate should be a function');
+              }
+              if (typeof routeObject.request.cast !== 'function') {
+                this.logger.error('request.cast should be a function');
+              }
 
-              return res.status(400).json({
-                errors: {
-                  [e.path]: errors,
-                },
+              try {
+                await routeObject.request.validate(req.body);
+              } catch (e) {
+                // translate it
+                const errors = e.errors.map((err) => req.i18n.t(err));
+                this.logger.error(`Request validation failed: ${errors}`);
+
+                return res.status(400).json({
+                  errors: {
+                    [e.path]: errors,
+                  },
+                });
+              }
+              req.appInfo.request = routeObject.request.cast(req.body, {
+                stripUnknown: true,
               });
             }
-            req.appInfo.request = routeObject.request.cast(req.body, {
-              stripUnknown: true,
+            req.body = new Proxy(req.body, {
+              get: (target, prop) => {
+                this.logger.warn(
+                  'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
+                );
+                return target[prop];
+              },
             });
-          }
-          req.body = new Proxy(req.body, {
-            get: (target, prop) => {
-              this.logger.warn(
-                'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
-              );
-              return target[prop];
-            },
-          });
 
-          if (routeObject.handler.constructor.name !== 'AsyncFunction') {
-            const error =
-              "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
-            this.logger.error(error);
-            return res.status(500).json({
-              succes: false,
-              message: 'Platform error. Please check later or contact support',
+            if (routeObject.handler.constructor.name !== 'AsyncFunction') {
+              const error =
+                "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
+              this.logger.error(error);
+              return res.status(500).json({
+                succes: false,
+                message:
+                  'Platform error. Please check later or contact support',
+              });
+            }
+            return routeObject.handler.call(this, req, res, next).catch((e) => {
+              this.logger.error(e.message);
+              console.error(e);
+              return res.status(500).json({
+                succes: false,
+                message:
+                  'Platform error. Please check later or contact support',
+              });
             });
-          }
-          return routeObject.handler.call(this, req, res, next).catch((e) => {
-            this.logger.error(e.message);
-            console.error(e);
-            return res.status(500).json({
-              succes: false,
-              message: 'Platform error. Please check later or contact support',
-            });
-          });
-        });
+          },
+        );
       }
     }
 
@@ -206,8 +293,76 @@ class AbstractController extends Base {
     text.push(`Time: ${Date.now() - time} ms`);
 
     this.logger.verbose(text.join('\n'));
+    if (!this.app.httpServer) {
+      const fields = [];
+      if (routeObjectClone.request) {
+        const reqFields = routeObjectClone.request.fields;
+        const entries = Object.entries(reqFields);
+        entries.forEach(([key, value]) => {
+          const field = {};
+          field.name = key;
+          field.type = value.type;
+          if (value.exclusiveTests) {
+            field.isRequired = value.exclusiveTests.required;
+          }
 
-    this.app.httpServer.express.use(expressPath, this.router);
+          if (value.fields) {
+            field.fields = [];
+            // eslint-disable-next-line no-shadow
+            const entries = Object.entries(value.fields);
+            // eslint-disable-next-line no-shadow
+            entries.forEach(([key, value]) => {
+              field.fields.push({
+                name: key,
+                type: value.type,
+              });
+            });
+          }
+          fields.push(field);
+        });
+      }
+
+      let additionalMiddlewareNames = [];
+      this.app.documentation.push({
+        contollerName: this.getConstructorName(),
+        routesInfo: routesInfo.map((route) => {
+          additionalMiddlewareNames = [];
+          return {
+            [route.fullPath]: {
+              method: route.method,
+              name: route.name,
+              fields,
+              routeMiddlewares: routeMiddlewaresReg
+                // eslint-disable-next-line consistent-return
+                .map((middleware) => {
+                  if (
+                    route.fullPath.toUpperCase() ===
+                    middleware.fullPath.toUpperCase()
+                  ) {
+                    additionalMiddlewareNames.push(middleware.name);
+                    return {
+                      name: middleware.name,
+                      params: middleware.params,
+                    };
+                  }
+                })
+                .filter(Boolean),
+              globalMiddlewares: [
+                ...new Set(
+                  middlewaresInfo
+                    .map((middleware) => middleware.name)
+                    .filter(
+                      (item) => !additionalMiddlewareNames.includes(item),
+                    ),
+                ),
+              ],
+            },
+          };
+        }),
+      });
+    } else {
+      this.app.httpServer.express.use(expressPath, this.router);
+    }
   }
 
   /**
