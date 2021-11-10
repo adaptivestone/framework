@@ -1,7 +1,7 @@
 const request = require('supertest');
 
 describe('middlewares correct works', () => {
-  it('RateLimiter on route works correct', async () => {
+  it('rateLimiter on route works correct', async () => {
     expect.assertions(1);
     const resultsPromise = [];
 
@@ -17,7 +17,7 @@ describe('middlewares correct works', () => {
     expect(statuses.indexOf(429)).not.toBe(-1);
   });
 
-  it('CheckFlag middleware works correctly with other middleware', async () => {
+  it('checkFlag middleware works correctly with other middleware', async () => {
     expect.assertions(1);
 
     const { status } = await request(global.server.app.httpServer.express)
@@ -29,7 +29,7 @@ describe('middlewares correct works', () => {
     expect(status).toBe(400);
   });
 
-  it('Middlware with params works correctly', async () => {
+  it('middlware with params works correctly', async () => {
     expect.assertions(1);
 
     const { status } = await request(global.server.app.httpServer.express)

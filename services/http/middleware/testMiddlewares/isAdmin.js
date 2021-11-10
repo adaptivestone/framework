@@ -7,7 +7,7 @@ class isAdmin extends AbstractMiddleware {
   }
 
   async middleware(req, res, next) {
-    const { user } = req.appInfo.request;
+    const { user } = req.body;
 
     if (!this.params.roles.includes(user.role)) {
       return res.status(403).json({ message: 'You do not have access' });
