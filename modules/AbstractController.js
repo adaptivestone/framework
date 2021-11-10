@@ -32,13 +32,14 @@ class AbstractController extends Base {
       Object.entries(methodRoutes).forEach(([route, routeParam]) => {
         if (routeParam.middleware) {
           const fullRoute = method.toUpperCase() + route;
+
           if (!routeMiddlewares.has(fullRoute)) {
             routeMiddlewares.set(fullRoute, routeParam.middleware);
           } else {
-            routeMiddlewares.set(
+            routeMiddlewares.set(fullRoute, [
               ...routeMiddlewares.get(fullRoute),
               ...routeParam.middleware,
-            );
+            ]);
           }
         }
       });
