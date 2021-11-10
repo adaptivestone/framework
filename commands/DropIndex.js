@@ -1,6 +1,10 @@
 const AbstractCommand = require('../modules/AbstractCommand');
 
 class DropIndex extends AbstractCommand {
+  static get description() {
+    return 'Drop indexes of model';
+  }
+
   async run() {
     if (!this.args.model) {
       this.logger.error('Please provide model name as "--model=BestUserModel"');

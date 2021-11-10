@@ -95,15 +95,6 @@ class Base {
     });
   }
 
-  async loadFilesWithInheritance(internalFolder, externalFolder) {
-    this.logger.warn(
-      'Method "loadFilesWithInheritance" deprecated. Please use "getFilesPathWithInheritance"',
-    );
-    return (
-      await this.getFilesPathWithInheritance(internalFolder, externalFolder)
-    ).map((file) => file.path);
-  }
-
   async getFilesPathWithInheritance(internalFolder, externalFolder) {
     async function rreaddir(dir, allFiles = []) {
       const files = (await fs.readdir(dir)).map((f) => join(dir, f));

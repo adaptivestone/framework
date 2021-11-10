@@ -7,6 +7,10 @@ class AbstractCommand extends Base {
     this.commands = commands;
   }
 
+  static get description() {
+    return 'Command description';
+  }
+
   static get loggerGroup() {
     return 'command';
   }

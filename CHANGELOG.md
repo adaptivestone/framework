@@ -1,3 +1,41 @@
+### 3.0.0
+
+[UPDATE] update deps
+[BREAKING] Mongoose v6. Than a lot of changes:[mongoDB drive changes](https://github.com/mongodb/node-mongodb-native/blob/4.0/docs/CHANGES_4.0.0.md), [Mongoose changes](https://mongoosejs.com/docs/migrating_to_6.html).
+Notable changes from migration
+Removed `execPopulate()`[link](https://mongoosejs.com/docs/migrating_to_6.html#removed-execpopulate)
+
+```js
+// Document#populate() now returns a promise and is now no longer chainable.
+
+//Replace
+await doc.populate('path1').populate('path2').execPopulate();
+// with
+await doc.populate(['path1', 'path2']);
+//Replace
+await doc
+  .populate('path1', 'select1')
+  .populate('path2', 'select2')
+  .execPopulate();
+// with
+await doc.populate([
+  { path: 'path1', select: 'select1' },
+  { path: 'path2', select: 'select2' },
+]);
+```
+
+[REMOVED] removed deprecated router handler string not allowed anymore. Use functions by itself
+[REMOVED] removed deprecated someSecretSalt() on user model (use this.saltSecret instead)
+[REMOVED] removed deprecated validate() on abstract controller and as result validator dependency. Use request validators instead
+[REMOVED] removed deprecated isUseControllerNameForRouting() on abstract controller. Use getExpressPath() instead
+[REMOVED] removed deprecated Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
+
+### 2.18.0
+
+[UPDATE] update deps
+[UPDATE] replace body-parser with express.json
+[NEW] role middleware
+
 ### 2.17.0
 
 [UPDATE] update deps

@@ -5,6 +5,10 @@ const fs = require('fs').promises;
 const AbstractCommand = require('../../modules/AbstractCommand');
 
 class CreateMigration extends AbstractCommand {
+  static get description() {
+    return 'Create new migration';
+  }
+
   async run() {
     if (!this.args.name) {
       return this.logger.error(

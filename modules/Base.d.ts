@@ -23,11 +23,6 @@ declare class Base {
    */
   getLogger(label: string): winston.Logger;
 
-  loadFilesWithInheritance(
-    internalFolder: string,
-    externalFolder: string,
-  ): Promise<string[]>;
-
   getFilesPathWithInheritance(
     internalFolder: string,
     externalFolder: string,

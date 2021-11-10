@@ -2,8 +2,6 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
 const express = require('express');
-const validator = require('validator');
-// eslint-disable-next-line import/no-extraneous-dependencies
 const merge = require('deepmerge');
 
 const Base = require('./Base');
@@ -12,7 +10,7 @@ const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
 
 /**
- * Abstract controller. You shoul extend any controller from them.
+ * Abstract controller. You should extend any controller from them.
  * Place you cintroller into controller folder and it be inited in auto way.
  * By default name of route will be controller name not file name. But please name it in same ways.
  * You can overwrite base controllers byt creating controllers with tha same file name (yes file name, not class name)
@@ -162,13 +160,6 @@ class AbstractController extends Base {
             request: null,
             middleware: null,
           };
-
-          if (typeof routeObject.handler === 'string') {
-            routeObject.handler = this[routeObject];
-            this.logger.warn(
-              'Using string as a controller callback deprecated. Please use function instead',
-            );
-          }
 
           if (typeof routeObject.handler !== 'function') {
             this.logger.error(
@@ -365,87 +356,6 @@ class AbstractController extends Base {
   }
 
   /**
-   * Internal validation method for params validation.
-   * You can pass own function or use validator.js functions
-   * From own function you can return a bool then will be treater as rule pass or not. At that case error message will be used from default error. But you also can provide error as output. Where only one arrya element will be an error message
-   * @param {object} obj object with params to validate
-   * @param {object} rules validation rules. rule name should match parameter name
-   * @deprecated
-   * @example
-   * // We can pass own function
-   * validate({
-   *      someKey:10
-   *    },{
-   *      'someKey':[
-   *        (val)=>val>10,
-   *        'Error message'
-   *      ]
-   *    })
-   * @example
-   * // We can pass function to validator.js
-   *  validate({
-   *      someKey: 'test_at_test.com'
-   *    },{
-   *      'someKey':[
-   *        'isEmail',
-   *        'Please provide valid email'
-   *      ]
-   *    })
-   * @example
-   * // We can pass function to validator.js with params
-   *  validate({
-   *      someKey: 'test_at_test.com'
-   *    },{
-   *      'someKey':[
-   *        ['isEmail',{'require_tld':false}],
-   *        'Please provide valid email'
-   *      ]
-   *    })
-   */
-  validate(obj, rules) {
-    this.logger.warn(
-      'Validate deprecated. Please do not use it. Will be revomed it future release',
-    );
-    const errors = {};
-    for (const name in rules) {
-      let validationResult = false;
-      if (typeof rules[name][0] === 'function') {
-        validationResult = rules[name][0](obj[name]);
-        if (
-          Object.prototype.toString.call(validationResult) === '[object Array]'
-        ) {
-          [errors[name]] = validationResult;
-          validationResult = false;
-        }
-      } else if (typeof validator[rules[name][0]] === 'function') {
-        // use from validator then
-        validationResult = validator[rules[name][0]](obj[name]);
-      } else if (
-        Object.prototype.toString.call(rules[name][0]) === '[object Array]' &&
-        typeof validator[rules[name][0][0]] === 'function'
-      ) {
-        // use from validator then
-        validationResult = validator[rules[name][0][0]](
-          `${obj[name]}`,
-          rules[name][0][1],
-        );
-      } else {
-        this.logger.warn(
-          `No rule found for ${name}. Swith to existing checking`,
-        );
-        validationResult = !!obj[name];
-      }
-      if (!validationResult && !errors[name]) {
-        [, errors[name]] = rules[name];
-      }
-    }
-    if (Object.entries(errors).length === 0 && errors.constructor === Object) {
-      return false;
-    }
-    return errors;
-  }
-
-  /**
    * Array of middlewares to append for route
    * You should provide path relative to controller and then array of middlewares to apply.
    * Order is matter.
@@ -460,16 +370,6 @@ class AbstractController extends Base {
    */
   static get middleware() {
     return new Map([['/*', [PrepareAppInfo, GetUserByToken, Auth]]]);
-  }
-
-  /**
-   * Part of abstract contorller.
-   * When you do not need controller name to append in route then return false here.
-   * Useful for home(root) controllers
-   * @deprecated please use getExpressPath instead
-   */
-  static get isUseControllerNameForRouting() {
-    return true;
   }
 
   /**
@@ -488,12 +388,6 @@ class AbstractController extends Base {
    * Get express path with inheritance of path
    */
   getExpressPath() {
-    if (!this.constructor.isUseControllerNameForRouting) {
-      console.warn(
-        'isUseControllerNameForRouting is DEPRECATED. Please use getExpressPath instead',
-      );
-      return '/';
-    }
     return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
   }
 
