@@ -27,21 +27,18 @@ class AbstractController extends Base {
     const { routes } = this;
     const expressPath = this.getExpressPath();
 
-    const routeMiddlewares = new Set();
+    const routeMiddlewares = new Map();
     Object.entries(routes).forEach(([method, methodRoutes]) => {
       Object.entries(methodRoutes).forEach(([route, routeParam]) => {
         if (routeParam.middleware) {
           const fullRoute = method.toUpperCase() + route;
           if (!routeMiddlewares.has(fullRoute)) {
-            routeMiddlewares.add({
-              fullRoute,
-              middleware: routeParam.middleware,
-            });
+            routeMiddlewares.set(fullRoute, routeParam.middleware);
           } else {
-            routeMiddlewares.add(fullRoute, [
+            routeMiddlewares.set(
               ...routeMiddlewares.get(fullRoute),
               ...routeParam.middleware,
-            ]);
+            );
           }
         }
       });
@@ -50,7 +47,7 @@ class AbstractController extends Base {
     const routeMiddlewaresReg = [];
 
     // eslint-disable-next-line prefer-const
-    for (let { fullRoute, middleware } of routeMiddlewares) {
+    for (let [fullRoute, middleware] of routeMiddlewares) {
       if (!Array.isArray(middleware)) {
         middleware = [middleware];
       }
@@ -83,11 +80,6 @@ class AbstractController extends Base {
           params: middlewareParams,
           MiddlewareFunction,
         });
-
-        // this.router[method](
-        //   realPath,
-        //   new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
-        // );
       }
     }
 
@@ -210,6 +202,7 @@ class AbstractController extends Base {
         // );
 
         let additionalMiddlewares;
+
         if (routeAdditionalMiddlewares.length > 0) {
           additionalMiddlewares = Array.from(
             routeAdditionalMiddlewares,
@@ -330,43 +323,40 @@ class AbstractController extends Base {
         });
       }
 
-      let additionalMiddlewareNames = [];
       this.app.documentation.push({
         contollerName: this.getConstructorName(),
-        routesInfo: routesInfo.map((route) => {
-          additionalMiddlewareNames = [];
-          return {
-            [route.fullPath]: {
-              method: route.method,
-              name: route.name,
-              fields,
-              routeMiddlewares: routeMiddlewaresReg
-                // eslint-disable-next-line consistent-return
-                .map((middleware) => {
-                  if (
-                    route.fullPath.toUpperCase() ===
-                    middleware.fullPath.toUpperCase()
-                  ) {
-                    additionalMiddlewareNames.push(middleware.name);
-                    return {
-                      name: middleware.name,
-                      params: middleware.params,
-                    };
-                  }
-                })
-                .filter(Boolean),
-              globalMiddlewares: [
-                ...new Set(
-                  middlewaresInfo
-                    .map((middleware) => middleware.name)
-                    .filter(
-                      (item) => !additionalMiddlewareNames.includes(item),
-                    ),
-                ),
-              ],
-            },
-          };
-        }),
+        routesInfo: routesInfo.map((route) => ({
+          [route.fullPath]: {
+            method: route.method,
+            name: route.name,
+            fields,
+            routeMiddlewares: routeMiddlewaresReg
+              // eslint-disable-next-line consistent-return
+              .map((middleware) => {
+                if (
+                  route.fullPath.toUpperCase() ===
+                  middleware.fullPath.toUpperCase()
+                ) {
+                  return {
+                    name: middleware.name,
+                    params: middleware.params,
+                  };
+                }
+              })
+              .filter(Boolean),
+            globalMiddlewares: [
+              ...new Set(
+                middlewaresInfo
+                  .filter(
+                    (middleware) =>
+                      middleware.fullPath.toUpperCase() ===
+                      route.fullPath.toUpperCase(),
+                  )
+                  .map(({ name, params }) => ({ name, params })),
+              ),
+            ],
+          },
+        })),
       });
     } else {
       this.app.httpServer.express.use(expressPath, this.router);
