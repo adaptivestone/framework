@@ -21,7 +21,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await request(global.server.app.httpServer.express)
-      .post('/somecontroller/someData')
+      .get('/somecontroller/someData')
       .send({
         flag: false,
       });
@@ -33,7 +33,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await request(global.server.app.httpServer.express)
-      .post('/somecontroller/someDataWithPermission')
+      .get('/somecontroller/someDataWithPermission')
       .send({
         user: {
           role: 'client',

@@ -33,7 +33,6 @@ class ControllerManager extends Base {
     });
 
     for (const controller of controllersToLoad) {
-      console.log(controller);
       // eslint-disable-next-line global-require, import/no-dynamic-require
       const ControllerModule = require(controller.path);
       const contollerName = ControllerModule.name.toLowerCase();
