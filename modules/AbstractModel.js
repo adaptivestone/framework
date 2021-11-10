@@ -20,28 +20,21 @@ class AbstractModel extends Base {
     );
     if (!mongoose.connection.readyState) {
       // do not connect on test
-      mongoose
-        .connect(this.app.getConfig('mongo').connectionString, {
-          useNewUrlParser: true,
-          useCreateIndex: true,
-          useUnifiedTopology: true,
-          useFindAndModify: false,
-        })
-        .then(
-          () => {
-            this.logger.info('Mongo connection success');
-            this.app.events.on('die', async () => {
-              for (const c of mongoose.connections) {
-                c.close(true);
-              }
-              // await mongoose.disconnect(); // TODO it have problems with replica-set
-            });
-            callback();
-          },
-          (error) => {
-            this.logger.error("Can't install mongodb connection", error);
-          },
-        );
+      mongoose.connect(this.app.getConfig('mongo').connectionString, {}).then(
+        () => {
+          this.logger.info('Mongo connection success');
+          this.app.events.on('die', async () => {
+            for (const c of mongoose.connections) {
+              c.close(true);
+            }
+            // await mongoose.disconnect(); // TODO it have problems with replica-set
+          });
+          callback();
+        },
+        (error) => {
+          this.logger.error("Can't install mongodb connection", error);
+        },
+      );
     } else {
       callback();
     }
