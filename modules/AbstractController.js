@@ -345,7 +345,7 @@ class AbstractController extends Base {
                 }
               })
               .filter(Boolean),
-            globalMiddlewares: [
+            controllerMiddlewares: [
               ...new Set(
                 middlewaresInfo
                   .filter(
