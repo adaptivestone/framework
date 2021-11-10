@@ -2,7 +2,6 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
 const express = require('express');
-
 const merge = require('deepmerge');
 
 const Base = require('./Base');
