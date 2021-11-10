@@ -49,14 +49,14 @@
   },
   "devDependencies": {
     "eslint": "^8.0.0",
-    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-import": "^2.23.4",
     "eslint-plugin-jest": "^25.0.0",
     "husky": "^7.0.0",
     "jest": "^27.0.6",
     "lint-staged": "^11.1.1",
-    "mongodb-memory-server": "^7.3.4",
+    "mongodb-memory-server": "^8.0.2",
     "nodemon": "^2.0.12",
     "supertest": "^6.1.4"
   },
@@ -64,10 +64,5 @@
     "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
       "prettier --write"
     ]
-  },
-  "config": {
-    "mongodbMemoryServer": {
-      "version": "4.4.6"
-    }
   }
 }
