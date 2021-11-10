@@ -1,7 +1,7 @@
 const request = require('supertest');
 
-describe('rate limiter', () => {
-  it('test routeMiddleware RateLimiter work correctly', async () => {
+describe('middlewares correct works', () => {
+  it('RateLimiter on route works correct', async () => {
     expect.assertions(1);
     const resultsPromise = [];
 
@@ -15,5 +15,31 @@ describe('rate limiter', () => {
     const statuses = results.map((res) => res.status);
 
     expect(statuses.indexOf(429)).not.toBe(-1);
+  });
+
+  it('CheckFlag middleware works correctly with other middleware', async () => {
+    expect.assertions(1);
+
+    const { status } = await request(global.server.app.httpServer.express)
+      .post('/somecontroller/someData')
+      .send({
+        flag: false,
+      });
+
+    expect(status).toBe(400);
+  });
+
+  it('Middlware with params works correctly', async () => {
+    expect.assertions(1);
+
+    const { status } = await request(global.server.app.httpServer.express)
+      .post('/somecontroller/someDataWithPermission')
+      .send({
+        user: {
+          role: 'client',
+        },
+      });
+
+    expect(status).toBe(403);
   });
 });
