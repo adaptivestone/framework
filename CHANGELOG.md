@@ -1,3 +1,13 @@
+### 3.0.0
+
+[UPDATE] update deps
+[BREAKING] Mongoose v6
+[REMOVED] removed deprecated router handler string not allowed anymore. Use functions by itself
+[REMOVED] removed deprecated someSecretSalt() on user model (use this.saltSecret instead)
+[REMOVED] removed deprecated validate() on abstract controller and as result validator dependency. Use request validators instead
+[REMOVED] removed deprecated isUseControllerNameForRouting() on abstract controller. Use getExpressPath() instead
+[REMOVED] removed deprecated Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
+
 ### 2.18.0
 
 [UPDATE] update deps

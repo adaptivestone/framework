@@ -12,16 +12,6 @@ class User extends AbstractModel {
     this.saltSecret = authConfig.saltSecret;
   }
 
-  /**
-   * @deprecated
-   */
-  get someSecretSalt() {
-    this.logger.warn(
-      'someSecretSalt deprecatred and will be removed in future release. Please use "this.saltSecret" instead ',
-    );
-    return this.saltSecret;
-  }
-
   initHooks() {
     this.mongooseSchema.pre('save', async function () {
       if (this.isModified('password')) {
