@@ -10,7 +10,7 @@ const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
 
 /**
- * Abstract controller. You shoul extend any controller from them.
+ * Abstract controller. You should extend any controller from them.
  * Place you cintroller into controller folder and it be inited in auto way.
  * By default name of route will be controller name not file name. But please name it in same ways.
  * You can overwrite base controllers byt creating controllers with tha same file name (yes file name, not class name)
