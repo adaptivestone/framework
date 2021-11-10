@@ -25,7 +25,7 @@ class SomeController extends AbstractController {
           handler: this.getSomething,
           request: yup.object().shape({
             user: yup.object().shape({
-              role: yup.string().oneOf('client', 'admin').required(),
+              role: yup.string().oneOf(['client', 'admin']).required(),
             }),
           }),
           middleware: [RateLimiter, [isAdmin, { roles: ['admin'] }]],
