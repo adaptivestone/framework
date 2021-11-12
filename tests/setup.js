@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
 const path = require('path');
-const SomeController = require('../controllers/test/SomeController');
 const Server = require('../server');
 
 jest.setTimeout(1000000);
@@ -61,13 +60,7 @@ beforeAll(async () => {
   if (typeof global.testSetup.beforeAll === 'function') {
     await global.testSetup.beforeAll();
   }
-
   await global.server.startServer();
-
-  global.server.controllers['/SomeController'] = new SomeController(
-    global.server.app,
-    '/SomeController',
-  );
 });
 afterAll(async () => {
   if (global.server) {
