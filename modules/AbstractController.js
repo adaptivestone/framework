@@ -28,7 +28,7 @@ class AbstractController extends Base {
     const routeMiddlewares = new Map();
     Object.entries(routes).forEach(([method, methodRoutes]) => {
       Object.entries(methodRoutes).forEach(([route, routeParam]) => {
-        if (routeParam.middleware) {
+        if (routeParam?.middleware) {
           const fullRoute = method.toUpperCase() + route;
 
           if (!routeMiddlewares.has(fullRoute)) {
