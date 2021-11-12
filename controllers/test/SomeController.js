@@ -1,10 +1,10 @@
 const yup = require('yup');
-const AbstractController = require('../modules/AbstractController');
-const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
-const GetUserByToken = require('../services/http/middleware/GetUserByToken');
-const RateLimiter = require('../services/http/middleware/RateLimiter');
-const CheckFlag = require('../services/http/middleware/testMiddlewares/CheckFlag');
-const isAdmin = require('../services/http/middleware/testMiddlewares/isAdmin');
+const AbstractController = require('../../modules/AbstractController');
+const PrepareAppInfo = require('../../services/http/middleware/PrepareAppInfo');
+const GetUserByToken = require('../../services/http/middleware/GetUserByToken');
+const RateLimiter = require('../../services/http/middleware/RateLimiter');
+const CheckFlag = require('./middlewares/CheckFlag');
+const isAdmin = require('./middlewares/isAdmin');
 
 class SomeController extends AbstractController {
   get routes() {
