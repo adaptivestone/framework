@@ -7,7 +7,9 @@ describe('middlewares correct works', () => {
 
     for (let i = 0; i < 11; i += 1) {
       resultsPromise.push(
-        request(global.server.app.httpServer.express).get('/somecontroller/'),
+        request(global.server.app.httpServer.express).get(
+          '/test/somecontroller/',
+        ),
       );
     }
 
@@ -21,7 +23,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await request(global.server.app.httpServer.express)
-      .get('/somecontroller/someData')
+      .get('/test/somecontroller/someData')
       .send({
         flag: false,
       });
@@ -33,7 +35,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await request(global.server.app.httpServer.express)
-      .get('/somecontroller/someDataWithPermission')
+      .get('/test/somecontroller/someDataWithPermission')
       .send({
         user: {
           role: 'client',
