@@ -35,6 +35,13 @@ class SomeController extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
+
+  // eslint-disable-next-line class-methods-use-this
+  getExpressPath() {
+    return "SomeController";
+  }
+
+  // eslint-disable-next-line class-methods-use-this
   async getSomething(req, res) {
     return res.status(200).json({ data: { text: 'Available text' } });
   }
