@@ -38,7 +38,7 @@ class SomeController extends AbstractController {
 
   // eslint-disable-next-line class-methods-use-this
   getExpressPath() {
-    return "SomeController";
+    return 'SomeController';
   }
 
   // eslint-disable-next-line class-methods-use-this
