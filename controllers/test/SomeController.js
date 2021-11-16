@@ -3,8 +3,8 @@ const AbstractController = require('../../modules/AbstractController');
 const PrepareAppInfo = require('../../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../../services/http/middleware/GetUserByToken');
 const RateLimiter = require('../../services/http/middleware/RateLimiter');
-const CheckFlag = require('./middlewares/CheckFlag');
-const isAdmin = require('./middlewares/isAdmin');
+const CheckFlag = require('../../services/http/middleware/test/CheckFlag');
+const isAdmin = require('../../services/http/middleware/test/isAdmin');
 
 class SomeController extends AbstractController {
   get routes() {

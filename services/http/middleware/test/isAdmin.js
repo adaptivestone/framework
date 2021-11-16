@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('../../../services/http/middleware/AbstractMiddleware');
+const AbstractMiddleware = require('../AbstractMiddleware');
 
 class isAdmin extends AbstractMiddleware {
   constructor(app, params) {

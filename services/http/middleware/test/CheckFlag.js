@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('../../../services/http/middleware/AbstractMiddleware');
+const AbstractMiddleware = require('../AbstractMiddleware');
 
 class CheckFlag extends AbstractMiddleware {
   // eslint-disable-next-line class-methods-use-this
