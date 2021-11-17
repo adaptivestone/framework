@@ -31,7 +31,55 @@ class SomeController extends AbstractController {
           middleware: [RateLimiter, [isAdmin, { roles: ['admin'] }]],
         },
       },
+      post: {
+        '/postInfo': {
+          handler: this.addPost,
+          request: yup.object().shape({
+            name: yup.string(),
+            discription: yup.string(),
+          }),
+        },
+      },
+      put: {
+        '/putInfo': {
+          handler: this.putInfo,
+          request: yup.object().shape({
+            field: yup.string(),
+            user: yup.object().shape({
+              role: yup.string().oneOf(['client', 'admin']).required(),
+            }),
+          }),
+          middleware: [[isAdmin, { roles: ['admin'] }]],
+        },
+      },
     };
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async addPost(req, res) {
+    const { name, discription } = req.appInfo.request;
+
+    return res.status(200).json({
+      data: {
+        newPost: {
+          name,
+          discription,
+        },
+      },
+    });
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async putInfo(req, res) {
+    const { field } = req.appInfo.request;
+
+    return res.status(200).json({
+      data: {
+        newField: {
+          field,
+        },
+      },
+    });
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -40,7 +88,10 @@ class SomeController extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/*', [PrepareAppInfo, GetUserByToken]]]);
+    return new Map([
+      ['/*', [PrepareAppInfo, GetUserByToken]],
+      ['PUT/*', [[isAdmin, { roles: ['client'] }]]],
+    ]);
   }
 }
 
