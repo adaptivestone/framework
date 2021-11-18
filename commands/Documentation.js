@@ -1,5 +1,5 @@
-const AbstractCommand = require('@adaptivestone/framework/modules/AbstractCommand');
-const ControllerManager = require('@adaptivestone/framework/controllers/index');
+const AbstractCommand = require('../modules/AbstractCommand');
+const ControllerManager = require('../controllers/index');
 
 class Documentation extends AbstractCommand {
   async run() {
