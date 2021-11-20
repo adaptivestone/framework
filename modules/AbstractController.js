@@ -46,6 +46,9 @@ class AbstractController extends Base {
       });
     });
 
+    /**
+     * Parse middlewares to be an object.
+     */
     const parseMiddlewares = (middlewareMap) => {
       const middlewaresInfo = [];
       // eslint-disable-next-line prefer-const
@@ -101,11 +104,14 @@ class AbstractController extends Base {
     };
 
     const routeMiddlewaresReg = parseMiddlewares(routeMiddlewares);
-
     const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
+
     const routesInfo = [];
     let routeObjectClone = {};
 
+    /**
+     *  Register controller middleware
+     */
     for (const middleware of middlewaresInfo) {
       this.router[middleware.method](
         middleware.path,
@@ -116,6 +122,9 @@ class AbstractController extends Base {
       );
     }
 
+    /**
+     *  Register routes itself
+     */
     for (const verb in routes) {
       if (typeof this.router[verb] !== 'function') {
         this.logger.error(
@@ -252,14 +261,18 @@ class AbstractController extends Base {
 
     middlewaresInfo.forEach((m) => {
       text.push(
-        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Function: '${m.name}'`,
+        `Path:'${m.path}'. Full path: '${
+          m.fullPath
+        }'. Method: '${m.method.toUpperCase()}'. Function: '${m.name}'`,
       );
     });
     text.push('Callbacks:');
 
     routesInfo.forEach((m) => {
       text.push(
-        `Path:'${m.path}'. Full path: '${m.fullPath}'. Method: '${m.method}'. Callback: '${m.name}'`,
+        `Path:'${m.path}'. Full path: '${
+          m.fullPath
+        }'. Method: '${m.method.toUpperCase()}'. Callback: '${m.name}'`,
       );
     });
     text.push(`Time: ${Date.now() - time} ms`);
