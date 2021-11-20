@@ -7,6 +7,7 @@
     "type": "git",
     "url": "https://gitlab.com/adaptivestone/framework"
   },
+  "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
     "dev": "nodemon ./index.js",
     "prod": "nodemon ./cluster.js",
