@@ -25,6 +25,9 @@ class AbstractController extends Base {
     const { routes } = this;
     const expressPath = this.getExpressPath();
 
+    /**
+     * Grab route middleware onlo one Map
+     */
     const routeMiddlewares = new Map();
     Object.entries(routes).forEach(([method, methodRoutes]) => {
       Object.entries(methodRoutes).forEach(([route, routeParam]) => {
@@ -32,112 +35,85 @@ class AbstractController extends Base {
           const fullRoute = method.toUpperCase() + route;
 
           if (!routeMiddlewares.has(fullRoute)) {
-            routeMiddlewares.set(fullRoute, routeParam.middleware);
-          } else {
-            routeMiddlewares.set(fullRoute, [
-              ...routeMiddlewares.get(fullRoute),
-              ...routeParam.middleware,
-            ]);
+            routeMiddlewares.set(fullRoute, []);
           }
+
+          routeMiddlewares.set(fullRoute, [
+            ...routeMiddlewares.get(fullRoute),
+            ...routeParam.middleware,
+          ]);
         }
       });
     });
 
-    const routeMiddlewaresReg = [];
-
-    // eslint-disable-next-line prefer-const
-    for (let [fullRoute, middleware] of routeMiddlewares) {
-      if (!Array.isArray(middleware)) {
-        middleware = [middleware];
-      }
-
-      for (const M of middleware) {
-        let realPath = fullRoute;
-        const method = realPath.split('/')[0]?.toLowerCase();
-        if (!method) {
-          this.logger.error(`Method not found for ${realPath}`);
-          // eslint-disable-next-line no-continue
-          continue;
+    const parseMiddlewares = (middlewareMap) => {
+      const middlewaresInfo = [];
+      // eslint-disable-next-line prefer-const
+      for (let [path, middleware] of middlewareMap) {
+        if (!Array.isArray(middleware)) {
+          middleware = [middleware];
         }
-        realPath = realPath.substring(method.length);
-
-        const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
-          .split('//')
-          .join('/')
-          .split('//')
-          .join('/');
-        let MiddlewareFunction = M;
-        let middlewareParams = {};
-        if (Array.isArray(M)) {
-          [MiddlewareFunction, middlewareParams] = M;
-        }
-        routeMiddlewaresReg.push({
-          name: MiddlewareFunction.name,
-          method: method.toUpperCase(),
-          path: realPath,
-          fullPath,
-          params: middlewareParams,
-          MiddlewareFunction,
-        });
-      }
-    }
-
-    const middlewaresInfo = [];
-    const routesInfo = [];
-    let routeObjectClone = {};
-
-    // eslint-disable-next-line prefer-const
-    for (let [path, middleware] of this.constructor.middleware) {
-      if (!Array.isArray(middleware)) {
-        middleware = [middleware];
-      }
-      for (const M of middleware) {
-        let method = 'all';
-        let realPath = path;
-        if (typeof realPath !== 'string') {
-          this.logger.error(`Path not a string ${realPath}. Please check it`);
-          // eslint-disable-next-line no-continue
-          continue;
-        }
-        if (!realPath.startsWith('/')) {
-          method = realPath.split('/')[0]?.toLowerCase();
-          if (!method) {
-            this.logger.error(`Method not found for ${realPath}`);
+        for (const M of middleware) {
+          let method = 'all';
+          let realPath = path;
+          if (typeof realPath !== 'string') {
+            this.logger.error(`Path not a string ${realPath}. Please check it`);
             // eslint-disable-next-line no-continue
             continue;
           }
-          realPath = realPath.substring(method.length);
+          if (!realPath.startsWith('/')) {
+            method = realPath.split('/')[0]?.toLowerCase();
+            if (!method) {
+              this.logger.error(`Method not found for ${realPath}`);
+              // eslint-disable-next-line no-continue
+              continue;
+            }
+            realPath = realPath.substring(method.length);
+          }
+          if (typeof this.router[method] !== 'function') {
+            this.logger.error(
+              `Method ${method} not exist for middleware. Please check your codebase`,
+            );
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+          const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
+            .split('//')
+            .join('/')
+            .split('//')
+            .join('/');
+          let MiddlewareFunction = M;
+          let middlewareParams = {};
+          if (Array.isArray(M)) {
+            [MiddlewareFunction, middlewareParams] = M;
+          }
+          middlewaresInfo.push({
+            name: MiddlewareFunction.name,
+            method,
+            path: realPath,
+            fullPath,
+            params: middlewareParams,
+            MiddlewareFunction,
+          });
         }
-        if (typeof this.router[method] !== 'function') {
-          this.logger.error(
-            `Method ${method} not exist for middleware. Please check your codebase`,
-          );
-          // eslint-disable-next-line no-continue
-          continue;
-        }
-        const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
-          .split('//')
-          .join('/')
-          .split('//')
-          .join('/');
-        let MiddlewareFunction = M;
-        let middlewareParams = {};
-        if (Array.isArray(M)) {
-          [MiddlewareFunction, middlewareParams] = M;
-        }
-        middlewaresInfo.push({
-          name: MiddlewareFunction.name,
-          method: method.toUpperCase(),
-          path: realPath,
-          fullPath,
-          params: middlewareParams,
-        });
-
-        this.router[method](
-          realPath,
-          new MiddlewareFunction(this.app, middlewareParams).getMiddleware(),
-        );
       }
+      return middlewaresInfo;
+    };
+
+    const routeMiddlewaresReg = parseMiddlewares(routeMiddlewares);
+
+    const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
+    const routesInfo = [];
+    let routeObjectClone = {};
+
+    for (const middleware of middlewaresInfo) {
+      this.router[middleware.method](
+        middleware.path,
+        new middleware.MiddlewareFunction(
+          this.app,
+          middleware.params,
+        ).getMiddleware(),
+      );
     }
 
     for (const verb in routes) {
@@ -218,8 +194,11 @@ class AbstractController extends Base {
               try {
                 await routeObject.request.validate(req.body);
               } catch (e) {
+                let { errors } = e;
                 // translate it
-                const errors = e.errors.map((err) => req.i18n.t(err));
+                if (req.i18n) {
+                  errors = e.errors.map((err) => req.i18n.t(err));
+                }
                 this.logger.error(`Request validation failed: ${errors}`);
 
                 return res.status(400).json({
