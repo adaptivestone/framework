@@ -253,31 +253,34 @@ class AbstractController extends Base {
       }
     }
 
-    const text = [
-      '',
-      `Controller '${this.getConstructorName()}' registered.`,
-      'Middlewares:',
-    ];
+    /**
+     * Generate text info
+     */
+    const text = ['', `Controller '${this.getConstructorName()}' registered.`];
 
-    middlewaresInfo.forEach((m) => {
-      text.push(
-        `Path:'${m.path}'. Full path: '${
-          m.fullPath
-        }'. Method: '${m.method.toUpperCase()}'. Function: '${m.name}'`,
-      );
-    });
-    text.push('Callbacks:');
+    const reports = {
+      'Middlewares:': middlewaresInfo,
+      'Route middlewares:': routeMiddlewaresReg,
+      'Callbacks:': routesInfo,
+    };
+    for (const key in reports) {
+      text.push(`${key}`);
+      for (const item of reports[key]) {
+        text.push(
+          `Path:'${item.path}'. Full path: '${
+            item.fullPath
+          }'. Method: '${item.method.toUpperCase()}'. Function: '${item.name}'`,
+        );
+      }
+    }
 
-    routesInfo.forEach((m) => {
-      text.push(
-        `Path:'${m.path}'. Full path: '${
-          m.fullPath
-        }'. Method: '${m.method.toUpperCase()}'. Callback: '${m.name}'`,
-      );
-    });
     text.push(`Time: ${Date.now() - time} ms`);
 
     this.logger.verbose(text.join('\n'));
+
+    /**
+     * Generate documentation
+     */
     if (!this.app.httpServer) {
       const fields = [];
       if (routeObjectClone.request) {
