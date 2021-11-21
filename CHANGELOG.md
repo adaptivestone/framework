@@ -29,6 +29,19 @@ await doc.populate([
 [REMOVED] removed deprecated validate() on abstract controller and as result validator dependency. Use request validators instead
 [REMOVED] removed deprecated isUseControllerNameForRouting() on abstract controller. Use getExpressPath() instead
 [REMOVED] removed deprecated Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
+[BREAKING] Removed "success" field on Auth contreoller. Please use http status instead
+[BREAKING] Auth controller - "error" error responce renamed to "message"
+
+```js
+// Before
+{
+  error: 'Some error';
+}
+// After
+{
+  message: 'Some error';
+}
+```
 
 ### 2.18.0
 

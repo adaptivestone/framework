@@ -20,10 +20,8 @@ describe('auth', () => {
     });
 
     it('can create user', async () => {
-      expect.assertions(2);
-      const { status, body } = await request(
-        global.server.app.httpServer.express,
-      )
+      expect.assertions(1);
+      const { status } = await request(global.server.app.httpServer.express)
         .post('/auth/register')
         .send({
           email: userEmail,
@@ -31,7 +29,6 @@ describe('auth', () => {
           nickName: 'test',
         });
       expect(status).toBe(201);
-      expect(body.success).toBe(true);
     });
 
     it('can NOT create SAME user', async () => {
@@ -71,7 +68,7 @@ describe('auth', () => {
     });
 
     it('can login with normal creds and verifyed email', async () => {
-      expect.assertions(3);
+      expect.assertions(2);
 
       const user = await global.server.app
         .getModel('User')
@@ -88,14 +85,13 @@ describe('auth', () => {
           password: userPassword,
         });
       expect(status).toBe(200);
-      expect(body.success).toBe(true);
       expect(body.token).toBeDefined();
     });
   });
 
   describe('isAuthWithVefificationFlow auth option', () => {
     it('can login with normal creds and  NOT verifyed email is option isAuthWithVefificationFlow is set', async () => {
-      expect.assertions(5);
+      expect.assertions(4);
 
       const { status } = await request(global.server.app.httpServer.express)
         .post('/auth/register')
@@ -129,7 +125,6 @@ describe('auth', () => {
       expect(status).toBe(201);
       expect(status2).toBe(400);
       expect(status3).toBe(200);
-      expect(body.success).toBe(true);
       expect(body.token).toBeDefined();
     });
   });

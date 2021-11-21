@@ -234,7 +234,6 @@ class AbstractController extends Base {
                 "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
               this.logger.error(error);
               return res.status(500).json({
-                succes: false,
                 message:
                   'Platform error. Please check later or contact support',
               });
@@ -243,7 +242,6 @@ class AbstractController extends Base {
               this.logger.error(e.message);
               console.error(e);
               return res.status(500).json({
-                succes: false,
                 message:
                   'Platform error. Please check later or contact support',
               });
