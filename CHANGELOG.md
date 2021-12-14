@@ -44,6 +44,7 @@ await doc.populate([
 
 [UPDATE] update deps
 [UPDATE] winston console transport now using timestapms
+[UPDATE] PrepareAppInfo middleware now a global one. Do not need to include it on every controller
 
 ### 2.18.0
 
