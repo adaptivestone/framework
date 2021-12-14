@@ -38,7 +38,14 @@ class SomeController extends AbstractController {
             discription: yup.string(),
           }),
         },
+        '/postQueryParamaters': {
+          handler: this.postQueryParamaters,
+          request: yup.object().shape({
+            name: yup.string(),
+          }),
+        },
       },
+
       put: {
         '/putInfo': {
           handler: this.putInfo,
@@ -52,6 +59,16 @@ class SomeController extends AbstractController {
         },
       },
     };
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async postQueryParamaters(req, res) {
+    const { name } = req.appInfo.request;
+    return res.status(200).json({
+      data: {
+        name,
+      },
+    });
   }
 
   // eslint-disable-next-line class-methods-use-this

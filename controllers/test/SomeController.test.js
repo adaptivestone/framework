@@ -31,6 +31,30 @@ describe('middlewares correct works', () => {
     expect(status).toBe(400);
   });
 
+  it('request also can grab query paramaters', async () => {
+    expect.assertions(2);
+
+    const { status, body } = await request(global.server.app.httpServer.express)
+      .post('/test/somecontroller/postQueryParamaters?name=test')
+      .send();
+
+    expect(status).toBe(200);
+    expect(body.data.name).toBe('test');
+  });
+
+  it('request also can grab query paramaters but body have bigger priority', async () => {
+    expect.assertions(2);
+
+    const { status, body } = await request(global.server.app.httpServer.express)
+      .post('/test/somecontroller/postQueryParamaters?name=test')
+      .send({
+        name: 'notATest',
+      });
+
+    expect(status).toBe(200);
+    expect(body.data.name).toBe('notATest');
+  });
+
   it('middlware with params works correctly', async () => {
     expect.assertions(1);
 

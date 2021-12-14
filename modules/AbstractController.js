@@ -198,9 +198,10 @@ class AbstractController extends Base {
               if (typeof routeObject.request.cast !== 'function') {
                 this.logger.error('request.cast should be a function');
               }
+              const bodyAndQuery = merge(req.query, req.body);
 
               try {
-                await routeObject.request.validate(req.body);
+                await routeObject.request.validate(bodyAndQuery);
               } catch (e) {
                 let { errors } = e;
                 // translate it
@@ -215,7 +216,7 @@ class AbstractController extends Base {
                   },
                 });
               }
-              req.appInfo.request = routeObject.request.cast(req.body, {
+              req.appInfo.request = routeObject.request.cast(bodyAndQuery, {
                 stripUnknown: true,
               });
             }
