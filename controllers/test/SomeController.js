@@ -1,6 +1,5 @@
 const yup = require('yup');
 const AbstractController = require('../../modules/AbstractController');
-const PrepareAppInfo = require('../../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../../services/http/middleware/GetUserByToken');
 const RateLimiter = require('../../services/http/middleware/RateLimiter');
 const CheckFlag = require('../../services/http/middleware/test/CheckFlag');
@@ -89,7 +88,7 @@ class SomeController extends AbstractController {
 
   static get middleware() {
     return new Map([
-      ['/*', [PrepareAppInfo, GetUserByToken]],
+      ['/*', [GetUserByToken]],
       ['PUT/*', [[isAdmin, { roles: ['client'] }]]],
     ]);
   }

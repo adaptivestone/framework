@@ -5,7 +5,6 @@ const express = require('express');
 const merge = require('deepmerge');
 
 const Base = require('./Base');
-const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
 
@@ -355,14 +354,14 @@ class AbstractController extends Base {
    * Be default path apply to ANY' method, but you can preattach 'METHOD' into patch to scope patch to this METHOD
    * @example
    * return new Map([
-   *    ['/*', [PrepareAppInfo, GetUserByToken]] // for any method for this controller
+   *    ['/*', [GetUserByToken]] // for any method for this controller
    *    ['POST/', [Auth]] // for POST method
    *    ['/superSecretMethod', [OnlySuperSecretUsers]] // route with ANY method
    *    ['PUT/superSecretMathod', [OnlySuperSecretAdmin]] // route with PUT method
    * ]);
    */
   static get middleware() {
-    return new Map([['/*', [PrepareAppInfo, GetUserByToken, Auth]]]);
+    return new Map([['/*', [GetUserByToken, Auth]]]);
   }
 
   /**

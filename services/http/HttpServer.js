@@ -7,6 +7,7 @@ const i18next = require('i18next');
 const i18nextMiddleware = require('i18next-http-middleware');
 const BackendFS = require('i18next-fs-backend');
 const Backend = require('i18next-chained-backend');
+const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
 
 const Base = require('../../modules/Base');
 
@@ -44,6 +45,8 @@ class HttpServer extends Base {
     this.express.use(express.json({ limit: '50mb' }));
     this.express.use(express.static(folderConfig.folders.public));
     this.express.use(express.static('./public'));
+
+    this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
 
     // As exprress will check numbersof arguments
     // eslint-disable-next-line no-unused-vars

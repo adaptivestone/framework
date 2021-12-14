@@ -1,6 +1,5 @@
 const yup = require('yup');
 const AbstractController = require('../modules/AbstractController');
-const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const RateLimiter = require('../services/http/middleware/RateLimiter');
 
@@ -206,7 +205,7 @@ class Auth extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/*', [PrepareAppInfo, GetUserByToken, RateLimiter]]]);
+    return new Map([['/*', [GetUserByToken, RateLimiter]]]);
   }
 }
 

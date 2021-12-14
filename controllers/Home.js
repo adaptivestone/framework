@@ -1,5 +1,4 @@
 const AbstractController = require('../modules/AbstractController');
-const PrepareAppInfo = require('../services/http/middleware/PrepareAppInfo');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 
 class Home extends AbstractController {
@@ -22,7 +21,7 @@ class Home extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/*', [PrepareAppInfo, GetUserByToken]]]);
+    return new Map([['/*', [GetUserByToken]]]);
   }
 }
 
