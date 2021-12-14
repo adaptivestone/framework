@@ -14,6 +14,7 @@ module.exports = {
       transport: 'console',
       transportOptions: {
         level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
+        timestamp: true,
       },
       enable: process.env.LOGGER_CONSOLE_ENABLE || true,
     },
