@@ -1,3 +1,8 @@
+### 3.0.1
+
+[UPDATE] update deps
+[UPDATE] getUserByTokens more logs
+
 ### 3.0.0
 
 [BREAKING] Mongoose v6. Than a lot of changes:[mongoDB drive changes](https://github.com/mongodb/node-mongodb-native/blob/4.0/docs/CHANGES_4.0.0.md), [Mongoose changes](https://mongoosejs.com/docs/migrating_to_6.html).
