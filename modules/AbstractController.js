@@ -205,10 +205,12 @@ class AbstractController extends Base {
               } catch (e) {
                 let { errors } = e;
                 // translate it
-                if (req.i18n) {
-                  errors = e.errors.map((err) => req.i18n.t(err));
+                if (req.i18n && errors) {
+                  errors = errors.map((err) => req.i18n.t(err));
                 }
-                this.logger.error(`Request validation failed: ${errors}`);
+                this.logger.error(
+                  `Request validation failed with message: ${e.message}. errors: ${errors}`,
+                );
 
                 return res.status(400).json({
                   errors: {
