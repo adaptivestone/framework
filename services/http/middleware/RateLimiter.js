@@ -55,6 +55,10 @@ class RateLimiter extends AbstractMiddleware {
       this.logger.info('Redis connection success');
     });
 
+    this.app.events.on('shutdown', () => {
+      redisClient.quit();
+    });
+
     return new RateLimiterRedis({
       storeClient: redisClient,
       ...this.finalOptions.limiterOptions,

@@ -12,7 +12,7 @@ class Cli extends BaseCli {
   async run() {
     const command = process.argv[2]?.toLowerCase();
     await super.run(command, this.args);
-    this.app.events.emit('die');
+    this.app.events.emit('shutdown');
   }
 }
 

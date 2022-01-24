@@ -168,7 +168,7 @@ class HttpServer extends Base {
   /**
    * Stop http server (mostly for unit testing)
    */
-  die() {
+  shutdown() {
     this.httpServer.close();
   }
 }

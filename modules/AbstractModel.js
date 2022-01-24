@@ -23,7 +23,7 @@ class AbstractModel extends Base {
       mongoose.connect(this.app.getConfig('mongo').connectionString, {}).then(
         () => {
           this.logger.info('Mongo connection success');
-          this.app.events.on('die', async () => {
+          this.app.events.on('shutdown', async () => {
             for (const c of mongoose.connections) {
               c.close(true);
             }

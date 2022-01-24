@@ -64,7 +64,8 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   if (global.server) {
-    global.server.app.httpServer.die();
+    global.server.app.httpServer.shutdown();
+    global.server.app.events.emit('shutdown');
   }
   setTimeout(async () => {
     if (typeof global.testSetup.afterAll === 'function') {

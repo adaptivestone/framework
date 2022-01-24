@@ -1,3 +1,7 @@
+### 3.0.4
+
+[UPDATE] fix bug with app shutdown
+
 ### 3.0.3
 
 [UPDATE] update deps

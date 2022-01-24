@@ -17,6 +17,9 @@ class Cache extends Base {
     this.redisClient.on('connect', () => {
       this.logger.info('Redis connection success');
     });
+    this.app.events.on('shutdown', () => {
+      this.redisClient.quit();
+    });
     this.redisGetAsync = promisify(this.redisClient.get).bind(this.redisClient);
     this.promiseMapping = new Map();
   }
