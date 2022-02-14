@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "repository": {
@@ -28,7 +28,7 @@
     "bcrypt": "^5.0.1",
     "cors": "^2.8.5",
     "deepmerge": "^4.2.2",
-    "dotenv": "^14.0.0",
+    "dotenv": "^16.0.0",
     "email-templates": "^8.0.7",
     "express": "^4.17.1",
     "i18next": "^21.2.4",
