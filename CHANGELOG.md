@@ -1,6 +1,7 @@
 ### 3.0.7
 
 [UPDATE] update deps
+[CHANGE] change default getConfig method
 
 ### 3.0.6
 

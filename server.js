@@ -102,12 +102,12 @@ class Server {
             `${configName}.${process.env.NODE_ENV}.js`,
           ) || envConfig;
       }
-
       this.cache.configs.set(
         configName,
         merge(
           this.getFileWithExtendingInhirence('config', configName),
           envConfig,
+          { arrayMerge: (destinationArray, sourceArray) => sourceArray },
         ),
       );
     }
