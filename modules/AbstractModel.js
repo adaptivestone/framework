@@ -40,6 +40,14 @@ class AbstractModel extends Base {
     }
   }
 
+  /**
+   * Mongoose schema
+   */
+  get modelSchema() {
+    this.logger.warn('You should provide modelSchema');
+    return {};
+  }
+
   static get loggerGroup() {
     return 'model';
   }

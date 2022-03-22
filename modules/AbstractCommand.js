@@ -11,6 +11,14 @@ class AbstractCommand extends Base {
     return 'Command description';
   }
 
+  /**
+   * Entry point to every command. This method should be overridden
+   * @override
+   */
+  async run() {
+    this.logger.error('You should implement run method');
+  }
+
   static get loggerGroup() {
     return 'command';
   }

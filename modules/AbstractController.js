@@ -351,6 +351,25 @@ class AbstractController extends Base {
   }
 
   /**
+   * Object with routes. Routes relative to controller
+   * @example
+   * return {
+   *   post: {
+   *     "/someUrl": {
+   *       handler: this.postSomeUrl,
+   *       request: yup.object().shape({
+   *         count: yup.number().max(100)required(),
+   *       })
+   *     }
+   *   },
+   * };
+   */
+  get routes() {
+    this.logger.warn('Please implement "routes" method on controller.');
+    return {};
+  }
+
+  /**
    * Array of middlewares to append for route
    * You should provide path relative to controller and then array of middlewares to apply.
    * Order is matter.
