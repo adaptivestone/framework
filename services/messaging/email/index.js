@@ -32,7 +32,9 @@ class Mail extends Base {
         this.template = `${__dirname}/templates/${path.basename(template)}`;
       } else {
         this.template = `${__dirname}/templates/emptyTemplate`;
-        this.logger.error('not found');
+        this.logger.error(
+          `Template '${template}' not found. Using 'emptyTemplate' as a fallback`,
+        );
       }
     }
     this.templateData = templateData;

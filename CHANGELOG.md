@@ -1,3 +1,7 @@
+### 3.0.11
+
+[UPDATE] more verbose email error
+
 ### 3.0.10
 
 [UPDATE] update deps
