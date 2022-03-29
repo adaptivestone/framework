@@ -67,11 +67,11 @@ afterAll(async () => {
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }
-  setTimeout(async () => {
-    if (typeof global.testSetup.afterAll === 'function') {
-      await global.testSetup.afterAll();
-    }
-    await mongoose.disconnect();
-    await mongoMemoryServerInstance.stop();
-  }, 2000);
+  // setTimeout(async () => {
+  if (typeof global.testSetup.afterAll === 'function') {
+    await global.testSetup.afterAll();
+  }
+  await mongoose.disconnect();
+  await mongoMemoryServerInstance.stop();
+  // }, 2000);
 });

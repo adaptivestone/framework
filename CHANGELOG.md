@@ -1,3 +1,9 @@
+### 3.0.10
+
+[UPDATE] update deps
+[CHANGE] tests afterAll not using timeout anymore (conflict with jest 28-alpha)
+[NEW] config for mail now supports "EMAIL_TRANSPORT" env variable. SMTP by default (as was)
+
 ### 3.0.9
 
 [UPDATE] update deps

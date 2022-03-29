@@ -17,7 +17,7 @@ module.exports = {
       connectionTimeout: 10000, // timeout to 10 seconds
     },
   },
-  transport: 'smtp',
+  transport: process.env.EMAIL_TRANSPORT || 'smtp',
   webResources: {
     // https://github.com/jrit/web-resource-inliner path to find resources
     relativeTo: 'build',
