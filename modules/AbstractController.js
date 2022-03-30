@@ -16,13 +16,15 @@ const Auth = require('../services/http/middleware/Auth');
  * In most cases you will want to have a 'home' route that not include controller name. For this case please check 'getExpressPath'
  */
 class AbstractController extends Base {
-  constructor(app, prefix) {
+  constructor(app, prefix, isExpressMergeParams = false) {
     const time = Date.now();
     super(app);
     this.prefix = prefix;
     this.router = express.Router();
     const { routes } = this;
-    const expressPath = this.getExpressPath();
+    const expressPath = this.getExpressPath({
+      mergeParams: isExpressMergeParams,
+    });
 
     /**
      * Grab route middleware onlo one Map

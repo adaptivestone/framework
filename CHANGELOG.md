@@ -1,3 +1,8 @@
+### 3.0.12
+
+[NEW] ability to pass "mergeParams" options to express
+[UPDATE] update deps
+
 ### 3.0.11
 
 [UPDATE] more verbose email error
