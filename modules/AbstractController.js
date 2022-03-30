@@ -20,11 +20,11 @@ class AbstractController extends Base {
     const time = Date.now();
     super(app);
     this.prefix = prefix;
-    this.router = express.Router();
-    const { routes } = this;
-    const expressPath = this.getExpressPath({
+    this.router = express.Router({
       mergeParams: isExpressMergeParams,
     });
+    const { routes } = this;
+    const expressPath = this.getExpressPath();
 
     /**
      * Grab route middleware onlo one Map

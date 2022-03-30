@@ -1,6 +1,10 @@
+### 3.0.13
+
+[UPDATE] bug fix with "mergeParams"
+
 ### 3.0.12
 
-[NEW] ability to pass "mergeParams" options to express
+[NEW] ability to pass "mergeParams" options to express router
 [UPDATE] update deps
 
 ### 3.0.11
