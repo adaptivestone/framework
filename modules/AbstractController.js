@@ -188,7 +188,8 @@ class AbstractController extends Base {
               new MiddlewareFunction(this.app, params).getMiddleware(),
           );
         }
-
+        const { controllerValidationAbortEarly } =
+          this.app.getConfig('validate');
         this.router[verb](
           path,
           additionalMiddlewares || [],
@@ -203,7 +204,9 @@ class AbstractController extends Base {
               const bodyAndQuery = merge(req.query, req.body);
 
               try {
-                await routeObject.request.validate(bodyAndQuery);
+                await routeObject.request.validate(bodyAndQuery, {
+                  abortEarly: controllerValidationAbortEarly,
+                });
               } catch (e) {
                 let { errors } = e;
                 // translate it
@@ -214,10 +217,22 @@ class AbstractController extends Base {
                   `Request validation failed with message: ${e.message}. errors: ${errors}`,
                 );
 
+                const errorAnswer = {};
+                if (!e.inner.length) {
+                  errorAnswer[e.path] = errors;
+                } else {
+                  e.inner.forEach((err) => {
+                    errorAnswer[err.path] = err.errors;
+                    if (req.i18n && err.errors) {
+                      errorAnswer[err.path] = err.errors.map((err1) =>
+                        req.i18n.t(err1),
+                      );
+                    }
+                  });
+                }
+
                 return res.status(400).json({
-                  errors: {
-                    [e.path]: errors,
-                  },
+                  errors: errorAnswer,
                 });
               }
               req.appInfo.request = routeObject.request.cast(bodyAndQuery, {

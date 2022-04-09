@@ -1,3 +1,8 @@
+### 3.0.14
+
+[NEW] now possible to show all errors during validation (default one) by parameter controllerValidationAbortEarly
+[UPDATE] update deps
+
 ### 3.0.13
 
 [UPDATE] bug fix with "mergeParams"
