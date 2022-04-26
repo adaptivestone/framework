@@ -1,3 +1,8 @@
+### 3.0.15
+
+[UPDATE] update deps
+[UPDATE] minimum node version 16
+
 ### 3.0.14
 
 [NEW] now possible to show all errors during validation (default one) by parameter controllerValidationAbortEarly
