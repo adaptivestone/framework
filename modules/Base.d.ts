@@ -3,7 +3,7 @@ import Server from '../server';
 
 declare class Base {
   app: Server['app'];
-  _realLogger: null;
+  #realLogger: null;
 
   constructor(app: Server['app']);
 

@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 const path = require('path');
 const fs = require('fs').promises;
 

@@ -1,3 +1,4 @@
+/* eslint-disable no-param-reassign */
 const bcrypt = require('bcrypt');
 
 const AbstractModel = require('../modules/AbstractModel');
@@ -99,8 +100,7 @@ class User extends AbstractModel {
       avatar: this.avatar,
       name: this.name,
       email: this.email,
-      // eslint-disable-next-line no-underscore-dangle
-      _id: this._id,
+      id: this.id,
       isVerified: this.isVerified,
       permissions: this.permissions,
       locale: this.locale,

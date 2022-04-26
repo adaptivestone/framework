@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle */
 const AbstractCommand = require('../../modules/AbstractCommand');
 
 class Migrate extends AbstractCommand {

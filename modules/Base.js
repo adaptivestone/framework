@@ -1,11 +1,11 @@
-/* eslint-disable no-underscore-dangle */
 const fs = require('fs').promises;
 const { join } = require('path');
 
 class Base {
+  #realLogger = null;
+
   constructor(app) {
     this.app = app;
-    this._realLogger = null;
   }
 
   /**
@@ -19,12 +19,12 @@ class Base {
    * Optimzation to lazy load logger. It will be inited only on request
    */
   get logger() {
-    if (!this._realLogger) {
-      this._realLogger = this.getLogger(
+    if (!this.#realLogger) {
+      this.#realLogger = this.getLogger(
         this.constructor.loggerGroup + this.getConstructorName(),
       );
     }
-    return this._realLogger;
+    return this.#realLogger;
   }
 
   /**
