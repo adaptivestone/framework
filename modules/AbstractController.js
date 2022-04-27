@@ -136,7 +136,9 @@ class AbstractController extends Base {
       }
       for (const path in routes[verb]) {
         const routeAdditionalMiddlewares = routeMiddlewaresReg.filter(
-          (middleware) => middleware.path === path && middleware.method === verb);
+          (middleware) =>
+            middleware.path === path && middleware.method === verb,
+        );
         let routeObject = routes[verb][path];
         routeObjectClone = merge({}, routeObject);
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
