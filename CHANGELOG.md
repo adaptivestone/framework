@@ -1,3 +1,8 @@
+### 3.0.16
+
+[UPDATE] update deps
+[FIX] fix bug with route level middleware
+
 ### 3.0.15
 
 [UPDATE] update deps
