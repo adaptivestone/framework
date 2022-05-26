@@ -172,7 +172,7 @@ class AbstractController extends Base {
 
         routesInfo.push({
           name: fnName,
-          description: routeObject.description,
+          description: routeObject?.description,
           method: verb.toUpperCase(),
           path,
           fullPath,
@@ -335,7 +335,7 @@ class AbstractController extends Base {
           [route.fullPath]: {
             method: route.method,
             name: route.name,
-            description: route.description,
+            description: route?.description,
             fields,
             routeMiddlewares: routeMiddlewaresReg
               // eslint-disable-next-line consistent-return
