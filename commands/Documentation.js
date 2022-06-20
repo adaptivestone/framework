@@ -6,8 +6,7 @@ class Documentation extends AbstractCommand {
     const CM = new ControllerManager(this.app);
     this.app.documentation = [];
     await CM.initControllers({ folders: this.app.foldersConfig });
-    console.log(JSON.stringify(this.app.documentation));
-    return JSON.stringify(this.app.documentation);
+    return this.app.documentation;
   }
 }
 
