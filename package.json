@@ -32,7 +32,7 @@
     "cors": "^2.8.5",
     "deepmerge": "^4.2.2",
     "dotenv": "^16.0.0",
-    "email-templates": "^9.0.0",
+    "email-templates": "^10.0.0",
     "express": "^4.17.1",
     "i18next": "^21.2.4",
     "i18next-chained-backend": "^3.0.2",
