@@ -1,6 +1,7 @@
-### NEXT
+### 3.0.18
 
 [UPDATE] update deps
+[UPDATE] change default branch to 'main'
 
 ### 3.0.17
 
