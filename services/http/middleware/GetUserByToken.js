@@ -5,6 +5,17 @@ class GetUserByToken extends AbstractMiddleware {
     return 'Grab a token and try to parse the user from it. It user exist will add req.appInfo.user variable';
   }
 
+  static get getHeaderAuthParams() {
+    return [
+      {
+        name: 'Authorization',
+        type: 'apiKey',
+        in: 'header',
+        description: this?.description,
+      },
+    ];
+  }
+
   async middleware(req, res, next) {
     let { token } = req.body;
     this.logger.verbose(
