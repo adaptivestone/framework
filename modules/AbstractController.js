@@ -111,7 +111,7 @@ class AbstractController extends Base {
     const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
     const routesInfo = [];
     let routeObjectClone = {};
-    const routeObjests = []
+    const routeObjests = [];
 
     /**
      *  Register controller middleware
@@ -308,7 +308,7 @@ class AbstractController extends Base {
 
     const processingFields = (fieldsByRoute) => {
       const fields = [];
-      if (!fieldsByRoute) return fields
+      if (!fieldsByRoute) return fields;
       const entries = Object.entries(fieldsByRoute);
       entries.forEach(([key, value]) => {
         const field = {};
@@ -318,7 +318,7 @@ class AbstractController extends Base {
           field.isRequired = value.exclusiveTests.required;
         }
         if (value?.innerType) {
-           field.innerType = value?.innerType?.type
+          field.innerType = value?.innerType?.type;
         }
 
         if (value.fields) {
@@ -335,9 +335,8 @@ class AbstractController extends Base {
         }
         fields.push(field);
       });
-      return fields
-    }
-
+      return fields;
+    };
 
     if (!this.app.httpServer) {
       this.app.documentation.push({
@@ -353,12 +352,14 @@ class AbstractController extends Base {
               .map((middleware) => {
                 if (
                   route.fullPath.toUpperCase() ===
-                  middleware.fullPath.toUpperCase() || middleware.fullPath.toUpperCase() === `${route.fullPath.toUpperCase()}*`
+                    middleware.fullPath.toUpperCase() ||
+                  middleware.fullPath.toUpperCase() ===
+                    `${route.fullPath.toUpperCase()}*`
                 ) {
                   return {
                     name: middleware.name,
                     params: middleware.params,
-                    authParams: middleware.authParams
+                    authParams: middleware.authParams,
                   };
                 }
               })
@@ -367,11 +368,17 @@ class AbstractController extends Base {
               ...new Set(
                 middlewaresInfo
                   .filter(
-                    (middleware) => middleware.fullPath.toUpperCase() ===
-                      route.fullPath.toUpperCase() || middleware.fullPath.toUpperCase() === `${route.fullPath.toUpperCase()}*`
-
+                    (middleware) =>
+                      middleware.fullPath.toUpperCase() ===
+                        route.fullPath.toUpperCase() ||
+                      middleware.fullPath.toUpperCase() ===
+                        `${route.fullPath.toUpperCase()}*`,
                   )
-                  .map(({ name, params, authParams }) => ({ name, params, authParams})),
+                  .map(({ name, params, authParams }) => ({
+                    name,
+                    params,
+                    authParams,
+                  })),
               ),
             ],
           },
