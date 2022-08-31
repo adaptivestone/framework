@@ -98,7 +98,7 @@ class AbstractController extends Base {
             path: realPath,
             fullPath,
             params: middlewareParams,
-            authParams: MiddlewareFunction?.getHeaderAuthParams,
+            authParams: MiddlewareFunction?.usedAuthParameters,
             MiddlewareFunction,
           });
         }
@@ -308,7 +308,9 @@ class AbstractController extends Base {
 
     const processingFields = (fieldsByRoute) => {
       const fields = [];
-      if (!fieldsByRoute) return fields;
+      if (!fieldsByRoute) {
+        return fields;
+      }
       const entries = Object.entries(fieldsByRoute);
       entries.forEach(([key, value]) => {
         const field = {};
