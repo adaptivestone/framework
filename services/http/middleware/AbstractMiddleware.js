@@ -7,7 +7,11 @@ class AbstractMiddleware extends Base {
   }
 
   static get description() {
-    return ' Middleware description. Please provide own';
+    return 'Middleware description. Please provide own';
+  }
+
+  static get usedAuthParameters() {
+    return [];
   }
 
   async middleware(req, res, next) {

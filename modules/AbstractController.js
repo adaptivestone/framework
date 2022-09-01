@@ -91,12 +91,14 @@ class AbstractController extends Base {
           if (Array.isArray(M)) {
             [MiddlewareFunction, middlewareParams] = M;
           }
+
           middlewaresInfo.push({
             name: MiddlewareFunction.name,
             method,
             path: realPath,
             fullPath,
             params: middlewareParams,
+            authParams: MiddlewareFunction?.usedAuthParameters,
             MiddlewareFunction,
           });
         }
@@ -105,10 +107,11 @@ class AbstractController extends Base {
     };
 
     const routeMiddlewaresReg = parseMiddlewares(routeMiddlewares);
-    const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
 
+    const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
     const routesInfo = [];
     let routeObjectClone = {};
+    const routeObjests = [];
 
     /**
      *  Register controller middleware
@@ -140,7 +143,6 @@ class AbstractController extends Base {
             middleware.path === path && middleware.method === verb,
         );
         let routeObject = routes[verb][path];
-        routeObjectClone = merge({}, routeObject);
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
             handler: routeObject,
@@ -174,6 +176,7 @@ class AbstractController extends Base {
           name: fnName,
           description: routeObject?.description,
           method: verb.toUpperCase(),
+          fields: routeObject?.request?.fields,
           path,
           fullPath,
         });
@@ -269,6 +272,8 @@ class AbstractController extends Base {
             });
           },
         );
+
+        routeObjectClone = merge({}, routeObject);
       }
     }
 
@@ -300,35 +305,42 @@ class AbstractController extends Base {
     /**
      * Generate documentation
      */
-    if (!this.app.httpServer) {
+
+    const processingFields = (fieldsByRoute) => {
       const fields = [];
-      if (routeObjectClone.request) {
-        const reqFields = routeObjectClone.request.fields;
-        const entries = Object.entries(reqFields);
-        entries.forEach(([key, value]) => {
-          const field = {};
-          field.name = key;
-          field.type = value.type;
-          if (value.exclusiveTests) {
-            field.isRequired = value.exclusiveTests.required;
-          }
-
-          if (value.fields) {
-            field.fields = [];
-            // eslint-disable-next-line no-shadow
-            const entries = Object.entries(value.fields);
-            // eslint-disable-next-line no-shadow
-            entries.forEach(([key, value]) => {
-              field.fields.push({
-                name: key,
-                type: value.type,
-              });
-            });
-          }
-          fields.push(field);
-        });
+      if (!fieldsByRoute) {
+        return fields;
       }
+      const entries = Object.entries(fieldsByRoute);
+      entries.forEach(([key, value]) => {
+        const field = {};
+        field.name = key;
+        field.type = value.type;
+        if (value.exclusiveTests) {
+          field.isRequired = value.exclusiveTests.required;
+        }
+        if (value?.innerType) {
+          field.innerType = value?.innerType?.type;
+        }
 
+        if (value.fields) {
+          field.fields = [];
+          // eslint-disable-next-line no-shadow
+          const entries = Object.entries(value.fields);
+          // eslint-disable-next-line no-shadow
+          entries.forEach(([key, value]) => {
+            field.fields.push({
+              name: key,
+              type: value.type,
+            });
+          });
+        }
+        fields.push(field);
+      });
+      return fields;
+    };
+
+    if (!this.app.httpServer) {
       this.app.documentation.push({
         contollerName: this.getConstructorName(),
         routesInfo: routesInfo.map((route) => ({
@@ -336,17 +348,20 @@ class AbstractController extends Base {
             method: route.method,
             name: route.name,
             description: route?.description,
-            fields,
+            fields: processingFields(route.fields),
             routeMiddlewares: routeMiddlewaresReg
               // eslint-disable-next-line consistent-return
               .map((middleware) => {
                 if (
                   route.fullPath.toUpperCase() ===
-                  middleware.fullPath.toUpperCase()
+                    middleware.fullPath.toUpperCase() ||
+                  middleware.fullPath.toUpperCase() ===
+                    `${route.fullPath.toUpperCase()}*`
                 ) {
                   return {
                     name: middleware.name,
                     params: middleware.params,
+                    authParams: middleware.authParams,
                   };
                 }
               })
@@ -357,9 +372,15 @@ class AbstractController extends Base {
                   .filter(
                     (middleware) =>
                       middleware.fullPath.toUpperCase() ===
-                      route.fullPath.toUpperCase(),
+                        route.fullPath.toUpperCase() ||
+                      middleware.fullPath.toUpperCase() ===
+                        `${route.fullPath.toUpperCase()}*`,
                   )
-                  .map(({ name, params }) => ({ name, params })),
+                  .map(({ name, params, authParams }) => ({
+                    name,
+                    params,
+                    authParams,
+                  })),
               ),
             ],
           },
