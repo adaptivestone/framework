@@ -1,8 +1,8 @@
 const redis = require('redis');
 
-async function clearNamespace(pattern = '') {
+async function clearNamespace(pattern = '', app) {
   const deletedKeys = [];
-  const conf = this.app.getConfig('redis');
+  const conf = app.getConfig('redis');
   const redisClient = redis.createClient({ url: conf.url });
   await redisClient.connect();
   const keys = await redisClient.sendCommand(['keys', `${pattern}*`]);
