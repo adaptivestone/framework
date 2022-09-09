@@ -10,7 +10,10 @@ class Cache extends Base {
     // we should support multiple cashe same time
     super(app);
     const conf = this.app.getConfig('redis');
-    this.redisClient = redis.createClient(conf.url);
+    this.redisClient = redis.createClient({
+      url: conf.url,
+      prefix: process.env.REDIS_NAMESPACE,
+    });
     this.redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
     });
@@ -25,6 +28,10 @@ class Cache extends Base {
   }
 
   async getSetValue(key, onNotFound, storeTime = 60 * 5) {
+    const { namespace } = this.app.updateConfig('redis', {
+      namespace: process.env.REDIS_NAMESPACE,
+    });
+    this.redisClient.options.prefix = namespace;
     // 5 mins default
     let resolve = null;
     if (this.promiseMapping.has(key)) {

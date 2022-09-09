@@ -6,8 +6,13 @@ let mongoMemoryServerInstance;
 const path = require('path');
 const Server = require('../server');
 
+const REDIS_NAMESPACE = 'testing:';
+const clearRadisNamespace = require('../helpers/redis/clearNamespace');
+
 jest.setTimeout(1000000);
 beforeAll(async () => {
+  process.env.REDIS_NAMESPACE = REDIS_NAMESPACE;
+  clearRadisNamespace(REDIS_NAMESPACE);
   mongoMemoryServerInstance = await MongoMemoryReplSet.create({
     // binary: { version: '4.4.6' },
     replSet: { storageEngine: 'wiredTiger' },
@@ -64,6 +69,8 @@ beforeAll(async () => {
   await global.server.startServer();
 });
 afterAll(async () => {
+  process.env.REDIS_NAMESPACE = '';
+  clearRadisNamespace(REDIS_NAMESPACE);
   if (global.server) {
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');

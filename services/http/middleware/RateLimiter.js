@@ -47,7 +47,10 @@ class RateLimiter extends AbstractMiddleware {
 
   initRedisLimiter() {
     const redisConfig = this.app.getConfig('redis');
-    const redisClient = redis.createClient(redisConfig.url);
+    const redisClient = redis.createClient({
+      url: redisConfig.url,
+      prefix: redisConfig.namespace,
+    });
     redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
     });

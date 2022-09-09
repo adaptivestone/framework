@@ -46,7 +46,7 @@
     "prettier": "^2.3.2",
     "pug": "^3.0.2",
     "rate-limiter-flexible": "^2.2.4",
-    "redis": "^3.1.2",
+    "redis": "^4.3.1",
     "winston": "^3.3.3",
     "winston-transport-sentry-node": "^2.0.0",
     "yup": "^0.32.9"
