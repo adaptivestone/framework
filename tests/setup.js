@@ -6,8 +6,8 @@ let mongoMemoryServerInstance;
 const path = require('path');
 const Server = require('../server');
 
-// const REDIS_NAMESPACE = 'testing:';
-// const clearRadisNamespace = require('../helpers/redis/clearNamespace');
+const REDIS_NAMESPACE = 'testing:';
+const clearRadisNamespace = require('../helpers/redis/clearNamespace');
 
 jest.setTimeout(1000000);
 beforeAll(async () => {
@@ -66,16 +66,25 @@ beforeAll(async () => {
   }
   await global.server.startServer();
 
-  // process.env.REDIS_NAMESPACE = REDIS_NAMESPACE;
-  // await clearRadisNamespace(global.server.getConfig('redis'), REDIS_NAMESPACE);
+  process.env.REDIS_NAMESPACE = REDIS_NAMESPACE;
+  await clearRadisNamespace(
+    {
+      url: process.env.REDIS_URI || 'redis://localhost',
+      namespace: process.env.REDIS_NAMESPACE || 'main:',
+    },
+    REDIS_NAMESPACE,
+  );
 });
 afterAll(async () => {
   if (global.server) {
-    // process.env.REDIS_NAMESPACE = '';
-    // await clearRadisNamespace(
-    //   global.server.getConfig('redis'),
-    //   REDIS_NAMESPACE,
-    // );
+    process.env.REDIS_NAMESPACE = '';
+    await clearRadisNamespace(
+      {
+        url: process.env.REDIS_URI || 'redis://localhost',
+        namespace: process.env.REDIS_NAMESPACE || 'main:',
+      },
+      REDIS_NAMESPACE,
+    );
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }
