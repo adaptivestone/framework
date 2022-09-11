@@ -1,16 +1,19 @@
-const redis = require('redis');
+const { createClient } = require('redis');
 
 async function clearNamespace(conf) {
   const deletedKeys = [];
-  const redisClient = redis.createClient({ url: conf.url });
-  await redisClient.connect();
-  const keys = await redisClient.sendCommand(['keys', `${conf.namespace}*`]);
+  const redisClient = createClient({ url: conf.url });
 
-  for (const key of keys) {
-    deletedKeys.push(redisClient.sendCommand(['del', key]));
+  if (redisClient) {
+    await redisClient.connect();
+    const keys = await redisClient.sendCommand(['keys', `${conf.namespace}*`]);
+
+    for (const key of keys) {
+      deletedKeys.push(redisClient.sendCommand(['del', key]));
+    }
+    await Promise.all(deletedKeys);
+    await redisClient.disconnect();
   }
-  await Promise.all(deletedKeys);
-  await redisClient.disconnect();
 }
 
 module.exports = clearNamespace;
