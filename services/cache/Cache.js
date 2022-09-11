@@ -14,6 +14,7 @@ class Cache extends Base {
       url: conf.url,
       prefix: process.env.REDIS_NAMESPACE,
     });
+
     this.redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
     });

@@ -4,7 +4,7 @@ async function clearNamespace(conf) {
   const deletedKeys = [];
   const redisClient = createClient({ url: conf.url });
 
-  if (redisClient) {
+  if (redisClient.isOpen) {
     await redisClient.connect();
     const keys = await redisClient.sendCommand(['keys', `${conf.namespace}*`]);
 
