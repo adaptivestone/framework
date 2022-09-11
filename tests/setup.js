@@ -67,24 +67,12 @@ beforeAll(async () => {
   await global.server.startServer();
 
   process.env.REDIS_NAMESPACE = REDIS_NAMESPACE;
-  await clearRadisNamespace(
-    {
-      url: process.env.REDIS_URI || 'redis://localhost',
-      namespace: process.env.REDIS_NAMESPACE || 'main:',
-    },
-    REDIS_NAMESPACE,
-  );
+  await clearRadisNamespace(global.server.getConfig('redis'));
 });
 afterAll(async () => {
   if (global.server) {
     process.env.REDIS_NAMESPACE = '';
-    await clearRadisNamespace(
-      {
-        url: process.env.REDIS_URI || 'redis://localhost',
-        namespace: process.env.REDIS_NAMESPACE || 'main:',
-      },
-      REDIS_NAMESPACE,
-    );
+    await clearRadisNamespace(global.server.getConfig('redis'));
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }
