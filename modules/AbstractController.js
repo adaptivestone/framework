@@ -253,6 +253,14 @@ class AbstractController extends Base {
               },
             });
 
+            if (!routeObject.handler) {
+              this.logger.error(`Route object have no handler defined`);
+              return res.status(500).json({
+                message:
+                  'Platform error 2. Please check later or contact support',
+              });
+            }
+
             if (routeObject.handler.constructor.name !== 'AsyncFunction') {
               const error =
                 "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
