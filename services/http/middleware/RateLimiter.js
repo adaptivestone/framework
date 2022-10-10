@@ -16,8 +16,15 @@ class RateLimiter extends AbstractMiddleware {
 
   constructor(app, params) {
     super(app, params);
+    const routeParams = params;
+    const { namespace, defaultTestingNamespace } = this.app.getConfig('redis');
     const limiterOptions = this.app.getConfig('rateLimiter');
-    this.finalOptions = merge(limiterOptions, params);
+
+    if (namespace === defaultTestingNamespace) {
+      routeParams.points = 100;
+    }
+
+    this.finalOptions = merge(limiterOptions, routeParams);
     this.limiter = null;
 
     switch (this.finalOptions.driver) {
@@ -95,15 +102,10 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   async middleware(req, res, next) {
-    const { namespace, defaultTestingNamespace } = this.app.getConfig('redis');
     if (!this.limiter) {
       this.logger.info(
         `RateLimmiter not inited correclty! Please check init logs `,
       );
-    }
-
-    if (namespace === defaultTestingNamespace) {
-      return next();
     }
 
     const consumeKey = this.gerenateConsumeKey(req);
