@@ -18,7 +18,6 @@ class RateLimiter extends AbstractMiddleware {
     super(app, params);
     const limiterOptions = this.app.getConfig('rateLimiter');
     this.finalOptions = merge(limiterOptions, params);
-
     this.limiter = null;
 
     switch (this.finalOptions.driver) {
@@ -49,7 +48,6 @@ class RateLimiter extends AbstractMiddleware {
     const redisConfig = this.app.getConfig('redis');
     const redisClient = redis.createClient({
       url: redisConfig.url,
-      prefix: redisConfig.namespace,
     });
     redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
@@ -93,14 +91,19 @@ class RateLimiter extends AbstractMiddleware {
       });
     }
 
-    return key.join('_');
+    return `${this.redisNamespace}${key.join('_')}`;
   }
 
   async middleware(req, res, next) {
+    const { namespace, defaultTestingNamespace } = this.app.getConfig('redis');
     if (!this.limiter) {
       this.logger.info(
         `RateLimmiter not inited correclty! Please check init logs `,
       );
+    }
+
+    if (namespace === defaultTestingNamespace) {
+      return next();
     }
 
     const consumeKey = this.gerenateConsumeKey(req);
