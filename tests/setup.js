@@ -73,6 +73,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  console.log(global.server);
   if (global.server) {
     await clearRadisNamespace(global.server.app.getConfig('redis'));
   }
