@@ -73,7 +73,9 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  await clearRadisNamespace(global.server.app.getConfig('redis'));
+  if (global.server) {
+    await clearRadisNamespace(global.server.app.getConfig('redis'));
+  }
 });
 
 afterAll(async () => {
