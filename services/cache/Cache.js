@@ -12,7 +12,12 @@ class Cache extends Base {
     const conf = this.app.getConfig('redis');
     this.redisClient = redis.createClient({
       url: conf.url,
+      legacyMode: true,
     });
+
+    (async () => {
+      await this.redisClient.connect();
+    })();
 
     this.redisNamespace = conf.namespace;
 
@@ -22,16 +27,15 @@ class Cache extends Base {
     this.redisClient.on('connect', () => {
       this.logger.info('Redis connection success');
     });
-    this.app.events.on('shutdown', () => {
-      this.redisClient.quit();
-    });
+    // this.app.events.on('shutdown', async () => {
+    //   this.redisClient.quit();
+    // });
     this.redisGetAsync = promisify(this.redisClient.get).bind(this.redisClient);
     this.promiseMapping = new Map();
   }
 
   async getSetValue(keyValue, onNotFound, storeTime = 60 * 5) {
     const key = `${this.redisNamespace}${keyValue}`;
-
     // 5 mins default
     let resolve = null;
     if (this.promiseMapping.has(key)) {

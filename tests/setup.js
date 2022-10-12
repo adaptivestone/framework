@@ -73,7 +73,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
-  await clearRadisNamespace(global.server.getConfig('redis'));
+  await clearRadisNamespace(global.server.app.getConfig('redis'));
 });
 
 afterAll(async () => {
@@ -83,6 +83,7 @@ afterAll(async () => {
     global.server.app.updateConfig('redis', {
       namespace: process.env.REDIS_NAMESPACE,
     });
+
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }

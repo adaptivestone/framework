@@ -17,14 +17,11 @@ class RateLimiter extends AbstractMiddleware {
   constructor(app, params) {
     super(app, params);
     const routeParams = params;
-    const { namespace, defaultTestingNamespace } = this.app.getConfig('redis');
+    const { namespace } = this.app.getConfig('redis');
     const limiterOptions = this.app.getConfig('rateLimiter');
 
-    if (namespace === defaultTestingNamespace) {
-      routeParams.points = 100;
-    }
-
     this.finalOptions = merge(limiterOptions, routeParams);
+    this.redisNamespace = namespace;
     this.limiter = null;
 
     switch (this.finalOptions.driver) {
@@ -55,7 +52,13 @@ class RateLimiter extends AbstractMiddleware {
     const redisConfig = this.app.getConfig('redis');
     const redisClient = redis.createClient({
       url: redisConfig.url,
+      legacyMode: true,
     });
+
+    (async () => {
+      await redisClient.connect();
+    })();
+
     redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
     });
@@ -63,8 +66,8 @@ class RateLimiter extends AbstractMiddleware {
       this.logger.info('Redis connection success');
     });
 
-    this.app.events.on('shutdown', () => {
-      redisClient.quit();
+    this.app.events.on('shutdown', async () => {
+      await redisClient.disconnect();
     });
 
     return new RateLimiterRedis({
