@@ -93,6 +93,7 @@ afterAll(async () => {
   if (typeof global.testSetup.afterAll === 'function') {
     await global.testSetup.afterAll();
   }
+
   await mongoose.disconnect();
   await mongoMemoryServerInstance.stop();
 
