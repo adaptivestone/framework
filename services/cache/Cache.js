@@ -29,7 +29,7 @@ class Cache extends Base {
     this.app.events.on('shutdown', async () => {
       this.redisClient.quit();
     });
-    this.redisGetAsync = promisify(this.redisClient.get).bind(this.redisClient);
+
     this.promiseMapping = new Map();
   }
 
@@ -48,11 +48,11 @@ class Cache extends Base {
       }),
     );
 
-    let result = await this.redisGetAsync(key);
+    let result = await this.redisClient.get(key);
     if (!result) {
       this.logger.verbose(`getSetValueFromCache not found for key ${key}`);
       result = await onNotFound();
-      this.redisClient.set(key, JSON.stringify(result), 'EX', storeTime);
+      this.redisClient.setEx(key, storeTime, JSON.stringify(result));
     } else {
       this.logger.verbose(
         `getSetValueFromCache FROM CACHE key ${key}, value ${result}`,
