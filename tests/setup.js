@@ -17,7 +17,7 @@ beforeAll(async () => {
   await mongoMemoryServerInstance.waitUntilRunning();
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
   const connectionStringMongo = await mongoMemoryServerInstance.getUri();
-  console.info('MONGO_URI: ', connectionStringMongo);
+  // console.info('MONGO_URI: ', connectionStringMongo);
   global.server = new Server({
     folders: {
       config: process.env.TEST_FOLDER_CONFIG || path.resolve('./config'),
