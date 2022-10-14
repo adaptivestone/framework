@@ -1,23 +1,23 @@
 const request = require('supertest');
 
 describe('middlewares correct works', () => {
-  // it('rateLimiter on route works correct', async () => {
-  //   expect.assertions(1);
-  //   const resultsPromise = [];
+  it('rateLimiter on route works correct', async () => {
+    expect.assertions(1);
+    const resultsPromise = [];
 
-  //   for (let i = 0; i < 11; i += 1) {
-  //     resultsPromise.push(
-  //       request(global.server.app.httpServer.express).get(
-  //         '/test/somecontroller/',
-  //       ),
-  //     );
-  //   }
+    for (let i = 0; i < 11; i += 1) {
+      resultsPromise.push(
+        request(global.server.app.httpServer.express).get(
+          '/test/somecontroller/',
+        ),
+      );
+    }
 
-  //   const results = await Promise.all(resultsPromise);
-  //   const statuses = results.map((res) => res.status);
+    const results = await Promise.all(resultsPromise);
+    const statuses = results.map((res) => res.status);
 
-  //   expect(statuses.indexOf(429)).not.toBe(-1);
-  // });
+    expect(statuses.indexOf(429)).not.toBe(-1);
+  });
 
   it('checkFlag middleware works correctly with other middleware', async () => {
     expect.assertions(1);
