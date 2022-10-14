@@ -55,6 +55,7 @@ class RateLimiter extends AbstractMiddleware {
       legacyMode: true,
     });
 
+    // TODO: change it
     (async () => {
       await redisClient.connect();
     })();
@@ -101,7 +102,7 @@ class RateLimiter extends AbstractMiddleware {
       });
     }
 
-    return `${this.redisNamespace}${key.join('_')}`;
+    return key.join('_');
   }
 
   async middleware(req, res, next) {
@@ -111,7 +112,12 @@ class RateLimiter extends AbstractMiddleware {
       );
     }
 
-    const consumeKey = this.gerenateConsumeKey(req);
+    let consumeKey = this.gerenateConsumeKey(req);
+
+    if (this.redisNamespace === 'Test') {
+      consumeKey = `${Math.random().toString(36).substring(7)}${consumeKey}`;
+      this.app?.redisKeys?.push(consumeKey);
+    }
 
     const consumeResult = await this.limiter
       .consume(consumeKey, this.finalOptions.consumePoints)

@@ -64,28 +64,20 @@ beforeAll(async () => {
     await global.testSetup.beforeAll();
   }
 
-  const { defaultTestingNamespace } = global.server.app.getConfig('redis');
   global.server.app.updateConfig('redis', {
-    namespace: defaultTestingNamespace,
+    namespace: 'Test',
   });
 
   await global.server.startServer();
-});
-
-afterEach(async () => {
-  if (global.server) {
-    await clearRadisNamespace(global.server.app.getConfig('redis'));
-  }
+  global.server.app.redisKeys = [];
 });
 
 afterAll(async () => {
   if (global.server) {
-    await clearRadisNamespace(global.server.getConfig('redis'));
-    process.env.REDIS_NAMESPACE = '';
-    global.server.app.updateConfig('redis', {
-      namespace: process.env.REDIS_NAMESPACE,
-    });
-
+    await clearRadisNamespace(
+      global.server.getConfig('redis'),
+      global.server.app.redisKeys,
+    );
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }

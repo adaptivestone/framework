@@ -1,5 +1,4 @@
 const redis = require('redis');
-const { promisify } = require('util');
 const Base = require('../../modules/Base');
 
 class Cache extends Base {
@@ -13,10 +12,6 @@ class Cache extends Base {
     this.redisClient = redis.createClient({
       url: conf.url,
     });
-
-    (async () => {
-      await this.redisClient.connect();
-    })();
 
     this.redisNamespace = conf.namespace;
 
@@ -34,6 +29,9 @@ class Cache extends Base {
   }
 
   async getSetValue(keyValue, onNotFound, storeTime = 60 * 5) {
+    if (!this.redisClient.isOpen) {
+      await this.redisClient.connect();
+    }
     const key = `${this.redisNamespace}${keyValue}`;
     // 5 mins default
     let resolve = null;
