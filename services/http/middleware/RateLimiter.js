@@ -23,7 +23,7 @@ class RateLimiter extends AbstractMiddleware {
     this.finalOptions = merge(limiterOptions, routeParams);
     this.redisNamespace = namespace;
     this.limiter = null;
-    this.testPrefix = `${Math.random().toString(36).substring(7)}`;
+    this.testPrefix = `${namespace}-${Math.random().toString(36).substring(7)}`;
 
     switch (this.finalOptions.driver) {
       case 'memory':
@@ -117,8 +117,11 @@ class RateLimiter extends AbstractMiddleware {
 
     if (this.redisNamespace === 'Test') {
       consumeKey = `${this.testPrefix}${consumeKey}`;
-      this.app?.redisKeys?.push(consumeKey);
+      if (!this.app.redisKeys.includes(consumeKey)) {
+        this.app.redisKeys.push(consumeKey);
+      }
     }
+
     const consumeResult = await this.limiter
       .consume(consumeKey, this.finalOptions.consumePoints)
       .catch(() => {

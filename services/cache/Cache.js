@@ -32,7 +32,7 @@ class Cache extends Base {
     if (!this.redisClient.isOpen) {
       await this.redisClient.connect();
     }
-    const key = `${this.redisNamespace}${keyValue}`;
+    const key = `${this.redisNamespace}-${keyValue}`;
     // 5 mins default
     let resolve = null;
     if (this.promiseMapping.has(key)) {

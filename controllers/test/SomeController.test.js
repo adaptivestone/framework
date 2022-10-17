@@ -1,6 +1,47 @@
 const request = require('supertest');
 
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 describe('middlewares correct works', () => {
+  it('cache work correctly', async () => {
+    expect.assertions(3);
+    const key = 'someKey';
+    await request(global.server.app.httpServer.express)
+      .post('/test/somecontroller/someDataItems')
+      .send({
+        items: ['Value1', 'Value2', 'Value3'],
+        key,
+      });
+
+    let items = await global.server.app.cache.getSetValue(
+      key,
+      () => ['v1', 'v2', 'v3'],
+      30,
+    );
+
+    expect(items).toStrictEqual(['Value1', 'Value2', 'Value3']);
+
+    await delay(1000);
+
+    items = await global.server.app.cache.getSetValue(
+      key,
+      () => ['v1', 'v2', 'v3'],
+      30,
+    );
+
+    expect(items).toStrictEqual(['Value1', 'Value2', 'Value3']);
+
+    await delay(5000);
+
+    items = await global.server.app.cache.getSetValue(
+      key,
+      () => ['v1', 'v2', 'v3'],
+      30,
+    );
+
+    expect(items).toStrictEqual(['v1', 'v2', 'v3']);
+  });
+
   it('rateLimiter on route works correct', async () => {
     expect.assertions(1);
     const resultsPromise = [];
