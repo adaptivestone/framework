@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
 const path = require('path');
+const redis = require('redis');
 const Server = require('../server');
 
 const clearRadisNamespace = require('../helpers/redis/clearNamespace');
@@ -74,10 +75,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (global.server) {
-    await clearRadisNamespace(
-      global.server.getConfig('redis'),
-      global.server.app.redisKeys,
-    );
+    const { url } = global.server.getConfig('redis');
+    const redisClient = redis.createClient({ url });
+
+    if (redisClient.isReady) {
+      await redisClient.connect();
+      await clearRadisNamespace(redisClient, global.server.app.redisKeys);
+      await redisClient.disconnect();
+    }
+
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }
