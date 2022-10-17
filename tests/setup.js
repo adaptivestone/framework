@@ -64,25 +64,31 @@ beforeAll(async () => {
   if (typeof global.testSetup.beforeAll === 'function') {
     await global.testSetup.beforeAll();
   }
-
-  global.server.app.updateConfig('redis', {
-    namespace: 'Test',
-  });
-
   await global.server.startServer();
-  global.server.app.redisKeys = [];
+});
+
+beforeEach(() => {
+  if (global.server) {
+    const key = `test-${Math.random().toString(36).substring(7)}`;
+    global.server.app.updateConfig('redis', {
+      namespace: key,
+    });
+  }
+});
+
+afterEach(async () => {
+  if (global.server) {
+    const { url, namespace } = global.server.getConfig('redis');
+    const redisClient = redis.createClient({ url });
+
+    await redisClient.connect();
+    await clearRadisNamespace(redisClient, namespace);
+    await redisClient.disconnect();
+  }
 });
 
 afterAll(async () => {
   if (global.server) {
-    const { url } = global.server.getConfig('redis');
-    const redisClient = redis.createClient({ url });
-    if (redisClient.isReady) {
-      await redisClient.connect();
-      await clearRadisNamespace(redisClient, global.server.app.redisKeys);
-      await redisClient.disconnect();
-    }
-
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }
