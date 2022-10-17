@@ -24,9 +24,8 @@ test:
   services:
     - redis:latest
   variables:
-    REDIS_URI: redis://redis
-  variables:
     LOGGER_CONSOLE_LEVEL: 'error'
+    REDIS_URI: redis://redis
   script:
     - npm test
 
