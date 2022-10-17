@@ -77,7 +77,6 @@ afterAll(async () => {
   if (global.server) {
     const { url } = global.server.getConfig('redis');
     const redisClient = redis.createClient({ url });
-
     if (redisClient.isReady) {
       await redisClient.connect();
       await clearRadisNamespace(redisClient, global.server.app.redisKeys);
