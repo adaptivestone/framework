@@ -1,8 +1,5 @@
 image: registry.gitlab.com/adaptivestone/ubuntu-node:latest
 
-services:
-  - redis:latest
-
 stages:
   - install
   - codeStyle
@@ -24,11 +21,12 @@ prettier:
 
 test:
   stage: test
+  services:
+    - redis:latest
+  variables:
+    REDIS_URI: redis://redis
   variables:
     LOGGER_CONSOLE_LEVEL: 'error'
-    REDIS_PORT: 6379
-    REDIS_HOST: redis
-    REDIS_URL: redis://localhost:6379
   script:
     - npm test
 
