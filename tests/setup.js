@@ -4,7 +4,10 @@ const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
 const path = require('path');
+const redis = require('redis');
 const Server = require('../server');
+
+const clearRadisNamespace = require('../helpers/redis/clearNamespace');
 
 jest.setTimeout(1000000);
 beforeAll(async () => {
@@ -63,6 +66,27 @@ beforeAll(async () => {
   }
   await global.server.startServer();
 });
+
+beforeEach(() => {
+  if (global.server) {
+    const key = `test-${Math.random().toString(36).substring(7)}`;
+    global.server.app.updateConfig('redis', {
+      namespace: key,
+    });
+  }
+});
+
+afterEach(async () => {
+  if (global.server) {
+    const { url, namespace } = global.server.getConfig('redis');
+    const redisClient = redis.createClient({ url });
+
+    await redisClient.connect();
+    await clearRadisNamespace(redisClient, namespace);
+    await redisClient.disconnect();
+  }
+});
+
 afterAll(async () => {
   if (global.server) {
     global.server.app.httpServer.shutdown();
@@ -72,7 +96,9 @@ afterAll(async () => {
   if (typeof global.testSetup.afterAll === 'function') {
     await global.testSetup.afterAll();
   }
+
   await mongoose.disconnect();
   await mongoMemoryServerInstance.stop();
+
   // }, 2000);
 });

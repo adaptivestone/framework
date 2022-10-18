@@ -1,5 +1,4 @@
 const redis = require('redis');
-const { promisify } = require('util');
 const Base = require('../../modules/Base');
 
 class Cache extends Base {
@@ -10,7 +9,12 @@ class Cache extends Base {
     // we should support multiple cashe same time
     super(app);
     const conf = this.app.getConfig('redis');
-    this.redisClient = redis.createClient(conf.url);
+    this.redisClient = redis.createClient({
+      url: conf.url,
+    });
+
+    this.redisNamespace = conf.namespace;
+
     this.redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
     });
@@ -20,11 +24,15 @@ class Cache extends Base {
     this.app.events.on('shutdown', () => {
       this.redisClient.quit();
     });
-    this.redisGetAsync = promisify(this.redisClient.get).bind(this.redisClient);
+
     this.promiseMapping = new Map();
   }
 
-  async getSetValue(key, onNotFound, storeTime = 60 * 5) {
+  async getSetValue(keyValue, onNotFound, storeTime = 60 * 5) {
+    if (!this.redisClient.isOpen) {
+      await this.redisClient.connect();
+    }
+    const key = `${this.redisNamespace}-${keyValue}`;
     // 5 mins default
     let resolve = null;
     if (this.promiseMapping.has(key)) {
@@ -38,11 +46,11 @@ class Cache extends Base {
       }),
     );
 
-    let result = await this.redisGetAsync(key);
+    let result = await this.redisClient.get(key);
     if (!result) {
       this.logger.verbose(`getSetValueFromCache not found for key ${key}`);
       result = await onNotFound();
-      this.redisClient.set(key, JSON.stringify(result), 'EX', storeTime);
+      this.redisClient.setEx(key, storeTime, JSON.stringify(result));
     } else {
       this.logger.verbose(
         `getSetValueFromCache FROM CACHE key ${key}, value ${result}`,

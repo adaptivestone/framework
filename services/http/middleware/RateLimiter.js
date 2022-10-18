@@ -16,9 +16,10 @@ class RateLimiter extends AbstractMiddleware {
 
   constructor(app, params) {
     super(app, params);
+    const routeParams = params;
     const limiterOptions = this.app.getConfig('rateLimiter');
-    this.finalOptions = merge(limiterOptions, params);
 
+    this.finalOptions = merge(limiterOptions, routeParams);
     this.limiter = null;
 
     switch (this.finalOptions.driver) {
@@ -47,7 +48,16 @@ class RateLimiter extends AbstractMiddleware {
 
   initRedisLimiter() {
     const redisConfig = this.app.getConfig('redis');
-    const redisClient = redis.createClient(redisConfig.url);
+    const redisClient = redis.createClient({
+      url: redisConfig.url,
+      legacyMode: true,
+    });
+
+    // TODO: change it
+    (async () => {
+      await redisClient.connect();
+    })();
+
     redisClient.on('error', (error, b, c) => {
       this.logger.error(error, b, c);
     });
@@ -55,8 +65,8 @@ class RateLimiter extends AbstractMiddleware {
       this.logger.info('Redis connection success');
     });
 
-    this.app.events.on('shutdown', () => {
-      redisClient.quit();
+    this.app.events.on('shutdown', async () => {
+      await redisClient.disconnect();
     });
 
     return new RateLimiterRedis({
@@ -100,7 +110,9 @@ class RateLimiter extends AbstractMiddleware {
       );
     }
 
-    const consumeKey = this.gerenateConsumeKey(req);
+    const { namespace } = this.app.getConfig('redis');
+
+    const consumeKey = `${namespace}-${this.gerenateConsumeKey(req)}`;
 
     const consumeResult = await this.limiter
       .consume(consumeKey, this.finalOptions.consumePoints)

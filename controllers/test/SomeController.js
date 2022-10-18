@@ -44,6 +44,13 @@ class SomeController extends AbstractController {
             name: yup.string(),
           }),
         },
+        '/someDataItems': {
+          handler: this.getSomeDataItems,
+          request: yup.object().shape({
+            items: yup.array().of(yup.string()),
+            key: yup.string(),
+          }),
+        },
       },
 
       put: {
@@ -59,6 +66,19 @@ class SomeController extends AbstractController {
         },
       },
     };
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async getSomething(req, res) {
+    return res.status(200).json({ data: { text: 'Available text' } });
+  }
+
+  async getSomeDataItems(req, res) {
+    const { items, key } = req.appInfo.request;
+
+    await this.app.cache.getSetValue(key, () => items, 5);
+
+    return res.status(200).json({ data: items });
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -96,11 +116,6 @@ class SomeController extends AbstractController {
         },
       },
     });
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  async getSomething(req, res) {
-    return res.status(200).json({ data: { text: 'Available text' } });
   }
 
   static get middleware() {

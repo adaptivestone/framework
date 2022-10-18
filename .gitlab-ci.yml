@@ -21,8 +21,11 @@ prettier:
 
 test:
   stage: test
+  services:
+    - redis:latest
   variables:
     LOGGER_CONSOLE_LEVEL: 'error'
+    REDIS_URI: redis://redis
   script:
     - npm test
 
