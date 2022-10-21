@@ -14,7 +14,8 @@
   "scripts": {
     "dev": "nodemon ./index.js",
     "prod": "nodemon ./cluster.js",
-    "test": "jest --testResultsProcessor=jest-stare",
+    "test": "jest --coverage=false",
+    "coverage": "jest --coverage=true",
     "codestyle": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
     "prepare": "husky install",
     "cli": "node cliCommand"
@@ -27,18 +28,9 @@
     "verbose": true,
     "collectCoverage": true,
     "coverageReporters": [
-      "lcov"
-    ],
-    "coverageDirectory": "./public/coverage/"
-  },
-  "jest-stare": {
-    "merge": "true",
-    "resultDir": "./public/coverage/jest-stare",
-    "log": "true",
-    "resultHtml": "coverage.html",
-    "resultJson": "data.json",
-    "jestStareConfigJson": "jest-stare-config.json",
-    "coverageLink": "../lcov-report/index.html"
+      "text",
+      "text-summary"
+    ]
   },
   "author": "Andrey Logunov",
   "license": "MIT",
