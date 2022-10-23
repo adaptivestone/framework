@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "nodemon ./index.js",
     "prod": "nodemon ./cluster.js",
-    "test": "jest",
+    "test": "jest --coverage=true",
     "codestyle": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
     "prepare": "husky install",
     "cli": "node cliCommand"
@@ -24,7 +24,12 @@
       "./tests/setup.js"
     ],
     "testEnvironment": "node",
-    "verbose": true
+    "verbose": true,
+    "collectCoverage": true,
+    "coverageReporters": [
+      "text",
+      "text-summary"
+    ]
   },
   "author": "Andrey Logunov",
   "license": "MIT",
