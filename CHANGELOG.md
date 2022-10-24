@@ -1,3 +1,8 @@
+### 3.0.22
+
+[UPDATE] updated deps
+[UPDATE] cast function now can be ASYNC too
+
 ### 3.0.21
 
 [UPDATE] updated redis to v4
