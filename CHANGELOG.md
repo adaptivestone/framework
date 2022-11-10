@@ -1,3 +1,8 @@
+### 3.0.23
+
+[UPDATE] updated deps
+[FIX] fix custom errors
+
 ### 3.0.22
 
 [UPDATE] updated deps

@@ -221,7 +221,7 @@ class AbstractController extends Base {
                 );
 
                 const errorAnswer = {};
-                if (!e.inner.length) {
+                if (!e.inner || !e.inner.length) {
                   errorAnswer[e.path] = errors;
                 } else {
                   e.inner.forEach((err) => {
