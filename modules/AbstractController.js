@@ -110,8 +110,6 @@ class AbstractController extends Base {
 
     const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
     const routesInfo = [];
-    let routeObjectClone = {};
-    const routeObjests = [];
 
     /**
      *  Register controller middleware
@@ -223,7 +221,7 @@ class AbstractController extends Base {
                 );
 
                 const errorAnswer = {};
-                if (!e.inner.length) {
+                if (!e.inner || !e.inner.length) {
                   errorAnswer[e.path] = errors;
                 } else {
                   e.inner.forEach((err) => {
@@ -240,9 +238,12 @@ class AbstractController extends Base {
                   errors: errorAnswer,
                 });
               }
-              req.appInfo.request = routeObject.request.cast(bodyAndQuery, {
-                stripUnknown: true,
-              });
+              req.appInfo.request = await routeObject.request.cast(
+                bodyAndQuery,
+                {
+                  stripUnknown: true,
+                },
+              );
             }
             req.body = new Proxy(req.body, {
               get: (target, prop) => {
@@ -280,8 +281,6 @@ class AbstractController extends Base {
             });
           },
         );
-
-        routeObjectClone = merge({}, routeObject);
       }
     }
 

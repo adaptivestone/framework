@@ -1,3 +1,18 @@
+### 3.0.23
+
+[UPDATE] updated deps
+[FIX] fix custom errors
+
+### 3.0.22
+
+[UPDATE] updated deps
+[UPDATE] cast function now can be ASYNC too
+
+### 3.0.21
+
+[UPDATE] updated redis to v4
+[NEW] updates tests to have own namespace on redis
+
 ### 3.0.20
 
 [UPDATE] update deps
