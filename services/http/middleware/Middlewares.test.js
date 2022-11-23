@@ -12,13 +12,13 @@ describe('middlewares methods', () => {
   });
 
   it('can not create rateLimiter with unknown driver', async () => {
-    expect.assertions(2);
+    expect.assertions(1);
 
-    const redisRateLimiter = new RateLimiter(global.server.app, {
+    const rateLimiter = new RateLimiter(global.server.app, {
       driver: 'unknown',
     });
 
-    expect(redisRateLimiter.limiter).toBeNull();
+    expect(rateLimiter.limiter).toBeNull();
   });
 
   it('generateConsumeKey works correctly', async () => {
