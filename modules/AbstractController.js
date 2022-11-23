@@ -312,90 +312,98 @@ class AbstractController extends Base {
     /**
      * Generate documentation
      */
-
-    const processingFields = (fieldsByRoute) => {
-      const fields = [];
-      if (!fieldsByRoute) {
-        return fields;
-      }
-      const entries = Object.entries(fieldsByRoute);
-      entries.forEach(([key, value]) => {
-        const field = {};
-        field.name = key;
-        field.type = value.type;
-        if (value.exclusiveTests) {
-          field.isRequired = value.exclusiveTests.required;
-        }
-        if (value?.innerType) {
-          field.innerType = value?.innerType?.type;
-        }
-
-        if (value.fields) {
-          field.fields = [];
-          // eslint-disable-next-line no-shadow
-          const entries = Object.entries(value.fields);
-          // eslint-disable-next-line no-shadow
-          entries.forEach(([key, value]) => {
-            field.fields.push({
-              name: key,
-              type: value.type,
-            });
-          });
-        }
-        fields.push(field);
-      });
-      return fields;
-    };
-
     if (!this.app.httpServer) {
-      this.app.documentation.push({
-        contollerName: this.getConstructorName(),
-        routesInfo: routesInfo.map((route) => ({
-          [route.fullPath]: {
-            method: route.method,
-            name: route.name,
-            description: route?.description,
-            fields: processingFields(route.fields),
-            routeMiddlewares: routeMiddlewaresReg
-              // eslint-disable-next-line consistent-return
-              .map((middleware) => {
-                if (
-                  route.fullPath.toUpperCase() ===
-                    middleware.fullPath.toUpperCase() ||
-                  middleware.fullPath.toUpperCase() ===
-                    `${route.fullPath.toUpperCase()}*`
-                ) {
-                  return {
-                    name: middleware.name,
-                    params: middleware.params,
-                    authParams: middleware.authParams,
-                  };
-                }
-              })
-              .filter(Boolean),
-            controllerMiddlewares: [
-              ...new Set(
-                middlewaresInfo
-                  .filter(
-                    (middleware) =>
-                      middleware.fullPath.toUpperCase() ===
-                        route.fullPath.toUpperCase() ||
-                      middleware.fullPath.toUpperCase() ===
-                        `${route.fullPath.toUpperCase()}*`,
-                  )
-                  .map(({ name, params, authParams }) => ({
-                    name,
-                    params,
-                    authParams,
-                  })),
-              ),
-            ],
-          },
-        })),
-      });
+      this.getInfoForDocumentation(
+        routesInfo,
+        routeMiddlewaresReg,
+        middlewaresInfo,
+      );
     } else {
       this.app.httpServer.express.use(expressPath, this.router);
     }
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  processingFields(fieldsByRoute) {
+    const fields = [];
+    if (!fieldsByRoute) {
+      return fields;
+    }
+    const entries = Object.entries(fieldsByRoute);
+    entries.forEach(([key, value]) => {
+      const field = {};
+      field.name = key;
+      field.type = value.type;
+      if (value.exclusiveTests) {
+        field.isRequired = value.exclusiveTests.required;
+      }
+      if (value?.innerType) {
+        field.innerType = value?.innerType?.type;
+      }
+
+      if (value.fields) {
+        field.fields = [];
+        // eslint-disable-next-line no-shadow
+        const entries = Object.entries(value.fields);
+        // eslint-disable-next-line no-shadow
+        entries.forEach(([key, value]) => {
+          field.fields.push({
+            name: key,
+            type: value.type,
+          });
+        });
+      }
+      fields.push(field);
+    });
+    return fields;
+  }
+
+  getInfoForDocumentation(routesInfo, routeMiddlewaresReg, middlewaresInfo) {
+    this.app.documentation.push({
+      contollerName: this.getConstructorName(),
+      routesInfo: routesInfo.map((route) => ({
+        [route.fullPath]: {
+          method: route.method,
+          name: route.name,
+          description: route?.description,
+          fields: this.processingFields(route.fields),
+          routeMiddlewares: routeMiddlewaresReg
+            // eslint-disable-next-line consistent-return
+            .map((middleware) => {
+              if (
+                route.fullPath.toUpperCase() ===
+                  middleware.fullPath.toUpperCase() ||
+                middleware.fullPath.toUpperCase() ===
+                  `${route.fullPath.toUpperCase()}*`
+              ) {
+                return {
+                  name: middleware.name,
+                  params: middleware.params,
+                  authParams: middleware.authParams,
+                };
+              }
+            })
+            .filter(Boolean),
+          controllerMiddlewares: [
+            ...new Set(
+              middlewaresInfo
+                .filter(
+                  (middleware) =>
+                    middleware.fullPath.toUpperCase() ===
+                      route.fullPath.toUpperCase() ||
+                    middleware.fullPath.toUpperCase() ===
+                      `${route.fullPath.toUpperCase()}*`,
+                )
+                .map(({ name, params, authParams }) => ({
+                  name,
+                  params,
+                  authParams,
+                })),
+            ),
+          ],
+        },
+      })),
+    });
   }
 
   /**

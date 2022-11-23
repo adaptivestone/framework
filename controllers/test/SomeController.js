@@ -1,5 +1,6 @@
 const yup = require('yup');
 const AbstractController = require('../../modules/AbstractController');
+const AuthMiddleware = require('../../services/http/middleware/Auth');
 const GetUserByToken = require('../../services/http/middleware/GetUserByToken');
 const RateLimiter = require('../../services/http/middleware/RateLimiter');
 const CheckFlag = require('../../services/http/middleware/test/CheckFlag');
@@ -52,7 +53,14 @@ class SomeController extends AbstractController {
           }),
         },
       },
-
+      patch: {
+        '/userAvatar': {
+          handler: this.patchUserAvatar,
+          request: yup.object().shape({
+            avatar: yup.string(),
+          }),
+        },
+      },
       put: {
         '/putInfo': {
           handler: this.putInfo,
@@ -106,6 +114,22 @@ class SomeController extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
+  async patchUserAvatar(req, res) {
+    const { avatar } = req.appInfo.request;
+    const { user } = req.appInfo;
+
+    user.avatar = avatar;
+
+    await user.save();
+
+    return res.status(200).json({
+      data: {
+        updatedUser: user,
+      },
+    });
+  }
+
+  // eslint-disable-next-line class-methods-use-this
   async putInfo(req, res) {
     const { field } = req.appInfo.request;
 
@@ -121,6 +145,7 @@ class SomeController extends AbstractController {
   static get middleware() {
     return new Map([
       ['/*', [GetUserByToken]],
+      ['PATCH/userAvatar', [GetUserByToken, AuthMiddleware]],
       ['PUT/*', [[isAdmin, { roles: ['client'] }]]],
     ]);
   }
