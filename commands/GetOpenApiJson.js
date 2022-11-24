@@ -1,17 +1,51 @@
+const fs = require('fs').promises;
+
 const AbstractCommand = require('../modules/AbstractCommand');
 
+/**
+ * Command for generate documentation json file openApi
+ */
 class GetOpenApiJson extends AbstractCommand {
   async run() {
     const { myDomain } = this.app.getConfig('http');
+    let jsonFile = process.env.npm_package_json;
+    if (!jsonFile) {
+      jsonFile = `${process.env.PWD}/package.json`;
+    }
+
+    try {
+      // eslint-disable-next-line import/no-dynamic-require, global-require
+      jsonFile = require(jsonFile);
+    } catch (e) {
+      this.logger.error(
+        'No npm package detected. Please start this command via NPM as it depends on package.json',
+      );
+    }
+
+    if (!jsonFile) {
+      jsonFile = {
+        name: 'UNDETECTD PROJECT',
+        description: 'UNDETECTD PROJECT DECCRIPTION',
+        version: '0.0.0-undetrcted',
+        author: {
+          email: 'none@example.com',
+        },
+      };
+    }
+
+    if (!jsonFile.author) {
+      jsonFile.author = 'none@example.com';
+    }
+
     const openApi = {
       openapi: '3.0.0',
       info: {
-        title: 'Some title',
-        description: 'This is a simple API',
+        title: jsonFile.name,
+        description: jsonFile.description,
         contact: {
-          email: 'you@your-company.com',
+          email: jsonFile.author.email,
         },
-        version: '1.0.0',
+        version: jsonFile.version,
       },
       servers: [
         {
@@ -215,7 +249,12 @@ class GetOpenApiJson extends AbstractCommand {
     }
 
     const result = JSON.stringify(openApi);
-    console.log(result);
+
+    if (this.args.output) {
+      await fs.writeFile(this.args.output, result);
+      this.logger.info(`Output to: ${this.args.output}`);
+    }
+
     return result;
   }
 }

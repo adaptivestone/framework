@@ -1,3 +1,9 @@
+### 3.1.0
+
+[NEW] new comand to generate open API documentation (wip)
+[NEW] coverage report
+[UPDATE] updated deps
+
 ### 3.0.23
 
 [UPDATE] updated deps
