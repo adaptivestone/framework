@@ -1,3 +1,8 @@
+### 3.1.1
+
+[UPDATE] updated deps
+[FIX] fix cache error handling.
+
 ### 3.1.0
 
 [NEW] new comand to generate open API documentation (wip)

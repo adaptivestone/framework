@@ -35,21 +35,33 @@ class Cache extends Base {
     const key = `${this.redisNamespace}-${keyValue}`;
     // 5 mins default
     let resolve = null;
+    let reject = null;
     if (this.promiseMapping.has(key)) {
       return this.promiseMapping.get(key);
     }
 
     this.promiseMapping.set(
       key,
-      new Promise((res) => {
+      new Promise((res, rej) => {
         resolve = res;
+        reject = rej;
       }),
     );
 
     let result = await this.redisClient.get(key);
     if (!result) {
       this.logger.verbose(`getSetValueFromCache not found for key ${key}`);
-      result = await onNotFound();
+      try {
+        result = await onNotFound();
+      } catch (e) {
+        this.logger.error(
+          `Cache onNotFound for key '${key}' error: ${e.message}`,
+        );
+        this.promiseMapping.delete(key);
+        reject(e);
+        return Promise.reject(e);
+      }
+
       this.redisClient.setEx(key, storeTime, JSON.stringify(result));
     } else {
       this.logger.verbose(
