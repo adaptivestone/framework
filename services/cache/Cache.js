@@ -28,11 +28,15 @@ class Cache extends Base {
     this.promiseMapping = new Map();
   }
 
+  getKeyWithNameSpace(key) {
+    return `${this.redisNamespace}-${key}`;
+  }
+
   async getSetValue(keyValue, onNotFound, storeTime = 60 * 5) {
     if (!this.redisClient.isOpen) {
       await this.redisClient.connect();
     }
-    const key = `${this.redisNamespace}-${keyValue}`;
+    const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
     let resolve = null;
     let reject = null;
@@ -79,6 +83,14 @@ class Cache extends Base {
     resolve(result);
     this.promiseMapping.delete(key);
     return result;
+  }
+
+  async removeKey(keyValue) {
+    if (!this.redisClient.isOpen) {
+      await this.redisClient.connect();
+    }
+    const key = this.getKeyWithNameSpace(keyValue);
+    return this.redisClient.del(key);
   }
 
   static get loggerGroup() {

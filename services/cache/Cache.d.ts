@@ -7,6 +7,13 @@ declare class Cache extends Base {
   constructor(app: Server['app']);
 
   /**
+   * As framework support namespaces all key for cache go through this function
+   * Function return new key with added namespace
+   * @param key key to add namespace
+   */
+  getKeyWithNameSpace(key: String): String;
+
+  /**
    * Get value from cache. Set and get if not eists
    * @param key key to check
    * @param onNotFound callback that will be executed if value not found on cahce
@@ -17,6 +24,12 @@ declare class Cache extends Base {
     onNotFound: () => Promise<any>,
     storeTime: number,
   ): Promise<any>;
+
+  /**
+   * Remove key from cache
+   * @param key key to remove
+   */
+  removeKey(key: String): Promise<number>;
 }
 
 export = Cache;

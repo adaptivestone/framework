@@ -1,3 +1,8 @@
+### 3.2.0
+
+[UPDATE] updated deps
+[NEW] cache.removeKey(key) - function to remove key from cache
+
 ### 3.1.1
 
 [UPDATE] updated deps
