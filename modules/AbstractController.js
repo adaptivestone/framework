@@ -359,11 +359,15 @@ class AbstractController extends Base {
             routeMiddlewares: routeMiddlewaresReg
               // eslint-disable-next-line consistent-return
               .map((middleware) => {
+                const routeFullPath = route.fullPath.toUpperCase();
+                const middlewareFullPath = middleware.fullPath.toUpperCase();
+                const middlewareFullPathWithSliced = middleware.fullPath
+                  .toUpperCase()
+                  .slice(0, -1);
                 if (
-                  route.fullPath.toUpperCase() ===
-                    middleware.fullPath.toUpperCase() ||
-                  middleware.fullPath.toUpperCase() ===
-                    `${route.fullPath.toUpperCase()}*`
+                  middlewareFullPath === routeFullPath ||
+                  middlewareFullPath === `${routeFullPath}*` ||
+                  routeFullPath?.indexOf(middlewareFullPathWithSliced) !== -1
                 ) {
                   return {
                     name: middleware.name,
@@ -376,13 +380,20 @@ class AbstractController extends Base {
             controllerMiddlewares: [
               ...new Set(
                 middlewaresInfo
-                  .filter(
-                    (middleware) =>
-                      middleware.fullPath.toUpperCase() ===
-                        route.fullPath.toUpperCase() ||
-                      middleware.fullPath.toUpperCase() ===
-                        `${route.fullPath.toUpperCase()}*`,
-                  )
+                  .filter((middleware) => {
+                    const routeFullPath = route.fullPath.toUpperCase();
+                    const middlewareFullPath =
+                      middleware.fullPath.toUpperCase();
+                    const middlewareFullPathWithSliced = middleware.fullPath
+                      .toUpperCase()
+                      .slice(0, -1);
+                    return (
+                      middlewareFullPath === routeFullPath ||
+                      middlewareFullPath === `${routeFullPath}*` ||
+                      routeFullPath?.indexOf(middlewareFullPathWithSliced) !==
+                        -1
+                    );
+                  })
                   .map(({ name, params, authParams }) => ({
                     name,
                     params,
