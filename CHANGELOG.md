@@ -1,3 +1,8 @@
+### 3.2.2
+
+[UPDATE] add options for i18n to config.
+[CHANGE] by default i18n not writing missed keys. Can be enabled via config
+
 ### 3.2.1
 
 [UPDATE] updated deps

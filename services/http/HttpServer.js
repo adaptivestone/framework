@@ -133,8 +133,8 @@ class HttpServer extends Base {
         },
         fallbackLng: I18NConfig.fallbackLng,
         preload: I18NConfig.preload,
-        saveMissing: true,
-        debug: false,
+        saveMissing: I18NConfig.saveMissing,
+        debug: I18NConfig.debug,
         detection: {
           // caches: ['cookie'],
           order: I18NConfig.langDetectionOders || ['xLang'],
