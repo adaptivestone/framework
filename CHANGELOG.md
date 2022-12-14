@@ -1,3 +1,8 @@
+### 3.2.1
+
+[UPDATE] updated deps
+[FIX] fix documentation generation
+
 ### 3.2.0
 
 [UPDATE] updated deps
