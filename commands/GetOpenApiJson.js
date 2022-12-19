@@ -1,5 +1,4 @@
 const fs = require('fs').promises;
-
 const AbstractCommand = require('../modules/AbstractCommand');
 
 /**
@@ -96,13 +95,18 @@ class GetOpenApiJson extends AbstractCommand {
           for (const middleware of middlewares) {
             if (middleware?.authParams?.length) {
               for (const authParam of middleware.authParams) {
-                if (!openApi.components.securitySchemes[authParam.name]) {
-                  openApi.components.securitySchemes[authParam.name] =
-                    authParam;
+                const { permissions, ...mainFields } = authParam;
+                let fullName = authParam.name;
+                if (permissions) {
+                  fullName = `${fullName}-permissions-${permissions}`;
+                }
+
+                if (!openApi.components.securitySchemes[fullName]) {
+                  openApi.components.securitySchemes[fullName] = mainFields;
                 }
 
                 securitySchemaNames.push({
-                  [authParam.name]: [],
+                  [fullName]: [],
                 });
               }
             }
