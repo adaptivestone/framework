@@ -1,5 +1,5 @@
 const fs = require('fs').promises;
-const { join } = require('path');
+const { join, normalize } = require('path');
 
 class Base {
   #realLogger = null;
@@ -108,7 +108,7 @@ class Base {
           return null;
         }),
       );
-      return allFiles.map((file) => file.replace(`${dir}/`, ''));
+      return allFiles.map((file) => file.replace(`${normalize(dir)}/`, ''));
     }
 
     let [internalFiles, externalFiles] = await Promise.all([
