@@ -98,7 +98,8 @@ class AbstractController extends Base {
             path: realPath,
             fullPath,
             params: middlewareParams,
-            authParams: MiddlewareFunction?.usedAuthParameters,
+            authParams: new MiddlewareFunction(this.app, middlewareParams)
+              ?.usedAuthParameters,
             MiddlewareFunction,
           });
         }

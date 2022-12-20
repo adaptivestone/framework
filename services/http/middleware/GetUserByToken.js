@@ -5,7 +5,7 @@ class GetUserByToken extends AbstractMiddleware {
     return 'Grab a token and try to parse the user from it. It user exist will add req.appInfo.user variable';
   }
 
-  static get usedAuthParameters() {
+  get usedAuthParameters() {
     return [
       {
         name: 'Authorization',
