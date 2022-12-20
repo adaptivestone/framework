@@ -1,3 +1,9 @@
+### 3.3.0
+
+[NEW] new command 'SyncIndexes' to sync indexes for mongodb https://framework.adaptivestone.com/docs/cli#syncindexes
+[UPDATE] updated deps
+[FIX] fix documentation generation
+
 ### 3.2.2
 
 [UPDATE] add options for i18n to config.
