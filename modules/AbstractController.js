@@ -210,6 +210,7 @@ class AbstractController extends Base {
               try {
                 await routeObject.request.validate(bodyAndQuery, {
                   abortEarly: controllerValidationAbortEarly,
+                  req,
                 });
               } catch (e) {
                 let { errors } = e;
@@ -243,6 +244,7 @@ class AbstractController extends Base {
                 bodyAndQuery,
                 {
                   stripUnknown: true,
+                  req,
                 },
               );
             }
