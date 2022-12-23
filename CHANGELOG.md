@@ -1,3 +1,7 @@
+### 3.4.1
+
+[FIX] fix documentation generation
+
 ### 3.4.0
 
 [NEW] now we pass 'req' to validation and casting as a second parameter. This done mostly for custom validators
