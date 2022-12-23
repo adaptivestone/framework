@@ -90,15 +90,15 @@ class GetOpenApiJson extends AbstractCommand {
         ];
 
         const securitySchemaNames = [];
-
+        let permissionString = '';
         if (middlewares?.length) {
           for (const middleware of middlewares) {
             if (middleware?.authParams?.length) {
               for (const authParam of middleware.authParams) {
                 const { permissions, ...mainFields } = authParam;
-                let fullName = authParam.name;
+                const fullName = authParam.name;
                 if (permissions) {
-                  fullName = `${fullName}-permissions-${permissions}`;
+                  permissionString = permissions;
                 }
 
                 if (!openApi.components.securitySchemes[fullName]) {
@@ -148,10 +148,12 @@ class GetOpenApiJson extends AbstractCommand {
           openApi.paths[routeName] = {};
         }
 
-        const methodName = route[Object.keys(route)[0]].method.toLowerCase();
-        const routeTitle = route[Object.keys(route)[0]].name;
         const routeDescription =
           route[Object.keys(route)[0]]?.description || 'empty description';
+        const routeDescriptionWithPermissions = `${permissionString} ${routeDescription}`;
+        const methodName = route[Object.keys(route)[0]].method.toLowerCase();
+        const routeTitle = route[Object.keys(route)[0]].name;
+
         const routeFields = route[Object.keys(route)[0]].fields;
 
         if (!openApi.paths[routeName][methodName]) {
@@ -165,7 +167,8 @@ class GetOpenApiJson extends AbstractCommand {
         );
 
         openApi.paths[routeName][methodName].summary = routeTitle;
-        openApi.paths[routeName][methodName].description = routeDescription;
+        openApi.paths[routeName][methodName].description =
+          routeDescriptionWithPermissions;
         openApi.paths[routeName][methodName].parameters = [];
         openApi.paths[routeName][methodName].security = securitySchemaNames;
 
