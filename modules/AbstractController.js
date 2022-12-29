@@ -364,13 +364,11 @@ class AbstractController extends Base {
               .map((middleware) => {
                 const routeFullPath = route.fullPath.toUpperCase();
                 const middlewareFullPath = middleware.fullPath.toUpperCase();
-                const middlewareFullPathWithSliced = middleware.fullPath
-                  .toUpperCase()
-                  .slice(0, -1);
                 if (
-                  middlewareFullPath === routeFullPath ||
-                  middlewareFullPath === `${routeFullPath}*` ||
-                  routeFullPath?.indexOf(middlewareFullPathWithSliced) !== -1
+                  route.method.toLowerCase() ===
+                    middleware.method.toLowerCase() &&
+                  (middlewareFullPath === routeFullPath ||
+                    middlewareFullPath === `${routeFullPath}*`)
                 ) {
                   return {
                     name: middleware.name,
@@ -390,6 +388,7 @@ class AbstractController extends Base {
                     const middlewareFullPathWithSliced = middleware.fullPath
                       .toUpperCase()
                       .slice(0, -1);
+
                     return (
                       middlewareFullPath === routeFullPath ||
                       middlewareFullPath === `${routeFullPath}*` ||
