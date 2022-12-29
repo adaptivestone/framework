@@ -285,7 +285,6 @@ class GetOpenApiJson extends AbstractCommand {
       this.logger.info(`Output to: ${this.args.output}`);
     }
 
-    console.log(result);
     return result;
   }
 }
