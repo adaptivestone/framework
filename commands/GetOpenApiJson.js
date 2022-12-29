@@ -81,6 +81,7 @@ class GetOpenApiJson extends AbstractCommand {
 
     openApi.paths = {};
 
+    const permissionWithRoutes = {};
     for (const controller of baseDocumentation) {
       for (const route of controller.routesInfo) {
         const routeInfo = route[Object.keys(route)?.[0]];
@@ -90,7 +91,9 @@ class GetOpenApiJson extends AbstractCommand {
         ];
 
         const securitySchemaNames = [];
-        let permissionString = '';
+
+        permissionWithRoutes[Object.keys(route)?.[0]] = [];
+
         if (middlewares?.length) {
           for (const middleware of middlewares) {
             if (middleware?.authParams?.length) {
@@ -98,7 +101,9 @@ class GetOpenApiJson extends AbstractCommand {
                 const { permissions, ...mainFields } = authParam;
                 const fullName = authParam.name;
                 if (permissions) {
-                  permissionString = permissions;
+                  permissionWithRoutes[Object.keys(route)?.[0]].push(
+                    permissions,
+                  );
                 }
 
                 if (!openApi.components.securitySchemes[fullName]) {
@@ -114,7 +119,6 @@ class GetOpenApiJson extends AbstractCommand {
         }
 
         let routeName = Object.keys(route)[0];
-
         if (routeName === '/') {
           // eslint-disable-next-line no-continue
           continue;
@@ -150,7 +154,13 @@ class GetOpenApiJson extends AbstractCommand {
 
         const routeDescription =
           route[Object.keys(route)[0]]?.description || 'empty description';
-        const routeDescriptionWithPermissions = `${permissionString} ${routeDescription}`;
+        const permissions =
+          permissionWithRoutes[Object.keys(route)[0]][
+            permissionWithRoutes[Object.keys(route)[0]].length - 1
+          ];
+        const routeDescriptionWithPermissions = `${
+          permissions || ''
+        } ${routeDescription}`;
         const methodName = route[Object.keys(route)[0]].method.toLowerCase();
         const routeTitle = route[Object.keys(route)[0]].name;
 
@@ -232,6 +242,19 @@ class GetOpenApiJson extends AbstractCommand {
                   type: field.innerType,
                 };
               }
+
+              if (field.type === 'lazy') {
+                groupBodyFields[field.name] = {
+                  oneOf: [
+                    {
+                      type: 'object',
+                    },
+                    {
+                      type: 'string',
+                    },
+                  ],
+                };
+              }
             }
           }
 
@@ -262,6 +285,7 @@ class GetOpenApiJson extends AbstractCommand {
       this.logger.info(`Output to: ${this.args.output}`);
     }
 
+    console.log(result);
     return result;
   }
 }
