@@ -1,7 +1,5 @@
 const request = require('supertest');
-
-// eslint-disable-next-line no-promise-executor-return
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const { setTimeout } = require('node:timers/promises');
 
 describe('middlewares correct works', () => {
   beforeAll(async () => {
@@ -33,7 +31,7 @@ describe('middlewares correct works', () => {
 
     expect(items).toStrictEqual(['Value1', 'Value2', 'Value3']);
 
-    await delay(1000);
+    await setTimeout(1000);
 
     items = await global.server.app.cache.getSetValue(
       key,
@@ -43,7 +41,7 @@ describe('middlewares correct works', () => {
 
     expect(items).toStrictEqual(['Value1', 'Value2', 'Value3']);
 
-    await delay(5000);
+    await setTimeout(5000);
 
     items = await global.server.app.cache.getSetValue(
       key,
