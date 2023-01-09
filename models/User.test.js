@@ -59,6 +59,16 @@ describe('user model', () => {
       );
       expect(user).toBe(false);
     });
+
+    it('should NOT with wrong email', async () => {
+      expect.assertions(1);
+      const userModel = await global.server.app.getModel('User');
+      const user = await userModel.getUserByEmailAndPassword(
+        'not@exists.com',
+        userPassword,
+      );
+      expect(user).toBe(false);
+    });
   });
 
   describe('getUserByVerificationToken', () => {

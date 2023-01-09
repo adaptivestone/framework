@@ -230,16 +230,16 @@ class User extends AbstractModel {
     return result;
   }
 
-  removeVerificationToken(verificationToken) {
-    this.mongooseModel.updateOne(
-      {
-        verificationTokens: {
-          $elemMatch: { token: String(verificationToken) },
-        },
-      },
-      { $pop: { verificationTokens: 1 } },
-    );
-  }
+  // async removeVerificationToken(verificationToken) {
+  //   this.mongooseModel.updateOne(
+  //     {
+  //       verificationTokens: {
+  //         $elemMatch: { token: String(verificationToken) },
+  //       },
+  //     },
+  //     { $pop: { verificationTokens: 1 } },
+  //   );
+  // }
 
   async sendVerificationEmail(i18n) {
     const verificationToken = await User.generateUserVerificationToken(this);
