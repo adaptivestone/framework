@@ -1,5 +1,7 @@
 /* eslint-disable no-param-reassign */
-const bcrypt = require('bcrypt');
+
+const { scrypt } = require('node:crypto');
+const { promisify } = require('node:util');
 
 const AbstractModel = require('../modules/AbstractModel');
 
@@ -9,7 +11,7 @@ class User extends AbstractModel {
   constructor(app) {
     super(app);
     const authConfig = this.app.getConfig('auth');
-    this.saltRounds = authConfig.saltRounds;
+    this.hashRounds = authConfig.hashRounds;
     this.saltSecret = authConfig.saltSecret;
   }
 
@@ -72,12 +74,9 @@ class User extends AbstractModel {
     if (!data) {
       return false;
     }
-    const same = await bcrypt.compare(
-      String(password) + data.constructor.getSuper().saltSecret,
-      data.password,
-    );
+    const hashedPasswords = await this.hashPassword(password);
 
-    if (!same) {
+    if (data.password !== hashedPasswords) {
       return false;
     }
     return data;
@@ -86,10 +85,13 @@ class User extends AbstractModel {
   async generateToken() {
     const timestamp = new Date();
     timestamp.setDate(timestamp.getDate() + 30);
-    const token = await bcrypt.hash(
+    const scryptAsync = promisify(scrypt);
+    const data = await scryptAsync(
       this.email + Date.now(),
-      this.constructor.getSuper().saltRounds,
+      this.constructor.getSuper().saltSecret,
+      this.constructor.getSuper().hashRounds,
     );
+    const token = data.toString('base64url');
     this.sessionTokens.push({ token, valid: timestamp });
     await this.save();
     return { token, valid: timestamp };
@@ -108,10 +110,13 @@ class User extends AbstractModel {
   }
 
   static async hashPassword(password) {
-    return bcrypt.hash(
-      String(password) + this.getSuper().saltSecret,
-      this.getSuper().saltRounds,
+    const scryptAsync = promisify(scrypt);
+    const data = await scryptAsync(
+      String(password),
+      this.getSuper().saltSecret,
+      this.getSuper().hashRounds,
     );
+    return data.toString('base64url');
   }
 
   static async getUserByToken(token) {
@@ -130,10 +135,13 @@ class User extends AbstractModel {
   static async generateUserPasswordRecoveryToken(userMongoose) {
     const date = new Date();
     date.setDate(date.getDate() + 14);
-    const token = await bcrypt.hash(
+    const scryptAsync = promisify(scrypt);
+    const data = await scryptAsync(
       userMongoose.email + Date.now(),
-      userMongoose.constructor.getSuper().saltRounds,
+      userMongoose.constructor.getSuper().saltSecret,
+      userMongoose.constructor.getSuper().hashRounds,
     );
+    const token = data.toString('base64url');
     //       if (err) {
     //     this.logger.error("Hash 2 error ", err);
     //     reject(err);
@@ -184,10 +192,13 @@ class User extends AbstractModel {
   static async generateUserVerificationToken(userMongoose) {
     const date = new Date();
     date.setDate(date.getDate() + 14);
-    const token = await bcrypt.hash(
+    const scryptAsync = promisify(scrypt);
+    const data = await scryptAsync(
       userMongoose.email + Date.now(),
-      userMongoose.constructor.getSuper().saltRounds,
+      userMongoose.constructor.getSuper().saltSecret,
+      userMongoose.constructor.getSuper().hashRounds,
     );
+    const token = data.toString('base64url');
     // if (err) {
     //     this.logger.error("Hash 2 error ", err);
     //     reject(err);
