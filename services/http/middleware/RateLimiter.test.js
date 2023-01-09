@@ -1,6 +1,6 @@
 const RateLimiter = require('./RateLimiter');
 
-describe('middlewares methods', () => {
+describe('rate limiter methods', () => {
   it('can create redis rateLimiter', async () => {
     expect.assertions(1);
 
