@@ -9,6 +9,7 @@ class AbstractModel extends Base {
   constructor(app, callback = () => {}) {
     super(app);
     this.mongooseSchema = mongoose.Schema(this.modelSchema);
+    mongoose.set('strictQuery', true);
     this.mongooseSchema.set('timestamps', true);
     this.mongooseSchema.set('minimize', false);
     this.mongooseSchema.loadClass(this.constructor);
