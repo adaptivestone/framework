@@ -22,7 +22,7 @@ describe('user model', () => {
     const user = await global.server.app.getModel('User').findOne({
       email: userEmail,
     });
-    expect(user.password !== userPassword).toBe(true);
+    expect(user.password).not.toBe(userPassword);
   });
 
   it('passwords should not be changed on other fields save', async () => {
@@ -32,9 +32,33 @@ describe('user model', () => {
     });
     const psw = user.password;
     user.email = 'rrrr';
-    user.save();
+    await user.save();
+    user.email = userEmail;
+    await user.save();
 
-    expect(user.password === psw).toBe(true);
+    expect(user.password).toBe(psw);
+  });
+
+  describe('getUserByEmailAndPassword', () => {
+    it('should WORK with valid creds', async () => {
+      expect.assertions(1);
+      const userModel = await global.server.app.getModel('User');
+      const user = await userModel.getUserByEmailAndPassword(
+        userEmail,
+        userPassword,
+      );
+      expect(user.id).toBe(globalUser.id);
+    });
+
+    it('should NOT with INvalid creds', async () => {
+      expect.assertions(1);
+      const userModel = await global.server.app.getModel('User');
+      const user = await userModel.getUserByEmailAndPassword(
+        userEmail,
+        'wrongPassword',
+      );
+      expect(user).toBe(false);
+    });
   });
 
   describe('getUserByVerificationToken', () => {
