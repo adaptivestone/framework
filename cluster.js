@@ -1,5 +1,5 @@
-const cluster = require('cluster');
-const numCPUs = require('os').cpus().length;
+const cluster = require('node:cluster');
+const numCPUs = require('node:os').cpus().length;
 
 if (cluster.isMaster) {
   // eslint-disable-next-line no-console

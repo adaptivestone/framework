@@ -1,5 +1,5 @@
-const fs = require('fs').promises;
-const { join, normalize } = require('path');
+const fs = require('node:fs').promises;
+const { join, normalize } = require('node:path');
 
 class Base {
   #realLogger = null;

@@ -1,9 +1,10 @@
+const path = require('node:path');
 /* eslint-disable jest/require-top-level-describe */
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
-const path = require('path');
+
 const redis = require('redis');
 const Server = require('../server');
 

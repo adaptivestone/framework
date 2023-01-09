@@ -1,6 +1,6 @@
+const http = require('node:http');
+const path = require('node:path');
 const express = require('express');
-const http = require('http');
-const path = require('path');
 const cors = require('cors');
 
 const i18next = require('i18next');

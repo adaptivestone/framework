@@ -1,7 +1,8 @@
+const EventEmitter = require('node:events');
+
 /* eslint-disable global-require */
 require('dotenv').config();
 const merge = require('deepmerge');
-const EventEmitter = require('events');
 
 /**
  * Main framework class.

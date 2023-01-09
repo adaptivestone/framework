@@ -1,4 +1,4 @@
-const path = require('path');
+const path = require('node:path');
 const Base = require('./Base');
 
 class Cli extends Base {
