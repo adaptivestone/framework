@@ -1,3 +1,9 @@
+### 4.0.0 - DEV
+
+[BREAKING] change bcrypt encryption with scrypt
+[NEW] pagination middleware
+[UPDATE] updated deps
+
 ### 3.4.2
 
 [UPDATE] updated deps
