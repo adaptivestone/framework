@@ -8,7 +8,7 @@ let mongoMemoryServerInstance;
 const redis = require('redis');
 const Server = require('../server');
 
-const clearRadisNamespace = require('../helpers/redis/clearNamespace');
+const clearRedisNamespace = require('../helpers/redis/clearNamespace');
 
 jest.setTimeout(1000000);
 beforeAll(async () => {
@@ -84,7 +84,7 @@ afterEach(async () => {
 
     try {
       await redisClient.connect();
-      await clearRadisNamespace(redisClient, namespace);
+      await clearRedisNamespace(redisClient, namespace);
       await redisClient.disconnect();
     } catch (err) {
       // that ok. No redis connection
