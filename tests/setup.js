@@ -82,9 +82,13 @@ afterEach(async () => {
     const { url, namespace } = global.server.getConfig('redis');
     const redisClient = redis.createClient({ url });
 
-    await redisClient.connect();
-    await clearRadisNamespace(redisClient, namespace);
-    await redisClient.disconnect();
+    try {
+      await redisClient.connect();
+      await clearRadisNamespace(redisClient, namespace);
+      await redisClient.disconnect();
+    } catch (err) {
+      // that ok. No redis connection
+    }
   }
 });
 
