@@ -2,6 +2,7 @@
 
 [BREAKING] change bcrypt encryption with scrypt
 [NEW] pagination middleware
+[NEW] AddUser command
 [UPDATE] updated deps
 
 ### 3.4.2
