@@ -1,7 +1,7 @@
 const AbstractCommand = require('../modules/AbstractCommand');
 
-// Example: node src/cli adduser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
-class AddUser extends AbstractCommand {
+// Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
+class CreateUser extends AbstractCommand {
   async run() {
     const User = this.app.getModel('User');
     const { email, password, roles } = this.args;
@@ -22,4 +22,4 @@ class AddUser extends AbstractCommand {
   }
 }
 
-module.exports = AddUser;
+module.exports = CreateUser;
