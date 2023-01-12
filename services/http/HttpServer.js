@@ -18,6 +18,7 @@ class HttpServer extends Base {
   constructor(app, folderConfig) {
     super(app);
     this.express = express();
+    this.express.disable('x-powered-by');
     this.express.set('views', [
       folderConfig.folders.views,
       path.join(__dirname, '../../views'),
