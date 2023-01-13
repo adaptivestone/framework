@@ -216,34 +216,34 @@ class GetOpenApiJson extends AbstractCommand {
         if (routeFields.length) {
           const groupBodyFields = {};
           const requiredFields = [];
+          let isMultipartFormaData = false;
           for (const field of routeFields) {
             if (field.isRequired) {
               requiredFields.push(field.name);
             }
 
-            if (field.type === 'object') {
-              groupBodyFields[field.name] = {};
-              const objectFields = {};
-              for (const objField of field.fields) {
-                objectFields[objField.name] = {
-                  // fields file has mixed type but openApi doesnt have this type
-                  type: objField.type === 'mixed' ? 'string' : objField.type,
+            switch (field.type) {
+              case 'object':
+                groupBodyFields[field.name] = {
+                  properties: {},
                 };
-              }
 
-              groupBodyFields[field.name].properties = objectFields;
-            } else {
-              groupBodyFields[field.name] = {
-                type: field.type,
-              };
+                for (const objField of field.fields) {
+                  groupBodyFields[field.name].properties[objField.name] = {
+                    // fields file has mixed type but openApi doesnt have this type
+                    type: objField.type === 'mixed' ? 'string' : objField.type,
+                  };
+                }
 
-              if (field.type === 'array') {
+                break;
+
+              case 'array':
                 groupBodyFields[field.name].items = {
                   type: field.innerType,
                 };
-              }
+                break;
 
-              if (field.type === 'lazy') {
+              case 'lazy':
                 groupBodyFields[field.name] = {
                   oneOf: [
                     {
@@ -254,13 +254,29 @@ class GetOpenApiJson extends AbstractCommand {
                     },
                   ],
                 };
-              }
+                break;
+
+              case 'file':
+                groupBodyFields[field.name] = {
+                  type: 'string',
+                  format: 'binary',
+                };
+                isMultipartFormaData = true;
+                break;
+              default:
+                groupBodyFields[field.name] = {
+                  type: field.type,
+                };
             }
           }
 
+          const contentType = isMultipartFormaData
+            ? 'multipart/form-data'
+            : 'application/json';
+
           openApi.paths[routeName][methodName].requestBody = {
             content: {
-              'application/json': {
+              [contentType]: {
                 schema: {
                   type: 'object',
                   properties: groupBodyFields,
@@ -271,7 +287,7 @@ class GetOpenApiJson extends AbstractCommand {
 
           if (requiredFields.length) {
             openApi.paths[routeName][methodName].requestBody.content[
-              'application/json'
+              contentType
             ].schema.required = requiredFields;
           }
         }

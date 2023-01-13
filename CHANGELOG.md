@@ -4,8 +4,9 @@
 [BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used
 [NEW] pagination middleware
 [NEW] CreateUser command
-[NEW] custom yup validator for validate File requres
+[NEW] custom yup validator for validate File requests
 [UPDATE] updated deps
+[UPDATE] openApi generator support files
 
 ### 3.4.2
 
