@@ -22,7 +22,7 @@ class YupFile extends yup.BaseSchema {
   }
 }
 
-export {
+module.exports = {
   // eslint-disable-next-line import/prefer-default-export
   YupFile,
 };

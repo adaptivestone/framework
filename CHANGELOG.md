@@ -4,6 +4,7 @@
 [BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used
 [NEW] pagination middleware
 [NEW] CreateUser command
+[NEW] custom yup validator for validate File requres
 [UPDATE] updated deps
 
 ### 3.4.2
