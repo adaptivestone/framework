@@ -1,0 +1,28 @@
+const yup = require('yup');
+const formidable = require('formidable');
+
+/**
+ * Validator for file
+ * use as
+ * @example
+ * request: yup.object().shape({
+ *          someFile: new YupFile().required(),
+ * })
+ */
+class YupFile extends yup.BaseSchema {
+  constructor() {
+    super({
+      type: 'file',
+    });
+  }
+
+  // eslint-disable-next-line class-methods-use-this, no-underscore-dangle
+  _typeCheck(value) {
+    return value instanceof formidable.PersistentFile;
+  }
+}
+
+export {
+  // eslint-disable-next-line import/prefer-default-export
+  YupFile,
+};
