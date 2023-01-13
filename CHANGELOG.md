@@ -1,6 +1,7 @@
 ### 4.0.0 - DEV
 
 [BREAKING] change bcrypt encryption with scrypt
+[BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used
 [NEW] pagination middleware
 [NEW] CreateUser command
 [UPDATE] updated deps

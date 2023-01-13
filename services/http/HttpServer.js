@@ -8,6 +8,7 @@ const i18nextMiddleware = require('i18next-http-middleware');
 const BackendFS = require('i18next-fs-backend');
 const Backend = require('i18next-chained-backend');
 const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
+const RequestParserMiddleware = require('./middleware/RequestParser');
 
 const Base = require('../../modules/Base');
 
@@ -42,12 +43,13 @@ class HttpServer extends Base {
         origin: httpConfig.corsDomains,
       }),
     ); // todo whitelist
-    this.express.use(express.urlencoded({ limit: '50mb', extended: true }));
-    this.express.use(express.json({ limit: '50mb' }));
+    // this.express.use(express.urlencoded({ limit: '50mb', extended: true }));
+    // this.express.use(express.json({ limit: '50mb' }));
     this.express.use(express.static(folderConfig.folders.public));
     this.express.use(express.static('./public'));
 
     this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
+    this.express.use(new RequestParserMiddleware(this.app).getMiddleware());
 
     // As exprress will check numbersof arguments
     // eslint-disable-next-line no-unused-vars
