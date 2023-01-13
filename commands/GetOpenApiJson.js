@@ -238,8 +238,10 @@ class GetOpenApiJson extends AbstractCommand {
                 break;
 
               case 'array':
-                groupBodyFields[field.name].items = {
-                  type: field.innerType,
+                groupBodyFields[field.name] = {
+                  items: {
+                    type: field.innerType,
+                  },
                 };
                 break;
 
