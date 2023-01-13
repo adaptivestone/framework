@@ -3,6 +3,7 @@
 /* eslint-disable guard-for-in */
 const express = require('express');
 const merge = require('deepmerge');
+const isPlainObject = require('is-plain-object');
 
 const Base = require('./Base');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
@@ -205,7 +206,9 @@ class AbstractController extends Base {
               if (typeof routeObject.request.cast !== 'function') {
                 this.logger.error('request.cast should be a function');
               }
-              const bodyAndQuery = merge(req.query, req.body);
+              const bodyAndQuery = merge(req.query, req.body, {
+                isMergeableObject: isPlainObject,
+              });
 
               try {
                 await routeObject.request.validate(bodyAndQuery, {
