@@ -14,6 +14,32 @@ class AbstractMiddleware extends Base {
     return [];
   }
 
+  // eslint-disable-next-line class-methods-use-this
+  get relatedQueryParameters() {
+    // For example:
+    // {
+    //   name: {
+    //     type: 'string',
+    //     description: 'Some description',
+    //     required: true,
+    //   }
+    // }
+    return {};
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  get relatedRequestParameters() {
+    // For example:
+    // {
+    //   name: {
+    //     type: 'string',
+    //     description: 'Some description',
+    //     required: true,
+    //   }
+    // }
+    return {};
+  }
+
   async middleware(req, res, next) {
     this.logger.warn('Middleware is not implemented');
     next();

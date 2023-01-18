@@ -8,6 +8,22 @@ class Pagination extends AbstractMiddleware {
     return 'Pagination middleware. You can use limit=10 and maxLimit=100 parameters';
   }
 
+  // eslint-disable-next-line class-methods-use-this
+  get relatedQueryParameters() {
+    return {
+      page: {
+        type: 'number',
+        description: 'selected page',
+        required: false,
+      },
+      limit: {
+        type: 'number',
+        description: 'max items',
+        required: false,
+      },
+    };
+  }
+
   async middleware(req, res, next) {
     let { limit, maxLimit } = this.params;
 
