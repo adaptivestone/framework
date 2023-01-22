@@ -20,10 +20,10 @@ class Mail extends Base {
    * Construct mail class
    * @param {object} app
    * @param {string} template template name
-   * @param {object} templateData data to render in template. Object with value that available inside template
-   * @param {object} i18n data to render in template
+   * @param {object} [templateData={}] data to render in template. Object with value that available inside template
+   * @param {object} [i18n] data to render in template
    */
-  constructor(app, template, templateData, i18n) {
+  constructor(app, template, templateData = {}, i18n = null) {
     super(app);
     if (!path.isAbsolute(template)) {
       if (
@@ -82,9 +82,10 @@ class Mail extends Base {
    * Send email
    * @param {string} to email send to
    * @param {string} [from = mailConfig.from]
+   * @param {object} [aditionalNodemailerOptions = {}] additional option to nodemailer
    * @return {Promise}
    */
-  async send(to, from = null) {
+  async send(to, from = null, aditionalNodemailerOptions = {}) {
     const files = await fs.promises.readdir(this.template);
     const templates = {};
     for (const file of files) {
@@ -131,6 +132,7 @@ class Mail extends Base {
       inlinedHTML,
       textRendered,
       from,
+      aditionalNodemailerOptions,
     );
   }
 
