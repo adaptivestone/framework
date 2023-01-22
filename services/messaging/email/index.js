@@ -1,20 +1,28 @@
-const fs = require('fs');
-const EmailTemplate = require('email-templates');
+const fs = require('node:fs');
+const path = require('node:path');
+const { promisify } = require('node:util');
 const nodemailer = require('nodemailer');
 const sendMail = require('nodemailer-sendmail-transport');
 const stub = require('nodemailer-stub-transport');
+const pug = require('pug');
+const juice = require('juice');
+const { convert } = require('html-to-text');
 
 const mailTransports = {
   sendMail,
   stub,
   smtp: (data) => data,
 };
-const path = require('path');
 const Base = require('../../../modules/Base');
 
-// const i18next = require('i18next');
-
 class Mail extends Base {
+  /**
+   * Construct mail class
+   * @param {object} app
+   * @param {string} template template name
+   * @param {object} templateData data to render in template. Object with value that available inside template
+   * @param {object} i18n data to render in template
+   */
   constructor(app, template, templateData, i18n) {
     super(app);
     if (!path.isAbsolute(template)) {
@@ -38,60 +46,146 @@ class Mail extends Base {
       }
     }
     this.templateData = templateData;
-    this.i18n = i18n;
-    this.locale = this.i18n.language;
+    this.i18n = i18n ?? {
+      t: (str) => str,
+      locale: 'en', // todo change it to config
+    };
+    this.locale = this.i18n?.language;
+  }
+
+  /**
+   * Render template
+   * @param {object} type and fullpath
+   * @param {object} templateData
+   * @returns string
+   */
+  // eslint-disable-next-line default-param-last
+  static async #renderTemplate({ type, fullPath } = {}, templateData) {
+    if (!type) {
+      return null;
+    }
+
+    switch (type) {
+      case 'html':
+      case 'text':
+        return fs.promises.readFile(fullPath, { encoding: 'utf8' });
+      case 'pug': {
+        const compiledFunction = pug.compileFile(fullPath);
+        return compiledFunction(templateData);
+      }
+      default:
+        throw new Error(`Template type ${type} is not supported`);
+    }
   }
 
   /**
    * Send email
-   * @param to
-   * @param [from = mailConfig.from]
+   * @param {string} to email send to
+   * @param {string} [from = mailConfig.from]
    * @return {Promise}
    */
-  async send(to, from) {
+  async send(to, from = null) {
+    const files = await fs.promises.readdir(this.template);
+    const templates = {};
+    for (const file of files) {
+      const [name, extension] = file.split('.');
+      templates[name] = {
+        type: extension,
+        fullPath: path.join(this.template, file),
+      };
+    }
+
+    if (!templates.html || !templates.subject) {
+      throw new Error(
+        'Template HTML and Subject must be provided. Please follow documentation for details https://framework.adaptivestone.com/docs/email',
+      );
+    }
     const mailConfig = this.app.getConfig('mail');
+    const { siteDomain } = this.app.getConfig('http');
+
+    const templateDataToRender = {
+      locale: this.locale,
+      serverDomain: mailConfig.myDomain,
+      siteDomain,
+      t: this.i18n.t.bind(this.i18n),
+      ...this.templateData,
+    };
+
+    const [htmlRendered, subjectRendered, textRendered] = await Promise.all([
+      this.constructor.#renderTemplate(templates.html, templateDataToRender),
+      this.constructor.#renderTemplate(templates.subject, templateDataToRender),
+      this.constructor.#renderTemplate(templates.text, templateDataToRender),
+    ]);
+
+    juice.tableElements = ['TABLE'];
+
+    const juiceResourcesAsync = promisify(juice.juiceResources);
+
+    const inlinedHTML = await juiceResourcesAsync(htmlRendered, {
+      preserveImportant: true,
+      webResources: mailConfig.webResources,
+    });
+
+    return this.constructor.sendRaw(
+      this.app,
+      to,
+      subjectRendered,
+      inlinedHTML,
+      textRendered,
+      from,
+    );
+  }
+
+  /**
+   * Send provided text (html) to email. Low level function. All data should be prepared before sending (like inline styles)
+   * @param {objetc} app application
+   * @param {string} to send to
+   * @param {string} subject email topic
+   * @param {string} html hmlt body of emain
+   * @param {string} [text] if not provided will be generated from html string
+   * @param {string} [from = mailConfig.from] from. If not provided will be grabbed from config
+   * @param {object} [additionalNodeMailerOption = {}] any otipns to pass to nodemailer  https://nodemailer.com/message/
+   */
+  static async sendRaw(
+    app,
+    to,
+    subject,
+    html,
+    text = null,
+    from = null,
+    additionalNodeMailerOption = {},
+  ) {
+    if (!app || !to || !subject || !html) {
+      throw new Error('App, to, subject and html is required fields.');
+    }
+    const mailConfig = app.getConfig('mail');
     if (!from) {
       // eslint-disable-next-line no-param-reassign
       from = mailConfig.from;
     }
-    const { siteDomain } = this.app.getConfig('http');
+
+    if (!text) {
+      // eslint-disable-next-line no-param-reassign
+      text = convert(html, {
+        selectors: [{ selector: 'img', format: 'skip' }],
+      });
+    }
     const transportConfig = mailConfig.transports[mailConfig.transport];
     const transport = mailTransports[mailConfig.transport];
     const transporter = nodemailer.createTransport(transport(transportConfig));
 
-    const email = new EmailTemplate({
-      message: {
-        from,
-      },
-      send: true,
-      preview: false,
-      transport: transporter,
-      juiceResources: {
-        webResources: mailConfig.webResources,
-      },
+    return transporter.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      html,
+      ...additionalNodeMailerOption,
     });
-
-    return email.send({
-      template: this.template,
-      message: {
-        to,
-      },
-      locals: {
-        locale: this.locale,
-        serverDomain: mailConfig.myDomain,
-        siteDomain,
-        t: this.i18n.t.bind(this.i18n),
-        ...this.templateData,
-      },
-    });
-  }
-
-  render() {
-    // TODO for debug
   }
 
   static get loggerGroup() {
-    return 'messaging';
+    return 'email_';
   }
 }
 
