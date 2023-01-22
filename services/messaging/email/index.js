@@ -101,13 +101,11 @@ class Mail extends Base {
       );
     }
     const mailConfig = this.app.getConfig('mail');
-    const { siteDomain } = this.app.getConfig('http');
 
     const templateDataToRender = {
       locale: this.locale,
-      serverDomain: mailConfig.myDomain,
-      siteDomain,
       t: this.i18n.t.bind(this.i18n),
+      ...mailConfig.globalVariablesToTemplates,
       ...this.templateData,
     };
 
