@@ -91,7 +91,6 @@ class SomeController extends AbstractController {
 
   // eslint-disable-next-line class-methods-use-this
   async postQueryParamaters(req, res) {
-    // TODO: change test, request has not query params
     const { name } = req.appInfo.request;
     return res.status(200).json({
       data: {
