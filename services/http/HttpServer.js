@@ -160,7 +160,7 @@ class HttpServer extends Base {
   add404Page() {
     this.express.use((req, res) => {
       // error handling
-      res.status(404).render('404');
+      res.status(404).json({ message: '404' });
     });
   }
 

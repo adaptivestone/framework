@@ -2,6 +2,7 @@
 
 [BREAKING] change bcrypt encryption with scrypt
 [BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used
+[BREAKING] should not affect any user. Changed email-templates module to internal implementation. Idea to keep dependensy list smaller
 [NEW] pagination middleware
 [NEW] CreateUser command
 [NEW] custom yup validator for validate File requests

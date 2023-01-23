@@ -11,7 +11,7 @@ declare class Cache extends Base {
    * Function return new key with added namespace
    * @param key key to add namespace
    */
-  getKeyWithNameSpace(key: String): String;
+  getKeyWithNameSpace(key: string): string;
 
   /**
    * Get value from cache. Set and get if not eists
@@ -20,7 +20,7 @@ declare class Cache extends Base {
    * @param storeTime how long we should store value on cache
    */
   getSetValue(
-    key: String,
+    key: string,
     onNotFound: () => Promise<any>,
     storeTime: number,
   ): Promise<any>;
@@ -29,7 +29,7 @@ declare class Cache extends Base {
    * Remove key from cache
    * @param key key to remove
    */
-  removeKey(key: String): Promise<number>;
+  removeKey(key: string): Promise<number>;
 }
 
 export = Cache;

@@ -1,6 +1,7 @@
 const EventEmitter = require('node:events');
 
 /* eslint-disable global-require */
+// eslint-disable-next-line jest/require-hook
 require('dotenv').config();
 const merge = require('deepmerge');
 
