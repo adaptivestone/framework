@@ -108,7 +108,7 @@ describe('middlewares correct works', () => {
     expect(status).toBe(400);
   });
 
-  it('request also can grab query paramaters', async () => {
+  it('request can not grab query paramaters', async () => {
     expect.assertions(2);
 
     const { status, body } = await request(global.server.app.httpServer.express)
