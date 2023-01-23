@@ -1,3 +1,4 @@
+const yup = require('yup');
 const Base = require('../../../modules/Base');
 
 class AbstractMiddleware extends Base {
@@ -16,28 +17,21 @@ class AbstractMiddleware extends Base {
 
   // eslint-disable-next-line class-methods-use-this
   get relatedQueryParameters() {
-    // For example:
-    // {
-    //   name: {
-    //     type: 'string',
-    //     description: 'Some description',
-    //     required: true,
-    //   }
-    // }
-    return {};
+    // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
+    return yup.object().shape({});
   }
 
   // eslint-disable-next-line class-methods-use-this
   get relatedRequestParameters() {
-    // For example:
-    // {
-    //   name: {
-    //     type: 'string',
-    //     description: 'Some description',
-    //     required: true,
-    //   }
-    // }
-    return {};
+    // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
+    return yup.object().shape({});
+  }
+
+  get relatedReqParameters() {
+    return {
+      request: this.relatedRequestParameters,
+      query: this.relatedQueryParameters,
+    };
   }
 
   async middleware(req, res, next) {
