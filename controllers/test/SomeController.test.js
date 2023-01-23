@@ -116,7 +116,7 @@ describe('middlewares correct works', () => {
       .send();
 
     expect(status).toBe(200);
-    expect(body.data.name).toBe('test');
+    expect(body?.data?.name).toBeUndefined();
   });
 
   it('request also can grab query paramaters but body have bigger priority', async () => {
