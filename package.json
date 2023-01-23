@@ -44,7 +44,6 @@
     "i18next-chained-backend": "^4.0.0",
     "i18next-fs-backend": "^2.0.0",
     "i18next-http-middleware": "^3.1.4",
-    "is-plain-object": "^5.0.0",
     "juice": "^8.1.0",
     "minimist": "^1.2.5",
     "mongoose": "^6.0.0",
