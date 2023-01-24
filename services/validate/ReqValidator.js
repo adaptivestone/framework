@@ -43,6 +43,7 @@ class ReqValidator extends Base {
       method,
       path,
     );
+
     const controllerMiddlewaresParams = this.filterRelatedParametersByRoute(
       controllerMiddlewares,
       method,

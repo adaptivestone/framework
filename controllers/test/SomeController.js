@@ -4,7 +4,8 @@ const AuthMiddleware = require('../../services/http/middleware/Auth');
 const GetUserByToken = require('../../services/http/middleware/GetUserByToken');
 const RateLimiter = require('../../services/http/middleware/RateLimiter');
 const CheckFlag = require('../../services/http/middleware/test/CheckFlag');
-const isAdmin = require('../../services/http/middleware/test/isAdmin');
+const RoleMiddleware = require('../../services/http/middleware/Role');
+const Pagination = require('../../services/http/middleware/Pagination');
 
 class SomeController extends AbstractController {
   get routes() {
@@ -23,12 +24,26 @@ class SomeController extends AbstractController {
         },
         '/someDataWithPermission': {
           handler: this.getSomething,
-          request: yup.object().shape({
-            user: yup.object().shape({
-              role: yup.string().oneOf(['client', 'admin']).required(),
-            }),
+          middleware: [RateLimiter, [RoleMiddleware, { roles: ['admin'] }]],
+        },
+        '/grabSomeDataFromQuery': {
+          handler: this.grabSomeDataFromQuery,
+          query: yup.object().shape({
+            name: yup.string(),
           }),
-          middleware: [RateLimiter, [isAdmin, { roles: ['admin'] }]],
+        },
+        '/grabSomeDataFromQueryWithRequiredParam': {
+          handler: this.grabSomeDataFromQuery,
+          query: yup.object().shape({
+            name: yup.number().required(),
+          }),
+        },
+        '/grabSomeDataFromQueryWithMiddlewareParams': {
+          handler: this.grabSomeDataFromQueryWithMiddlewareParams,
+          query: yup.object().shape({
+            name: yup.string(),
+          }),
+          middleware: [Pagination],
         },
       },
       post: {
@@ -66,11 +81,8 @@ class SomeController extends AbstractController {
           handler: this.putInfo,
           request: yup.object().shape({
             field: yup.string(),
-            user: yup.object().shape({
-              role: yup.string().oneOf(['client', 'admin']).required(),
-            }),
           }),
-          middleware: [[isAdmin, { roles: ['admin'] }]],
+          middleware: [[RoleMiddleware, { roles: ['admin'] }]],
         },
       },
     };
@@ -79,6 +91,17 @@ class SomeController extends AbstractController {
   // eslint-disable-next-line class-methods-use-this
   async getSomething(req, res) {
     return res.status(200).json({ data: { text: 'Available text' } });
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async grabSomeDataFromQuery(req, res) {
+    return res.status(200).json({ data: { name: req.appInfo.query.name } });
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  async grabSomeDataFromQueryWithMiddlewareParams(req, res) {
+    const { page, limit, name } = req.appInfo.query;
+    return res.status(200).json({ data: { page, limit, name } });
   }
 
   async getSomeDataItems(req, res) {
@@ -146,7 +169,7 @@ class SomeController extends AbstractController {
     return new Map([
       ['/*', [GetUserByToken]],
       ['PATCH/userAvatar', [GetUserByToken, AuthMiddleware]],
-      ['PUT/*', [[isAdmin, { roles: ['client'] }]]],
+      ['PUT/*', [[RoleMiddleware, { roles: ['client'] }]]],
     ]);
   }
 }
