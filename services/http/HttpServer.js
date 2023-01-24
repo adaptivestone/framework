@@ -7,6 +7,7 @@ const i18next = require('i18next');
 const i18nextMiddleware = require('i18next-http-middleware');
 const BackendFS = require('i18next-fs-backend');
 const Backend = require('i18next-chained-backend');
+const RequestLoggerMiddleware = require('./middleware/RequestLogger');
 const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
 const RequestParserMiddleware = require('./middleware/RequestParser');
 
@@ -25,16 +26,8 @@ class HttpServer extends Base {
       path.join(__dirname, '../../views'),
     ]);
     this.express.set('view engine', 'pug');
-    this.express.use((req, res, next) => {
-      const startTime = Date.now();
-      const text = `Request is  [${req.method}] ${req.url}`;
-      this.logger.info(text);
-      res.on('finish', () => {
-        const duration = Date.now() - startTime;
-        this.logger.info(`Finished ${text}. Duration ${duration} ms`);
-      });
-      next();
-    });
+
+    this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
     this.enableI18N(folderConfig);
 
     const httpConfig = this.app.getConfig('http');
