@@ -61,7 +61,7 @@ class Server {
 
     this.app.controllerManager = new ControllerManager(this.app);
 
-    await this.app.controllerManager.initControllers(this.config);
+    await this.app.controllerManager.initControllers();
     await callbackBefore404();
     this.app.httpServer.add404Page();
   }

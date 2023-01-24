@@ -36,8 +36,6 @@ class HttpServer extends Base {
         origin: httpConfig.corsDomains,
       }),
     ); // todo whitelist
-    // this.express.use(express.urlencoded({ limit: '50mb', extended: true }));
-    // this.express.use(express.json({ limit: '50mb' }));
     this.express.use(express.static(folderConfig.folders.public));
     this.express.use(express.static('./public'));
 
@@ -139,7 +137,7 @@ class HttpServer extends Base {
       });
     this.express.use(i18nextMiddleware.handle(i18next));
     this.express.use((req, res, next) => {
-      // f ix ru-Ru, en-US, etc
+      // fix ru-Ru, en-US, etc
       if (res.locals.language.length !== 2) {
         [res.locals.language] = res.locals.language.split('-');
       }
