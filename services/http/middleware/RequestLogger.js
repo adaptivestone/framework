@@ -11,7 +11,9 @@ class RequestLogger extends AbstractMiddleware {
     this.logger.info(text);
     res.on('finish', () => {
       const duration = Date.now() - startTime;
-      this.logger.info(`Finished ${text}. Duration ${duration} ms`);
+      this.logger.info(
+        `Finished ${text}. Status: ${res.statusCode}. Duration ${duration} ms`,
+      );
     });
     next();
   }
