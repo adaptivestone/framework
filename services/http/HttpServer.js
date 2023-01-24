@@ -17,18 +17,18 @@ const Base = require('../../modules/Base');
  * HTTP server based on Express
  */
 class HttpServer extends Base {
-  constructor(app, folderConfig) {
+  constructor(app) {
     super(app);
     this.express = express();
     this.express.disable('x-powered-by');
     this.express.set('views', [
-      folderConfig.folders.views,
+      this.app.foldersConfig.views,
       path.join(__dirname, '../../views'),
     ]);
     this.express.set('view engine', 'pug');
 
     this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
-    this.enableI18N(folderConfig);
+    this.enableI18N();
 
     const httpConfig = this.app.getConfig('http');
     this.express.use(
@@ -36,7 +36,7 @@ class HttpServer extends Base {
         origin: httpConfig.corsDomains,
       }),
     ); // todo whitelist
-    this.express.use(express.static(folderConfig.folders.public));
+    this.express.use(express.static(this.app.foldersConfig.public));
     this.express.use(express.static('./public'));
 
     this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
@@ -75,17 +75,8 @@ class HttpServer extends Base {
 
   /**
    *  Enable support for i18n
-   * @param {object} folderConfig config
-   * @param {object} folderConfig.folders folder config
-   * @param {string} folderConfig.folders.config path to folder with config files
-   * @param {string} folderConfig.folders.models path to folder with moidels files
-   * @param {string} folderConfig.folders.controllers path to folder with controllers files
-   * @param {string} folderConfig.folders.views path to folder with view files
-   * @param {string} folderConfig.folders.public path to folder with public files
-   * @param {string} folderConfig.folders.locales path to folder with locales files
-   * @param {string} folderConfig.folders.emails path to folder with emails files
    */
-  enableI18N(folderConfig) {
+  enableI18N() {
     const I18NConfig = this.app.getConfig('i18n');
     if (!I18NConfig.enabled) {
       return;
@@ -120,8 +111,8 @@ class HttpServer extends Base {
             //   addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
             // },
             {
-              loadPath: `${folderConfig.folders.locales}/{{lng}}/{{ns}}.json`,
-              addPath: `${folderConfig.folders.locales}/{{lng}}/{{ns}}.missing.json`,
+              loadPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.json`,
+              addPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.missing.json`,
             },
           ],
         },
