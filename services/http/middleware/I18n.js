@@ -58,11 +58,11 @@ class I18n extends AbstractMiddleware {
     req.i18n = new Proxy(req.appInfo.i18n, {
       get: (target, prop) => {
         this.logger.warn('Please not use "req.i18n" Use "req.appInfo.i18n"');
-        return target[[prop]];
+        return target[prop];
       },
     });
 
-    next();
+    return next();
   }
 
   detectors = {

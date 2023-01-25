@@ -24,6 +24,7 @@ class HttpServer extends Base {
     ]);
     this.express.set('view engine', 'pug');
 
+    this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
     this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
     this.express.use(new I18nMiddleware(this.app).getMiddleware());
 
@@ -36,7 +37,6 @@ class HttpServer extends Base {
     this.express.use(express.static(this.app.foldersConfig.public));
     this.express.use(express.static('./public'));
 
-    this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
     this.express.use(new RequestParserMiddleware(this.app).getMiddleware());
 
     // As exprress will check numbersof arguments
