@@ -3,11 +3,8 @@ const path = require('node:path');
 const express = require('express');
 const cors = require('cors');
 
-const i18next = require('i18next');
-const i18nextMiddleware = require('i18next-http-middleware');
-const BackendFS = require('i18next-fs-backend');
-const Backend = require('i18next-chained-backend');
 const RequestLoggerMiddleware = require('./middleware/RequestLogger');
+const I18nMiddleware = require('./middleware/I18n');
 const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
 const RequestParserMiddleware = require('./middleware/RequestParser');
 
@@ -28,7 +25,7 @@ class HttpServer extends Base {
     this.express.set('view engine', 'pug');
 
     this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
-    this.enableI18N();
+    this.express.use(new I18nMiddleware(this.app).getMiddleware());
 
     const httpConfig = this.app.getConfig('http');
     this.express.use(
@@ -71,69 +68,6 @@ class HttpServer extends Base {
         }
       },
     );
-  }
-
-  /**
-   *  Enable support for i18n
-   */
-  enableI18N() {
-    const I18NConfig = this.app.getConfig('i18n');
-    if (!I18NConfig.enabled) {
-      return;
-    }
-    const lngDetector = new i18nextMiddleware.LanguageDetector();
-    lngDetector.addDetector({
-      name: 'xLang',
-      // eslint-disable-next-line no-unused-vars
-      lookup: (req, res, options) => {
-        const lng = req.get('X-Lang');
-        if (lng) {
-          return lng;
-        }
-        return false;
-      },
-      // eslint-disable-next-line no-unused-vars
-      cacheUserLanguage: (req, res, lng, options) => {},
-    });
-    this.logger.info('Enabling i18n support');
-    i18next
-      .use(Backend)
-      .use(lngDetector)
-      .init({
-        backend: {
-          backends: [
-            BackendFS,
-            //  BackendFS,
-          ],
-          backendOptions: [
-            // {
-            //  loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
-            //   addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
-            // },
-            {
-              loadPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.json`,
-              addPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.missing.json`,
-            },
-          ],
-        },
-        fallbackLng: I18NConfig.fallbackLng,
-        preload: I18NConfig.preload,
-        saveMissing: I18NConfig.saveMissing,
-        debug: I18NConfig.debug,
-        detection: {
-          // caches: ['cookie'],
-          order: I18NConfig.langDetectionOders || ['xLang'],
-          lookupQuerystring: I18NConfig.lookupQuerystring,
-        },
-      });
-    this.express.use(i18nextMiddleware.handle(i18next));
-    this.express.use((req, res, next) => {
-      // fix ru-Ru, en-US, etc
-      if (res.locals.language.length !== 2) {
-        [res.locals.language] = res.locals.language.split('-');
-      }
-      next();
-    });
   }
 
   /**
