@@ -12,14 +12,11 @@ class ControllerManager extends Base {
 
   /**
    * Load controllers
-   * @param {object} folderConfig
-   * @param {object} folderConfig.folders  server folder config
-   * @param {string} folderConfig.controllers  controller folder path
    */
-  async initControllers(folderConfig) {
+  async initControllers() {
     const controllersToLoad = await this.getFilesPathWithInheritance(
       __dirname,
-      folderConfig.folders.controllers,
+      this.app.foldersConfig.controllers,
     );
 
     controllersToLoad.sort((a, b) => {

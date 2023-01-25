@@ -17,6 +17,10 @@ class GetUserByToken extends AbstractMiddleware {
   }
 
   async middleware(req, res, next) {
+    if (req.appInfo.user) {
+      this.logger.warn('You call GetUserByToken more then once');
+      return next();
+    }
     let { token } = req.body;
     this.logger.verbose(
       `GetUserByToken token in BODY ${token}. Token if Authorization header ${req.get(

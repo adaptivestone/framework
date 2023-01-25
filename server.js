@@ -57,11 +57,11 @@ class Server {
     this.addErrorHandling();
 
     // TODO config
-    this.app.httpServer = new HttpServer(this.app, this.config);
+    this.app.httpServer = new HttpServer(this.app);
 
     this.app.controllerManager = new ControllerManager(this.app);
 
-    await this.app.controllerManager.initControllers(this.config);
+    await this.app.controllerManager.initControllers();
     await callbackBefore404();
     this.app.httpServer.add404Page();
   }

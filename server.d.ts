@@ -19,7 +19,7 @@ declare class Server {
     getModel: Server['getModel'];
     runCliCommand: Server['runCliCommand'];
     updateConfig: Server['updateConfig'];
-    foldersConfig: Server['config'];
+    foldersConfig: Server['config']['folders'];
     events: EventEmitter;
     get cache(): Server['cacheService'];
     httpServer: null;
