@@ -4,6 +4,8 @@
 [BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used
 [BREAKING] should not affect any user. Changed email-templates module to internal implementation. Idea to keep dependensy list smaller
 [BREAKING] change i18n middleware to internal one. Nothing should be affected
+[BREAKING] now validation of request splitted between request and query
+
 [NEW] pagination middleware
 [NEW] requestLogger middleware. Migrated from core server to be an middleware
 [NEW] CreateUser command
