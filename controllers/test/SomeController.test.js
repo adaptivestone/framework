@@ -10,6 +10,7 @@ describe('middlewares correct works', () => {
         first: 'Artem',
         last: 'Testov',
       },
+      roles: ['user'],
       sessionTokens: [{ token: 'testUser1' }],
     });
   });
@@ -108,7 +109,59 @@ describe('middlewares correct works', () => {
     expect(status).toBe(400);
   });
 
-  it('request also can grab query paramaters', async () => {
+  it('request can grab query paramaters', async () => {
+    expect.assertions(2);
+
+    const { status, body } = await request(global.server.app.httpServer.express)
+      .get('/test/somecontroller/grabSomeDataFromQuery?name=123')
+      .set({ Authorization: 'testUser1' });
+
+    expect(status).toBe(200);
+    expect(body.data.name).toBe('123');
+  });
+
+  it('request required query param must be provided', async () => {
+    expect.assertions(2);
+
+    const { status, body } = await request(global.server.app.httpServer.express)
+      .get('/test/somecontroller/grabSomeDataFromQueryWithRequiredParam')
+      .set({ Authorization: 'testUser1' });
+
+    expect(status).toBe(400);
+    expect(body?.data?.name).toBeUndefined();
+  });
+
+  it('request with provided required query param', async () => {
+    expect.assertions(2);
+
+    const { status, body } = await request(global.server.app.httpServer.express)
+      .get(
+        '/test/somecontroller/grabSomeDataFromQueryWithRequiredParam?name=123',
+      )
+      .set({ Authorization: 'testUser1' });
+
+    expect(status).toBe(200);
+    expect(body.data.name).toBe(123);
+  });
+
+  it('request can grab query params from Pagination middleware', async () => {
+    expect.assertions(2);
+
+    const { status, body } = await request(global.server.app.httpServer.express)
+      .get(
+        '/test/somecontroller/grabSomeDataFromQueryWithMiddlewareParams?name=123&page=3&limit=50',
+      )
+      .set({ Authorization: 'testUser1' });
+
+    expect(status).toBe(200);
+    expect(body.data).toStrictEqual({
+      name: '123',
+      page: 3,
+      limit: 50,
+    });
+  });
+
+  it('request can not grab query paramaters', async () => {
     expect.assertions(2);
 
     const { status, body } = await request(global.server.app.httpServer.express)
@@ -116,7 +169,7 @@ describe('middlewares correct works', () => {
       .send();
 
     expect(status).toBe(200);
-    expect(body.data.name).toBe('test');
+    expect(body?.data?.name).toBeUndefined();
   });
 
   it('request also can grab query paramaters but body have bigger priority', async () => {
@@ -137,11 +190,7 @@ describe('middlewares correct works', () => {
 
     const { status } = await request(global.server.app.httpServer.express)
       .get('/test/somecontroller/someDataWithPermission')
-      .send({
-        user: {
-          role: 'client',
-        },
-      });
+      .set({ Authorization: 'testUser1' });
 
     expect(status).toBe(403);
   });
@@ -165,11 +214,9 @@ describe('middlewares correct works', () => {
     const { status } = await request(global.server.app.httpServer.express)
       .put('/test/somecontroller/putInfo')
       .send({
-        field: 'Test',
-        user: {
-          role: 'client',
-        },
-      });
+        field: 'testField',
+      })
+      .set({ Authorization: 'testUser1' });
 
     expect(status).toBe(403);
   });

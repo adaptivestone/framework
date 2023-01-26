@@ -165,6 +165,7 @@ class GetOpenApiJson extends AbstractCommand {
         const routeTitle = route[Object.keys(route)[0]].name;
 
         const routeFields = route[Object.keys(route)[0]].fields;
+        const routeQueryFields = route[Object.keys(route)[0]].queryFields;
 
         if (!openApi.paths[routeName][methodName]) {
           openApi.paths[routeName][methodName] = {};
@@ -201,6 +202,17 @@ class GetOpenApiJson extends AbstractCommand {
               'The server accepted the request, but did not find the corresponding resource at the specified URI',
           },
         };
+
+        for (const queryField of routeQueryFields) {
+          openApi.paths[routeName][methodName].parameters.push({
+            name: queryField.name,
+            in: 'query',
+            required: queryField?.isRequired,
+            schema: {
+              type: queryField.type,
+            },
+          });
+        }
 
         for (const routeField of routeParameters) {
           openApi.paths[routeName][methodName].parameters.push({

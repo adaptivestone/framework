@@ -1,11 +1,19 @@
+const yup = require('yup');
 const AbstractMiddleware = require('./AbstractMiddleware');
-
 /**
  * Middleware for reusing pagination
  */
 class Pagination extends AbstractMiddleware {
   static get description() {
     return 'Pagination middleware. You can use limit=10 and maxLimit=100 parameters';
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  get relatedQueryParameters() {
+    return yup.object().shape({
+      page: yup.number(),
+      limit: yup.number(),
+    });
   }
 
   async middleware(req, res, next) {

@@ -2,13 +2,11 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
 const express = require('express');
-const merge = require('deepmerge');
-const { isPlainObject } = require('is-plain-object');
-
 const Base = require('./Base');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
-
+const ReqValidator = require('../services/validate/ReqValidator');
+const DocumentationGenerator = require('../services/documentation/DocumentationGenerator');
 /**
  * Abstract controller. You should extend any controller from them.
  * Place you cintroller into controller folder and it be inited in auto way.
@@ -99,6 +97,10 @@ class AbstractController extends Base {
             path: realPath,
             fullPath,
             params: middlewareParams,
+            relatedQueryParameters: new MiddlewareFunction(
+              this.app,
+              middlewareParams,
+            )?.relatedQueryParameters,
             authParams: new MiddlewareFunction(this.app, middlewareParams)
               ?.usedAuthParameters,
             MiddlewareFunction,
@@ -109,8 +111,8 @@ class AbstractController extends Base {
     };
 
     const routeMiddlewaresReg = parseMiddlewares(routeMiddlewares);
-
     const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
+
     const routesInfo = [];
 
     /**
@@ -142,11 +144,13 @@ class AbstractController extends Base {
           (middleware) =>
             middleware.path === path && middleware.method === verb,
         );
+
         let routeObject = routes[verb][path];
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
             handler: routeObject,
             request: null,
+            query: null,
             middleware: null,
           };
 
@@ -177,6 +181,7 @@ class AbstractController extends Base {
           description: routeObject?.description,
           method: verb.toUpperCase(),
           fields: routeObject?.request?.fields,
+          queryFields: routeObject?.query?.fields,
           path,
           fullPath,
         });
@@ -193,68 +198,59 @@ class AbstractController extends Base {
               new MiddlewareFunction(this.app, params).getMiddleware(),
           );
         }
-        const { controllerValidationAbortEarly } =
-          this.app.getConfig('validate');
+
         this.router[verb](
           path,
           additionalMiddlewares || [],
           async (req, res, next) => {
-            if (routeObject.request) {
-              if (typeof routeObject.request.validate !== 'function') {
-                this.logger.error('request.validate should be a function');
-              }
-              if (typeof routeObject.request.cast !== 'function') {
-                this.logger.error('request.cast should be a function');
-              }
-              const bodyAndQuery = merge(req.query, req.body, {
-                isMergeableObject: isPlainObject,
-              });
-
-              try {
-                await routeObject.request.validate(bodyAndQuery, {
-                  abortEarly: controllerValidationAbortEarly,
-                  req,
-                });
-              } catch (e) {
-                let { errors } = e;
-                // translate it
-                if (req.i18n && errors) {
-                  errors = errors.map((err) => req.i18n.t(err));
-                }
-                this.logger.error(
-                  `Request validation failed with message: ${e.message}. errors: ${errors}`,
-                );
-
-                const errorAnswer = {};
-                if (!e.inner || !e.inner.length) {
-                  errorAnswer[e.path] = errors;
-                } else {
-                  e.inner.forEach((err) => {
-                    errorAnswer[err.path] = err.errors;
-                    if (req.i18n && err.errors) {
-                      errorAnswer[err.path] = err.errors.map((err1) =>
-                        req.i18n.t(err1),
-                      );
-                    }
-                  });
-                }
-
-                return res.status(400).json({
-                  errors: errorAnswer,
-                });
-              }
-              req.appInfo.request = await routeObject.request.cast(
-                bodyAndQuery,
-                {
-                  stripUnknown: true,
-                  req,
+            try {
+              req.appInfo.request = await new ReqValidator(
+                this.app,
+                routeObject?.request,
+              ).validateReqData(req, {
+                selectedReqData: req.body,
+                additionalMiddlewareFieldsData: {
+                  middlewaresInfo,
+                  routeMiddlewaresReg,
+                  options: {
+                    method: verb,
+                    path: fullPath,
+                    prefix: 'request',
+                  },
                 },
-              );
+              });
+              req.appInfo.query = await new ReqValidator(
+                this.app,
+                routeObject?.query,
+              ).validateReqData(req, {
+                selectedReqData: req.query,
+                additionalMiddlewareFieldsData: {
+                  middlewaresInfo,
+                  routeMiddlewaresReg,
+                  options: {
+                    method: verb,
+                    path: fullPath,
+                    prefix: 'query',
+                  },
+                },
+              });
+            } catch (err) {
+              return res.status(400).json({
+                errors: err.message,
+              });
             }
             req.body = new Proxy(req.body, {
               get: (target, prop) => {
                 this.logger.warn(
                   'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
+                );
+                return target[prop];
+              },
+            });
+            req.query = new Proxy(req.query, {
+              get: (target, prop) => {
+                this.logger.warn(
+                  'Please not use "req.query" directly. Implement "query" and use "req.appInfo.query" ',
                 );
                 return target[prop];
               },
@@ -318,97 +314,15 @@ class AbstractController extends Base {
     /**
      * Generate documentation
      */
-
-    const processingFields = (fieldsByRoute) => {
-      const fields = [];
-      if (!fieldsByRoute) {
-        return fields;
-      }
-      const entries = Object.entries(fieldsByRoute);
-      entries.forEach(([key, value]) => {
-        const field = {};
-        field.name = key;
-        field.type = value.type;
-        if (value.exclusiveTests) {
-          field.isRequired = value.exclusiveTests.required;
-        }
-        if (value?.innerType) {
-          field.innerType = value?.innerType?.type;
-        }
-
-        if (value.fields) {
-          field.fields = [];
-          // eslint-disable-next-line no-shadow
-          const entries = Object.entries(value.fields);
-          // eslint-disable-next-line no-shadow
-          entries.forEach(([key, value]) => {
-            field.fields.push({
-              name: key,
-              type: value.type,
-            });
-          });
-        }
-        fields.push(field);
-      });
-      return fields;
-    };
-
     if (!this.app.httpServer) {
-      this.app.documentation.push({
-        contollerName: this.getConstructorName(),
-        routesInfo: routesInfo.map((route) => ({
-          [route.fullPath]: {
-            method: route.method,
-            name: route.name,
-            description: route?.description,
-            fields: processingFields(route.fields),
-            routeMiddlewares: routeMiddlewaresReg
-              // eslint-disable-next-line consistent-return
-              .map((middleware) => {
-                const routeFullPath = route.fullPath.toUpperCase();
-                const middlewareFullPath = middleware.fullPath.toUpperCase();
-                if (
-                  route.method.toLowerCase() ===
-                    middleware.method.toLowerCase() &&
-                  (middlewareFullPath === routeFullPath ||
-                    middlewareFullPath === `${routeFullPath}*`)
-                ) {
-                  return {
-                    name: middleware.name,
-                    params: middleware.params,
-                    authParams: middleware.authParams,
-                  };
-                }
-              })
-              .filter(Boolean),
-            controllerMiddlewares: [
-              ...new Set(
-                middlewaresInfo
-                  .filter((middleware) => {
-                    const routeFullPath = route.fullPath.toUpperCase();
-                    const middlewareFullPath =
-                      middleware.fullPath.toUpperCase();
-                    const middlewareFullPathWithSliced = middleware.fullPath
-                      .toUpperCase()
-                      .slice(0, -1);
-
-                    return (
-                      middlewareFullPath === routeFullPath ||
-                      middlewareFullPath === `${routeFullPath}*` ||
-                      routeFullPath?.indexOf(middlewareFullPathWithSliced) !==
-                        -1
-                    );
-                  })
-                  .map(({ name, params, authParams }) => ({
-                    name,
-                    params,
-                    authParams,
-                  })),
-              ),
-            ],
-          },
-        })),
-      });
+      this.app.documentation.push(
+        DocumentationGenerator.convertDataToDocumentationElement(
+          this.getConstructorName(),
+          routesInfo,
+          middlewaresInfo,
+          routeMiddlewaresReg,
+        ),
+      );
     } else {
       this.app.httpServer.express.use(expressPath, this.router);
     }
