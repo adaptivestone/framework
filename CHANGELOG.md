@@ -12,6 +12,7 @@
 [NEW] custom yup validator for validate File requests
 [UPDATE] updated deps
 [UPDATE] openApi generator support files
+[FIX] support in tests TEST_FOLDER_EMAILS
 
 ### 3.4.2
 
