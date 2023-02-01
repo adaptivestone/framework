@@ -1,5 +1,5 @@
 const Base = require('../../modules/Base');
-const ReqValidator = require('../validate/ReqValidator');
+const ReqValidator = require('../validate/ValidateService');
 
 class DocumentationGenerator extends Base {
   static convertYupFieldsToSwaggerFormat(fields) {
@@ -83,7 +83,7 @@ class DocumentationGenerator extends Base {
             method: route.method.toLowerCase(),
             path: route.fullPath,
           },
-        ).fields.query;
+        ).query;
 
         const middlewareRequestParams = ReqValidator.getMiddlewareParams(
           middlewaresInfo,
@@ -92,7 +92,7 @@ class DocumentationGenerator extends Base {
             method: route.method.toLowerCase(),
             path: route.fullPath,
           },
-        ).fields.request;
+        ).request;
 
         const queryParams = this.convertYupFieldsToSwaggerFormat(
           middlewareQueryParams,
