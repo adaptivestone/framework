@@ -1,13 +1,14 @@
+const path = require('node:path');
 /* eslint-disable jest/require-top-level-describe */
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
 let mongoMemoryServerInstance;
-const path = require('path');
+
 const redis = require('redis');
 const Server = require('../server');
 
-const clearRadisNamespace = require('../helpers/redis/clearNamespace');
+const clearRedisNamespace = require('../helpers/redis/clearNamespace');
 
 jest.setTimeout(1000000);
 beforeAll(async () => {
@@ -29,6 +30,7 @@ beforeAll(async () => {
       models: process.env.TEST_FOLDER_MODELS || path.resolve('./models'),
       emails:
         process.env.TEST_FOLDER_EMAIL ||
+        process.env.TEST_FOLDER_EMAILS ||
         path.resolve('./services/messaging/email/templates'),
       locales: process.env.TEST_FOLDER_LOCALES || path.resolve('./locales'),
       commands: process.env.TEST_FOLDER_COMMANDS || path.resolve('./commands'),
@@ -81,9 +83,13 @@ afterEach(async () => {
     const { url, namespace } = global.server.getConfig('redis');
     const redisClient = redis.createClient({ url });
 
-    await redisClient.connect();
-    await clearRadisNamespace(redisClient, namespace);
-    await redisClient.disconnect();
+    try {
+      await redisClient.connect();
+      await clearRedisNamespace(redisClient, namespace);
+      await redisClient.disconnect();
+    } catch (err) {
+      // that ok. No redis connection
+    }
   }
 });
 
