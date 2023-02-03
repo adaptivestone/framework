@@ -9,7 +9,7 @@ class AbstractValidator extends Base {
   // eslint-disable-next-line no-unused-vars
   static convertFieldsToSwaggerFormat(fields) {
     console.log('IMPLENT ME Abstract convertFieldsToSwaggerFormat');
-    return {};
+    return [];
   }
 
   // eslint-disable-next-line class-methods-use-this
