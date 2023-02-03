@@ -1,6 +1,41 @@
 const AbstractValidator = require('./AbstractValidator');
 
 class YupValidator extends AbstractValidator {
+  static convertFieldsToSwaggerFormat(fields) {
+    const convertedFields = [];
+    const entries = Object.entries(fields.describe().fields);
+
+    if (!entries?.length) {
+      return convertedFields;
+    }
+    const requiredFields = [];
+
+    for (const [field, fieldProp] of entries) {
+      const isRequired = fieldProp?.tests?.find(
+        (prop) => prop.name === 'required',
+      );
+      if (isRequired) {
+        requiredFields.push(field);
+      }
+    }
+
+    entries.forEach(([key, value]) => {
+      const field = {
+        name: key,
+        type: value.type,
+        isRequired: requiredFields?.includes(key),
+      };
+
+      convertedFields.push(field);
+    });
+
+    return convertedFields;
+  }
+
+  get fieldsInSwaggerFormat() {
+    return this.constructor.convertFieldsToSwaggerFormat(this.body);
+  }
+
   async validateFields(data, { req }) {
     const yupSchema = this.body;
     const { controllerValidationAbortEarly } = this.app.getConfig('validate');

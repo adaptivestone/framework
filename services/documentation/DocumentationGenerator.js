@@ -1,38 +1,7 @@
 const Base = require('../../modules/Base');
-const ReqValidator = require('../validate/ValidateService');
+const ValidateService = require('../validate/ValidateService');
 
 class DocumentationGenerator extends Base {
-  static convertYupFieldsToSwaggerFormat(fields) {
-    const convertedFields = [];
-    const entries = Object.entries(fields.describe().fields);
-
-    if (!entries?.length) {
-      return convertedFields;
-    }
-    const requiredFields = [];
-
-    for (const [field, fieldProp] of entries) {
-      const isRequired = fieldProp?.tests?.find(
-        (prop) => prop.name === 'required',
-      );
-      if (isRequired) {
-        requiredFields.push(field);
-      }
-    }
-
-    entries.forEach(([key, value]) => {
-      const field = {
-        name: key,
-        type: value.type,
-        isRequired: requiredFields?.includes(key),
-      };
-
-      convertedFields.push(field);
-    });
-
-    return convertedFields;
-  }
-
   static processingFields(fieldsByRoute) {
     const fields = [];
     if (!fieldsByRoute) {
@@ -67,6 +36,36 @@ class DocumentationGenerator extends Base {
     return fields;
   }
 
+  static selectUniqueFields(fields) {
+    return Array.from(
+      new Map(fields.map((item) => [item.name, item])).values(),
+    ).reduce((uniqueArray, item) => {
+      const existingItem = uniqueArray.find(
+        (uniqueItem) => uniqueItem.name === item.name,
+      );
+      if (!existingItem) {
+        uniqueArray.push(item);
+      } else if (item.isRequired) {
+        existingItem.isRequired = true;
+      }
+      return uniqueArray;
+    }, []);
+  }
+
+  static groupFieldsFromSchemas(schemas) {
+    const result = [];
+    schemas.forEach((schema) => {
+      const convertedSchema = new ValidateService(this.app, schema).validator;
+      if (convertedSchema.fieldsInSwaggerFormat.length) {
+        for (const field of convertedSchema.fieldsInSwaggerFormat) {
+          result.push(field);
+        }
+      }
+    });
+
+    return result;
+  }
+
   static convertDataToDocumentationElement(
     controllerName,
     routesInfo,
@@ -76,7 +75,7 @@ class DocumentationGenerator extends Base {
     return {
       contollerName: controllerName,
       routesInfo: routesInfo.map((route) => {
-        const middlewareQueryParams = ReqValidator.getMiddlewareParams(
+        const middlewareQueryParams = ValidateService.getMiddlewareParams(
           middlewaresInfo,
           routeMiddlewaresReg,
           {
@@ -85,7 +84,7 @@ class DocumentationGenerator extends Base {
           },
         ).query;
 
-        const middlewareRequestParams = ReqValidator.getMiddlewareParams(
+        const middlewareRequestParams = ValidateService.getMiddlewareParams(
           middlewaresInfo,
           routeMiddlewaresReg,
           {
@@ -94,10 +93,9 @@ class DocumentationGenerator extends Base {
           },
         ).request;
 
-        const queryParams = this.convertYupFieldsToSwaggerFormat(
-          middlewareQueryParams,
-        );
-        const requestParams = this.convertYupFieldsToSwaggerFormat(
+        const queryParams = this.groupFieldsFromSchemas(middlewareQueryParams);
+
+        const requestParams = this.groupFieldsFromSchemas(
           middlewareRequestParams,
         );
 
@@ -106,12 +104,15 @@ class DocumentationGenerator extends Base {
             method: route.method,
             name: route.name,
             description: route?.description,
-            fields: this.processingFields(route.fields).concat(requestParams),
-            queryFields: this.processingFields(route.queryFields).concat(
-              queryParams,
-            ),
+            fields: this.selectUniqueFields([
+              ...this.processingFields(route.fields),
+              ...requestParams,
+            ]),
+            queryFields: this.selectUniqueFields([
+              ...this.processingFields(route.queryFields),
+              ...queryParams,
+            ]),
             routeMiddlewares: routeMiddlewaresReg
-              // eslint-disable-next-line consistent-return
               .map((middleware) => {
                 const routeFullPath = route.fullPath.toUpperCase();
                 const middlewareFullPath = middleware.fullPath.toUpperCase();
@@ -127,6 +128,7 @@ class DocumentationGenerator extends Base {
                     authParams: middleware.authParams,
                   };
                 }
+                return null;
               })
               .filter(Boolean),
             controllerMiddlewares: [

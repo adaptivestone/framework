@@ -6,6 +6,18 @@ class AbstractValidator extends Base {
     this.body = body;
   }
 
+  // eslint-disable-next-line no-unused-vars
+  static convertFieldsToSwaggerFormat(fields) {
+    console.log('IMPLENT ME Abstract convertFieldsToSwaggerFormat');
+    return {};
+  }
+
+  // eslint-disable-next-line class-methods-use-this
+  get fieldsInSwaggerFormat() {
+    console.log('IMPLENT ME Abstract fieldsInSwaggerFormat');
+    return [];
+  }
+
   // eslint-disable-next-line class-methods-use-this
   async validateFields() {
     console.log('IMPLENT ME Abstract validateFields');
