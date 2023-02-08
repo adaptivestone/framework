@@ -207,7 +207,7 @@ class GetOpenApiJson extends AbstractCommand {
           openApi.paths[routeName][methodName].parameters.push({
             name: queryField.name,
             in: 'query',
-            required: queryField?.isRequired,
+            required: queryField?.required,
             schema: {
               type: queryField.type,
             },
@@ -230,7 +230,7 @@ class GetOpenApiJson extends AbstractCommand {
           const requiredFields = [];
           let isMultipartFormaData = false;
           for (const field of routeFields) {
-            if (field.isRequired) {
+            if (field.required) {
               requiredFields.push(field.name);
             }
 

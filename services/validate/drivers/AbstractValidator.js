@@ -7,15 +7,15 @@ class AbstractValidator extends Base {
   }
 
   // eslint-disable-next-line no-unused-vars
-  static convertFieldsToSwaggerFormat(fields) {
+  static convertFieldsToJson(fields) {
     console.log('IMPLENT ME Abstract convertFieldsToSwaggerFormat');
-    return [];
+    return {};
   }
 
   // eslint-disable-next-line class-methods-use-this
-  get fieldsInSwaggerFormat() {
+  get fieldsInJsonFormat() {
     console.log('IMPLENT ME Abstract fieldsInSwaggerFormat');
-    return [];
+    return {};
   }
 
   // eslint-disable-next-line class-methods-use-this

@@ -13,7 +13,7 @@ class DocumentationGenerator extends Base {
       field.name = key;
       field.type = value.type;
       if (value.exclusiveTests) {
-        field.isRequired = value.exclusiveTests.required;
+        field.required = value.exclusiveTests.required;
       }
       if (value?.innerType) {
         field.innerType = value?.innerType?.type;
@@ -45,8 +45,8 @@ class DocumentationGenerator extends Base {
       );
       if (!existingItem) {
         uniqueArray.push(item);
-      } else if (item.isRequired) {
-        existingItem.isRequired = true;
+      } else if (item.required) {
+        existingItem.required = true;
       }
       return uniqueArray;
     }, []);
@@ -56,10 +56,15 @@ class DocumentationGenerator extends Base {
     const result = [];
     schemas.forEach((schema) => {
       const convertedSchema = new ValidateService(this.app, schema).validator;
-      if (convertedSchema.fieldsInSwaggerFormat.length) {
-        for (const field of convertedSchema.fieldsInSwaggerFormat) {
-          result.push(field);
-        }
+
+      for (const [key, value] of Object.entries(
+        convertedSchema?.fieldsInJsonFormat,
+      )) {
+        result.push({
+          name: key,
+          type: value.type,
+          required: value.required,
+        });
       }
     });
 
