@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const path = require('node:path');
 const Base = require('./Base');
 

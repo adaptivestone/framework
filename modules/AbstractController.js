@@ -275,6 +275,7 @@ class AbstractController extends Base {
             }
             return routeObject.handler.call(this, req, res, next).catch((e) => {
               this.logger.error(e.message);
+              // eslint-disable-next-line no-console
               console.error(e);
               return res.status(500).json({
                 message:
