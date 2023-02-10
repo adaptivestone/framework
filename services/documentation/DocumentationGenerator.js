@@ -111,7 +111,6 @@ class DocumentationGenerator extends Base {
               queryParams,
             ),
             routeMiddlewares: routeMiddlewaresReg
-              // eslint-disable-next-line consistent-return
               .map((middleware) => {
                 const routeFullPath = route.fullPath.toUpperCase();
                 const middlewareFullPath = middleware.fullPath.toUpperCase();
