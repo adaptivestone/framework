@@ -98,17 +98,11 @@ class ValidateService extends Base {
       return {};
     }
 
-    await validator.validateFields(data, { req });
+    await validator.validateFields(data, req);
 
-    return validator.castFields(data, {
-      stripUnknown: true,
-      req,
-    });
+    return validator.castFields(data, req);
   }
 
-  /**
-   * Return all validated fields from validators
-   */
   async validateArrayOfSchemas(req, validators, data) {
     const result = [];
 
