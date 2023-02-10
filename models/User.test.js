@@ -93,15 +93,13 @@ describe('user model', () => {
 
   describe('getUserByVerificationToken', () => {
     it('should NOT work for non valid token', async () => {
-      expect.assertions(2);
+      expect.assertions(1);
 
-      const user = await global.server.app
-        .getModel('User')
-        .getUserByVerificationToken('fake one')
-        .catch((e) => {
-          expect(e).toBeDefined();
-        });
-      expect(user).toBeUndefined();
+      await expect(
+        global.server.app
+          .getModel('User')
+          .getUserByVerificationToken('fake one'),
+      ).rejects.toStrictEqual(new Error('User not exists'));
     });
 
     it('should  work for VALID token', async () => {
@@ -119,15 +117,13 @@ describe('user model', () => {
 
   describe('getUserByPasswordRecoveryToken', () => {
     it('should NOT work for non valid token', async () => {
-      expect.assertions(2);
+      expect.assertions(1);
 
-      const user = await global.server.app
-        .getModel('User')
-        .getUserByPasswordRecoveryToken('fake one')
-        .catch((e) => {
-          expect(e).toBeDefined();
-        });
-      expect(user).toBeUndefined();
+      await expect(
+        global.server.app
+          .getModel('User')
+          .getUserByPasswordRecoveryToken('fake one'),
+      ).rejects.toStrictEqual(new Error('User not exists'));
     });
 
     it('should  work for VALID token', async () => {

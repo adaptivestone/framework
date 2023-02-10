@@ -77,6 +77,7 @@ class Base {
           if (!IsConstructor(Tr) && Tr.default) {
             Tr = Tr.default;
           } else {
+            // eslint-disable-next-line no-console
             console.error(
               `${log.transport} not a constructor. Please check it`,
             );

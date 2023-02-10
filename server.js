@@ -1,7 +1,6 @@
+/* eslint-disable no-console */
 const EventEmitter = require('node:events');
 
-/* eslint-disable global-require */
-// eslint-disable-next-line jest/require-hook
 require('dotenv').config();
 const merge = require('deepmerge');
 
@@ -52,8 +51,14 @@ class Server {
    * @returns {Promise}
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
-    const HttpServer = require('./services/http/HttpServer'); // Speed optimisation
-    const ControllerManager = require('./controllers/index'); // Speed optimisation
+    const [{ default: HttpServer }, { default: ControllerManager }] =
+      await Promise.all([
+        // eslint-disable-next-line import/extensions
+        import('./services/http/HttpServer.js'), // Speed optimisation
+        // eslint-disable-next-line import/extensions
+        import('./controllers/index.js'), // Speed optimisation
+      ]);
+
     this.addErrorHandling();
 
     // TODO config
@@ -72,7 +77,7 @@ class Server {
   // eslint-disable-next-line class-methods-use-this
   addErrorHandling() {
     process.on('uncaughtException', console.error);
-    process.on('unhandledRejection', function (reason, p) {
+    process.on('unhandledRejection', (reason, p) => {
       console.log(
         'Possibly Unhandled Rejection at: Promise ',
         p,
@@ -168,7 +173,8 @@ class Server {
    */
   async runCliCommand(commandName, args) {
     if (!this.cli) {
-      const BaseCli = require('./modules/BaseCli'); // Speed optimisation
+      // eslint-disable-next-line import/extensions
+      const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
       this.cli = new BaseCli(this);
     }
     return this.cli.run(commandName, args);
@@ -180,6 +186,7 @@ class Server {
    */
   getCache() {
     if (!this.cacheService) {
+      // eslint-disable-next-line global-require
       const Cache = require('./services/cache/Cache'); // Speed optimisation
       this.cacheService = new Cache(this.app);
     }

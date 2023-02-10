@@ -16,7 +16,7 @@ class User extends AbstractModel {
   }
 
   initHooks() {
-    this.mongooseSchema.pre('save', async function () {
+    this.mongooseSchema.pre('save', async function userPreSaveHook() {
       if (this.isModified('password')) {
         this.password = await this.constructor.hashPassword(this.password);
       }

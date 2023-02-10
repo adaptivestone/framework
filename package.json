@@ -15,7 +15,10 @@
     "dev": "nodemon ./index.js",
     "prod": "nodemon ./cluster.js",
     "test": "jest --coverage=true",
-    "codestyle": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
+    "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
+    "lint": "eslint '**/*.js'",
+    "lint:fix": "eslint '**/*.js' --fix",
+    "codestyle": "npm run prettier && npm run lint",
     "prepare": "husky install",
     "cli": "node cliCommand"
   },
