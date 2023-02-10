@@ -2,7 +2,6 @@
 const EventEmitter = require('node:events');
 
 /* eslint-disable global-require */
-// eslint-disable-next-line jest/require-hook
 require('dotenv').config();
 const merge = require('deepmerge');
 
@@ -73,7 +72,7 @@ class Server {
   // eslint-disable-next-line class-methods-use-this
   addErrorHandling() {
     process.on('uncaughtException', console.error);
-    process.on('unhandledRejection', function (reason, p) {
+    process.on('unhandledRejection', (reason, p) => {
       console.log(
         'Possibly Unhandled Rejection at: Promise ',
         p,
