@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const EventEmitter = require('node:events');
 
 /* eslint-disable global-require */

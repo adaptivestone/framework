@@ -56,7 +56,9 @@ beforeAll(async () => {
         nick: 'testUserNickName',
       },
     }).catch((e) => {
+      // eslint-disable-next-line no-console
       console.error(e);
+      // eslint-disable-next-line no-console
       console.info(
         'That error can happens in case you have custom user model. Please use global.testSetup.disableUserCreate flag to skip user creating',
       );
