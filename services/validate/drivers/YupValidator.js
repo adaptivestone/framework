@@ -53,6 +53,7 @@ class YupValidator extends AbstractValidator {
         req: { query, body },
       });
     } catch (e) {
+      console.log(e);
       let { errors } = e;
       // translate it
       if (appInfo.i18n && errors) {
