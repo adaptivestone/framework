@@ -2,7 +2,7 @@ const path = require('node:path');
 const Base = require('../modules/Base');
 
 /**
- * Class do autoloading a http comntrollers
+ * Class do autoloading a http controllers
  */
 class ControllerManager extends Base {
   constructor(app) {
@@ -28,23 +28,26 @@ class ControllerManager extends Base {
       }
       return 0;
     });
-
+    const controllers = [];
     for (const controller of controllersToLoad) {
-      // eslint-disable-next-line global-require, import/no-dynamic-require
-      const ControllerModule = require(controller.path);
-      const contollerName = ControllerModule.name.toLowerCase();
-      let prefix = path.dirname(controller.file);
-      if (prefix === '.') {
-        prefix = '';
-      }
-      const controllePath = prefix
-        ? `${contollerName}/${contollerName}`
-        : contollerName;
-      this.app.controllers[controllePath] = new ControllerModule(
-        this.app,
-        prefix,
+      controllers.push(
+        import(controller.path).then(({ default: ControllerModule }) => {
+          const contollerName = ControllerModule.name.toLowerCase();
+          let prefix = path.dirname(controller.file);
+          if (prefix === '.') {
+            prefix = '';
+          }
+          const controllePath = prefix
+            ? `${contollerName}/${contollerName}`
+            : contollerName;
+          this.app.controllers[controllePath] = new ControllerModule(
+            this.app,
+            prefix,
+          );
+        }),
       );
     }
+    await Promise.all(controllers);
   }
 
   static get loggerGroup() {
