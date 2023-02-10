@@ -8,25 +8,25 @@ class AbstractValidator extends Base {
 
   // eslint-disable-next-line no-unused-vars
   static convertFieldsToJson(fields) {
-    console.log('IMPLENT ME Abstract convertFieldsToSwaggerFormat');
+    // IMPLENT;
     return {};
   }
 
   // eslint-disable-next-line class-methods-use-this
   get fieldsInJsonFormat() {
-    console.log('IMPLENT ME Abstract fieldsInSwaggerFormat');
+    // IMPLENT;
     return {};
   }
 
   // eslint-disable-next-line class-methods-use-this
   async validateFields() {
-    console.log('IMPLENT ME Abstract validateFields');
+    // IMPLENT;
     return true;
   }
 
   // eslint-disable-next-line class-methods-use-this
   async castFields() {
-    console.log('IMPLENT ME Abstract castFields');
+    // IMPLENT;
     return true;
   }
 
