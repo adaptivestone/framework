@@ -1,6 +1,5 @@
+const yup = require('yup');
 const AbstractValidator = require('./AbstractValidator');
-const yup = require('yup')
-
 
 class YupValidator extends AbstractValidator {
   get fieldsInJsonFormat() {
@@ -39,7 +38,7 @@ class YupValidator extends AbstractValidator {
     return convertedFields;
   }
 
-  async validateFields(data, { query, body, appInfo}) {
+  async validateFields(data, { query, body, appInfo }) {
     const yupSchema = this.body;
     const { controllerValidationAbortEarly } = this.app.getConfig('validate');
     if (yupSchema) {
@@ -51,7 +50,7 @@ class YupValidator extends AbstractValidator {
     try {
       await yupSchema.validate(data, {
         abortEarly: controllerValidationAbortEarly,
-        req: { query, body},
+        req: { query, body },
       });
     } catch (e) {
       console.log(e);
@@ -71,18 +70,20 @@ class YupValidator extends AbstractValidator {
         e.inner.forEach((err) => {
           errorAnswer[err.path] = err.errors;
           if (appInfo.i18n && err.errors) {
-            errorAnswer[err.path] = err.errors.map((err1) => appInfo.i18n.t(err1));
+            errorAnswer[err.path] = err.errors.map((err1) =>
+              appInfo.i18n.t(err1),
+            );
           }
         });
       }
 
       throw new yup.ValidationError({
-       ...errorAnswer,
-      })
+        ...errorAnswer,
+      });
     }
   }
 
-  async castFields(data, { query, body, appInfo}) {
+  async castFields(data, { query, body, appInfo }) {
     const yupSchema = this.body;
     if (yupSchema) {
       if (typeof yupSchema.cast !== 'function') {
@@ -92,7 +93,7 @@ class YupValidator extends AbstractValidator {
 
     return yupSchema.cast(data, {
       stripUnknown: true,
-      req: { query, body},
+      req: { query, body },
     });
   }
 

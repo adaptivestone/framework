@@ -5,7 +5,7 @@ const express = require('express');
 const Base = require('./Base');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
-const ValidateService = require('./../services/validate/ValidateService');
+const ValidateService = require('../services/validate/ValidateService');
 const DocumentationGenerator = require('../services/documentation/DocumentationGenerator');
 /**
  * Abstract controller. You should extend any controller from them.
@@ -14,7 +14,7 @@ const DocumentationGenerator = require('../services/documentation/DocumentationG
  * You can overwrite base controllers byt creating controllers with tha same file name (yes file name, not class name)
  * In most cases you will want to have a 'home' route that not include controller name. For this case please check 'getExpressPath'
  */
- class AbstractController extends Base {
+class AbstractController extends Base {
   constructor(app, prefix, isExpressMergeParams = false) {
     const time = Date.now();
     super(app);
@@ -203,7 +203,11 @@ const DocumentationGenerator = require('../services/documentation/DocumentationG
           path,
           additionalMiddlewares || [],
           async (req, res, next) => {
-            const requestObj = { query: req.query, body: req.body, appInfo: req.appInfo}
+            const requestObj = {
+              query: req.query,
+              body: req.body,
+              appInfo: req.appInfo,
+            };
             try {
               req.appInfo.request = await new ValidateService(
                 this.app,
@@ -391,4 +395,3 @@ const DocumentationGenerator = require('../services/documentation/DocumentationG
 }
 
 module.exports = AbstractController;
-
