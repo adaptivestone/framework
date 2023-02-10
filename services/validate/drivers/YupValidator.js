@@ -83,7 +83,7 @@ class YupValidator extends AbstractValidator {
     }
   }
 
-  async castFields(data, { query, body, appInfo }) {
+  async castFields(data, { query, body }) {
     const yupSchema = this.body;
     if (yupSchema) {
       if (typeof yupSchema.cast !== 'function') {
