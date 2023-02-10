@@ -48,8 +48,8 @@ class Cli extends Base {
       return false;
     }
 
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const Command = require(this.commands[command]);
+    const { default: Command } = await import(this.commands[command]);
+
     const c = new Command(this.app, this.commands, args);
     let result = false;
 
