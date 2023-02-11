@@ -5,7 +5,7 @@ const express = require('express');
 const Base = require('./Base');
 const GetUserByToken = require('../services/http/middleware/GetUserByToken');
 const Auth = require('../services/http/middleware/Auth');
-const ReqValidator = require('../services/validate/ReqValidator');
+const ValidateService = require('../services/validate/ValidateService');
 const DocumentationGenerator = require('../services/documentation/DocumentationGenerator');
 /**
  * Abstract controller. You should extend any controller from them.
@@ -203,11 +203,16 @@ class AbstractController extends Base {
           path,
           additionalMiddlewares || [],
           async (req, res, next) => {
+            const requestObj = {
+              query: req.query,
+              body: req.body,
+              appInfo: req.appInfo,
+            };
             try {
-              req.appInfo.request = await new ReqValidator(
+              req.appInfo.request = await new ValidateService(
                 this.app,
                 routeObject?.request,
-              ).validateReqData(req, {
+              ).validateReqData(requestObj, {
                 selectedReqData: req.body,
                 additionalMiddlewareFieldsData: {
                   middlewaresInfo,
@@ -219,10 +224,10 @@ class AbstractController extends Base {
                   },
                 },
               });
-              req.appInfo.query = await new ReqValidator(
+              req.appInfo.query = await new ValidateService(
                 this.app,
                 routeObject?.query,
-              ).validateReqData(req, {
+              ).validateReqData(requestObj, {
                 selectedReqData: req.query,
                 additionalMiddlewareFieldsData: {
                   middlewaresInfo,
