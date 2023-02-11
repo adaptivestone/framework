@@ -51,13 +51,18 @@ class Server {
    * @returns {Promise}
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
-    const [{ default: HttpServer }, { default: ControllerManager }] =
-      await Promise.all([
-        // eslint-disable-next-line import/extensions
-        import('./services/http/HttpServer.js'), // Speed optimisation
-        // eslint-disable-next-line import/extensions
-        import('./controllers/index.js'), // Speed optimisation
-      ]);
+    // eslint-disable-next-line global-require
+    const HttpServer = require('./services/http/HttpServer');
+    // eslint-disable-next-line global-require
+    const ControllerManager = require('./controllers/index');
+    // TODO wait until https://github.com/nodejs/node/issues/35889
+    // const [{ default: HttpServer }, { default: ControllerManager }] =
+    //   await Promise.all([
+    //     // eslint-disable-next-line import/extensions
+    //     import('./services/http/HttpServer.js'), // Speed optimisation
+    //     // eslint-disable-next-line import/extensions
+    //     import('./controllers/index.js'), // Speed optimisation
+    //   ]);
 
     this.addErrorHandling();
 
@@ -174,7 +179,10 @@ class Server {
   async runCliCommand(commandName, args) {
     if (!this.cli) {
       // eslint-disable-next-line import/extensions
-      const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
+      // TODO wait until https://github.com/nodejs/node/issues/35889
+      // const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
+      // eslint-disable-next-line global-require
+      const BaseCli = require('./modules/BaseCli');
       this.cli = new BaseCli(this);
     }
     return this.cli.run(commandName, args);
