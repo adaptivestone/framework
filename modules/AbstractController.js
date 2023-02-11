@@ -1,4 +1,3 @@
-/* eslint-disable array-callback-return */
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
 const express = require('express');
