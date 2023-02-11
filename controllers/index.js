@@ -28,26 +28,29 @@ class ControllerManager extends Base {
       }
       return 0;
     });
-    const controllers = [];
+    // const controllers = [];
     for (const controller of controllersToLoad) {
-      controllers.push(
-        import(controller.path).then(({ default: ControllerModule }) => {
-          const contollerName = ControllerModule.name.toLowerCase();
-          let prefix = path.dirname(controller.file);
-          if (prefix === '.') {
-            prefix = '';
-          }
-          const controllePath = prefix
-            ? `${contollerName}/${contollerName}`
-            : contollerName;
-          this.app.controllers[controllePath] = new ControllerModule(
-            this.app,
-            prefix,
-          );
-        }),
+      // TODO wait until https://github.com/nodejs/node/issues/35889
+      // controllers.push(
+      // import(controller.path).then(({ default: ControllerModule }) => {
+      // eslint-disable-next-line import/no-dynamic-require, global-require
+      const ControllerModule = require(controller.path);
+      const contollerName = ControllerModule.name.toLowerCase();
+      let prefix = path.dirname(controller.file);
+      if (prefix === '.') {
+        prefix = '';
+      }
+      const controllePath = prefix
+        ? `${contollerName}/${contollerName}`
+        : contollerName;
+      this.app.controllers[controllePath] = new ControllerModule(
+        this.app,
+        prefix,
       );
+      // }),
+      // );
     }
-    await Promise.all(controllers);
+    // await Promise.all(controllers);
   }
 
   static get loggerGroup() {
