@@ -11,7 +11,7 @@ const DocumentationGenerator = require('../services/documentation/DocumentationG
  * Place you cintroller into controller folder and it be inited in auto way.
  * By default name of route will be controller name not file name. But please name it in same ways.
  * You can overwrite base controllers byt creating controllers with tha same file name (yes file name, not class name)
- * In most cases you will want to have a 'home' route that not include controller name. For this case please check 'getExpressPath'
+ * In most cases you will want to have a 'home' route that not include controller name. For this case please check '  getHttpPath'
  */
 class AbstractController extends Base {
   constructor(app, prefix, isExpressMergeParams = false) {
@@ -22,7 +22,14 @@ class AbstractController extends Base {
       mergeParams: isExpressMergeParams,
     });
     const { routes } = this;
-    const expressPath = this.getExpressPath();
+    let httpPath = this.getHttpPath();
+
+    if (this.getExpressPath) {
+      this.logger.warningn(
+        `getExpressPath deprecated. Please use getHttpPath instead. Will be removed on v5`,
+      );
+      httpPath = this.getExpressPath();
+    }
 
     /**
      * Grab route middleware onlo one Map
@@ -79,7 +86,7 @@ class AbstractController extends Base {
             // eslint-disable-next-line no-continue
             continue;
           }
-          const fullPath = `/${expressPath}/${realPath.toUpperCase()}`
+          const fullPath = `/${httpPath}/${realPath.toUpperCase()}`
             .split('//')
             .join('/')
             .split('//')
@@ -169,7 +176,7 @@ class AbstractController extends Base {
           fnName = fnName.name;
         }
 
-        const fullPath = `/${expressPath}/${path}`
+        const fullPath = `/${httpPath}/${path}`
           .split('//')
           .join('/')
           .split('//')
@@ -329,7 +336,7 @@ class AbstractController extends Base {
         ),
       );
     } else {
-      this.app.httpServer.express.use(expressPath, this.router);
+      this.app.httpServer.express.use(httpPath, this.router);
     }
   }
 
@@ -382,9 +389,9 @@ class AbstractController extends Base {
   }
 
   /**
-   * Get express path with inheritance of path
+   * Get http path with inheritance of path
    */
-  getExpressPath() {
+  getHttpPath() {
     return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
   }
 

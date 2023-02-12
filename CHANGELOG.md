@@ -6,6 +6,8 @@
 [BREAKING] change i18n middleware to internal one. Nothing should be affected
 [BREAKING] now validation of request splitted between request and query
 
+[DEPRECATED] getExpress path is deprecated. Renamed to getHttpPath
+
 [NEW] pagination middleware
 [NEW] requestLogger middleware. Migrated from core server to be an middleware
 [NEW] CreateUser command

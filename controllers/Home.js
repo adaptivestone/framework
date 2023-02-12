@@ -16,7 +16,7 @@ class Home extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  getExpressPath() {
+  getHttpPath() {
     return '/';
   }
 
