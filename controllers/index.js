@@ -41,7 +41,7 @@ class ControllerManager extends Base {
         prefix = '';
       }
       const controllePath = prefix
-        ? `${contollerName}/${contollerName}`
+        ? `${prefix}/${contollerName}`
         : contollerName;
       this.app.controllers[controllePath] = new ControllerModule(
         this.app,
