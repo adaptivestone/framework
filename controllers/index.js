@@ -7,7 +7,7 @@ const Base = require('../modules/Base');
 class ControllerManager extends Base {
   constructor(app) {
     super(app);
-    this.app.controllers = {};
+    this.controllers = {};
   }
 
   /**
@@ -43,10 +43,7 @@ class ControllerManager extends Base {
       const controllePath = prefix
         ? `${prefix}/${contollerName}`
         : contollerName;
-      this.app.controllers[controllePath] = new ControllerModule(
-        this.app,
-        prefix,
-      );
+      this.controllers[controllePath] = new ControllerModule(this.app, prefix);
       // }),
       // );
     }
