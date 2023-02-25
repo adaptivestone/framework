@@ -52,72 +52,14 @@ class AbstractController extends Base {
       });
     });
 
-    /**
-     * Parse middlewares to be an object.
-     */
-    const parseMiddlewares = (middlewareMap) => {
-      const middlewaresInfo = [];
-      // eslint-disable-next-line prefer-const
-      for (let [path, middleware] of middlewareMap) {
-        if (!Array.isArray(middleware)) {
-          middleware = [middleware];
-        }
-        for (const M of middleware) {
-          let method = 'all';
-          let realPath = path;
-          if (typeof realPath !== 'string') {
-            this.logger.error(`Path not a string ${realPath}. Please check it`);
-            // eslint-disable-next-line no-continue
-            continue;
-          }
-          if (!realPath.startsWith('/')) {
-            method = realPath.split('/')[0]?.toLowerCase();
-            if (!method) {
-              this.logger.error(`Method not found for ${realPath}`);
-              // eslint-disable-next-line no-continue
-              continue;
-            }
-            realPath = realPath.substring(method.length);
-          }
-          if (typeof this.router[method] !== 'function') {
-            this.logger.error(
-              `Method ${method} not exist for middleware. Please check your codebase`,
-            );
-            // eslint-disable-next-line no-continue
-            continue;
-          }
-          const fullPath = `/${httpPath}/${realPath.toUpperCase()}`
-            .split('//')
-            .join('/')
-            .split('//')
-            .join('/');
-          let MiddlewareFunction = M;
-          let middlewareParams = {};
-          if (Array.isArray(M)) {
-            [MiddlewareFunction, middlewareParams] = M;
-          }
-
-          middlewaresInfo.push({
-            name: MiddlewareFunction.name,
-            method,
-            path: realPath,
-            fullPath,
-            params: middlewareParams,
-            relatedQueryParameters: new MiddlewareFunction(
-              this.app,
-              middlewareParams,
-            )?.relatedQueryParameters,
-            authParams: new MiddlewareFunction(this.app, middlewareParams)
-              ?.usedAuthParameters,
-            MiddlewareFunction,
-          });
-        }
-      }
-      return middlewaresInfo;
-    };
-
-    const routeMiddlewaresReg = parseMiddlewares(routeMiddlewares);
-    const middlewaresInfo = parseMiddlewares(this.constructor.middleware);
+    const routeMiddlewaresReg = this.parseMiddlewares(
+      routeMiddlewares,
+      httpPath,
+    );
+    const middlewaresInfo = this.parseMiddlewares(
+      this.constructor.middleware,
+      httpPath,
+    );
 
     const routesInfo = [];
 
@@ -322,6 +264,7 @@ class AbstractController extends Base {
     text.push(`Time: ${Date.now() - time} ms`);
 
     this.logger.verbose(text.join('\n'));
+    this.loadedTime = Date.now() - time;
 
     /**
      * Generate documentation
@@ -338,6 +281,70 @@ class AbstractController extends Base {
     } else {
       this.app.httpServer.express.use(httpPath, this.router);
     }
+  }
+
+  /**
+   * Parse middlewares to be an object.
+   */
+  parseMiddlewares(middlewareMap, httpPath) {
+    const middlewaresInfo = [];
+    // eslint-disable-next-line prefer-const
+    for (let [path, middleware] of middlewareMap) {
+      if (!Array.isArray(middleware)) {
+        middleware = [middleware];
+      }
+      for (const M of middleware) {
+        let method = 'all';
+        let realPath = path;
+        if (typeof realPath !== 'string') {
+          this.logger.error(`Path not a string ${realPath}. Please check it`);
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        if (!realPath.startsWith('/')) {
+          method = realPath.split('/')[0]?.toLowerCase();
+          if (!method) {
+            this.logger.error(`Method not found for ${realPath}`);
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+          realPath = realPath.substring(method.length);
+        }
+        if (typeof this.router[method] !== 'function') {
+          this.logger.error(
+            `Method ${method} not exist for middleware. Please check your codebase`,
+          );
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+        const fullPath = `/${httpPath}/${realPath.toUpperCase()}`
+          .split('//')
+          .join('/')
+          .split('//')
+          .join('/');
+        let MiddlewareFunction = M;
+        let middlewareParams = {};
+        if (Array.isArray(M)) {
+          [MiddlewareFunction, middlewareParams] = M;
+        }
+
+        middlewaresInfo.push({
+          name: MiddlewareFunction.name,
+          method,
+          path: realPath,
+          fullPath,
+          params: middlewareParams,
+          relatedQueryParameters: new MiddlewareFunction(
+            this.app,
+            middlewareParams,
+          )?.relatedQueryParameters,
+          authParams: new MiddlewareFunction(this.app, middlewareParams)
+            ?.usedAuthParameters,
+          MiddlewareFunction,
+        });
+      }
+    }
+    return middlewaresInfo;
   }
 
   /**
