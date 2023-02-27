@@ -9,3 +9,4 @@
 cliCommand.js
 /controllers/test/*
 /services/http/middleware/test/*
+/benchmark/*
