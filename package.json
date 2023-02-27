@@ -20,7 +20,8 @@
     "lint:fix": "eslint '**/*.js' --fix",
     "codestyle": "npm run prettier && npm run lint",
     "prepare": "husky install",
-    "cli": "node cliCommand"
+    "cli": "node cliCommand",
+    "benchmark": "ab -k -n 5000 -c 10 http://127.0.0.1:3300/"
   },
   "jest": {
     "setupFilesAfterEnv": [

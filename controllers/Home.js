@@ -12,7 +12,7 @@ class Home extends AbstractController {
 
   // eslint-disable-next-line class-methods-use-this
   async home(req, res) {
-    res.render('home');
+    return res.json({ message: 'Home' });
   }
 
   // eslint-disable-next-line class-methods-use-this
