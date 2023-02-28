@@ -10,7 +10,10 @@ class I18n extends AbstractMiddleware {
     const I18NConfig = this.app.getConfig('i18n');
     this.i18n = {
       t: (text) => text,
+      language: I18NConfig.fallbackLng,
     };
+    this.cache = {};
+
     if (I18NConfig.enabled) {
       this.logger.info('Enabling i18n support');
       this.i18n = i18next;
@@ -40,6 +43,8 @@ class I18n extends AbstractMiddleware {
 
     this.enabled = I18NConfig.enabled;
     this.lookupQuerystring = I18NConfig.lookupQuerystring;
+    this.supportedLngs = I18NConfig.supportedLngs;
+    this.fallbackLng = I18NConfig.fallbackLng;
   }
 
   static get description() {
@@ -47,11 +52,28 @@ class I18n extends AbstractMiddleware {
   }
 
   async middleware(req, res, next) {
-    let { i18n } = this;
+    let i18n;
 
     if (this.enabled) {
-      const lang = this.detectLang(req);
-      i18n = i18next.cloneInstance({ initImmediate: false, lng: lang });
+      let lang = this.detectLang(req);
+      if (!lang || this.supportedLngs.indexOf(lang) === -1) {
+        this.logger.verbose(
+          `Language "${lang}" is not supported or not detected. Using fallback on ${this.fallbackLng}`,
+        );
+        lang = this.fallbackLng;
+      }
+
+      if (!this.cache[lang]) {
+        this.cache[lang] = i18next.cloneInstance({
+          initImmediate: false,
+          lng: lang,
+        });
+      }
+      i18n = this.cache[lang];
+    }
+
+    if (!i18n) {
+      i18n = this.i18n;
     }
 
     req.appInfo.i18n = i18n;
