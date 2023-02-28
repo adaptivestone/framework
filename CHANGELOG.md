@@ -5,6 +5,7 @@
 [BREAKING] should not affect any user. Changed email-templates module to internal implementation. Idea to keep dependensy list smaller
 [BREAKING] change i18n middleware to internal one. Nothing should be affected
 [BREAKING] now validation of request splitted between request and query
+[BREAKING] supportedLngs option added to i18n config
 
 [DEPRECATED] getExpress path is deprecated. Renamed to getHttpPath
 

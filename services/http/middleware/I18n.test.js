@@ -11,7 +11,7 @@ describe('i18n middleware methods', () => {
   });
 
   it('detectors should works correctly', async () => {
-    expect.assertions(4);
+    expect.assertions(5);
     const request = {
       get: () => 'en',
       query: {
@@ -35,6 +35,12 @@ describe('i18n middleware methods', () => {
     delete request.query;
     lang = await middleware.detectLang(request);
     expect(lang).toBe('be');
+
+    request.query = {
+      [middleware.lookupQuerystring]: 'en-GB',
+    };
+    lang = await middleware.detectLang(request);
+    expect(lang).toBe('en');
   });
 
   it('middleware that works', async () => {

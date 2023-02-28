@@ -73,7 +73,7 @@ class I18n extends AbstractMiddleware {
 
   detectorOrder = ['XLang', 'query', 'user'];
 
-  detectLang(req) {
+  detectLang(req, isUseShortCode = true) {
     let lang = '';
     for (const detectorName of this.detectorOrder) {
       const lng = this.detectors[detectorName](req);
@@ -82,7 +82,11 @@ class I18n extends AbstractMiddleware {
         continue;
       }
       if (i18next.services.languageUtils.isSupportedCode(lng)) {
-        lang = lng;
+        if (isUseShortCode) {
+          lang = i18next.services.languageUtils.getLanguagePartFromCode(lng);
+        } else {
+          lang = lng;
+        }
         break;
       }
     }
