@@ -34,7 +34,8 @@ class ValidateService extends Base {
       const yupValidator = new YupValidator(app, body);
       return yupValidator;
     }
-    return null;
+    const customValidator = new CustomValidator(app, body);
+    return customValidator;
   }
 
   /**
