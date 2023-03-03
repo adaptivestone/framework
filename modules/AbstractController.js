@@ -25,7 +25,7 @@ class AbstractController extends Base {
     let httpPath = this.getHttpPath();
 
     if (this.getExpressPath) {
-      this.logger.warningn(
+      this.logger.warning(
         `getExpressPath deprecated. Please use getHttpPath instead. Will be removed on v5`,
       );
       httpPath = this.getExpressPath();
