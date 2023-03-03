@@ -7,6 +7,8 @@
 [BREAKING] now validation of request splitted between request and query
 [BREAKING] supportedLngs option added to i18n config
 
+[BREAKING] Mongoose v7. https://mongoosejs.com/docs/migrating_to_7.html
+
 [DEPRECATED] getExpress path is deprecated. Renamed to getHttpPath
 
 [NEW] pagination middleware
