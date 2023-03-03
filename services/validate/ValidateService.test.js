@@ -1,6 +1,7 @@
 const yup = require('yup');
 const ValidateService = require('./ValidateService');
 const YupValidator = require('./drivers/YupValidator');
+const CustomValidator = require('./drivers/CustomValidator');
 
 describe('validate service', () => {
   describe('validateSchema funtion', () => {
@@ -90,7 +91,7 @@ describe('validate service', () => {
       expect(validator).toBeInstanceOf(YupValidator);
     });
 
-    it('should return null if the body is neither a validator nor a Yup schema', () => {
+    it('should return CustomValidator if the body is neither a validator nor a Yup schema', () => {
       expect.assertions(1);
       const body = 'string';
       const validator = ValidateService.getDriverByValidatorBody(
@@ -98,7 +99,7 @@ describe('validate service', () => {
         body,
       );
 
-      expect(validator).toBeNull();
+      expect(validator).toBeInstanceOf(CustomValidator);
     });
   });
 });
