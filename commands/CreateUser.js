@@ -16,6 +16,8 @@ class CreateUser extends AbstractCommand {
       password,
       roles: roles?.split(','),
     });
+    await user.generateToken();
+
     this.logger.info(`User was created ${JSON.stringify(user, 0, 4)}`);
 
     return user;
