@@ -53,11 +53,10 @@ class YupValidator extends AbstractValidator {
         req: { query, body },
       });
     } catch (e) {
-      console.log(e);
       let { errors } = e;
       // translate it
       if (appInfo.i18n && errors) {
-        errors = errors.map((err) => appInfo.i18n.t(err));
+        errors = errors.map((err) => appInfo.i18n.t(err, err));
       }
       this.logger.error(
         `Request validation failed with message: ${e.message}. errors: ${errors}`,
