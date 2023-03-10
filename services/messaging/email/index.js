@@ -59,8 +59,7 @@ class Mail extends Base {
    * @param {object} templateData
    * @returns string
    */
-  // eslint-disable-next-line default-param-last
-  static async #renderTemplate({ type, fullPath } = {}, templateData) {
+  static async #renderTemplate({ type, fullPath } = {}, templateData = {}) {
     if (!type) {
       return null;
     }
@@ -68,6 +67,7 @@ class Mail extends Base {
     switch (type) {
       case 'html':
       case 'text':
+      case 'css':
         return fs.promises.readFile(fullPath, { encoding: 'utf8' });
       case 'pug': {
         const compiledFunction = pug.compileFile(fullPath);
@@ -110,11 +110,16 @@ class Mail extends Base {
       ...this.templateData,
     };
 
-    const [htmlRendered, subjectRendered, textRendered] = await Promise.all([
-      this.constructor.#renderTemplate(templates.html, templateDataToRender),
-      this.constructor.#renderTemplate(templates.subject, templateDataToRender),
-      this.constructor.#renderTemplate(templates.text, templateDataToRender),
-    ]);
+    const [htmlRendered, subjectRendered, textRendered, extraCss] =
+      await Promise.all([
+        this.constructor.#renderTemplate(templates.html, templateDataToRender),
+        this.constructor.#renderTemplate(
+          templates.subject,
+          templateDataToRender,
+        ),
+        this.constructor.#renderTemplate(templates.text, templateDataToRender),
+        this.constructor.#renderTemplate(templates.style),
+      ]);
 
     juice.tableElements = ['TABLE'];
 
@@ -123,6 +128,7 @@ class Mail extends Base {
     const inlinedHTML = await juiceResourcesAsync(htmlRendered, {
       preserveImportant: true,
       webResources: mailConfig.webResources,
+      extraCss,
     });
 
     return this.constructor.sendRaw(
