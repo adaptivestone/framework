@@ -70,7 +70,7 @@ class YupValidator extends AbstractValidator {
           errorAnswer[err.path] = err.errors;
           if (appInfo.i18n && err.errors) {
             errorAnswer[err.path] = err.errors.map((err1) =>
-              appInfo.i18n.t(err1, err1),
+              appInfo.i18n.t(err1, err1, err.params),
             );
           }
         });
