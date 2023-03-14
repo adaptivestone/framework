@@ -1,3 +1,5 @@
+const path = require('node:path');
+
 module.exports = {
   from: 'Localhost <info@localhost>',
   transports: {
@@ -20,7 +22,8 @@ module.exports = {
   transport: process.env.EMAIL_TRANSPORT || 'smtp',
   webResources: {
     // https://github.com/jrit/web-resource-inliner path to find resources
-    relativeTo: 'build',
+    relativeTo: path.resolve('build'),
+    images: false,
   },
   globalVariablesToTemplates: {},
 };
