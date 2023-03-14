@@ -22,7 +22,7 @@ module.exports = {
   transport: process.env.EMAIL_TRANSPORT || 'smtp',
   webResources: {
     // https://github.com/jrit/web-resource-inliner path to find resources
-    relativeTo: path.resolve('build'),
+    relativeTo: path.resolve('src/services/messaging/email/resources'),
     images: false,
   },
   globalVariablesToTemplates: {},
