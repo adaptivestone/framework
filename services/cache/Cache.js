@@ -69,7 +69,10 @@ class Cache extends Base {
       this.redisClient.setEx(key, storeTime, JSON.stringify(result));
     } else {
       this.logger.verbose(
-        `getSetValueFromCache FROM CACHE key ${key}, value ${result}`,
+        `getSetValueFromCache FROM CACHE key ${key}, value ${result.substring(
+          0,
+          100,
+        )}`,
       );
       try {
         result = JSON.parse(result);
