@@ -1,3 +1,5 @@
+const yup = require('yup');
+
 const AbstractValidator = require('./AbstractValidator');
 
 class CustomValidator extends AbstractValidator {
@@ -7,14 +9,23 @@ class CustomValidator extends AbstractValidator {
         this.logger.error('request.validate should be a function');
       }
     }
-
-    return this.body.validate(data, {
-      req: {
-        query,
-        body,
-        appInfo,
-      },
-    });
+    try {
+      await this.body.validate(data, {
+        req: {
+          query,
+          body,
+          appInfo,
+        },
+      });
+    } catch (e) {
+      this.logger.warn(`CustomValidator validateFields ${e}`);
+      if (e.path) {
+        throw new yup.ValidationError({
+          [e.path]: e.message,
+        });
+      }
+      throw new Error(e);
+    }
   }
 
   async castFields(data, { query, body, appInfo }) {
