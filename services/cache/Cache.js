@@ -66,7 +66,13 @@ class Cache extends Base {
         return Promise.reject(e);
       }
 
-      this.redisClient.setEx(key, storeTime, JSON.stringify(result));
+      this.redisClient.setEx(
+        key,
+        storeTime,
+        JSON.stringify(result, (jsonkey, value) =>
+          typeof value === 'bigint' ? `${value}n` : value,
+        ),
+      );
     } else {
       this.logger.verbose(
         `getSetValueFromCache FROM CACHE key ${key}, value ${result.substring(
@@ -75,7 +81,12 @@ class Cache extends Base {
         )}`,
       );
       try {
-        result = JSON.parse(result);
+        result = JSON.parse(result, (jsonkey, value) => {
+          if (typeof value === 'string' && /^\d+n$/.test(value)) {
+            return BigInt(value.slice(0, value.length - 1));
+          }
+          return value;
+        });
       } catch (e) {
         this.logger.warn(
           'Not able to parse json from redis cache. That can be a normal in case you store string here',

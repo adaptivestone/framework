@@ -18,7 +18,8 @@
 [NEW] custom yup validator for validate File requests
 [UPDATE] updated deps
 [UPDATE] openApi generator support files
-[UPDATE] updated 18n middleware. Introduced internal cachse. Speed up of request processing up to 100%
+[UPDATE] updated 18n middleware. Introduced internal cachce. Speed up of request processing up to 100%
+[UPDATE] cache drivers to JSON support BigInt numbers
 
 ### 3.4.3
 
