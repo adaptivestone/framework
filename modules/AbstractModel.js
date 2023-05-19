@@ -3,7 +3,7 @@ const Base = require('./Base');
 
 class AbstractModel extends Base {
   /**
-   * @param {import('../Server')} app  //TODO change to *.d.ts as this is a Server, not app
+   * @param {import('../server')} app  //TODO change to *.d.ts as this is a Server, not app
    * @param function callback optional callback when connection ready
    */
   constructor(app, callback = () => {}) {
