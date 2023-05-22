@@ -9,6 +9,7 @@
 [BREAKING] email inliner now looking for src/services/messaging/email/resources folder instead of 'build' folder.
 
 [BREAKING] Mongoose v7. https://mongoosejs.com/docs/migrating_to_7.html
+[BREAKING] Yup validation was updated to v1 https://github.com/jquense/yup/issues/1906
 
 [DEPRECATED] getExpress path is deprecated. Renamed to getHttpPath
 
