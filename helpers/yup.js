@@ -13,12 +13,8 @@ class YupFile extends Schema {
   constructor() {
     super({
       type: 'file',
+      check: (value) => value instanceof formidable.PersistentFile,
     });
-  }
-
-  // eslint-disable-next-line class-methods-use-this, no-underscore-dangle
-  _typeCheck(value) {
-    return value instanceof formidable.PersistentFile;
   }
 }
 
