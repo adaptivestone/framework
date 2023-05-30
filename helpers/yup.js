@@ -1,4 +1,4 @@
-const yup = require('yup');
+const { Schema } = require('yup');
 const formidable = require('formidable');
 
 /**
@@ -9,7 +9,7 @@ const formidable = require('formidable');
  *          someFile: new YupFile().required(),
  * })
  */
-class YupFile extends yup.BaseSchema {
+class YupFile extends Schema {
   constructor() {
     super({
       type: 'file',
