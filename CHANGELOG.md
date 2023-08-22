@@ -1,4 +1,9 @@
-### 4.0.0 - DEV
+### 4.1.0
+
+[UPDATE] updated deps
+[NEW] email - Ability to render templae to string for future usage
+
+### 4.0.0
 
 [BREAKING] change bcrypt encryption with scrypt
 [BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used

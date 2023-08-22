@@ -59,7 +59,7 @@ class Mail extends Base {
    * @param {object} templateData
    * @returns string
    */
-  static async #renderTemplate({ type, fullPath } = {}, templateData = {}) {
+  static async #renderTemplateFile({ type, fullPath } = {}, templateData = {}) {
     if (!type) {
       return null;
     }
@@ -79,13 +79,10 @@ class Mail extends Base {
   }
 
   /**
-   * Send email
-   * @param {string} to email send to
-   * @param {string} [from = mailConfig.from]
-   * @param {object} [aditionalNodemailerOptions = {}] additional option to nodemailer
+   * Render template
    * @return {Promise}
    */
-  async send(to, from = null, aditionalNodemailerOptions = {}) {
+  async renderTemplate() {
     const files = await fs.promises.readdir(this.template);
     const templates = {};
     for (const file of files) {
@@ -112,13 +109,19 @@ class Mail extends Base {
 
     const [htmlRendered, subjectRendered, textRendered, extraCss] =
       await Promise.all([
-        this.constructor.#renderTemplate(templates.html, templateDataToRender),
-        this.constructor.#renderTemplate(
+        this.constructor.#renderTemplateFile(
+          templates.html,
+          templateDataToRender,
+        ),
+        this.constructor.#renderTemplateFile(
           templates.subject,
           templateDataToRender,
         ),
-        this.constructor.#renderTemplate(templates.text, templateDataToRender),
-        this.constructor.#renderTemplate(templates.style),
+        this.constructor.#renderTemplateFile(
+          templates.text,
+          templateDataToRender,
+        ),
+        this.constructor.#renderTemplateFile(templates.style),
       ]);
 
     juice.tableElements = ['TABLE'];
@@ -130,13 +133,30 @@ class Mail extends Base {
       webResources: mailConfig.webResources,
       extraCss,
     });
+    return {
+      htmlRaw: htmlRendered,
+      subject: subjectRendered,
+      text: textRendered,
+      inlinedHTML,
+    };
+  }
+
+  /**
+   * Send email
+   * @param {string} to email send to
+   * @param {string} [from = mailConfig.from]
+   * @param {object} [aditionalNodemailerOptions = {}] additional option to nodemailer
+   * @return {Promise}
+   */
+  async send(to, from = null, aditionalNodemailerOptions = {}) {
+    const { subject, text, inlinedHTML } = await this.renderTemplate();
 
     return this.constructor.sendRaw(
       this.app,
       to,
-      subjectRendered,
+      subject,
       inlinedHTML,
-      textRendered,
+      text,
       from,
       aditionalNodemailerOptions,
     );
