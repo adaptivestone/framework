@@ -266,9 +266,8 @@ const someTypeSequence = await SequenceModel.getSequence('someType');
 // will be 2
 const someTypeSequence2 = await SequenceModel.getSequence('someType');
 // will be 1 as type is another
-const someAnotherTypeSequence = await SequenceModel.getSequence(
-  'someAnotherType',
-);
+const someAnotherTypeSequence =
+  await SequenceModel.getSequence('someAnotherType');
 ```
 
 #### 2.13.1

@@ -174,9 +174,8 @@ class User extends AbstractModel {
   }
 
   async sendPasswordRecoveryEmail(i18n) {
-    const passwordRecoveryToken = await User.generateUserPasswordRecoveryToken(
-      this,
-    );
+    const passwordRecoveryToken =
+      await User.generateUserPasswordRecoveryToken(this);
     const mail = new Mailer(
       this.constructor.getSuper().app,
       'recovery',
