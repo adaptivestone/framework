@@ -6,7 +6,7 @@ describe('middlewares correct works', () => {
   beforeAll(async () => {
     const User = global.server.app.getModel('User');
     await User.create({
-      email: 'testUser1@gma˝il.com',
+      email: 'testUser1@gmail.com',
       name: {
         first: 'Artem',
         last: 'Testov',

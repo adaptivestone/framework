@@ -1,6 +1,14 @@
 const RateLimiter = require('./RateLimiter');
 
 describe('rate limiter methods', () => {
+  it('have description fields', async () => {
+    expect.assertions(1);
+    const middleware = new RateLimiter(global.server.app, {
+      driver: 'redis',
+    });
+    expect(middleware.constructor.description).toBeDefined();
+  });
+
   it('can create redis rateLimiter', async () => {
     expect.assertions(1);
 
