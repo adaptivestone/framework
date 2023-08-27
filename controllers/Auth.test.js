@@ -9,13 +9,21 @@ describe('auth', () => {
   describe('registration', () => {
     it('code NOT able to create user with wrong email', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/register')
-        .send({
-          email: 'bad email',
-          password: userPassword,
-          nickName: 'test',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/register'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'bad email',
+            password: userPassword,
+            nickName: 'test',
+          }),
+        },
+      ).catch(() => {});
+
       expect(status).toBe(400);
     });
 

@@ -46,6 +46,8 @@ beforeAll(async () => {
   if (!global.testSetup) {
     global.testSetup = {};
   }
+  global.server.testingGetUrl = (urlPart) =>
+    `http://127.0.0.1:${global.server.getConfig('http').port}${urlPart}`;
   if (!global.testSetup.disableUserCreate) {
     const User = global.server.app.getModel('User');
     global.user = await User.create({
