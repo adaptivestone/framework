@@ -22,7 +22,8 @@
     "prepare": "husky install",
     "cli": "node cliCommand",
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
-    "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/"
+    "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
+    "redis:docker": "docker run --rm  -p 6379:6379 redis"
   },
   "jest": {
     "setupFilesAfterEnv": [

@@ -15,15 +15,22 @@ describe('middlewares correct works', () => {
       sessionTokens: [{ token: 'testUser1' }],
     });
   });
-  it('cache work correctly', async () => {
+  it('cache works correctly', async () => {
     expect.assertions(3);
     const key = 'someKey';
-    await request(global.server.app.httpServer.express)
-      .post('/test/somecontroller/someDataItems')
-      .send({
-        items: ['Value1', 'Value2', 'Value3'],
-        key,
-      });
+    await fetch(
+      global.server.testingGetUrl('/test/somecontroller/someDataItems'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: ['Value1', 'Value2', 'Value3'],
+          key,
+        }),
+      },
+    );
 
     let items = await global.server.app.cache.getSetValue(
       key,
@@ -54,48 +61,58 @@ describe('middlewares correct works', () => {
     expect(items).toStrictEqual(['v1', 'v2', 'v3']);
   });
 
-  it('authMiddleware on route works correct (without token)', async () => {
+  it('authMiddleware on route works correctly (without token)', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .patch('/test/somecontroller/userAvatar')
-      .send({
-        avatar: 'newAvatar',
-      });
+    const { status } = await fetch(
+      global.server.testingGetUrl('/test/somecontroller/userAvatar'),
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          avatar: 'newAvatar',
+        }),
+      },
+    );
 
     expect(status).toBe(401);
   });
 
-  it('authMiddleware on route works correct (with token)', async () => {
+  it('authMiddleware on route works correctly (with token)', async () => {
     expect.assertions(2);
 
-    const { body, status } = await request(global.server.app.httpServer.express)
-      .patch('/test/somecontroller/userAvatar')
-      .set({ Authorization: 'testUser1' })
-      .send({
-        avatar: 'newAvatar',
-      });
+    const response = await fetch(
+      global.server.testingGetUrl('/test/somecontroller/userAvatar'),
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+        body: JSON.stringify({
+          avatar: 'newAvatar',
+        }),
+      },
+    );
 
-    expect(status).toBe(200);
-    expect(body.data.updatedUser.avatar).toBe('newAvatar');
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(responseBody.data.updatedUser.avatar).toBe('newAvatar');
   });
 
-  it('rateLimiter on route works correct', async () => {
+  it('rateLimiter on route works correctly', async () => {
     expect.assertions(1);
-    const resultsPromise = [];
+    const requests = Array.from({ length: 11 }, () =>
+      fetch(global.server.testingGetUrl('/test/somecontroller/')),
+    );
 
-    for (let i = 0; i < 11; i += 1) {
-      resultsPromise.push(
-        request(global.server.app.httpServer.express).get(
-          '/test/somecontroller/',
-        ),
-      );
-    }
+    const responses = await Promise.all(requests);
+    const statusCodes = responses.map((response) => response.status);
 
-    const results = await Promise.all(resultsPromise);
-    const statuses = results.map((res) => res.status);
-
-    expect(statuses.indexOf(429)).not.toBe(-1);
+    expect(statusCodes).toContain(429);
   });
 
   it('checkFlag middleware works correctly with other middleware', async () => {
