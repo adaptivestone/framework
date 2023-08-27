@@ -1,3 +1,7 @@
+### 4.3.0
+
+[BREAKING] updated formidable with a new version + tests. Marked as breaking because of a new major version, but this is internal of framework and exernal still the same. Shoukd break nothing
+
 ### 4.2.0
 
 [UPDATE] updated deps
