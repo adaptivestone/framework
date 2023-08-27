@@ -69,4 +69,43 @@ d\r
       });
     });
   });
+  it('middleware with a problem', async () => {
+    expect.assertions(1);
+
+    await new Promise((done) => {
+      // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
+
+      const server = createServer(async (req, res) => {
+        req.appInfo = {};
+        const middleware = new RequestParser(global.server.app);
+        middleware.middleware(req, {}, (err) => {
+          expect(err).toBeDefined();
+
+          res.writeHead(200);
+          res.end('ok');
+        });
+      });
+      server.listen(null, async () => {
+        const chosenPort = server.address().port;
+        const body = 'someBadBody';
+
+        await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
+          method: 'POST',
+
+          headers: {
+            'Content-Length': body.length,
+            Host: `localhost:${chosenPort}`,
+            'Content-Type': 'badContentType',
+          },
+          body,
+        }).catch((err) => {
+          console.error(err);
+          done(err);
+        });
+        server.close(() => {
+          done();
+        });
+      });
+    });
+  });
 });
