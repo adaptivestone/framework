@@ -1,3 +1,7 @@
+### 4.4.0
+
+[NEW] New method to grab url of server it testing enviroument global.server.testingGetUrl("/some/endpoint")
+
 ### 4.3.1
 
 [UPDATE] Yup file validator update. As formidable now return all fields as an array
