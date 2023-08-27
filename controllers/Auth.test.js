@@ -182,9 +182,14 @@ describe('auth', () => {
 
       await user.save();
 
-      const { status } = await request(
-        global.server.app.httpServer.express,
-      ).post(`/auth/verify?verification_token=testToken`);
+      const { status } = await fetch(
+        `${global.server.testingGetUrl(
+          '/auth/verify',
+        )}?verification_token=testToken`,
+        {
+          method: 'POST',
+        },
+      );
 
       const { isVerified } = await global.server.app.getModel('User').findOne({
         email: 'Test@gmail.com',
@@ -210,9 +215,14 @@ describe('auth', () => {
 
       await user.save();
 
-      const { status } = await request(
-        global.server.app.httpServer.express,
-      ).post(`/auth/verify?verification_token=testToken123wrong`);
+      const { status } = await fetch(
+        `${global.server.testingGetUrl(
+          '/auth/verify',
+        )}?verification_token=testToken123wrong`,
+        {
+          method: 'POST',
+        },
+      );
 
       const { isVerified } = await global.server.app.getModel('User').findOne({
         email: 'Test423@gmail.com',
@@ -224,21 +234,37 @@ describe('auth', () => {
 
     it('can NOT send recovery to not exist email', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/send-recovery-email')
-        .send({
-          email: 'notExists@gmail.com',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/send-recovery-email'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'notExists@gmail.com',
+          }),
+        },
+      );
+
       expect(status).toBe(400);
     });
 
     it('can send recovery to exist email', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/send-recovery-email')
-        .send({
-          email: userEmail,
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/send-recovery-email'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail,
+          }),
+        },
+      );
+
       expect(status).toBe(200);
     });
 
@@ -259,12 +285,19 @@ describe('auth', () => {
 
       await user.save();
 
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/recover-password')
-        .send({
-          password: 'newPass',
-          passwordRecoveryToken: 'superPassword',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/recover-password'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            password: 'newPass',
+            passwordRecoveryToken: 'superPassword',
+          }),
+        },
+      );
 
       expect(status).toBe(200);
     });
@@ -286,52 +319,78 @@ describe('auth', () => {
 
       await user.save();
 
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/recover-password')
-        .send({
-          password: 'newPass',
-          passwordRecoveryToken: '13123',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/recover-password'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            password: 'newPass',
+            passwordRecoveryToken: '13123',
+          }),
+        },
+      );
 
       expect(status).toBe(400);
     });
 
-    it('can login with normal creds and  NOT verifyed email is option isAuthWithVefificationFlow is set', async () => {
+    it('can login with normal creds and NOT verifyed email if option isAuthWithVefificationFlow is set', async () => {
       expect.assertions(4);
 
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/register')
-        .send({
-          email: userEmail2,
-          password: userPassword,
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/register'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail2,
+            password: userPassword,
+          }),
+        },
+      );
 
-      const { status: status2 } = await request(
-        global.server.app.httpServer.express,
-      )
-        .post('/auth/login')
-        .send({
-          email: userEmail2,
-          password: userPassword,
-        });
+      const { status: status2 } = await fetch(
+        global.server.testingGetUrl('/auth/login'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail2,
+            password: userPassword,
+          }),
+        },
+      );
 
       global.server.app.updateConfig('auth', {
         isAuthWithVefificationFlow: false,
       });
 
-      const { status: status3, body } = await request(
-        global.server.app.httpServer.express,
-      )
-        .post('/auth/login')
-        .send({
-          email: userEmail2,
-          password: userPassword,
-        });
+      const response3 = await fetch(
+        global.server.testingGetUrl('/auth/login'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail2,
+            password: userPassword,
+          }),
+        },
+      );
+
+      const responseBody3 = await response3.json();
 
       expect(status).toBe(201);
       expect(status2).toBe(400);
-      expect(status3).toBe(200);
-      expect(body.token).toBeDefined();
+      expect(response3.status).toBe(200);
+      expect(responseBody3.token).toBeDefined();
     });
   });
 
