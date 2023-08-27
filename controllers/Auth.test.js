@@ -101,29 +101,44 @@ describe('auth', () => {
   });
 
   describe('login', () => {
-    it('can NOT login with normal creds and not Verifyed email', async () => {
+    it('can NOT login with normal creds and not verified email', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/login')
-        .send({
-          email: userEmail,
-          password: userPassword,
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/login'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            password: userPassword,
+          }),
+        },
+      ).catch(() => {});
+
       expect(status).toBe(400);
     });
 
     it('can NOT login with WRONG creds', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/login')
-        .send({
-          email: 'test@test.by',
-          password: 'noPassword$',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/login'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: 'test@test.by',
+            password: 'noPassword$',
+          }),
+        },
+      ).catch(() => {});
       expect(status).toBe(400);
     });
 
-    it('can login with normal creds and verifyed email', async () => {
+    it('can login with normal creds and verified email', async () => {
       expect.assertions(2);
 
       const user = await global.server.app
@@ -132,16 +147,21 @@ describe('auth', () => {
       user.isVerified = true;
       await user.save();
 
-      const { status, body } = await request(
-        global.server.app.httpServer.express,
-      )
-        .post('/auth/login')
-        .send({
+      const response = await fetch(global.server.testingGetUrl('/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
           email: userEmail,
           password: userPassword,
-        });
-      expect(status).toBe(200);
-      expect(body.token).toBeDefined();
+        }),
+      });
+
+      const responseBody = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(responseBody.token).toBeDefined();
     });
   });
 
