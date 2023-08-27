@@ -17,7 +17,7 @@ class SomeController extends AbstractController {
         },
         '/someData': {
           handler: this.getSomething,
-          request: yup.object().shape({
+          query: yup.object().shape({
             flag: yup.boolean().required(),
           }),
           middleware: [RateLimiter, CheckFlag],

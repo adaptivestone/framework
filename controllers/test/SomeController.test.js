@@ -118,89 +118,146 @@ describe('middlewares correct works', () => {
   it('checkFlag middleware works correctly with other middleware', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .get('/test/somecontroller/someData')
-      .send({
-        flag: false,
-      });
+    const { status } = await fetch(
+      global.server.testingGetUrl('/test/somecontroller/someData?flag=false'),
+      {
+        headers: {
+          'Content-type': 'application/json',
+        },
+      },
+    );
 
     expect(status).toBe(400);
   });
 
-  it('request can grab query paramaters', async () => {
+  it('request can grab query parameters', async () => {
     expect.assertions(2);
 
-    const { status, body } = await request(global.server.app.httpServer.express)
-      .get('/test/somecontroller/grabSomeDataFromQuery?name=123')
-      .set({ Authorization: 'testUser1' });
+    const response = await fetch(
+      global.server.testingGetUrl(
+        '/test/somecontroller/grabSomeDataFromQuery?name=123',
+      ),
+      {
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+      },
+    );
 
-    expect(status).toBe(200);
-    expect(body.data.name).toBe('123');
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(responseBody.data.name).toBe('123');
   });
 
-  it('request required query param must be provided', async () => {
+  it('request required query parameter must be provided', async () => {
     expect.assertions(2);
 
-    const { status, body } = await request(global.server.app.httpServer.express)
-      .get('/test/somecontroller/grabSomeDataFromQueryWithRequiredParam')
-      .set({ Authorization: 'testUser1' });
+    const response = await fetch(
+      global.server.testingGetUrl(
+        '/test/somecontroller/grabSomeDataFromQueryWithRequiredParam',
+      ),
+      {
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+      },
+    );
 
-    expect(status).toBe(400);
-    expect(body?.data?.name).toBeUndefined();
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(responseBody?.data?.name).toBeUndefined();
   });
 
-  it('request with provided required query param', async () => {
+  it('request with provided required query parameter', async () => {
     expect.assertions(2);
 
-    const { status, body } = await request(global.server.app.httpServer.express)
-      .get(
+    const response = await fetch(
+      global.server.testingGetUrl(
         '/test/somecontroller/grabSomeDataFromQueryWithRequiredParam?name=123',
-      )
-      .set({ Authorization: 'testUser1' });
+      ),
+      {
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+      },
+    );
 
-    expect(status).toBe(200);
-    expect(body.data.name).toBe(123);
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(responseBody.data.name).toBe(123);
   });
 
-  it('request can grab query params from Pagination middleware', async () => {
-    expect.assertions(2);
+  it('request can grab query parameters from Pagination middleware', async () => {
+    expect.assertions(4);
 
-    const { status, body } = await request(global.server.app.httpServer.express)
-      .get(
+    const response = await fetch(
+      global.server.testingGetUrl(
         '/test/somecontroller/grabSomeDataFromQueryWithMiddlewareParams?name=123&page=3&limit=50',
-      )
-      .set({ Authorization: 'testUser1' });
+      ),
+      {
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+      },
+    );
 
-    expect(status).toBe(200);
-    expect(body.data).toStrictEqual({
-      name: '123',
-      page: 3,
-      limit: 50,
-    });
+    const responseBody = await response.json();
+    expect(response.status).toBe(200);
+    expect(responseBody.data.limit).toBe(50);
+    expect(responseBody.data.name).toBe('123');
+    expect(responseBody.data.page).toBe(3);
   });
 
-  it('request can not grab query paramaters', async () => {
+  it('request can not grab query parameters', async () => {
     expect.assertions(2);
 
-    const { status, body } = await request(global.server.app.httpServer.express)
-      .post('/test/somecontroller/postQueryParamaters?name=test')
-      .send();
+    const response = await fetch(
+      global.server.testingGetUrl(
+        '/test/somecontroller/postQueryParamaters?name=test',
+      ),
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+      },
+    );
 
-    expect(status).toBe(200);
-    expect(body?.data?.name).toBeUndefined();
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(responseBody?.data?.name).toBeUndefined();
   });
 
-  it('request also can grab query paramaters but body have bigger priority', async () => {
+  it('request also can grab query parameters but body has higher priority', async () => {
     expect.assertions(2);
 
-    const { status, body } = await request(global.server.app.httpServer.express)
-      .post('/test/somecontroller/postQueryParamaters?name=test')
-      .send({
-        name: 'notATest',
-      });
+    const response = await fetch(
+      global.server.testingGetUrl(
+        '/test/somecontroller/postQueryParamaters?name=test',
+      ),
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'notATest',
+        }),
+      },
+    );
 
-    expect(status).toBe(200);
-    expect(body.data.name).toBe('notATest');
+    const responseBody = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(responseBody.data.name).toBe('notATest');
   });
 
   it('middlware with params works correctly', async () => {
