@@ -4,21 +4,63 @@ const AbstractCommand = require('../modules/AbstractCommand');
 class CreateUser extends AbstractCommand {
   async run() {
     const User = this.app.getModel('User');
-    const { email, password, roles } = this.args;
+    const { id, email, password, roles, update } = this.args;
 
-    if (!email || !password) {
+    if (!email && !id) {
       this.logger.error('Input validation failded');
-      this.logger.error('Please add "email" and "password" variables');
+      this.logger.error('Please add "email" or "id" variables');
       return false;
     }
-    const user = await User.create({
-      email,
-      password,
-      roles: roles?.split(','),
-    });
+
+    let user;
+
+    if (id) {
+      user = await User.findOne({ _id: id });
+    } else if (email) {
+      user = await User.findOne({ email });
+    }
+
+    if (user && !update) {
+      this.logger.error(
+        'We are found a user in database. But "update" option is not providing. Exitin',
+      );
+      return false;
+    }
+
+    if (!user && !password) {
+      this.logger.error(
+        'For a new user we alway asking for a password. Please provide it and rerun command',
+      );
+      return false;
+    }
+
+    if (!user && !email) {
+      this.logger.error(
+        'For a new user we alway asking for a email. Please provide it and rerun command',
+      );
+      return false;
+    }
+
+    if (!user) {
+      user = new User();
+    }
+
+    if (password) {
+      user.password = password;
+    }
+    if (email) {
+      user.email = email;
+    }
+
+    if (roles) {
+      user.roles = roles.split(',');
+    }
+
+    await user.save();
+
     await user.generateToken();
 
-    this.logger.info(`User was created ${JSON.stringify(user, 0, 4)}`);
+    this.logger.info(`User was created/updated ${JSON.stringify(user, 0, 4)}`);
 
     return user;
   }

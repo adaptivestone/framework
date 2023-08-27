@@ -1,3 +1,8 @@
+### 4.2.0
+
+[UPDATE] updated deps
+[NEW] CreateUser cli command. Ability to update user by email or id.
+
 ### 4.1.0
 
 [UPDATE] updated deps
