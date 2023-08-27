@@ -29,45 +29,73 @@ describe('auth', () => {
 
     it('can create user', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/register')
-        .send({
-          email: userEmail,
-          password: userPassword,
-          nickName: 'test',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/register'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            password: userPassword,
+            nickName: 'test',
+          }),
+        },
+      );
       expect(status).toBe(201);
     });
 
     it('can  not create user with the same nickname', async () => {
       expect.assertions(1);
-      await request(global.server.app.httpServer.express)
-        .post('/auth/register')
-        .send({
+      await fetch(global.server.testingGetUrl('/auth/register'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
           email: userEmail,
           password: userPassword,
           nickName: 'test',
-        });
+        }),
+      });
 
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/register')
-        .send({
-          email: userEmail2,
-          password: '123',
-          nickName: 'test',
-        });
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/register'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail2,
+            password: '123',
+            nickName: 'test',
+          }),
+        },
+      ).catch(() => {});
+
       expect(status).toBe(400);
     });
 
     it('can NOT create SAME user', async () => {
       expect.assertions(1);
-      const { status } = await request(global.server.app.httpServer.express)
-        .post('/auth/register')
-        .send({
-          email: userEmail,
-          password: userPassword,
-          nickName: 'test',
-        });
+
+      const { status } = await fetch(
+        global.server.testingGetUrl('/auth/register'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            password: userPassword,
+            nickName: 'test',
+          }),
+        },
+      );
+
       expect(status).toBe(400);
     });
   });
