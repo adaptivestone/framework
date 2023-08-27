@@ -1,7 +1,5 @@
 const { setTimeout } = require('node:timers/promises');
 
-const request = require('supertest');
-
 describe('middlewares correct works', () => {
   beforeAll(async () => {
     const User = global.server.app.getModel('User');
@@ -260,12 +258,20 @@ describe('middlewares correct works', () => {
     expect(responseBody.data.name).toBe('notATest');
   });
 
-  it('middlware with params works correctly', async () => {
+  it('middleware with params works correctly', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .get('/test/somecontroller/someDataWithPermission')
-      .set({ Authorization: 'testUser1' });
+    const { status } = await fetch(
+      global.server.testingGetUrl(
+        '/test/somecontroller/someDataWithPermission',
+      ),
+      {
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+      },
+    );
 
     expect(status).toBe(403);
   });
@@ -273,12 +279,19 @@ describe('middlewares correct works', () => {
   it('route without middlewares', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .post('/test/somecontroller/postInfo')
-      .send({
-        name: 'Inform post',
-        discription: 'news',
-      });
+    const { status } = await fetch(
+      global.server.testingGetUrl('/test/somecontroller/postInfo'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Inform post',
+          description: 'news',
+        }),
+      },
+    );
 
     expect(status).toBe(200);
   });
@@ -286,12 +299,19 @@ describe('middlewares correct works', () => {
   it('priority middlewares', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .put('/test/somecontroller/putInfo')
-      .send({
-        field: 'testField',
-      })
-      .set({ Authorization: 'testUser1' });
+    const { status } = await fetch(
+      global.server.testingGetUrl('/test/somecontroller/putInfo'),
+      {
+        method: 'PUT',
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: 'testUser1',
+        },
+        body: JSON.stringify({
+          field: 'testField',
+        }),
+      },
+    );
 
     expect(status).toBe(403);
   });
