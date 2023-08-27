@@ -1,6 +1,10 @@
+### 4.3.1
+
+[UPDATE] Yup file validator update. As formidable now return all fields as an array
+
 ### 4.3.0
 
-[BREAKING] updated formidable with a new version + tests. Marked as breaking because of a new major version, but this is internal of framework and exernal still the same. Shoukd break nothing
+[BREAKING] updated formidable with a new version + tests. Marked as breaking because of a new major version, but this is internal of framework and exernal still the same. Should break nothing
 
 ### 4.2.0
 
