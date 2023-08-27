@@ -1,4 +1,4 @@
-const formidable = require('formidable');
+const formidable = require('formidable').default;
 
 const AbstractMiddleware = require('./AbstractMiddleware');
 
@@ -13,23 +13,25 @@ class RequestParser extends AbstractMiddleware {
     // TODO update this to https://github.com/node-formidable/formidable/issues/412#issuecomment-1367914268 in node v20 (in 2023?)
 
     const form = formidable(this.params); // not in construstor as reuse formidable affects performance
-    form.parse(req, (err, fields, files) => {
-      this.logger.verbose(
-        `Parsing multipart/formdata request DONE ${Date.now() - time}ms`,
-      );
-      if (err) {
-        this.logger.error(`Parsing failed ${err}`);
-        return next(err);
-      }
+    let fields;
+    let files;
+    try {
+      [fields, files] = await form.parse(req);
+    } catch (err) {
+      this.logger.error(`Parsing failed ${err}`);
+      return next(err);
+    }
+    this.logger.verbose(
+      `Parsing multipart/formdata request DONE ${Date.now() - time}ms`,
+    );
 
-      req.body = {
-        // todo avoid body in next versions
-        ...req.body,
-        ...fields,
-        ...files,
-      };
-      return next();
-    });
+    req.body = {
+      // todo avoid body in next versions
+      ...req.body,
+      ...fields,
+      ...files,
+    };
+    return next();
   }
 }
 

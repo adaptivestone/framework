@@ -43,7 +43,7 @@
     "deepmerge": "^4.2.2",
     "dotenv": "^16.0.0",
     "express": "^4.17.1",
-    "formidable": "^2.1.1",
+    "formidable": "^3.5.1",
     "html-to-text": "^9.0.3",
     "i18next": "^23.2.8",
     "i18next-chained-backend": "^4.0.0",
