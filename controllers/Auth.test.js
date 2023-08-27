@@ -1,5 +1,3 @@
-const request = require('supertest');
-
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 
@@ -397,42 +395,55 @@ describe('auth', () => {
   it('can user send verification', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .post('/auth/send-verification')
-      .send({
-        email: userEmail2,
-      });
+    const { status } = await fetch(
+      global.server.testingGetUrl('/auth/send-verification'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: userEmail2,
+        }),
+      },
+    );
+
     expect(status).toBe(200);
   });
 
   it('can not user send verification to wrong email', async () => {
     expect.assertions(1);
 
-    const { status } = await request(global.server.app.httpServer.express)
-      .post('/auth/send-verification')
-      .send({
-        email: 'wrong@gmail.com',
-      });
+    const { status } = await fetch(
+      global.server.testingGetUrl('/auth/send-verification'),
+      {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'wrong@gmail.com',
+        }),
+      },
+    );
+
     expect(status).toBe(400);
   });
 
   describe('rate limiter', () => {
-    it('we  should receive 429 on rate limit exceeded', async () => {
+    it('should receive 429 on rate limit exceeded', async () => {
       expect.assertions(1);
-      const resultsPromise = [];
 
-      for (let i = 0; i < 11; i += 1) {
-        resultsPromise.push(
-          request(global.server.app.httpServer.express)
-            .post('/auth/logout')
-            .send({}),
-        );
-      }
+      const requests = Array.from({ length: 11 }, () =>
+        fetch(global.server.testingGetUrl('/auth/logout'), {
+          method: 'POST',
+        }),
+      );
 
-      const results = await Promise.all(resultsPromise);
-      const statuses = results.map((res) => res.status);
+      const responses = await Promise.all(requests);
+      const statusCodes = responses.map((response) => response.status);
 
-      expect(statuses.indexOf(429)).not.toBe(-1);
+      expect(statusCodes).toContain(429);
     });
   });
 });
