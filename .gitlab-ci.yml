@@ -16,15 +16,29 @@ install:
 
 prettier:
   stage: codeStyle
+  needs:
+    - install
+
   script:
     - npm run codestyle
 
+lint:
+  stage: codeStyle
+  needs:
+    - install
+
+  script:
+    - npm run lint
+
 test:
   stage: test
+  needs:
+    - install
+
   services:
     - redis:latest
   variables:
-    LOGGER_CONSOLE_LEVEL: 'error'
+    LOGGER_CONSOLE_LEVEL: "error"
     REDIS_URI: redis://redis
   script:
     - npm test
