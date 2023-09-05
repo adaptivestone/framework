@@ -16,10 +16,9 @@ class RateLimiter extends AbstractMiddleware {
 
   constructor(app, params) {
     super(app, params);
-    const routeParams = params;
     const limiterOptions = this.app.getConfig('rateLimiter');
 
-    this.finalOptions = merge(limiterOptions, routeParams);
+    this.finalOptions = merge(limiterOptions, params);
     this.limiter = null;
 
     switch (this.finalOptions.driver) {
@@ -32,7 +31,7 @@ class RateLimiter extends AbstractMiddleware {
         break;
 
       case 'mongo':
-        this.limiter = RateLimiterMongo({
+        this.limiter = new RateLimiterMongo({
           storeClient: mongoose.connection,
           ...this.finalOptions.limiterOptions,
         });
@@ -120,7 +119,6 @@ class RateLimiter extends AbstractMiddleware {
       .catch(() => {
         this.logger.warn(`Too many requests. Consume key: ${consumeKey}`);
       });
-
     if (consumeResult) {
       return next();
     }

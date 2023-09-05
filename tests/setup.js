@@ -14,7 +14,7 @@ jest.setTimeout(1000000);
 beforeAll(async () => {
   mongoMemoryServerInstance = await MongoMemoryReplSet.create({
     // binary: { version: '4.4.6' },
-    replSet: { storageEngine: 'wiredTiger' },
+    replSet: { count: 1, storageEngine: 'wiredTiger' },
   });
   await mongoMemoryServerInstance.waitUntilRunning();
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
