@@ -1,7 +1,8 @@
-### 4.5.0 - dev
+### 4.5.0
 
 [NEW] Now getSuper() available as a method on monsgoose models
 [UPDATE] Update rate-limiter-flexible to v3
+[UPDATE] Update test runner to suport ESM. In case problem with test please copy babel.config.js from framework to your project directory
 
 ### 4.4.0
 
