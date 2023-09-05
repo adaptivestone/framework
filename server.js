@@ -52,17 +52,17 @@ class Server {
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
     // eslint-disable-next-line global-require
-    const HttpServer = require('./services/http/HttpServer');
+    // const HttpServer = require('./services/http/HttpServer');
     // eslint-disable-next-line global-require
-    const ControllerManager = require('./controllers/index');
+    // const ControllerManager = require('./controllers/index');
     // TODO wait until https://github.com/nodejs/node/issues/35889
-    // const [{ default: HttpServer }, { default: ControllerManager }] =
-    //   await Promise.all([
-    //     // eslint-disable-next-line import/extensions
-    //     import('./services/http/HttpServer.js'), // Speed optimisation
-    //     // eslint-disable-next-line import/extensions
-    //     import('./controllers/index.js'), // Speed optimisation
-    //   ]);
+    const [{ default: HttpServer }, { default: ControllerManager }] =
+      await Promise.all([
+        // eslint-disable-next-line import/extensions
+        import('./services/http/HttpServer.js'), // Speed optimisation
+        // eslint-disable-next-line import/extensions
+        import('./controllers/index.js'), // Speed optimisation
+      ]);
 
     this.addErrorHandling();
 
