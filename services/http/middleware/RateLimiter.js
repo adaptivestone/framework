@@ -50,7 +50,6 @@ class RateLimiter extends AbstractMiddleware {
     const redisConfig = this.app.getConfig('redis');
     const redisClient = redis.createClient({
       url: redisConfig.url,
-      legacyMode: true,
     });
 
     // TODO: change it
@@ -71,6 +70,7 @@ class RateLimiter extends AbstractMiddleware {
 
     return new RateLimiterRedis({
       storeClient: redisClient,
+      useRedisPackage: true,
       ...this.finalOptions.limiterOptions,
     });
   }
@@ -91,7 +91,7 @@ class RateLimiter extends AbstractMiddleware {
 
     if (request && request.length) {
       request.forEach((val) => {
-        if (req.body[val]) {
+        if (req.body && req.body[val]) {
           key.push(req.body[val]);
         }
         // if (req.appInfo.request && req.appInfo.request[val]) {

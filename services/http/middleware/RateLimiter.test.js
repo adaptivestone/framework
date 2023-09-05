@@ -47,4 +47,24 @@ describe('rate limiter methods', () => {
 
     expect(res).toBe('192.168.0.0__someId');
   });
+
+  it('generateConsumeKey with request works correctly', async () => {
+    expect.assertions(1);
+
+    const redisRateLimiter = new RateLimiter(global.server.app, {
+      driver: 'redis',
+      consumeKeyComponents: {
+        request: ['email'],
+      },
+    });
+
+    const res = await redisRateLimiter.gerenateConsumeKey({
+      ip: '192.168.0.0',
+      body: {
+        email: 'foo@example.com',
+      },
+    });
+
+    expect(res).toBe('192.168.0.0__foo@example.com');
+  });
 });
