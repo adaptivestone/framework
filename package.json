@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "nodemon ./index.js",
     "prod": "nodemon ./cluster.js",
-    "test": "jest --coverage=true",
+    "test": "vitest  run --coverage",
     "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
     "lint": "eslint '**/*.js'",
     "lint:fix": "eslint '**/*.js' --fix",
@@ -24,18 +24,6 @@
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
     "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
     "redis:docker": "docker run --rm  -p 6379:6379 redis"
-  },
-  "jest": {
-    "setupFilesAfterEnv": [
-      "./tests/setup.js"
-    ],
-    "testEnvironment": "node",
-    "verbose": true,
-    "collectCoverage": true,
-    "coverageReporters": [
-      "text",
-      "text-summary"
-    ]
   },
   "author": "Andrey Logunov",
   "license": "MIT",
@@ -63,17 +51,17 @@
     "yup": "^1.0.0"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.22.15",
+    "@vitest/coverage-v8": "^0.34.3",
     "eslint": "^8.0.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.0.0",
-    "eslint-plugin-jest": "^27.0.0",
+    "eslint-plugin-vitest": "^0.3.1",
     "husky": "^8.0.0",
-    "jest": "^29.0.0",
     "lint-staged": "^14.0.0",
     "mongodb-memory-server": "^8.0.2",
     "nodemon": "^3.0.1",
-    "prettier": "^3.0.0"
+    "prettier": "^3.0.0",
+    "vitest": "^0.34.3"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [

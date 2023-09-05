@@ -1,4 +1,5 @@
-const I18n = require('./I18n');
+import { beforeAll, describe, it, expect } from 'vitest';
+import I18n from './I18n';
 
 describe('i18n middleware methods', () => {
   let middleware;

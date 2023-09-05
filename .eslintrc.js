@@ -3,11 +3,10 @@ module.exports = {
     browser: true,
     commonjs: true,
     es2022: true,
-    'jest/globals': true,
     mongo: true,
   },
-  extends: ['airbnb-base', 'prettier', 'plugin:jest/all'],
-  plugins: ['jest'],
+  extends: ['airbnb-base', 'prettier', 'plugin:vitest/all'],
+  plugins: ['vitest'],
   globals: {
     Atomics: 'readonly',
     SharedArrayBuffer: 'readonly',
@@ -34,7 +33,5 @@ module.exports = {
           '`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
       },
     ],
-    'jest/no-hooks': 'off',
-    'jest/require-hook': 'off',
   },
 };

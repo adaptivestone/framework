@@ -1,4 +1,5 @@
 const { setTimeout } = require('node:timers/promises');
+const crypto = require('node:crypto');
 const RateLimiter = require('./RateLimiter');
 
 let mongoRateLimiter;
@@ -8,7 +9,7 @@ describe('rate limiter methods', () => {
     mongoRateLimiter = new RateLimiter(global.server.app, {
       driver: 'mongo',
       limiterOptions: {
-        keyPrefix: `mongo_${Date.now()}`,
+        keyPrefix: `mongo_${Date.now()}_${crypto.randomUUID()}}`,
       },
     });
   });

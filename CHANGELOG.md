@@ -1,3 +1,7 @@
+### 4.6.0
+
+[NEW] migrated from JEST to vitest
+
 ### 4.5.0
 
 [NEW] Now getSuper() available as a method on monsgoose models
