@@ -67,4 +67,32 @@ describe('rate limiter methods', () => {
 
     expect(res).toBe('192.168.0.0__foo@example.com');
   });
+
+  it('middleware without driver should fail', async () => {
+    expect.assertions(2);
+    const rateLimiter = new RateLimiter(global.server.app, {
+      driver: 'unknown',
+    });
+    const nextFunction = jest.fn(() => {});
+    const req = {
+      appInfo: {},
+    };
+    let status;
+    let isSend;
+    await rateLimiter.middleware(
+      req,
+      {
+        status(statusCode) {
+          status = statusCode;
+          return this;
+        },
+        send() {
+          isSend = true;
+        },
+      },
+      nextFunction,
+    );
+    expect(status).toBe(500);
+    expect(isSend).toBe(true);
+  });
 });

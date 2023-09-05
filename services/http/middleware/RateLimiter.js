@@ -108,6 +108,7 @@ class RateLimiter extends AbstractMiddleware {
       this.logger.info(
         `RateLimmiter not inited correclty! Please check init logs `,
       );
+      return res.status(500).send('');
     }
 
     const { namespace } = this.app.getConfig('redis');
