@@ -1,11 +1,15 @@
-const { setTimeout } = require('node:timers/promises');
-const crypto = require('node:crypto');
-const RateLimiter = require('./RateLimiter');
+import { setTimeout } from 'node:timers/promises';
+import crypto from 'node:crypto';
+import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+
+import RateLimiter from './RateLimiter';
 
 let mongoRateLimiter;
 
 describe('rate limiter methods', () => {
-  beforeAll(() => {
+  beforeAll(async () => {
+    await setTimeout(20);
+
     mongoRateLimiter = new RateLimiter(global.server.app, {
       driver: 'mongo',
       limiterOptions: {

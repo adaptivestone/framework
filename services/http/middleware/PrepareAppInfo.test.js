@@ -1,4 +1,5 @@
-const PrepareAppInfo = require('./PrepareAppInfo');
+import { describe, it, expect } from 'vitest';
+import PrepareAppInfo from './PrepareAppInfo';
 
 describe('prepareAppInfo methods', () => {
   it('have description fields', async () => {

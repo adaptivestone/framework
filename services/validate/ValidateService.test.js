@@ -1,3 +1,5 @@
+import { describe, it, expect } from 'vitest';
+
 const yup = require('yup');
 const ValidateService = require('./ValidateService');
 const YupValidator = require('./drivers/YupValidator');

@@ -1,7 +1,10 @@
-const { createServer } = require('node:http');
-const formidable = require('formidable');
+import { createServer } from 'node:http';
+import { describe, it, expect } from 'vitest';
 
-const RequestParser = require('./RequestParser');
+import RequestParser from './RequestParser';
+
+// TODO change on ESM
+const formidable = require('formidable');
 
 describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
@@ -24,7 +27,7 @@ describe('reqest parser limiter methods', () => {
           expect(req.body.multipleFiles).toBeDefined();
           expect(
             req.body.multipleFiles[0] instanceof formidable.PersistentFile,
-          ).toBe(true);
+          ).toBeTruthy();
 
           res.writeHead(200);
           res.end('ok');

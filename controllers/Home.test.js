@@ -1,3 +1,5 @@
+import { describe, it, expect } from 'vitest';
+
 describe('home', () => {
   it('can open home have', async () => {
     expect.assertions(1);

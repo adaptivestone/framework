@@ -1,3 +1,5 @@
+import { describe, it, expect } from 'vitest';
+
 describe('sequence model', () => {
   it('should produce sequence', async () => {
     expect.assertions(1);

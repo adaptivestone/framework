@@ -1,3 +1,5 @@
+import { describe, it, expect } from 'vitest';
+
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 

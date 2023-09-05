@@ -1,5 +1,6 @@
-const SomeController = require('../controllers/test/SomeController');
-const AbstractController = require('./AbstractController');
+import { describe, it, expect } from 'vitest';
+import SomeController from '../controllers/test/SomeController';
+import AbstractController from './AbstractController';
 
 describe('abstract controller methods', () => {
   it('can get routes', async () => {
