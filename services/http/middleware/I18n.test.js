@@ -45,13 +45,16 @@ describe('i18n middleware methods', () => {
 
   it('middleware that works', async () => {
     expect.assertions(4);
-    const nextFunction = jest.fn(() => {});
+    let isCalled = false;
+    const nextFunction = () => {
+      isCalled = true;
+    };
     const req = {
       get: () => 'en',
       appInfo: {},
     };
     await middleware.middleware(req, {}, nextFunction);
-    expect(nextFunction).toHaveBeenCalledWith();
+    expect(isCalled).toBe(true);
     expect(req.appInfo.i18n).toBeDefined();
     expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
     expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test
@@ -62,13 +65,16 @@ describe('i18n middleware methods', () => {
     global.server.app.updateConfig('i18n', { enabled: false });
     middleware = new I18n(global.server.app);
 
-    const nextFunction = jest.fn(() => {});
+    let isCalled = false;
+    const nextFunction = () => {
+      isCalled = true;
+    };
     const req = {
       get: () => 'en',
       appInfo: {},
     };
     await middleware.middleware(req, {}, nextFunction);
-    expect(nextFunction).toHaveBeenCalledWith();
+    expect(isCalled).toBe(true);
     expect(req.appInfo.i18n).toBeDefined();
     expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
     expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test

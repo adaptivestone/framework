@@ -10,10 +10,13 @@ describe('prepareAppInfo methods', () => {
   it('middleware that works', async () => {
     expect.assertions(3);
     const middleware = new PrepareAppInfo(global.server.app);
-    const nextFunction = jest.fn(() => {});
+    let isCalled = false;
+    const nextFunction = () => {
+      isCalled = true;
+    };
     const req = {};
     await middleware.middleware(req, {}, nextFunction);
-    expect(nextFunction).toHaveBeenCalledWith();
+    expect(isCalled).toBe(true);
     expect(req.appInfo).toBeDefined();
     req.appInfo.test = 5;
     await middleware.middleware(req, {}, nextFunction);

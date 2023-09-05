@@ -89,7 +89,6 @@ describe('rate limiter methods', () => {
     const rateLimiter = new RateLimiter(global.server.app, {
       driver: 'unknown',
     });
-    const nextFunction = jest.fn(() => {});
     const req = {
       appInfo: {},
     };
@@ -106,7 +105,7 @@ describe('rate limiter methods', () => {
           isSend = true;
         },
       },
-      nextFunction,
+      () => {},
     );
     expect(status).toBe(500);
     expect(isSend).toBe(true);
