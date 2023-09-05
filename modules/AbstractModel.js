@@ -14,6 +14,7 @@ class AbstractModel extends Base {
     this.mongooseSchema.set('minimize', false);
     this.mongooseSchema.loadClass(this.constructor);
     this.mongooseSchema.statics.getSuper = () => this;
+    this.mongooseSchema.methods.getSuper = () => this;
     this.initHooks();
     this.mongooseModel = mongoose.model(
       this.constructor.name,

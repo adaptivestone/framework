@@ -88,8 +88,8 @@ class User extends AbstractModel {
     const scryptAsync = promisify(scrypt);
     const data = await scryptAsync(
       this.email + Date.now(),
-      this.constructor.getSuper().saltSecret,
-      this.constructor.getSuper().hashRounds,
+      this.getSuper().saltSecret,
+      this.getSuper().hashRounds,
     );
     const token = data.toString('base64url');
     this.sessionTokens.push({ token, valid: timestamp });
@@ -138,8 +138,8 @@ class User extends AbstractModel {
     const scryptAsync = promisify(scrypt);
     const data = await scryptAsync(
       userMongoose.email + Date.now(),
-      userMongoose.constructor.getSuper().saltSecret,
-      userMongoose.constructor.getSuper().hashRounds,
+      userMongoose.getSuper().saltSecret,
+      userMongoose.getSuper().hashRounds,
     );
     const token = data.toString('base64url');
     //       if (err) {
@@ -177,7 +177,7 @@ class User extends AbstractModel {
     const passwordRecoveryToken =
       await User.generateUserPasswordRecoveryToken(this);
     const mail = new Mailer(
-      this.constructor.getSuper().app,
+      this.getSuper().app,
       'recovery',
       {
         link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
@@ -194,8 +194,8 @@ class User extends AbstractModel {
     const scryptAsync = promisify(scrypt);
     const data = await scryptAsync(
       userMongoose.email + Date.now(),
-      userMongoose.constructor.getSuper().saltSecret,
-      userMongoose.constructor.getSuper().hashRounds,
+      userMongoose.getSuper().saltSecret,
+      userMongoose.getSuper().hashRounds,
     );
     const token = data.toString('base64url');
     // if (err) {
@@ -243,7 +243,7 @@ class User extends AbstractModel {
   async sendVerificationEmail(i18n) {
     const verificationToken = await User.generateUserVerificationToken(this);
     const mail = new Mailer(
-      this.constructor.getSuper().app,
+      this.getSuper().app,
       'verification',
       {
         link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,

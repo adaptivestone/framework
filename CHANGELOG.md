@@ -1,3 +1,8 @@
+### 4.5.0 - dev
+
+[NEW] Now getSuper() available as a method on monsgoose models
+[UPDATE] Update rate-limiter-flexible to v3
+
 ### 4.4.0
 
 [NEW] New method to grab url of server it testing enviroument global.server.testingGetUrl("/some/endpoint")
