@@ -20,7 +20,7 @@ prettier:
     - install
 
   script:
-    - npm run codestyle
+    - npm run prettier
 
 lint:
   stage: codeStyle

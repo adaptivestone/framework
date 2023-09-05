@@ -1,5 +1,5 @@
+/* eslint-disable no-undef */
 const path = require('node:path');
-/* eslint-disable jest/require-top-level-describe */
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 

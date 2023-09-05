@@ -1,4 +1,5 @@
-const { setTimeout } = require('node:timers/promises');
+import { setTimeout } from 'node:timers/promises';
+import { beforeAll, describe, it, expect } from 'vitest';
 
 describe('middlewares correct works', () => {
   beforeAll(async () => {
