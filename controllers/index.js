@@ -33,7 +33,6 @@ class ControllerManager extends Base {
       // TODO wait until https://github.com/nodejs/node/issues/35889
       controllers.push(
         import(controller.path).then(({ default: ControllerModule }) => {
-          // eslint-disable-next-line import/no-dynamic-require, global-require
           // const ControllerModule = require(controller.path);
           const contollerName = ControllerModule.name.toLowerCase();
           let prefix = path.dirname(controller.file);

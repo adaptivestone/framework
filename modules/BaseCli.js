@@ -50,7 +50,6 @@ class Cli extends Base {
     // TODO wait until https://github.com/nodejs/node/issues/35889
     const { default: Command } = await import(this.commands[command]);
 
-    // eslint-disable-next-line import/no-dynamic-require, global-require
     // const Command = require(this.commands[command]);
 
     const c = new Command(this.app, this.commands, args);

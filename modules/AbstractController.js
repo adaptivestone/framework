@@ -271,7 +271,7 @@ class AbstractController extends Base {
      */
     if (!this.app.httpServer) {
       this.app.documentation.push(
-        DocumentationGenerator.convertDataToDocumentationElement(
+        new DocumentationGenerator(this.app).convertDataToDocumentationElement(
           this.getConstructorName(),
           routesInfo,
           middlewaresInfo,

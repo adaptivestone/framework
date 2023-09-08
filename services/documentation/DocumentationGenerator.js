@@ -2,7 +2,8 @@ const Base = require('../../modules/Base');
 const ValidateService = require('../validate/ValidateService');
 
 class DocumentationGenerator extends Base {
-  static processingFields(fieldsByRoute) {
+  // eslint-disable-next-line class-methods-use-this
+  processingFields(fieldsByRoute) {
     const fields = [];
     if (!fieldsByRoute) {
       return fields;
@@ -36,7 +37,8 @@ class DocumentationGenerator extends Base {
     return fields;
   }
 
-  static selectUniqueFields(fields) {
+  // eslint-disable-next-line class-methods-use-this
+  selectUniqueFields(fields) {
     return Array.from(
       new Map(fields.map((item) => [item.name, item])).values(),
     ).reduce((uniqueArray, item) => {
@@ -52,7 +54,7 @@ class DocumentationGenerator extends Base {
     }, []);
   }
 
-  static groupFieldsFromSchemas(schemas) {
+  groupFieldsFromSchemas(schemas) {
     const result = [];
     schemas.forEach((schema) => {
       const convertedSchema = new ValidateService(this.app, schema).validator;
@@ -71,7 +73,7 @@ class DocumentationGenerator extends Base {
     return result;
   }
 
-  static convertDataToDocumentationElement(
+  convertDataToDocumentationElement(
     controllerName,
     routesInfo,
     middlewaresInfo,
@@ -80,23 +82,19 @@ class DocumentationGenerator extends Base {
     return {
       contollerName: controllerName,
       routesInfo: routesInfo.map((route) => {
-        const middlewareQueryParams = ValidateService.getMiddlewareParams(
-          middlewaresInfo,
-          routeMiddlewaresReg,
-          {
-            method: route.method.toLowerCase(),
-            path: route.fullPath,
-          },
-        ).query;
+        const middlewareQueryParams = new ValidateService(
+          this.app,
+        ).getMiddlewareParams(middlewaresInfo, routeMiddlewaresReg, {
+          method: route.method.toLowerCase(),
+          path: route.fullPath,
+        }).query;
 
-        const middlewareRequestParams = ValidateService.getMiddlewareParams(
-          middlewaresInfo,
-          routeMiddlewaresReg,
-          {
-            method: route.method.toLowerCase(),
-            path: route.fullPath,
-          },
-        ).request;
+        const middlewareRequestParams = new ValidateService(
+          this.app,
+        ).getMiddlewareParams(middlewaresInfo, routeMiddlewaresReg, {
+          method: route.method.toLowerCase(),
+          path: route.fullPath,
+        }).request;
 
         const queryParams = this.groupFieldsFromSchemas(middlewareQueryParams);
 

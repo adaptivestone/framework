@@ -41,7 +41,7 @@ class ValidateService extends Base {
   /**
    * Filter middlewares by route path and select all parameters
    */
-  static filterRelatedParametersByRoute(middlewares, method, path) {
+  filterRelatedParametersByRoute(middlewares, method, path) {
     const middlewaresParams = middlewares
       .filter(
         (middleware) =>
@@ -63,11 +63,7 @@ class ValidateService extends Base {
   /**
    * Group all middleware(routes + controller) parameters
    */
-  static getMiddlewareParams(
-    controllerMiddlewares,
-    AllrouteMiddlewares,
-    options,
-  ) {
+  getMiddlewareParams(controllerMiddlewares, AllrouteMiddlewares, options) {
     const { method, path } = options;
     const routeMiddlewaresParams = this.filterRelatedParametersByRoute(
       AllrouteMiddlewares,
@@ -134,7 +130,7 @@ class ValidateService extends Base {
       this.validator,
       selectedReqData,
     );
-    const additionalMiddlewareSchemas = this.constructor.getMiddlewareParams(
+    const additionalMiddlewareSchemas = this.getMiddlewareParams(
       middlewaresInfo,
       routeMiddlewaresReg,
       routeOptions,
