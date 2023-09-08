@@ -13,8 +13,7 @@ class GetOpenApiJson extends AbstractCommand {
     }
 
     try {
-      // eslint-disable-next-line import/no-dynamic-require, global-require
-      jsonFile = require(jsonFile);
+      jsonFile = JSON.parse(await fs.readFile(jsonFile, 'utf8'));
     } catch (e) {
       this.logger.error(
         'No npm package detected. Please start this command via NPM as it depends on package.json',
