@@ -21,6 +21,5 @@ if (cluster.isMaster) {
     cluster.fork();
   });
 } else {
-  // eslint-disable-next-line global-require
-  require('./index');
+  import('./server.js');
 }

@@ -1,6 +1,6 @@
 module.exports = {
   env: {
-    es2022: true,
+    es2023: true,
     node: true,
   },
   extends: ['airbnb-base', 'prettier', 'plugin:vitest/all'],
