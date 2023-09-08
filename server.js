@@ -51,9 +51,7 @@ class Server {
    * @returns {Promise}
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
-    // eslint-disable-next-line global-require
     // const HttpServer = require('./services/http/HttpServer');
-    // eslint-disable-next-line global-require
     // const ControllerManager = require('./controllers/index');
     // TODO wait until https://github.com/nodejs/node/issues/35889
     const [{ default: HttpServer }, { default: ControllerManager }] =
@@ -178,7 +176,6 @@ class Server {
     if (!this.cli) {
       // TODO wait until https://github.com/nodejs/node/issues/35889
       const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
-      // eslint-disable-next-line global-require
       // const BaseCli = require('./modules/BaseCli');
       this.cli = new BaseCli(this);
     }
