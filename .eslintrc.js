@@ -1,18 +1,12 @@
 module.exports = {
   env: {
-    browser: true,
-    commonjs: true,
     es2022: true,
-    mongo: true,
+    node: true,
   },
   extends: ['airbnb-base', 'prettier', 'plugin:vitest/all'],
   plugins: ['vitest'],
-  globals: {
-    Atomics: 'readonly',
-    SharedArrayBuffer: 'readonly',
-  },
   parserOptions: {
-    ecmaVersion: 2022,
+    ecmaVersion: 2023,
   },
   rules: {
     'no-restricted-syntax': [
@@ -33,5 +27,6 @@ module.exports = {
           '`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
       },
     ],
+    'import/extensions': 'off', // it have a problem with dynamic imports
   },
 };
