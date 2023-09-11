@@ -29,7 +29,7 @@ class Base {
 
   /**
    * Get winston loger for given label
-   * @param {sting} label name of logger
+   * @param {string} label name of logger
    */
   getLogger(label) {
     // eslint-disable-next-line global-require
@@ -44,7 +44,7 @@ class Base {
       winston.format.timestamp(),
       winston.format.printf(
         (info) =>
-          `(${process.pid}) ${info.label}  ${info.timestamp}  ${info.level} : ${info.message}`,
+          `(${process.pid}) ${info.label}  ${info.timestamp}  ${info.level} : ${info.message} ${info?.stack}`,
       ),
     );
 
@@ -90,10 +90,12 @@ class Base {
       }
     }
 
-    return winston.createLogger({
+    const logger = winston.createLogger({
+      format: winston.format.errors({ stack: true }),
       level: 'silly',
       transports,
     });
+    return logger;
   }
 
   async getFilesPathWithInheritance(internalFolder, externalFolder) {
