@@ -1,3 +1,8 @@
+### 4.7.0
+
+[UPDATE] update logger init (refactor)
+[UPDATE] updated deps
+
 ### 4.6.0
 
 [NEW] migrated from JEST to vitest
