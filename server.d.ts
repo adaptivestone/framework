@@ -39,7 +39,7 @@ declare class Server {
   constructor(config: ExpandDeep<ServerConfig>);
 
   /**
-   * Start server (http + websocket + init all http and websocet ralated functions)
+   * Start server (http  + init all http ralated functions)
    */
   startServer(callbackBefore404?: Promise<null>): Promise<null>;
 
