@@ -38,13 +38,12 @@ class Base {
       winston.format.colorize({
         all: true,
       }),
-      winston.format.label({
-        label: ` \x1B[32m[${label}]\x1B[39m`,
-      }),
       winston.format.timestamp(),
       winston.format.printf(
         (info) =>
-          `(${process.pid}) ${info.label}  ${info.timestamp}  ${info.level} : ${info.message} ${info?.stack}`,
+          `(${process.pid}) ${info.label} ${info.timestamp}  ${info.level} : ${
+            info.message
+          } ${info?.stack ?? ''}`,
       ),
     );
 
@@ -95,7 +94,7 @@ class Base {
       level: 'silly',
       transports,
     });
-    return logger;
+    return logger.child({ label: `\x1B[32m[${label}]\x1B[39m` });
   }
 
   async getFilesPathWithInheritance(internalFolder, externalFolder) {
