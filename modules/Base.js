@@ -32,7 +32,7 @@ class Base {
    * @param {string} label name of logger
    */
   getLogger(label) {
-    return this.app.logger.child({ label: `\x1B[32m[${label}]\x1B[39m` });
+    return this.app.logger.child({ label });
   }
 
   async getFilesPathWithInheritance(internalFolder, externalFolder) {

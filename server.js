@@ -146,9 +146,11 @@ class Server {
       winston.format.timestamp(),
       winston.format.printf(
         (info) =>
-          `(${process.pid}) ${info.label} ${info.timestamp}  ${info.level} : ${
-            info.message
-          } ${info?.stack ?? ''}`,
+          `(${process.pid}) \x1B[32m[${info.label ?? 'SERVER'}]\x1B[39m ${
+            info.timestamp
+          }  ${info.level} : ${info.message} ${info?.stack ?? ''} ${
+            info.durationMs ? `Duration: ${info.durationMs}ms` : ''
+          }`,
       ),
     );
     const logConfig = this.app.getConfig('log').transports;
@@ -180,17 +182,18 @@ class Server {
           );
         } else {
           import(log.transport).then((Tr) => {
-            let Transport = Tr;
-            if (!IsConstructor(Tr) && Tr.default) {
-              Transport = Tr.default;
+            let Transport = Tr.default;
+            if (!IsConstructor(Transport) && Transport.default) {
+              Transport = Transport.default;
             } else {
-              // eslint-disable-next-line no-console
               console.error(
                 `${log.transport} not a constructor. Please check it`,
               );
               return;
             }
+            logger.profile(`Adding new logger ${log.transport}`);
             logger.add(new Transport(log.transportOptions));
+            logger.profile(`Adding new logger ${log.transport}`);
           });
         }
       }
