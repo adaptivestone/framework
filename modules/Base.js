@@ -32,69 +32,7 @@ class Base {
    * @param {string} label name of logger
    */
   getLogger(label) {
-    // eslint-disable-next-line global-require
-    const winston = require('winston'); // speed up optimisation
-    const alignColorsAndTime = winston.format.combine(
-      winston.format.colorize({
-        all: true,
-      }),
-      winston.format.timestamp(),
-      winston.format.printf(
-        (info) =>
-          `(${process.pid}) ${info.label} ${info.timestamp}  ${info.level} : ${
-            info.message
-          } ${info?.stack ?? ''}`,
-      ),
-    );
-
-    const logConfig = this.app.getConfig('log').transports;
-
-    function IsConstructor(f) {
-      try {
-        Reflect.construct(String, [], f);
-      } catch (e) {
-        return false;
-      }
-      return true;
-    }
-    const transports = [];
-    for (const log of logConfig) {
-      if (log.enable) {
-        if (log.transport === 'console') {
-          transports.push(
-            new winston.transports.Console({
-              level: log.transportOptions.level,
-              format: winston.format.combine(
-                winston.format.colorize(),
-                alignColorsAndTime,
-              ),
-            }),
-          );
-        } else {
-          // eslint-disable-next-line global-require, import/no-dynamic-require
-          let Tr = require(log.transport);
-          if (!IsConstructor(Tr) && Tr.default) {
-            Tr = Tr.default;
-          } else {
-            // eslint-disable-next-line no-console
-            console.error(
-              `${log.transport} not a constructor. Please check it`,
-            );
-            // eslint-disable-next-line no-continue
-            continue;
-          }
-
-          transports.push(new Tr(log.transportOptions));
-        }
-      }
-    }
-
-    const logger = winston.createLogger({
-      format: winston.format.errors({ stack: true }),
-      level: 'silly',
-      transports,
-    });
-    return logger.child({ label: `\x1B[32m[${label}]\x1B[39m` });
+    return this.app.logger.child({ label: `\x1B[32m[${label}]\x1B[39m` });
   }
 
   async getFilesPathWithInheritance(internalFolder, externalFolder) {

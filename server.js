@@ -3,11 +3,14 @@ const EventEmitter = require('node:events');
 
 require('dotenv').config();
 const merge = require('deepmerge');
+const winston = require('winston');
 
 /**
  * Main framework class.
  */
 class Server {
+  #realLogger = null;
+
   /**
    *  Construct new server
    * @param {Object} config main config object
@@ -33,6 +36,9 @@ class Server {
       get cache() {
         return that.getCache();
       },
+      get logger() {
+        return that.getLogger();
+      },
       httpServer: null,
       controllerManager: null,
     };
@@ -46,7 +52,7 @@ class Server {
   }
 
   /**
-   * Start server (http + websocket + init all http and websocet ralated functions)
+   * Start server (http  + init all http ralated functions)
    * @param <Promise>callbackBefore404 code that should be executed before adding page 404
    * @returns {Promise}
    */
@@ -120,6 +126,77 @@ class Server {
       );
     }
     return this.cache.configs.get(configName);
+  }
+
+  /**
+   * Return or create new logger instance. This is a main logger instance
+   */
+  getLogger() {
+    if (!this.#realLogger) {
+      this.#realLogger = this.#createLogger();
+    }
+    return this.#realLogger;
+  }
+
+  #createLogger() {
+    const alignColorsAndTime = winston.format.combine(
+      winston.format.colorize({
+        all: true,
+      }),
+      winston.format.timestamp(),
+      winston.format.printf(
+        (info) =>
+          `(${process.pid}) ${info.label} ${info.timestamp}  ${info.level} : ${
+            info.message
+          } ${info?.stack ?? ''}`,
+      ),
+    );
+    const logConfig = this.app.getConfig('log').transports;
+    function IsConstructor(f) {
+      try {
+        Reflect.construct(String, [], f);
+      } catch (e) {
+        return false;
+      }
+      return true;
+    }
+
+    const logger = winston.createLogger({
+      format: winston.format.errors({ stack: true }),
+      level: 'silly',
+    });
+
+    for (const log of logConfig) {
+      if (log.enable) {
+        if (log.transport === 'console') {
+          logger.add(
+            new winston.transports.Console({
+              level: log.transportOptions.level,
+              format: winston.format.combine(
+                winston.format.colorize(),
+                alignColorsAndTime,
+              ),
+            }),
+          );
+        } else {
+          import(log.transport).then((Tr) => {
+            let Transport = Tr;
+            if (!IsConstructor(Tr) && Tr.default) {
+              Transport = Tr.default;
+            } else {
+              // eslint-disable-next-line no-console
+              console.error(
+                `${log.transport} not a constructor. Please check it`,
+              );
+              return;
+            }
+            logger.add(new Transport(log.transportOptions));
+          });
+        }
+      }
+    }
+
+    return logger;
   }
 
   /**

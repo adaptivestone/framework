@@ -7,6 +7,7 @@ import { Model as MongooseModel, Schema } from 'mongoose';
 
 import BaseCli from './modules/BaseCli';
 import Cache from './services/cache/Cache';
+import winston from 'winston';
 
 type ServerConfig = {
   folders: ExpandDeep<TFolderConfig>;
@@ -22,6 +23,7 @@ declare class Server {
     foldersConfig: Server['config']['folders'];
     events: EventEmitter;
     get cache(): Server['cacheService'];
+    get logger(): winston.Logger;
     httpServer: null;
     controllerManager: null;
   };
@@ -53,6 +55,11 @@ declare class Server {
    * @TODO generate that based on real data
    */
   getConfig(configName: string): {};
+
+  /**
+   * Return or create new logger instance. This is a main logger instance
+   */
+  getLogger(): winston.Logger;
 
   /**
    * Primary designed for tests when we need to update some configs before start testing
