@@ -176,8 +176,6 @@ class Auth extends AbstractController {
       req.appInfo.request.passwordRecoveryToken,
     ).catch((e) => {
       this.logger.error(e);
-      // eslint-disable-next-line no-console
-      console.log(e);
     });
 
     if (!user) {
