@@ -4,6 +4,7 @@ const EventEmitter = require('node:events');
 require('dotenv').config();
 const merge = require('deepmerge');
 const winston = require('winston');
+const Cache = require('./services/cache/Cache');
 
 /**
  * Main framework class.
@@ -268,8 +269,6 @@ class Server {
    */
   getCache() {
     if (!this.cacheService) {
-      // eslint-disable-next-line global-require
-      const Cache = require('./services/cache/Cache'); // Speed optimisation
       this.cacheService = new Cache(this.app);
     }
     return this.cacheService;

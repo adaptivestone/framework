@@ -1,13 +1,17 @@
-const redis = require('redis');
 const Base = require('../../modules/Base');
 
 class Cache extends Base {
   constructor(app) {
+    super(app);
+    this.whenReady = this.#init();
+  }
+
+  async #init() {
     // todo for now only redis. refactor for drives support in future
     // at least memory and redis drivers should be presented
     // memory drives should works on master process level
     // we should support multiple cashe same time
-    super(app);
+    const redis = await import('redis');
     const conf = this.app.getConfig('redis');
     this.redisClient = redis.createClient({
       url: conf.url,
@@ -33,6 +37,7 @@ class Cache extends Base {
   }
 
   async getSetValue(keyValue, onNotFound, storeTime = 60 * 5) {
+    await this.whenReady;
     if (!this.redisClient.isOpen) {
       await this.redisClient.connect();
     }
@@ -58,9 +63,7 @@ class Cache extends Base {
       try {
         result = await onNotFound();
       } catch (e) {
-        this.logger.error(
-          `Cache onNotFound for key '${key}' error: ${e.message}`,
-        );
+        this.logger.error(`Cache onNotFound for key '${key}' error: ${e}`);
         this.promiseMapping.delete(key);
         reject(e);
         return Promise.reject(e);
@@ -100,6 +103,8 @@ class Cache extends Base {
   }
 
   async removeKey(keyValue) {
+    await this.whenReady;
+
     if (!this.redisClient.isOpen) {
       await this.redisClient.connect();
     }

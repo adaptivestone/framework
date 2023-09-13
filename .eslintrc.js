@@ -3,7 +3,12 @@ module.exports = {
     es2023: true,
     node: true,
   },
-  extends: ['airbnb-base', 'prettier', 'plugin:vitest/all'],
+  extends: [
+    'airbnb-base',
+    'prettier',
+    'plugin:vitest/recommended',
+    'plugin:vitest/all',
+  ],
   plugins: ['vitest'],
   parserOptions: {
     ecmaVersion: 2023,
