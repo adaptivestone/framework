@@ -1,3 +1,7 @@
+### 4.8.0
+
+[UPDATE] update cache (refactor+tets)
+
 ### 4.7.0
 
 [UPDATE] update logger init (refactor)

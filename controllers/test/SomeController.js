@@ -60,13 +60,6 @@ class SomeController extends AbstractController {
             name: yup.string(),
           }),
         },
-        '/someDataItems': {
-          handler: this.getSomeDataItems,
-          request: yup.object().shape({
-            items: yup.array().of(yup.string()),
-            key: yup.string(),
-          }),
-        },
       },
       patch: {
         '/userAvatar': {
@@ -102,14 +95,6 @@ class SomeController extends AbstractController {
   async grabSomeDataFromQueryWithMiddlewareParams(req, res) {
     const { page, limit, name } = req.appInfo.query;
     return res.status(200).json({ data: { page, limit, name } });
-  }
-
-  async getSomeDataItems(req, res) {
-    const { items, key } = req.appInfo.request;
-
-    await this.app.cache.getSetValue(key, () => items, 5);
-
-    return res.status(200).json({ data: items });
   }
 
   // eslint-disable-next-line class-methods-use-this

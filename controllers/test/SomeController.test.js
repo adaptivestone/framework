@@ -1,4 +1,3 @@
-import { setTimeout } from 'node:timers/promises';
 import { beforeAll, describe, it, expect } from 'vitest';
 
 describe('middlewares correct works', () => {
@@ -13,51 +12,6 @@ describe('middlewares correct works', () => {
       roles: ['user'],
       sessionTokens: [{ token: 'testUser1' }],
     });
-  });
-  it('cache works correctly', async () => {
-    expect.assertions(3);
-    const key = 'someKey';
-    await fetch(
-      global.server.testingGetUrl('/test/somecontroller/someDataItems'),
-      {
-        method: 'POST',
-        headers: {
-          'Content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: ['Value1', 'Value2', 'Value3'],
-          key,
-        }),
-      },
-    );
-
-    let items = await global.server.app.cache.getSetValue(
-      key,
-      () => ['v1', 'v2', 'v3'],
-      30,
-    );
-
-    expect(items).toStrictEqual(['Value1', 'Value2', 'Value3']);
-
-    await setTimeout(1000);
-
-    items = await global.server.app.cache.getSetValue(
-      key,
-      () => ['v1', 'v2', 'v3'],
-      30,
-    );
-
-    expect(items).toStrictEqual(['Value1', 'Value2', 'Value3']);
-
-    await setTimeout(5000);
-
-    items = await global.server.app.cache.getSetValue(
-      key,
-      () => ['v1', 'v2', 'v3'],
-      30,
-    );
-
-    expect(items).toStrictEqual(['v1', 'v2', 'v3']);
   });
 
   it('authMiddleware on route works correctly (without token)', async () => {
