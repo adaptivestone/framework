@@ -114,7 +114,7 @@ class Auth extends AbstractController {
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
       const answer = await user.sendVerificationEmail(req.i18n).catch((e) => {
-        this.logger.error(e.message);
+        this.logger.error(e);
       });
       if (!answer) {
         return res.status(500).json();
@@ -165,7 +165,7 @@ class Auth extends AbstractController {
       await user.sendPasswordRecoveryEmail(req.i18n);
       return res.status(200).json();
     } catch (e) {
-      this.logger.error(e.message);
+      this.logger.error(e);
       return res.status(400).json({ message: req.i18n.t('auth.errorUExist') });
     }
   }
@@ -175,7 +175,7 @@ class Auth extends AbstractController {
     const user = await User.getUserByPasswordRecoveryToken(
       req.appInfo.request.passwordRecoveryToken,
     ).catch((e) => {
-      this.logger.error(e.message);
+      this.logger.error(e);
       // eslint-disable-next-line no-console
       console.log(e);
     });
