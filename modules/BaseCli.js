@@ -47,10 +47,7 @@ class Cli extends Base {
       );
       return false;
     }
-    // TODO wait until https://github.com/nodejs/node/issues/35889
     const { default: Command } = await import(this.commands[command]);
-
-    // const Command = require(this.commands[command]);
 
     const c = new Command(this.app, this.commands, args);
     let result = false;

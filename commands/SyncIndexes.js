@@ -18,7 +18,7 @@ class SyncIndexes extends AbstractCommand {
     for (const modelName of models) {
       const Model = this.app.getModel(modelName);
       // eslint-disable-next-line no-await-in-loop
-      const removedIndexes = await Model.syncIndexes(); // that not a bug. Lets do one by one
+      const removedIndexes = await Model.syncIndexes(); // await in loop not a bug. Lets do one by one
       if (removedIndexes.length) {
         this.logger.info(
           `Model - ${modelName} removed indexes: ${removedIndexes}`,

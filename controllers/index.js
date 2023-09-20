@@ -30,10 +30,8 @@ class ControllerManager extends Base {
     });
     const controllers = [];
     for (const controller of controllersToLoad) {
-      // TODO wait until https://github.com/nodejs/node/issues/35889
       controllers.push(
         import(controller.path).then(({ default: ControllerModule }) => {
-          // const ControllerModule = require(controller.path);
           const contollerName = ControllerModule.name.toLowerCase();
           let prefix = path.dirname(controller.file);
           if (prefix === '.') {

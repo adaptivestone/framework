@@ -58,9 +58,6 @@ class Server {
    * @returns {Promise}
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
-    // const HttpServer = require('./services/http/HttpServer');
-    // const ControllerManager = require('./controllers/index');
-    // TODO wait until https://github.com/nodejs/node/issues/35889
     const [{ default: HttpServer }, { default: ControllerManager }] =
       await Promise.all([
         import('./services/http/HttpServer.js'), // Speed optimisation
@@ -255,9 +252,7 @@ class Server {
    */
   async runCliCommand(commandName, args) {
     if (!this.cli) {
-      // TODO wait until https://github.com/nodejs/node/issues/35889
       const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
-      // const BaseCli = require('./modules/BaseCli');
       this.cli = new BaseCli(this);
     }
     return this.cli.run(commandName, args);
