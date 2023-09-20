@@ -40,6 +40,7 @@ beforeAll(async () => {
         process.env.TEST_FOLDER_MIGRATIONS || path.resolve('./migrations'),
     },
   });
+  await global.server.init();
   global.server.updateConfig('mongo', {
     connectionString: connectionStringMongo,
   });

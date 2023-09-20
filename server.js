@@ -12,6 +12,8 @@ const Cache = require('./services/cache/Cache');
 class Server {
   #realLogger = null;
 
+  #isInited = false;
+
   /**
    *  Construct new server
    * @param {Object} config main config object
@@ -62,6 +64,7 @@ class Server {
       await Promise.all([
         import('./services/http/HttpServer.js'), // Speed optimisation
         import('./controllers/index.js'), // Speed optimisation
+        this.init(),
       ]);
 
     this.addErrorHandling();
@@ -74,6 +77,22 @@ class Server {
     await this.app.controllerManager.initControllers();
     await callbackBefore404();
     this.app.httpServer.add404Page();
+  }
+
+  /**
+   * Do an initialization (config reading,  etc)
+   * @returns {Promise}
+   */
+  async init() {
+    if (this.#isInited) {
+      return true;
+    }
+
+    console.log('INIT TODO');
+
+    this.#isInited = true;
+
+    return true;
   }
 
   /**
@@ -104,6 +123,10 @@ class Server {
    * @returns {Object} config object. Structure depends of config file
    */
   getConfig(configName) {
+    if (!this.#isInited) {
+      throw new Error('You should call Server.init() before using it');
+    }
+
     // const configName = name.charAt(0).toUpperCase() + name.slice(1);
     if (!this.cache.configs.has(configName)) {
       let envConfig = {};

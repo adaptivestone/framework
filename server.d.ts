@@ -46,6 +46,12 @@ declare class Server {
   startServer(callbackBefore404?: Promise<null>): Promise<null>;
 
   /**
+   * Do an initialization (config reading,  etc)
+   * @returns {Promise}
+   */
+  init(): Promise<boolean>;
+
+  /**
    * Return config from {configName} (file name) on config folder.
    * Support cache and updating confing into cache
    * Also will update config based on NODE_ENV. If config.js and config.production.js
