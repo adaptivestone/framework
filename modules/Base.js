@@ -1,5 +1,5 @@
 const fs = require('node:fs').promises;
-const { join, normalize } = require('node:path');
+const { join } = require('node:path');
 
 class Base {
   #realLogger = null;
@@ -36,38 +36,40 @@ class Base {
   }
 
   async getFilesPathWithInheritance(internalFolder, externalFolder) {
-    async function rreaddir(dir, allFiles = []) {
-      const files = (await fs.readdir(dir)).map((f) => join(dir, f));
-      allFiles.push(...files);
-      await Promise.all(
-        files.map(async (f) => {
-          if ((await fs.stat(f)).isDirectory()) {
-            allFiles.pop();
-            return rreaddir(f, allFiles);
-          }
-          return null;
-        }),
-      );
-      return allFiles.map((file) => file.replace(`${normalize(dir)}/`, ''));
-    }
-
     let [internalFiles, externalFiles] = await Promise.all([
-      rreaddir(internalFolder),
-      rreaddir(externalFolder),
+      fs.readdir(internalFolder, { recursive: true, withFileTypes: true }),
+      fs.readdir(externalFolder, { recursive: true, withFileTypes: true }),
     ]);
 
-    const filterIndexFile = (fileName) => {
-      const fileArray = fileName.split('/');
+    const filterIndexFile = (fileDirent) => {
+      if (!fileDirent.isFile()) {
+        return false;
+      }
+      const fileArray = fileDirent.name.split('/');
       const file = fileArray[fileArray.length - 1];
       return (
-        file[0] === file[0].toUpperCase() && // Start with capital
+        // file[0] === file[0].toUpperCase() && // Start with capital
         file[0] !== '.' && // not start with dot
-        !file.includes('.test.js') // not test files
+        !file.endsWith('.test.js') // not test files
       );
     };
 
-    internalFiles = internalFiles.filter(filterIndexFile);
-    externalFiles = externalFiles.filter(filterIndexFile);
+    internalFiles = internalFiles
+      .filter(filterIndexFile)
+      .map((fileDirent) =>
+        join(fileDirent.path, fileDirent.name).replace(
+          `${internalFolder}/`,
+          '',
+        ),
+      );
+    externalFiles = externalFiles
+      .filter(filterIndexFile)
+      .map((fileDirent) =>
+        join(fileDirent.path, fileDirent.name).replace(
+          `${externalFolder}/`,
+          '',
+        ),
+      );
 
     const filesToLoad = [];
     for (const file of internalFiles) {
@@ -89,6 +91,7 @@ class Base {
         file,
       });
     }
+    console.log(filesToLoad);
     return filesToLoad;
   }
 
