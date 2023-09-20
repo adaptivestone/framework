@@ -1,5 +1,7 @@
 ### 4.8.0
 
+[BREAKING] Minimum node js version id 18.17.0 now.
+[UPDATE] update Base getFilesPathWithInheritance to use fs.read dir resursive option
 [UPDATE] update cache (refactor+tets)
 
 ### 4.7.0
