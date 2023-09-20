@@ -4,6 +4,8 @@ const EventEmitter = require('node:events');
 require('dotenv').config();
 const merge = require('deepmerge');
 const winston = require('winston');
+const { getFilesPathWithInheritance } = require('./helpers/files');
+
 const Cache = require('./services/cache/Cache');
 
 /**
@@ -88,27 +90,77 @@ class Server {
       return true;
     }
 
-    console.log('INIT TODO');
+    console.time('Server init. Done');
+    await this.#initConfigFiles();
 
     this.#isInited = true;
 
+    console.timeEnd('Server init. Done');
+
+    return true;
+  }
+
+  async #initConfigFiles() {
+    const files = await getFilesPathWithInheritance({
+      internalFolder: `${__dirname}/config`,
+      externalFolder: this.app.foldersConfig.config,
+      logger: console.log,
+      filter: {
+        startWithCapital: false,
+      },
+    });
+
+    const configFiles = {};
+
+    for (const file of files) {
+      const config = file.file.split('.');
+      if (!configFiles[config[0]]) {
+        configFiles[config[0]] = {};
+      }
+      if (config.length === 2) {
+        configFiles[config[0]].default = file.path;
+      } else {
+        configFiles[config[0]][config[1]] = file.path;
+      }
+    }
+
+    const loadConfig = async (configName, values) => {
+      const promises = [import(values.default)];
+      if (process.env.NODE_ENV && values[process.env.NODE_ENV]) {
+        promises.push(import(values[process.env.NODE_ENV]));
+      }
+      const result = await Promise.all(promises);
+      return {
+        name: configName,
+        finalValue: merge(result[0].default, result[1]?.default || {}, {
+          arrayMerge: (destinationArray, sourceArray) => sourceArray,
+        }),
+      };
+    };
+
+    const loadingPromises = [];
+
+    for (const [configFile, value] of Object.entries(configFiles)) {
+      loadingPromises.push(loadConfig(configFile, value));
+    }
+
+    const configs = await Promise.all(loadingPromises);
+
+    for (const config of configs) {
+      this.cache.configs.set(config.name, config.finalValue);
+    }
     return true;
   }
 
   /**
    * Add error logging on promise reject
    */
-  // eslint-disable-next-line class-methods-use-this
   addErrorHandling() {
-    process.on('uncaughtException', console.error);
-    process.on('unhandledRejection', (reason, p) => {
-      console.log(
-        'Possibly Unhandled Rejection at: Promise ',
-        p,
-        ' reason: ',
-        reason,
-      );
-      console.trace('unhandledRejection');
+    process.on('uncaughtException', (e) =>
+      this.app.logger.error('uncaughtException', e),
+    );
+    process.on('unhandledRejection', (e) => {
+      this.app.logger.error('unhandledRejection', e);
     });
   }
 
@@ -127,24 +179,11 @@ class Server {
       throw new Error('You should call Server.init() before using it');
     }
 
-    // const configName = name.charAt(0).toUpperCase() + name.slice(1);
     if (!this.cache.configs.has(configName)) {
-      let envConfig = {};
-      if (process.env.NODE_ENV) {
-        envConfig =
-          this.getFileWithExtendingInhirence(
-            'config',
-            `${configName}.${process.env.NODE_ENV}.js`,
-          ) || envConfig;
-      }
-      this.cache.configs.set(
-        configName,
-        merge(
-          this.getFileWithExtendingInhirence('config', configName),
-          envConfig,
-          { arrayMerge: (destinationArray, sourceArray) => sourceArray },
-        ),
+      this.logger.warn(
+        `You asked for config ${configName} that not exists. Please check you codebase `,
       );
+      return {};
     }
     return this.cache.configs.get(configName);
   }
