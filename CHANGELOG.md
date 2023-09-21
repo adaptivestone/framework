@@ -1,3 +1,7 @@
+### 4.8.2
+
+[UPDATE] CLI - disable mongoose index creation
+
 ### 4.8.1
 
 [UPDATE] Model inited on server inited.
