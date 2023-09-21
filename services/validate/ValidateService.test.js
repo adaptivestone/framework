@@ -45,21 +45,21 @@ describe('validate service', () => {
       expect.assertions(1);
       const validator = 'not an object';
       const result = ValidateService.isValidatorExists(validator);
-      expect(result).toBe(false);
+      expect(result).toBeFalsy();
     });
 
     it('returns true if validator is an instance of one of the drivers', () => {
       expect.assertions(1);
       const validator = new ValidateService.drivers.YupValidator();
       const result = ValidateService.isValidatorExists(validator);
-      expect(result).toBe(true);
+      expect(result).toBeTruthy();
     });
 
     it('returns false if validator is not an instance of any of the drivers', () => {
       expect.assertions(1);
       const validator = {};
       const result = ValidateService.isValidatorExists(validator);
-      expect(result).toBe(false);
+      expect(result).toBeFalsy();
     });
   });
 

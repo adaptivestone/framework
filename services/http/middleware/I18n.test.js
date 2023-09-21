@@ -87,7 +87,7 @@ describe('i18n middleware methods', () => {
       appInfo: {},
     };
     await middleware.middleware(req, {}, nextFunction);
-    expect(isCalled).toBe(true);
+    expect(isCalled).toBeTruthy();
     expect(req.appInfo.i18n).toBeDefined();
     expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
     expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test

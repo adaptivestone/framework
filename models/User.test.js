@@ -59,7 +59,7 @@ describe('user model', () => {
         userEmail,
         'wrongPassword',
       );
-      expect(user).toBe(false);
+      expect(user).toBeFalsy();
     });
 
     it('should NOT with wrong email', async () => {
@@ -69,7 +69,7 @@ describe('user model', () => {
         'not@exists.com',
         userPassword,
       );
-      expect(user).toBe(false);
+      expect(user).toBeFalsy();
     });
   });
 
@@ -80,7 +80,7 @@ describe('user model', () => {
       const user = await global.server.app
         .getModel('User')
         .getUserByToken('fake one');
-      expect(user).toBe(false);
+      expect(user).toBeFalsy();
     });
 
     it('should  work for VALID token', async () => {

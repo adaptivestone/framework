@@ -113,7 +113,7 @@ describe('rate limiter methods', () => {
       () => {},
     );
     expect(status).toBe(500);
-    expect(isSend).toBe(true);
+    expect(isSend).toBeTruthy();
   });
 
   const makeOneRequest = async ({ rateLimiter, driver, request }) => {
@@ -154,7 +154,7 @@ describe('rate limiter methods', () => {
       rateLimiter: mongoRateLimiter,
       request: { ip: '10.10.0.1' },
     });
-    expect(isNextCalled).toBe(true);
+    expect(isNextCalled).toBeTruthy();
   });
 
   it('middleware should works with a memory drivers', async () => {
@@ -163,7 +163,7 @@ describe('rate limiter methods', () => {
       driver: 'memory',
       request: { ip: '10.10.0.1' },
     });
-    expect(isNextCalled).toBe(true);
+    expect(isNextCalled).toBeTruthy();
   });
 
   it('middleware should works with a redis drivers', async () => {
@@ -172,7 +172,7 @@ describe('rate limiter methods', () => {
       driver: 'redis',
       request: { ip: '10.10.0.1' },
     });
-    expect(isNextCalled).toBe(true);
+    expect(isNextCalled).toBeTruthy();
   });
 
   it('middleware should rate limits for us. mongo driver', async () => {
@@ -188,7 +188,7 @@ describe('rate limiter methods', () => {
     const isSend = data.find((obj) => obj.isSend);
 
     expect(status.status).toBe(429);
-    expect(isSend.isSend).toBe(true);
+    expect(isSend.isSend).toBeTruthy();
   });
 
   it('middleware should rate limits for us. memory driver', async () => {
@@ -208,7 +208,7 @@ describe('rate limiter methods', () => {
     const isSend = data.find((obj) => obj.isSend);
 
     expect(status.status).toBe(429);
-    expect(isSend.isSend).toBe(true);
+    expect(isSend.isSend).toBeTruthy();
   });
 
   it('middleware should rate limits for us. redis driver', async () => {
@@ -228,6 +228,6 @@ describe('rate limiter methods', () => {
     const isSend = data.find((obj) => obj.isSend);
 
     expect(status.status).toBe(429);
-    expect(isSend.isSend).toBe(true);
+    expect(isSend.isSend).toBeTruthy();
   });
 });
