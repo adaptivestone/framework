@@ -5,6 +5,7 @@ describe('migration model', () => {
     expect.assertions(1);
     let errorCode;
     const MigrationModel = global.server.app.getModel('Migration');
+    await MigrationModel.syncIndexes();
     await MigrationModel.create({
       migrationFile: 'a',
     });
