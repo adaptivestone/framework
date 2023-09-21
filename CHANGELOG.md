@@ -1,3 +1,9 @@
+### 4.8.1
+
+[UPDATE] Model inited on server inited.
+[NEW] New options to skip model init isSkipModelInit
+[NEW] New method server method initAllModels()
+
 ### 4.8.0
 
 [BREAKING] Minimum node js version id 18.17.0 now.
