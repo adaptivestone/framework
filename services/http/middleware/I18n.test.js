@@ -12,7 +12,7 @@ describe('i18n middleware methods', () => {
   });
 
   it('detectors should works correctly', async () => {
-    expect.assertions(5);
+    expect.assertions(6);
     const request = {
       get: () => 'en',
       query: {
@@ -42,10 +42,13 @@ describe('i18n middleware methods', () => {
     };
     lang = await middleware.detectLang(request);
     expect(lang).toBe('en');
+
+    lang = await middleware.detectLang(request, false);
+    expect(lang).toBe('en-GB');
   });
 
   it('middleware that works', async () => {
-    expect.assertions(4);
+    expect.assertions(6);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -55,10 +58,19 @@ describe('i18n middleware methods', () => {
       appInfo: {},
     };
     await middleware.middleware(req, {}, nextFunction);
-    expect(isCalled).toBe(true);
+    expect(isCalled).toBeTruthy();
     expect(req.appInfo.i18n).toBeDefined();
+    expect(req.appInfo.i18n.language).toBe('en');
     expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
     expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test
+
+    const req2 = {
+      get: () => 'fakeLang',
+      appInfo: {},
+    };
+
+    await middleware.middleware(req2, {}, nextFunction);
+    expect(req2.appInfo.i18n.language).toBe('en');
   });
 
   it('middleware disabled', async () => {

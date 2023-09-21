@@ -17,7 +17,7 @@ describe('prepareAppInfo methods', () => {
     };
     const req = {};
     await middleware.middleware(req, {}, nextFunction);
-    expect(isCalled).toBe(true);
+    expect(isCalled).toBeTruthy();
     expect(req.appInfo).toBeDefined();
     req.appInfo.test = 5;
     await middleware.middleware(req, {}, nextFunction);
