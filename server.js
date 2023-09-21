@@ -88,7 +88,7 @@ class Server {
    * Do an initialization (config reading,  etc)
    * @returns {Promise}
    */
-  async init() {
+  async init({ isSkipModelInit = false } = {}) {
     if (this.#isInited) {
       return true;
     }
@@ -98,6 +98,22 @@ class Server {
     await Promise.all([this.#initConfigFiles(), this.#loadModelFiles()]);
     console.timeEnd('Loading config and model files. Time');
 
+    if (!isSkipModelInit) {
+      await this.initAllModels();
+    }
+
+    this.#isInited = true;
+
+    console.timeEnd('Server init. Done');
+
+    return true;
+  }
+
+  /**
+   * Load model and init them
+   * @returns {Promise}
+   */
+  async initAllModels() {
     console.time('Initing models. Time');
 
     if (this.app.getConfig('mongo').connectionString) {
@@ -120,12 +136,6 @@ class Server {
     }
 
     console.timeEnd('Initing models. Time');
-
-    this.#isInited = true;
-
-    console.timeEnd('Server init. Done');
-
-    return true;
   }
 
   async #initConfigFiles() {

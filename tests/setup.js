@@ -38,12 +38,14 @@ beforeAll(async () => {
         process.env.TEST_FOLDER_MIGRATIONS || path.resolve('./migrations'),
     },
   });
-  await global.server.init();
+  await global.server.init({ isSkipModelInit: true });
   global.server.updateConfig('mongo', {
     connectionString: connectionStringMongo,
   });
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
+  await global.server.initAllModels();
+
   if (!global.testSetup) {
     global.testSetup = {};
   }

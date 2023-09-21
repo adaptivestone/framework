@@ -49,7 +49,15 @@ declare class Server {
    * Do an initialization (config reading,  etc)
    * @returns {Promise}
    */
-  init(): Promise<boolean>;
+  init(
+    options: { isSkipModelInit: boolean } = { isSkipModelInit: false },
+  ): Promise<boolean>;
+
+  /**
+   * Load model and init them
+   * @returns {Promise}
+   */
+  initAllModels(): Promise<void>;
 
   /**
    * Return config from {configName} (file name) on config folder.
