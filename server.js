@@ -1,10 +1,12 @@
 /* eslint-disable no-console */
 const EventEmitter = require('node:events');
+const { hrtime } = require('node:process');
 
 require('dotenv').config();
 const merge = require('deepmerge');
 const winston = require('winston');
 const { getFilesPathWithInheritance } = require('./helpers/files');
+const { consoleLogger } = require('./helpers/logger');
 
 const Cache = require('./services/cache/Cache');
 
@@ -51,6 +53,7 @@ class Server {
     this.cache = {
       configs: new Map(),
       models: new Map(),
+      modelConstructors: new Map(),
     };
 
     this.cli = false;
@@ -91,7 +94,7 @@ class Server {
     }
 
     console.time('Server init. Done');
-    await this.#initConfigFiles();
+    await Promise.all([this.#initConfigFiles(), this.#loadModelFiles()]);
 
     this.#isInited = true;
 
@@ -104,7 +107,8 @@ class Server {
     const files = await getFilesPathWithInheritance({
       internalFolder: `${__dirname}/config`,
       externalFolder: this.app.foldersConfig.config,
-      logger: console.log,
+      loggerFileType: 'CONFIG',
+      logger: (m) => consoleLogger('info', m),
       filter: {
         startWithCapital: false,
       },
@@ -148,6 +152,34 @@ class Server {
 
     for (const config of configs) {
       this.cache.configs.set(config.name, config.finalValue);
+    }
+    return true;
+  }
+
+  async #loadModelFiles() {
+    const files = await getFilesPathWithInheritance({
+      internalFolder: `${__dirname}/models`,
+      externalFolder: this.app.foldersConfig.models,
+      loggerFileType: 'MODEL',
+      logger: (m) => consoleLogger('info', m),
+    });
+
+    const promises = [];
+    for (const file of files) {
+      const t = hrtime.bigint();
+      promises.push(
+        import(file.path).then((f) => ({
+          name: file.file.split('.')[0],
+          file: f,
+          took: hrtime.bigint() - t,
+        })),
+      );
+    }
+
+    const loadedModels = await Promise.all(promises);
+
+    for (const model of loadedModels) {
+      this.cache.modelConstructors.set(model.name, model.file.default);
     }
     return true;
   }
@@ -285,14 +317,14 @@ class Server {
    */
   getModel(modelName) {
     if (modelName.endsWith('s')) {
-      console.warn(
+      this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
       );
     }
     if (!this.cache.models.has(modelName)) {
-      const Model = this.getFileWithExtendingInhirence('models', modelName);
+      const Model = this.cache.modelConstructors.get(modelName);
       if (!Model) {
-        console.error(`Model not found: ${modelName}`);
+        this.app.logger.error(`Model not found: ${modelName}`);
         return false;
       }
       try {
@@ -300,8 +332,8 @@ class Server {
 
         this.cache.models.set(modelName, model.mongooseModel);
       } catch (e) {
-        console.error(`Problem with model ${modelName}, ${e.message}`);
-        console.error(e);
+        this.app.logger.error(`Problem with model ${modelName}, ${e.message}`);
+        this.app.logger.error(e);
       }
     }
     return this.cache.models.get(modelName);
@@ -329,46 +361,6 @@ class Server {
       this.cacheService = new Cache(this.app);
     }
     return this.cacheService;
-  }
-
-  /**
-   * Get file using Inhirence (ability to overrite models, configs, etc)
-   * @param {('models'|'config')} fileType  type of file to load
-   * @param {string} fileName  name of file to load
-   */
-  getFileWithExtendingInhirence(fileType, fileName) {
-    let file;
-    try {
-      // eslint-disable-next-line global-require, import/no-dynamic-require
-      file = require(`${this.config.folders[fileType]}/${fileName}`);
-    } catch (e) {
-      try {
-        // eslint-disable-next-line global-require, import/no-dynamic-require
-        file = require(`./${fileType}/${fileName}`);
-      } catch (e2) {
-        const levels = [
-          'error',
-          'warn',
-          'info',
-          'http',
-          'verbose',
-          'debug',
-          'silly',
-        ];
-
-        if (
-          !process.env.LOGGER_CONSOLE_LEVEL ||
-          levels.indexOf(process.env.LOGGER_CONSOLE_LEVEL) > 0 // as a warn level
-        ) {
-          console.warn(
-            `Config not found '${fileName}'. This can be a normal (in case this an environment config)`,
-          );
-        }
-
-        file = false;
-      }
-    }
-    return file;
   }
 }
 

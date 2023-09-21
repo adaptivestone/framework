@@ -1,8 +1,10 @@
 ### 4.8.0
 
 [BREAKING] Minimum node js version id 18.17.0 now.
+[BREAKING] Removed getFileWithExtendingInhirence. This was internal method and not suppose to use externally
 [UPDATE] update Base getFilesPathWithInheritance to use fs.read dir resursive option
 [UPDATE] update cache (refactor+tets)
+[UPDATE] update config and model inits
 
 ### 4.7.0
 

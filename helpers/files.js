@@ -5,6 +5,7 @@ const getFilesPathWithInheritance = async ({
   internalFolder,
   externalFolder,
   logger,
+  loggerFileType = '',
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
 }) => {
   let [internalFiles, externalFiles] = await Promise.all([
@@ -47,7 +48,9 @@ const getFilesPathWithInheritance = async ({
   for (const file of internalFiles) {
     if (externalFiles.includes(file)) {
       logger(
-        `Skipping register INTERNAL file ${file} as it override by EXTERNAL ONE`,
+        `Skipping register INTERNAL file '${file}' ${
+          loggerFileType ? `of type ${loggerFileType}` : ''
+        } as it override by EXTERNAL ONE`,
       );
     } else {
       filesToLoad.push({
