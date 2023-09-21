@@ -5,6 +5,8 @@ const { MongoMemoryReplSet } = require('mongodb-memory-server');
 
 const mongoose = require('mongoose');
 
+mongoose.set('autoIndex', false); // we do not need create indexes щт еуыеы
+
 let mongoMemoryServerInstance;
 
 const redis = require('redis');

@@ -3,6 +3,8 @@ const path = require('node:path');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 
+mongoose.set('autoIndex', false);
+
 let mongoMemoryServerInstance;
 
 const redis = require('redis');
