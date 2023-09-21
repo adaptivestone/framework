@@ -12,7 +12,6 @@ const Server = require('../server');
 
 const clearRedisNamespace = require('../helpers/redis/clearNamespace');
 
-// eslint-disable-next-line vitest/no-hooks, vitest/require-top-level-describe
 beforeAll(async () => {
   mongoMemoryServerInstance = await MongoMemoryReplSet.create({
     // binary: { version: '4.4.6' },
@@ -76,7 +75,6 @@ beforeAll(async () => {
   await global.server.startServer();
 });
 
-// eslint-disable-next-line vitest/no-hooks, vitest/require-top-level-describe
 beforeEach(() => {
   if (global.server) {
     const key = `test-${Math.random().toString(36).substring(7)}`;
@@ -86,7 +84,6 @@ beforeEach(() => {
   }
 });
 
-// eslint-disable-next-line vitest/no-hooks, vitest/require-top-level-describe
 afterEach(async () => {
   if (global.server) {
     const { url, namespace } = global.server.getConfig('redis');
@@ -102,7 +99,6 @@ afterEach(async () => {
   }
 });
 
-// eslint-disable-next-line vitest/no-hooks, vitest/require-top-level-describe
 afterAll(async () => {
   if (global.server) {
     global.server.app.httpServer.shutdown();

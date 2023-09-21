@@ -3,13 +3,8 @@ module.exports = {
     es2023: true,
     node: true,
   },
-  extends: [
-    'airbnb-base',
-    'prettier',
-    'plugin:vitest/recommended',
-    'plugin:vitest/all',
-  ],
-  plugins: ['vitest'],
+  extends: ['airbnb-base', 'prettier'],
+  plugins: ['prettier'],
   parserOptions: {
     ecmaVersion: 2023,
   },
@@ -32,6 +27,14 @@ module.exports = {
           '`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
       },
     ],
+    'prettier/prettier': 'error',
     'import/extensions': 'off', // it have a problem with dynamic imports
   },
+  overrides: [
+    {
+      files: ['**/*.test.js'],
+      extends: ['plugin:vitest/all', 'plugin:vitest/recommended'],
+      plugins: ['vitest'],
+    },
+  ],
 };

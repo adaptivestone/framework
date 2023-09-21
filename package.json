@@ -55,6 +55,7 @@
     "eslint": "^8.0.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
     "eslint-plugin-vitest": "^0.3.1",
     "husky": "^8.0.0",
     "lint-staged": "^14.0.0",

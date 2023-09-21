@@ -32,7 +32,6 @@ class CreateMigration extends AbstractCommand {
     return this.logger.info(`Migration created ${fileName}`);
   }
 
-  // eslint-disable-next-line class-methods-use-this
   static camelSentence(str) {
     return ` ${str}`
       .toLowerCase()
