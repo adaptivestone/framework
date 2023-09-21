@@ -41,7 +41,8 @@ class CreateMigration extends AbstractCommand {
   static getTemplate(name) {
     return `/* eslint-disable class-methods-use-this */
 
-const Base = require('@adaptivestone/framework/modules/Base');
+// const Base = require('@adaptivestone/framework/modules/Base');
+import Base from '@adaptivestone/framework/modules/Base.js';
 
 class ${name} extends Base {
   async up() {
@@ -54,7 +55,8 @@ class ${name} extends Base {
   }
 }
 
-module.exports = ${name};
+// module.exports = ${name};
+export default ${name};
 `;
   }
 }

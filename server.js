@@ -94,7 +94,32 @@ class Server {
     }
 
     console.time('Server init. Done');
+    console.time('Loading config and model files. Time');
     await Promise.all([this.#initConfigFiles(), this.#loadModelFiles()]);
+    console.timeEnd('Loading config and model files. Time');
+
+    console.time('Initing models. Time');
+
+    if (this.app.getConfig('mongo').connectionString) {
+      for (const [modelName, ModelConstructor] of this.cache
+        .modelConstructors) {
+        try {
+          const model = new ModelConstructor(this.app);
+          this.cache.models.set(modelName, model.mongooseModel);
+        } catch (e) {
+          this.app.logger.error(
+            `Problem with model ${modelName}, ${e.message}`,
+          );
+          this.app.logger.error(e);
+        }
+      }
+    } else {
+      this.app.logger.info(
+        'Skipping inited models as we have no mongo connection string',
+      );
+    }
+
+    console.timeEnd('Initing models. Time');
 
     this.#isInited = true;
 
@@ -207,12 +232,11 @@ class Server {
    * @returns {Object} config object. Structure depends of config file
    */
   getConfig(configName) {
-    if (!this.#isInited) {
-      throw new Error('You should call Server.init() before using it');
-    }
-
     if (!this.cache.configs.has(configName)) {
-      this.logger.warn(
+      if (!this.#isInited) {
+        throw new Error('You should call Server.init() before using getConfig');
+      }
+      this.app.logger.warn(
         `You asked for config ${configName} that not exists. Please check you codebase `,
       );
       return {};
@@ -321,20 +345,17 @@ class Server {
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
       );
     }
+    if (!this.#isInited) {
+      this.app.logger.error(
+        new Error('You should call Server.init() before using getModel'),
+      );
+      return false;
+    }
     if (!this.cache.models.has(modelName)) {
-      const Model = this.cache.modelConstructors.get(modelName);
-      if (!Model) {
-        this.app.logger.error(`Model not found: ${modelName}`);
-        return false;
-      }
-      try {
-        const model = new Model(this.app);
-
-        this.cache.models.set(modelName, model.mongooseModel);
-      } catch (e) {
-        this.app.logger.error(`Problem with model ${modelName}, ${e.message}`);
-        this.app.logger.error(e);
-      }
+      this.app.logger.warn(
+        `You asked for model ${modelName} that not exists. Please check you codebase `,
+      );
+      return {};
     }
     return this.cache.models.get(modelName);
   }
