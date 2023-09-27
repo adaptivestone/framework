@@ -5,5 +5,7 @@ export default defineConfig({
   test: {
     setupFiles: './tests/setupVitest.js',
     testTimeout: 10000,
+    outputFile: './rspec.xml',
+    reporters: ['default', 'junit'],
   },
 });

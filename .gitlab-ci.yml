@@ -42,3 +42,9 @@ test:
     REDIS_URI: redis://redis
   script:
     - npm test
+  artifacts:
+    when: always
+    paths:
+      - rspec.xml
+    reports:
+      junit: rspec.xml
