@@ -7,5 +7,8 @@ export default defineConfig({
     testTimeout: 10000,
     outputFile: './rspec.xml',
     reporters: ['default', 'junit'],
+    coverage: {
+      enabled: true,
+    },
   },
 });

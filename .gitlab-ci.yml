@@ -42,6 +42,7 @@ test:
     REDIS_URI: redis://redis
   script:
     - npm test
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
     when: always
     paths:

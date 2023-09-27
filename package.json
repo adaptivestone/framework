@@ -14,7 +14,7 @@
   "scripts": {
     "dev": "nodemon ./index.js",
     "prod": "nodemon ./cluster.js",
-    "test": "vitest  run --coverage",
+    "test": "vitest run",
     "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
     "lint": "eslint '**/*.js'",
     "lint:fix": "eslint '**/*.js' --fix",
