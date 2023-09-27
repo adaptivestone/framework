@@ -1,3 +1,7 @@
+### 4.8.3
+
+[UPDATE] Fix problme with fat start and closing connections after
+
 ### 4.8.2
 
 [UPDATE] CLI - disable mongoose index creation

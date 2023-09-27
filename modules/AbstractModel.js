@@ -21,16 +21,17 @@ class AbstractModel extends Base {
       this.mongooseSchema,
     );
     if (!mongoose.connection.readyState) {
+      this.app.events.on('shutdown', async () => {
+        for (const c of mongoose.connections) {
+          c.close(true);
+        }
+        // await mongoose.disconnect(); // TODO it have problems with replica-set
+      });
       // do not connect on test
       mongoose.connect(this.app.getConfig('mongo').connectionString, {}).then(
         () => {
           this.logger.info('Mongo connection success');
-          this.app.events.on('shutdown', async () => {
-            for (const c of mongoose.connections) {
-              c.close(true);
-            }
-            // await mongoose.disconnect(); // TODO it have problems with replica-set
-          });
+
           callback();
         },
         (error) => {
