@@ -46,6 +46,9 @@ test:
   artifacts:
     when: always
     paths:
-      - rspec.xml
+      - coverage/rspec.xml
     reports:
-      junit: rspec.xml
+      junit: coverage/rspec.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml

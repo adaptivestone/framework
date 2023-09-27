@@ -11,5 +11,4 @@ cliCommand.js
 /services/http/middleware/test/*
 /benchmark/*
 /coverage/*
-rspec.xml
 

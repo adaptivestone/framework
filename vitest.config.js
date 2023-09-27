@@ -5,10 +5,11 @@ export default defineConfig({
   test: {
     setupFiles: './tests/setupVitest.js',
     testTimeout: 10000,
-    outputFile: './rspec.xml',
+    outputFile: './coverage/rspec.xml',
     reporters: ['default', 'junit'],
     coverage: {
       enabled: true,
+      reporter: ['text', 'html', 'clover', 'json', 'cobertura'],
     },
   },
 });
