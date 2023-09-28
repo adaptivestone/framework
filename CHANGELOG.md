@@ -1,6 +1,6 @@
 ### 4.9.0
 
-[BREAKING] We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memoery server is spinned up. If you are using vitest please add "globalSetup: @adaptivestone/framework/tests/gloablSetupVitest" to your vitest config
+[BREAKING] We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memoery server is spinned up. If you are using vitest please add "globalSetup: node_modules/@adaptivestone/framework/tests/globalSetupVitest" to your vitest config
 
 ### 4.8.3
 
