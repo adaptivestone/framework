@@ -1,13 +1,10 @@
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-
-const { MongoMemoryReplSet } = require('mongodb-memory-server');
 
 const mongoose = require('mongoose');
 
 mongoose.set('autoIndex', false); // we do not need create indexes щт еуыеы
-
-let mongoMemoryServerInstance;
 
 const redis = require('redis');
 const Server = require('../server');
@@ -15,14 +12,7 @@ const Server = require('../server');
 const clearRedisNamespace = require('../helpers/redis/clearNamespace');
 
 beforeAll(async () => {
-  mongoMemoryServerInstance = await MongoMemoryReplSet.create({
-    // binary: { version: '4.4.6' },
-    replSet: { count: 1, storageEngine: 'wiredTiger' },
-  });
-  await mongoMemoryServerInstance.waitUntilRunning();
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
-  const connectionStringMongo = await mongoMemoryServerInstance.getUri();
-  // console.info('MONGO_URI: ', connectionStringMongo);
   global.server = new Server({
     folders: {
       config: process.env.TEST_FOLDER_CONFIG || path.resolve('./config'),
@@ -42,8 +32,12 @@ beforeAll(async () => {
     },
   });
   await global.server.init({ isSkipModelInit: true });
+  const connectionString = process.env.TEST_MONGO_URI.replace(
+    '__DB_TO_REPLACE__',
+    `TEST_${crypto.randomUUID()}`,
+  );
   global.server.updateConfig('mongo', {
-    connectionString: connectionStringMongo,
+    connectionString,
   });
   global.server.updateConfig('http', { port: 0 }); // allow to use random
   global.server.updateConfig('mail', { transport: 'stub' });
@@ -108,13 +102,9 @@ afterAll(async () => {
     global.server.app.httpServer.shutdown();
     global.server.app.events.emit('shutdown');
   }
-  // setTimeout(async () => {
   if (typeof global.testSetup.afterAll === 'function') {
     await global.testSetup.afterAll();
   }
-
+  await mongoose.connection.db.dropDatabase(); // clean database after test
   await mongoose.disconnect();
-  await mongoMemoryServerInstance.stop();
-
-  // }, 2000);
 });
