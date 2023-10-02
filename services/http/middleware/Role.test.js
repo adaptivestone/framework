@@ -48,7 +48,7 @@ describe('role middleware methods', () => {
           status = statusCode;
           return this;
         },
-        send() {
+        json() {
           isSend = true;
         },
       },

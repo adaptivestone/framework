@@ -106,7 +106,7 @@ describe('rate limiter methods', () => {
           status = statusCode;
           return this;
         },
-        send() {
+        json() {
           isSend = true;
         },
       },
@@ -137,7 +137,7 @@ describe('rate limiter methods', () => {
           status = statusCode;
           return this;
         },
-        send() {
+        json() {
           isSend = true;
         },
       },

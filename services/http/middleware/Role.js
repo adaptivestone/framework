@@ -9,7 +9,7 @@ class RoleMiddleware extends AbstractMiddleware {
     const { user } = req.appInfo;
 
     if (!user) {
-      return res.status(401).send();
+      return res.status(401).json({ message: 'User should be provided' });
     }
 
     let hasRole = false;

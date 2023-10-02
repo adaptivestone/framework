@@ -105,9 +105,9 @@ class RateLimiter extends AbstractMiddleware {
   async middleware(req, res, next) {
     if (!this.limiter) {
       this.logger.info(
-        `RateLimmiter not inited correclty! Please check init logs `,
+        `RateLimiter not inited correclty! Please check init logs `,
       );
-      return res.status(500).send('');
+      return res.status(500).json({ message: 'RateLimiter error' });
     }
 
     const { namespace } = this.app.getConfig('redis');
@@ -122,7 +122,7 @@ class RateLimiter extends AbstractMiddleware {
     if (consumeResult) {
       return next();
     }
-    return res.status(429).send('Too Many Requests');
+    return res.status(429).json({ message: 'Too Many Requests' });
   }
 }
 
