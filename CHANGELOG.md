@@ -1,3 +1,7 @@
+### 4.9.2
+
+[UPDATE] deps update
+
 ### 4.9.1
 
 [UPDATE] all responces from framework now happens in JSON. Previouls sometime aswers was in plan text
