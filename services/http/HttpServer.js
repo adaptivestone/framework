@@ -7,6 +7,7 @@ const RequestLoggerMiddleware = require('./middleware/RequestLogger');
 const I18nMiddleware = require('./middleware/I18n');
 const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
 const RequestParserMiddleware = require('./middleware/RequestParser');
+const StaticFilesMiddleware = require('./middleware/StaticFiles');
 
 const Base = require('../../modules/Base');
 
@@ -33,9 +34,16 @@ class HttpServer extends Base {
       cors({
         origin: httpConfig.corsDomains,
       }),
-    ); // todo whitelist
-    this.express.use(express.static(this.app.foldersConfig.public));
-    this.express.use(express.static('./public'));
+    );
+    // todo whitelist
+    this.express.use(
+      new StaticFilesMiddleware(this.app, {
+        folders: [
+          this.app.foldersConfig.public,
+          path.join(__dirname, '../../public/files'),
+        ],
+      }).getMiddleware(),
+    );
 
     this.express.use(new RequestParserMiddleware(this.app).getMiddleware());
 
