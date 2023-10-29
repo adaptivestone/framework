@@ -1,8 +1,13 @@
+### 4.11.0
+
+[NEW] Cors middleware
+[BREAKING] This is a potencial breaking change as we switched from cors external package to internal middleware. From API nothing was changed. This is a potencial breaking changes, but it should keep working as it
+
 ### 4.10.0
 
 [UPDATE] deps update
 [NEW] Static file middleware
-[BREAKING] This is a potencial breaking change and we switched from express.static to internal middleware that provide less features but faster. From API nothing was changed
+[BREAKING] This is a potencial breaking change as we switched from express.static to internal middleware that provide less features but faster. From API nothing was changed
 
 ### 4.9.2
 
