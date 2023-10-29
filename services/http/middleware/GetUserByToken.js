@@ -23,7 +23,7 @@ class GetUserByToken extends AbstractMiddleware {
     }
     let { token } = req.body;
     this.logger.verbose(
-      `GetUserByToken token in BODY ${token}. Token if Authorization header ${req.get(
+      `GetUserByToken token in BODY ${token}. Token in Authorization header ${req.get(
         'Authorization',
       )}`,
     );
