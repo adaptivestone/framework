@@ -14,28 +14,29 @@ class Cors extends AbstractMiddleware {
   }
 
   async middleware(req, res, next) {
-    if (req.method !== 'OPTIONS') {
-      // only get supported
-      return next();
-    }
     for (const host of this.params.origins) {
       if (
         (typeof host === 'string' && req.headers.origin === host) ||
         (host instanceof RegExp && host.test(req.headers.origin))
       ) {
         res.set('Access-Control-Allow-Origin', req.headers.origin);
-        res.set(
-          'Access-Control-Allow-Methods',
-          'GET,HEAD,PUT,PATCH,POST,DELETE',
-        );
-        res.set('Vary', 'Origin, Access-Control-Request-Headers');
+        res.set('Vary', 'Origin');
 
-        const allowedHeaders = req.headers['access-control-request-headers'];
-        if (allowedHeaders) {
-          res.set('Access-Control-Allow-Headers', allowedHeaders);
+        if (req.method === 'OPTIONS') {
+          res.set(
+            'Access-Control-Allow-Methods',
+            'GET,HEAD,PUT,PATCH,POST,DELETE',
+          );
+          res.set('Vary', 'Origin, Access-Control-Request-Headers');
+
+          const allowedHeaders = req.headers['access-control-request-headers'];
+          if (allowedHeaders) {
+            res.set('Access-Control-Allow-Headers', allowedHeaders);
+          }
+          res.set('Content-Length', '0');
+          res.status(204);
+          return res.end();
         }
-        res.status(204);
-        return res.end();
       }
     }
     return next();

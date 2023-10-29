@@ -1,3 +1,7 @@
+### 4.11.2
+
+[FIX] Cors middleware return proper headers on multidomains
+
 ### 4.11.1
 
 [FIX] Cors middleware return proper status

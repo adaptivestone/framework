@@ -28,21 +28,30 @@ describe('cors middleware methods', () => {
     expect(() => new Cors(global.server.app, { origins: 'origins' })).toThrow();
   });
 
-  it('non options should be ignored', async () => {
-    expect.assertions(1);
+  it('non options should be different', async () => {
+    expect.assertions(2);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
     };
+    const map = new Map();
     const req = {
       method: 'GET',
+
+      headers: { origin: 'https://localhost' },
+    };
+    const res = {
+      set: (key, val) => {
+        map.set(key, val);
+      },
     };
     const middleware = new Cors(global.server.app, {
-      origins: ['something'],
+      origins: ['https://localhost'],
     });
 
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(req, res, nextFunction);
     expect(isCalled).toBeTruthy();
+    expect(map.get('Vary')).toBe('Origin');
   });
 
   it('host the not match origin', async () => {
