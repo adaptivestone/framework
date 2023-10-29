@@ -78,6 +78,7 @@ describe('cors middleware methods', () => {
       set: (key, val) => {
         map.set(key, val);
       },
+      status: () => {},
       end: () => {
         isEndCalled = true;
       },
@@ -113,6 +114,8 @@ describe('cors middleware methods', () => {
       set: (key, val) => {
         map.set(key, val);
       },
+      status: () => {},
+
       end: () => {
         isEndCalled = true;
       },
