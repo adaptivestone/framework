@@ -34,6 +34,7 @@ class Cors extends AbstractMiddleware {
         if (allowedHeaders) {
           res.set('Access-Control-Allow-Headers', allowedHeaders);
         }
+        res.status(204);
         return res.end();
       }
     }

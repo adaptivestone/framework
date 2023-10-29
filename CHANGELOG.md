@@ -1,3 +1,7 @@
+### 4.11.1
+
+[FIX] Cors middleware return proper status
+
 ### 4.11.0
 
 [NEW] Cors middleware
