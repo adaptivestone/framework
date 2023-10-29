@@ -1,13 +1,13 @@
 const http = require('node:http');
 const path = require('node:path');
 const express = require('express');
-const cors = require('cors');
 
 const RequestLoggerMiddleware = require('./middleware/RequestLogger');
 const I18nMiddleware = require('./middleware/I18n');
 const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
 const RequestParserMiddleware = require('./middleware/RequestParser');
 const StaticFilesMiddleware = require('./middleware/StaticFiles');
+const Cors = require('./middleware/Cors');
 
 const Base = require('../../modules/Base');
 
@@ -31,9 +31,9 @@ class HttpServer extends Base {
 
     const httpConfig = this.app.getConfig('http');
     this.express.use(
-      cors({
-        origin: httpConfig.corsDomains,
-      }),
+      new Cors(this.app, {
+        origins: httpConfig.corsDomains,
+      }).getMiddleware(),
     );
     // todo whitelist
     this.express.use(
