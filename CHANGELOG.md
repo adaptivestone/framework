@@ -1,3 +1,7 @@
+### 4.11.3
+
+[UPDATE] deps update
+
 ### 4.11.2
 
 [FIX] Cors middleware return proper headers on multidomains
