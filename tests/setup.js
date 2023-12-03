@@ -1,16 +1,15 @@
 /* eslint-disable no-undef */
-const path = require('node:path');
-const { MongoMemoryReplSet } = require('mongodb-memory-server');
-const mongoose = require('mongoose');
+import path from 'node:path';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import mongoose from 'mongoose';
+import redis from 'redis';
+import Server from '../server.js';
+
+import clearRedisNamespace from '../helpers/redis/clearNamespace.js';
 
 mongoose.set('autoIndex', false);
 
 let mongoMemoryServerInstance;
-
-const redis = require('redis');
-const Server = require('../server');
-
-const clearRedisNamespace = require('../helpers/redis/clearNamespace');
 
 jest.setTimeout(1000000);
 beforeAll(async () => {
