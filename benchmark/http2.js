@@ -1,5 +1,5 @@
-const http2 = require('node:http2');
-const fs = require('node:fs');
+import http2 from 'node:http2';
+import fs from 'node:fs';
 
 const server = http2.createSecureServer({
   // we can read the certificate and private key from
