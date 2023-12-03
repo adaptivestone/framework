@@ -3,6 +3,7 @@
   "version": "4.11.4",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
+  "type": "module",
   "engines": {
     "node": ">=18.17.0"
   },
@@ -39,7 +40,7 @@
     "juice": "^9.0.0",
     "mime": "^3.0.0",
     "minimist": "^1.2.5",
-    "mongoose": "^7.0.0",
+    "mongoose": "^8.0.0",
     "nodemailer": "^6.6.3",
     "nodemailer-sendmail-transport": "^1.0.2",
     "nodemailer-stub-transport": "^1.1.0",

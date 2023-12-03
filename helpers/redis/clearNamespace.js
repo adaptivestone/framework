@@ -11,4 +11,4 @@ async function clearNamespace(redisClient, namespace) {
   }
 }
 
-module.exports = clearNamespace;
+export default clearNamespace;

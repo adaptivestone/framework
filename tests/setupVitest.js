@@ -2,14 +2,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'; // we do not need create indexes on tests
 
-mongoose.set('autoIndex', false); // we do not need create indexes щт еуыеы
+import redis from 'redis';
+import clearRedisNamespace from '../helpers/redis/clearNamespace.js';
+import Server from '../server.js';
 
-const redis = require('redis');
-const Server = require('../server');
-
-const clearRedisNamespace = require('../helpers/redis/clearNamespace');
+mongoose.set('autoIndex', false);
 
 beforeAll(async () => {
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
