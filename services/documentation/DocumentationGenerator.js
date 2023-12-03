@@ -1,5 +1,5 @@
-const Base = require('../../modules/Base');
-const ValidateService = require('../validate/ValidateService');
+import Base from '../../modules/Base.js';
+import ValidateService from '../validate/ValidateService.js';
 
 class DocumentationGenerator extends Base {
   // eslint-disable-next-line class-methods-use-this
@@ -166,4 +166,4 @@ class DocumentationGenerator extends Base {
   }
 }
 
-module.exports = DocumentationGenerator;
+export default DocumentationGenerator;

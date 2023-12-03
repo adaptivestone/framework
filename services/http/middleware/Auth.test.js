@@ -1,5 +1,5 @@
 import { beforeAll, describe, it, expect } from 'vitest';
-import Auth from './Auth';
+import Auth from './Auth.js';
 
 describe('atuh middleware methods', () => {
   let middleware;

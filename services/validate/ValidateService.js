@@ -1,7 +1,7 @@
-const yup = require('yup');
-const YupValidator = require('./drivers/YupValidator');
-const CustomValidator = require('./drivers/CustomValidator');
-const Base = require('../../modules/Base');
+import yup from 'yup';
+import YupValidator from './drivers/YupValidator.js';
+import CustomValidator from './drivers/CustomValidator.js';
+import Base from '../../modules/Base.js';
 
 class ValidateService extends Base {
   constructor(app, validator) {
@@ -154,4 +154,4 @@ class ValidateService extends Base {
   }
 }
 
-module.exports = ValidateService;
+export default ValidateService;

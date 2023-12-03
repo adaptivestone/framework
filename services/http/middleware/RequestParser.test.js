@@ -1,10 +1,8 @@
 import { createServer } from 'node:http';
 import { describe, it, expect } from 'vitest';
+import { PersistentFile } from 'formidable';
 
-import RequestParser from './RequestParser';
-
-// TODO change on ESM
-const formidable = require('formidable');
+import RequestParser from './RequestParser.js';
 
 describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
@@ -14,6 +12,7 @@ describe('reqest parser limiter methods', () => {
   });
   it('middleware that works', async () => {
     expect.assertions(4);
+    console.log();
 
     await new Promise((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
@@ -26,7 +25,7 @@ describe('reqest parser limiter methods', () => {
           expect(req.body.title).toBeDefined();
           expect(req.body.multipleFiles).toBeDefined();
           expect(
-            req.body.multipleFiles[0] instanceof formidable.PersistentFile,
+            req.body.multipleFiles[0] instanceof PersistentFile,
           ).toBeTruthy();
 
           res.writeHead(200);

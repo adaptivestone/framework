@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import Role from './Role';
+import Role from './Role.js';
 
 describe('role middleware methods', () => {
   it('have description fields', async () => {

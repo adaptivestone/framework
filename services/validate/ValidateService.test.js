@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 
-const yup = require('yup');
-const ValidateService = require('./ValidateService');
-const YupValidator = require('./drivers/YupValidator');
-const CustomValidator = require('./drivers/CustomValidator');
+import yup from 'yup';
+import ValidateService from './ValidateService.js';
+import YupValidator from './drivers/YupValidator.js';
+import CustomValidator from './drivers/CustomValidator.js';
 
 describe('validate service', () => {
   describe('validateSchema funtion', () => {

@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
-const path = require('node:path');
-const Base = require('./Base');
+import path from 'node:path';
+
+import Base from './Base.js';
 
 class Cli extends Base {
   constructor(server) {
@@ -64,4 +65,4 @@ class Cli extends Base {
   }
 }
 
-module.exports = Cli;
+export default Cli;

@@ -1,5 +1,5 @@
-const AbstractController = require('../modules/AbstractController');
-const GetUserByToken = require('../services/http/middleware/GetUserByToken');
+import AbstractController from '../modules/AbstractController.js';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
 
 class Home extends AbstractController {
   get routes() {
@@ -25,4 +25,4 @@ class Home extends AbstractController {
   }
 }
 
-module.exports = Home;
+export default Home;

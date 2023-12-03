@@ -1,5 +1,3 @@
-const email = require('./email');
+import email from './email/index.js';
 
-module.exports = {
-  email,
-};
+export default { email };

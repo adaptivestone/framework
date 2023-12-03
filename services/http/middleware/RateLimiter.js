@@ -1,13 +1,12 @@
-const {
+import {
   RateLimiterMemory,
   RateLimiterRedis,
   RateLimiterMongo,
-} = require('rate-limiter-flexible');
-const merge = require('deepmerge');
-const redis = require('redis');
-const mongoose = require('mongoose');
-
-const AbstractMiddleware = require('./AbstractMiddleware');
+} from 'rate-limiter-flexible';
+import merge from 'deepmerge';
+import redis from 'redis';
+import mongoose from 'mongoose';
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class RateLimiter extends AbstractMiddleware {
   static get description() {
@@ -126,4 +125,4 @@ class RateLimiter extends AbstractMiddleware {
   }
 }
 
-module.exports = RateLimiter;
+export default RateLimiter;

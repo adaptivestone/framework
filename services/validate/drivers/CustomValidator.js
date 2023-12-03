@@ -1,6 +1,5 @@
-const yup = require('yup');
-
-const AbstractValidator = require('./AbstractValidator');
+import yup from 'yup';
+import AbstractValidator from './AbstractValidator.js';
 
 class CustomValidator extends AbstractValidator {
   async validateFields(data, { query, body, appInfo }) {
@@ -49,4 +48,4 @@ class CustomValidator extends AbstractValidator {
   }
 }
 
-module.exports = CustomValidator;
+export default CustomValidator;

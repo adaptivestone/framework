@@ -1,5 +1,5 @@
-const path = require('node:path');
-const AbstractCommand = require('../modules/AbstractCommand');
+import path from 'node:path';
+import AbstractCommand from '../modules/AbstractCommand.js';
 
 class SyncIndexes extends AbstractCommand {
   async run() {
@@ -34,4 +34,4 @@ class SyncIndexes extends AbstractCommand {
   }
 }
 
-module.exports = SyncIndexes;
+export default SyncIndexes;

@@ -1,4 +1,4 @@
-const { getFilesPathWithInheritance } = require('../helpers/files');
+import { getFilesPathWithInheritance } from '../helpers/files.js';
 
 class Base {
   #realLogger = null;
@@ -50,4 +50,4 @@ class Base {
   }
 }
 
-module.exports = Base;
+export default Base;

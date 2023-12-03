@@ -1,4 +1,4 @@
-const AbstractCommand = require('../modules/AbstractCommand');
+import AbstractCommand from '../modules/AbstractCommand.js';
 
 class DropIndex extends AbstractCommand {
   static get description() {
@@ -26,4 +26,4 @@ class DropIndex extends AbstractCommand {
   }
 }
 
-module.exports = DropIndex;
+export default DropIndex;

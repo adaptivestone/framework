@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   limiterOptions: {
     // https://github.com/animir/node-rate-limiter-flexible
     // https://github.com/animir/node-rate-limiter-flexible/wiki/Options

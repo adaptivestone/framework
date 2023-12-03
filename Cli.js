@@ -1,7 +1,7 @@
-const parseArgs = require('minimist');
-const mongoose = require('mongoose');
-const BaseCli = require('./modules/BaseCli');
-const Server = require('./server');
+import parseArgs from 'minimist';
+import mongoose from 'mongoose';
+import BaseCli from './modules/BaseCli.js';
+import Server from './server.js';
 
 class Cli extends BaseCli {
   constructor(serverConfig) {
@@ -19,4 +19,4 @@ class Cli extends BaseCli {
   }
 }
 
-module.exports = Cli;
+export default Cli;

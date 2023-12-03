@@ -1,4 +1,4 @@
-const Base = require('../../modules/Base');
+import Base from '../../modules/Base.js';
 
 class Cache extends Base {
   constructor(app) {
@@ -117,4 +117,4 @@ class Cache extends Base {
   }
 }
 
-module.exports = Cache;
+export default Cache;

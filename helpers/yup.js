@@ -1,5 +1,5 @@
-const { Schema } = require('yup');
-const formidable = require('formidable');
+import { Schema } from 'yup';
+import { PersistentFile } from 'formidable';
 
 /**
  * Validator for file
@@ -13,13 +13,12 @@ class YupFile extends Schema {
   constructor() {
     super({
       type: 'file',
-      check: (value) =>
-        value.every((item) => item instanceof formidable.PersistentFile),
+      check: (value) => value.every((item) => item instanceof PersistentFile),
     });
   }
 }
 
-module.exports = {
+export {
   // eslint-disable-next-line import/prefer-default-export
   YupFile,
 };

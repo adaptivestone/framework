@@ -1,4 +1,4 @@
-const Base = require('./Base');
+import Base from './Base.js';
 
 class AbstractCommand extends Base {
   constructor(app, commands, args) {
@@ -24,4 +24,4 @@ class AbstractCommand extends Base {
   }
 }
 
-module.exports = AbstractCommand;
+export default AbstractCommand;

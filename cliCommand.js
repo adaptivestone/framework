@@ -1,6 +1,7 @@
+/* eslint-disable import/first */
 console.time('CLI');
-const Cli = require('./Cli');
-const folderConfig = require('./folderConfig');
+import Cli from './Cli.js';
+import folderConfig from './folderConfig.js';
 
 const cli = new Cli(folderConfig);
 

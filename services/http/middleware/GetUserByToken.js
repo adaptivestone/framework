@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('./AbstractMiddleware');
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class GetUserByToken extends AbstractMiddleware {
   static get description() {
@@ -43,4 +43,4 @@ class GetUserByToken extends AbstractMiddleware {
   }
 }
 
-module.exports = GetUserByToken;
+export default GetUserByToken;

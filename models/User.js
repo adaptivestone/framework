@@ -1,11 +1,10 @@
 /* eslint-disable no-param-reassign */
 
-const { scrypt } = require('node:crypto');
-const { promisify } = require('node:util');
+import { scrypt } from 'node:crypto';
 
-const AbstractModel = require('../modules/AbstractModel');
-
-const Mailer = require('../services/messaging').email;
+import { promisify } from 'node:util';
+import AbstractModel from '../modules/AbstractModel.js';
+import Mailer from '../services/messaging/email/index.js';
 
 class User extends AbstractModel {
   constructor(app) {
@@ -255,4 +254,4 @@ class User extends AbstractModel {
   }
 }
 
-module.exports = User;
+export default User;

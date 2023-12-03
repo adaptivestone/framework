@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   transports: [
     {
       transport: 'winston-transport-sentry-node',

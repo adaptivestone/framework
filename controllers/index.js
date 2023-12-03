@@ -1,5 +1,5 @@
-const path = require('node:path');
-const Base = require('../modules/Base');
+import path from 'node:path';
+import Base from '../modules/Base.js';
 
 /**
  * Class do autoloading a http controllers
@@ -55,4 +55,4 @@ class ControllerManager extends Base {
   }
 }
 
-module.exports = ControllerManager;
+export default ControllerManager;

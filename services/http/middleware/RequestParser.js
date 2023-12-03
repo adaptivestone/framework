@@ -1,6 +1,5 @@
-const formidable = require('formidable').default;
-
-const AbstractMiddleware = require('./AbstractMiddleware');
+import formidable from 'formidable';
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class RequestParser extends AbstractMiddleware {
   static get description() {
@@ -35,4 +34,4 @@ class RequestParser extends AbstractMiddleware {
   }
 }
 
-module.exports = RequestParser;
+export default RequestParser;

@@ -1,9 +1,8 @@
-const fsPromises = require('node:fs/promises');
-const fs = require('node:fs');
-const path = require('node:path');
-const mime = require('mime');
-
-const AbstractMiddleware = require('./AbstractMiddleware');
+import fsPromises from 'node:fs/promises';
+import fs from 'node:fs';
+import path from 'node:path';
+import mime from 'mime';
+import AbstractMiddleware from './AbstractMiddleware.js';
 /**
  * Middleware for static files
  */
@@ -57,4 +56,4 @@ class StaticFiles extends AbstractMiddleware {
   }
 }
 
-module.exports = StaticFiles;
+export default StaticFiles;

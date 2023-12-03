@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   port: process.env.HTTP_PORT || 3300,
   hostname: process.env.HTTP_HOST || '0.0.0.0',
   // if you want to use 'all' domains please copy this file to your app

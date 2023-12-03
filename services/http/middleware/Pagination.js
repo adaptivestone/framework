@@ -1,5 +1,5 @@
-const yup = require('yup');
-const AbstractMiddleware = require('./AbstractMiddleware');
+import yup from 'yup';
+import AbstractMiddleware from './AbstractMiddleware.js';
 /**
  * Middleware for reusing pagination
  */
@@ -53,4 +53,4 @@ class Pagination extends AbstractMiddleware {
   }
 }
 
-module.exports = Pagination;
+export default Pagination;

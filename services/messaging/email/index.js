@@ -1,19 +1,19 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const { promisify } = require('node:util');
-const nodemailer = require('nodemailer');
-const sendMail = require('nodemailer-sendmail-transport');
-const stub = require('nodemailer-stub-transport');
-const pug = require('pug');
-const juice = require('juice');
-const { convert } = require('html-to-text');
+import fs from 'node:fs';
+import path from 'node:path';
+import { promisify } from 'node:util';
+import nodemailer from 'nodemailer';
+import sendMail from 'nodemailer-sendmail-transport';
+import stub from 'nodemailer-stub-transport';
+import pug from 'pug';
+import juice from 'juice';
+import { convert } from 'html-to-text';
+import Base from '../../../modules/Base.js';
 
 const mailTransports = {
   sendMail,
   stub,
   smtp: (data) => data,
 };
-const Base = require('../../../modules/Base');
 
 class Mail extends Base {
   /**
@@ -215,4 +215,4 @@ class Mail extends Base {
   }
 }
 
-module.exports = Mail;
+export default Mail;

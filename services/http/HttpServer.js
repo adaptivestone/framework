@@ -1,15 +1,13 @@
-const http = require('node:http');
-const path = require('node:path');
-const express = require('express');
-
-const RequestLoggerMiddleware = require('./middleware/RequestLogger');
-const I18nMiddleware = require('./middleware/I18n');
-const PrepareAppInfoMiddleware = require('./middleware/PrepareAppInfo');
-const RequestParserMiddleware = require('./middleware/RequestParser');
-const StaticFilesMiddleware = require('./middleware/StaticFiles');
-const Cors = require('./middleware/Cors');
-
-const Base = require('../../modules/Base');
+import http from 'node:http';
+import path from 'node:path';
+import express from 'express';
+import RequestLoggerMiddleware from './middleware/RequestLogger.js';
+import I18nMiddleware from './middleware/I18n.js';
+import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.js';
+import RequestParserMiddleware from './middleware/RequestParser.js';
+import StaticFilesMiddleware from './middleware/StaticFiles.js';
+import Cors from './middleware/Cors.js';
+import Base from '../../modules/Base.js';
 
 /**
  * HTTP server based on Express
@@ -101,4 +99,4 @@ class HttpServer extends Base {
   }
 }
 
-module.exports = HttpServer;
+export default HttpServer;

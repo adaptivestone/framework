@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('./AbstractMiddleware');
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class Cors extends AbstractMiddleware {
   constructor(app, params) {
@@ -43,4 +43,4 @@ class Cors extends AbstractMiddleware {
   }
 }
 
-module.exports = Cors;
+export default Cors;

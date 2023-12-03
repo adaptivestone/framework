@@ -1,5 +1,5 @@
-const fs = require('node:fs').promises;
-const AbstractCommand = require('../modules/AbstractCommand');
+import { promises as fs } from 'node:fs';
+import AbstractCommand from '../modules/AbstractCommand.js';
 
 /**
  * Command for generate documentation json file openApi
@@ -318,4 +318,4 @@ class GetOpenApiJson extends AbstractCommand {
   }
 }
 
-module.exports = GetOpenApiJson;
+export default GetOpenApiJson;

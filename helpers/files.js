@@ -1,5 +1,5 @@
-const fs = require('node:fs').promises;
-const { join } = require('node:path');
+import { promises as fs } from 'node:fs';
+import { join } from 'node:path';
 
 const getFilesPathWithInheritance = async ({
   internalFolder,
@@ -69,7 +69,7 @@ const getFilesPathWithInheritance = async ({
   return filesToLoad;
 };
 
-module.exports = {
+export {
   // eslint-disable-next-line import/prefer-default-export
   getFilesPathWithInheritance,
 };

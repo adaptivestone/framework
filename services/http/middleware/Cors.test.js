@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import Cors from './Cors';
+import Cors from './Cors.js';
 
 describe('cors middleware methods', () => {
   it('have description fields', async () => {

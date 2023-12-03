@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import SomeController from '../controllers/test/SomeController';
-import AbstractController from './AbstractController';
+import SomeController from '../controllers/test/SomeController.js';
+import AbstractController from './AbstractController.js';
 
 describe('abstract controller methods', () => {
   it('can get routes', async () => {

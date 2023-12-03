@@ -13,7 +13,5 @@ const consoleLogger = (level, message) => {
     }
   }
 };
-module.exports = {
-  levels,
-  consoleLogger,
-};
+
+export { levels, consoleLogger };

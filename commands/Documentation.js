@@ -1,5 +1,5 @@
-const AbstractCommand = require('../modules/AbstractCommand');
-const ControllerManager = require('../controllers/index');
+import AbstractCommand from '../modules/AbstractCommand.js';
+import ControllerManager from '../controllers/index.js';
 
 class Documentation extends AbstractCommand {
   async run() {
@@ -10,4 +10,4 @@ class Documentation extends AbstractCommand {
   }
 }
 
-module.exports = Documentation;
+export default Documentation;

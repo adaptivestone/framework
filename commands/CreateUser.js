@@ -1,4 +1,4 @@
-const AbstractCommand = require('../modules/AbstractCommand');
+import AbstractCommand from '../modules/AbstractCommand.js';
 
 // Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
 class CreateUser extends AbstractCommand {
@@ -66,4 +66,4 @@ class CreateUser extends AbstractCommand {
   }
 }
 
-module.exports = CreateUser;
+export default CreateUser;

@@ -1,5 +1,5 @@
-const yup = require('yup');
-const AbstractValidator = require('./AbstractValidator');
+import yup from 'yup';
+import AbstractValidator from './AbstractValidator.js';
 
 class YupValidator extends AbstractValidator {
   get fieldsInJsonFormat() {
@@ -100,4 +100,4 @@ class YupValidator extends AbstractValidator {
     return 'YupValidator_';
   }
 }
-module.exports = YupValidator;
+export default YupValidator;

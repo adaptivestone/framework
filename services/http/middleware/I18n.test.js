@@ -1,5 +1,5 @@
 import { beforeAll, describe, it, expect } from 'vitest';
-import I18n from './I18n';
+import I18n from './I18n.js';
 
 describe('i18n middleware methods', () => {
   let middleware;

@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('./AbstractMiddleware');
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class RequestLogger extends AbstractMiddleware {
   static get description() {
@@ -19,4 +19,4 @@ class RequestLogger extends AbstractMiddleware {
   }
 }
 
-module.exports = RequestLogger;
+export default RequestLogger;

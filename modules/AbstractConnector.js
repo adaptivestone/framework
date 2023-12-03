@@ -1,4 +1,4 @@
-const Base = require('./Base');
+import Base from './Base.js';
 
 class AbstractConnector extends Base {
   static get loggerGroup() {
@@ -6,4 +6,4 @@ class AbstractConnector extends Base {
   }
 }
 
-module.exports = AbstractConnector;
+export default AbstractConnector;

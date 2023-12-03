@@ -1,7 +1,6 @@
-const path = require('node:path');
-const fs = require('node:fs').promises;
-
-const AbstractCommand = require('../../modules/AbstractCommand');
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
+import AbstractCommand from '../../modules/AbstractCommand.js';
 
 class CreateMigration extends AbstractCommand {
   static get description() {
@@ -41,7 +40,6 @@ class CreateMigration extends AbstractCommand {
   static getTemplate(name) {
     return `/* eslint-disable class-methods-use-this */
 
-// const Base = require('@adaptivestone/framework/modules/Base');
 import Base from '@adaptivestone/framework/modules/Base.js';
 
 class ${name} extends Base {
@@ -55,10 +53,9 @@ class ${name} extends Base {
   }
 }
 
-// module.exports = ${name};
 export default ${name};
 `;
   }
 }
 
-module.exports = CreateMigration;
+export default CreateMigration;

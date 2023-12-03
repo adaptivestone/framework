@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('./AbstractMiddleware');
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class PrepareAppInfo extends AbstractMiddleware {
   static get description() {
@@ -15,4 +15,4 @@ class PrepareAppInfo extends AbstractMiddleware {
   }
 }
 
-module.exports = PrepareAppInfo;
+export default PrepareAppInfo;

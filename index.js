@@ -1,5 +1,5 @@
-const Server = require('./server');
-const folderConfig = require('./folderConfig');
+import Server from './server.js';
+import folderConfig from './folderConfig.js';
 
 const server = new Server(folderConfig);
 

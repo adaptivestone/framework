@@ -1,11 +1,11 @@
-const yup = require('yup');
-const AbstractController = require('../../modules/AbstractController');
-const AuthMiddleware = require('../../services/http/middleware/Auth');
-const GetUserByToken = require('../../services/http/middleware/GetUserByToken');
-const RateLimiter = require('../../services/http/middleware/RateLimiter');
-const CheckFlag = require('../../services/http/middleware/test/CheckFlag');
-const RoleMiddleware = require('../../services/http/middleware/Role');
-const Pagination = require('../../services/http/middleware/Pagination');
+import yup from 'yup';
+import AbstractController from '../../modules/AbstractController.js';
+import AuthMiddleware from '../../services/http/middleware/Auth.js';
+import GetUserByToken from '../../services/http/middleware/GetUserByToken.js';
+import RateLimiter from '../../services/http/middleware/RateLimiter.js';
+import CheckFlag from '../../services/http/middleware/test/CheckFlag.js';
+import RoleMiddleware from '../../services/http/middleware/Role.js';
+import Pagination from '../../services/http/middleware/Pagination.js';
 
 class SomeController extends AbstractController {
   get routes() {
@@ -159,4 +159,4 @@ class SomeController extends AbstractController {
   }
 }
 
-module.exports = SomeController;
+export default SomeController;

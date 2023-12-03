@@ -1,8 +1,7 @@
-const i18next = require('i18next');
-const BackendFS = require('i18next-fs-backend');
-const Backend = require('i18next-chained-backend');
-
-const AbstractMiddleware = require('./AbstractMiddleware');
+import i18next from 'i18next';
+import BackendFS from 'i18next-fs-backend';
+import Backend from 'i18next-chained-backend';
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class I18n extends AbstractMiddleware {
   constructor(app, params) {
@@ -116,4 +115,4 @@ class I18n extends AbstractMiddleware {
   }
 }
 
-module.exports = I18n;
+export default I18n;

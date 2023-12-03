@@ -1,4 +1,4 @@
-const Base = require('../../../modules/Base');
+import Base from '../../../modules/Base.js';
 
 class AbstractValidator extends Base {
   constructor(app, body) {
@@ -34,4 +34,4 @@ class AbstractValidator extends Base {
     return 'AbstractValidator_';
   }
 }
-module.exports = AbstractValidator;
+export default AbstractValidator;

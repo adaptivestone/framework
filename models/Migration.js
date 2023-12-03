@@ -1,4 +1,4 @@
-const AbstractModel = require('../modules/AbstractModel');
+import AbstractModel from '../modules/AbstractModel.js';
 
 class Migration extends AbstractModel {
   // eslint-disable-next-line class-methods-use-this
@@ -12,4 +12,4 @@ class Migration extends AbstractModel {
   }
 }
 
-module.exports = Migration;
+export default Migration;

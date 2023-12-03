@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const Base = require('./Base');
+import mongoose from 'mongoose';
+import Base from './Base.js';
 
 class AbstractModel extends Base {
   /**
@@ -59,4 +59,4 @@ class AbstractModel extends Base {
     this.logger.verbose('Model have no hooks');
   }
 }
-module.exports = AbstractModel;
+export default AbstractModel;

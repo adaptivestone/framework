@@ -1,6 +1,6 @@
-const path = require('node:path');
+import path from 'node:path';
 
-module.exports = {
+export default {
   from: 'Localhost <info@localhost>',
   transports: {
     sendMail: {

@@ -1,6 +1,6 @@
-const path = require('node:path');
+import path from 'node:path';
 
-module.exports = {
+export default {
   folders: {
     config: path.resolve('./config'),
     models: path.resolve('./models'),

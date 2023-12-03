@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('../AbstractMiddleware');
+import AbstractMiddleware from '../AbstractMiddleware.js';
 
 class CheckFlag extends AbstractMiddleware {
   // eslint-disable-next-line class-methods-use-this
@@ -15,4 +15,4 @@ class CheckFlag extends AbstractMiddleware {
   }
 }
 
-module.exports = CheckFlag;
+export default CheckFlag;

@@ -1,7 +1,7 @@
-const yup = require('yup');
-const AbstractController = require('../modules/AbstractController');
-const GetUserByToken = require('../services/http/middleware/GetUserByToken');
-const RateLimiter = require('../services/http/middleware/RateLimiter');
+import yup from 'yup';
+import AbstractController from '../modules/AbstractController.js';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
+import RateLimiter from '../services/http/middleware/RateLimiter.js';
 
 class Auth extends AbstractController {
   get routes() {
@@ -207,4 +207,4 @@ class Auth extends AbstractController {
   }
 }
 
-module.exports = Auth;
+export default Auth;

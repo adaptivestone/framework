@@ -1,14 +1,14 @@
 /* eslint-disable no-console */
-const EventEmitter = require('node:events');
-const { hrtime } = require('node:process');
+import EventEmitter from 'node:events';
 
-require('dotenv').config();
-const merge = require('deepmerge');
-const winston = require('winston');
-const { getFilesPathWithInheritance } = require('./helpers/files');
-const { consoleLogger } = require('./helpers/logger');
+import { hrtime } from 'node:process';
 
-const Cache = require('./services/cache/Cache');
+import 'dotenv/config';
+import merge from 'deepmerge';
+import winston from 'winston';
+import { getFilesPathWithInheritance } from './helpers/files.js';
+import { consoleLogger } from './helpers/logger.js';
+import Cache from './services/cache/Cache.js';
 
 /**
  * Main framework class.
@@ -395,4 +395,4 @@ class Server {
   }
 }
 
-module.exports = Server;
+export default Server;

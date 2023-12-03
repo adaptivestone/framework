@@ -1,7 +1,7 @@
 /**
  * You can use any options from https://www.i18next.com/overview/configuration-options
  */
-module.exports = {
+export default {
   enabled: true,
   preload: ['en', 'ru'],
   supportedLngs: ['en', 'ru'], // should be at least one supported

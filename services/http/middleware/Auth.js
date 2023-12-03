@@ -1,4 +1,4 @@
-const AbstractMiddleware = require('./AbstractMiddleware');
+import AbstractMiddleware from './AbstractMiddleware.js';
 
 class AuthMiddleware extends AbstractMiddleware {
   static get description() {
@@ -17,4 +17,4 @@ class AuthMiddleware extends AbstractMiddleware {
   }
 }
 
-module.exports = AuthMiddleware;
+export default AuthMiddleware;

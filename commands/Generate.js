@@ -1,4 +1,4 @@
-const AbstractCommand = require('../modules/AbstractCommand');
+import AbstractCommand from '../modules/AbstractCommand.js';
 
 class Generate extends AbstractCommand {
   async run() {
@@ -11,4 +11,4 @@ class Generate extends AbstractCommand {
   }
 }
 
-module.exports = Generate;
+export default Generate;

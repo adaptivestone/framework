@@ -1,11 +1,12 @@
 /* eslint-disable no-restricted-syntax */
 /* eslint-disable guard-for-in */
-const express = require('express');
-const Base = require('./Base');
-const GetUserByToken = require('../services/http/middleware/GetUserByToken');
-const Auth = require('../services/http/middleware/Auth');
-const ValidateService = require('../services/validate/ValidateService');
-const DocumentationGenerator = require('../services/documentation/DocumentationGenerator');
+import express from 'express';
+
+import Base from './Base.js';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
+import Auth from '../services/http/middleware/Auth.js';
+import ValidateService from '../services/validate/ValidateService.js';
+import DocumentationGenerator from '../services/documentation/DocumentationGenerator.js';
 /**
  * Abstract controller. You should extend any controller from them.
  * Place you cintroller into controller folder and it be inited in auto way.
@@ -405,4 +406,4 @@ class AbstractController extends Base {
   }
 }
 
-module.exports = AbstractController;
+export default AbstractController;

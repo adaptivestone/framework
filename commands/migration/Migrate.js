@@ -1,4 +1,4 @@
-const AbstractCommand = require('../../modules/AbstractCommand');
+import AbstractCommand from '../../modules/AbstractCommand.js';
 
 class Migrate extends AbstractCommand {
   static get description() {
@@ -48,4 +48,4 @@ class Migrate extends AbstractCommand {
   }
 }
 
-module.exports = Migrate;
+export default Migrate;

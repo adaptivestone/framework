@@ -1,5 +1,5 @@
-const yup = require('yup');
-const Base = require('../../../modules/Base');
+import yup from 'yup';
+import Base from '../../../modules/Base.js';
 
 class AbstractMiddleware extends Base {
   constructor(app, params) {
@@ -48,4 +48,4 @@ class AbstractMiddleware extends Base {
   }
 }
 
-module.exports = AbstractMiddleware;
+export default AbstractMiddleware;
