@@ -1,3 +1,8 @@
+### 5.0.0-alpha1
+
+[BREAKING] ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience
+[BREAKING] Mongoose v8. https://mongoosejs.com/docs/migrating_to_8.html
+
 ### 4.11.4
 
 [UPDATE] deps update
