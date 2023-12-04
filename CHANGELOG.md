@@ -1,5 +1,6 @@
-### 5.0.0-alpha1
+### 5.0.0-alpha.1
 
+[BREAKING] Vitest 1.0.0 https://vitest.dev/guide/migration.html#migrating-from-vitest-0-34-6
 [BREAKING] ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience
 [BREAKING] Mongoose v8. https://mongoosejs.com/docs/migrating_to_8.html
 
