@@ -29,6 +29,7 @@ module.exports = {
     ],
     'prettier/prettier': 'error',
     'import/extensions': 'off', // it have a problem with dynamic imports
+    'import/prefer-default-export': 'off', // we want to have signgke default export too
   },
   overrides: [
     {
