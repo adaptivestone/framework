@@ -1,7 +1,8 @@
 /* eslint-disable no-console */
 import EventEmitter from 'node:events';
-
 import { hrtime } from 'node:process';
+import * as url from 'node:url';
+import path from 'node:path';
 
 import 'dotenv/config';
 import merge from 'deepmerge';
@@ -139,8 +140,9 @@ class Server {
   }
 
   async #initConfigFiles() {
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const files = await getFilesPathWithInheritance({
-      internalFolder: `${__dirname}/config`,
+      internalFolder: path.join(dirname, '/config'),
       externalFolder: this.app.foldersConfig.config,
       loggerFileType: 'CONFIG',
       logger: (m) => consoleLogger('info', m),
@@ -192,8 +194,9 @@ class Server {
   }
 
   async #loadModelFiles() {
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const files = await getFilesPathWithInheritance({
-      internalFolder: `${__dirname}/models`,
+      internalFolder: path.join(dirname, '/models'),
       externalFolder: this.app.foldersConfig.models,
       loggerFileType: 'MODEL',
       logger: (m) => consoleLogger('info', m),

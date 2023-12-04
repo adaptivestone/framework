@@ -1,3 +1,5 @@
+import * as url from 'node:url';
+import path from 'node:path';
 import AbstractCommand from '../../modules/AbstractCommand.js';
 
 class Migrate extends AbstractCommand {
@@ -6,8 +8,10 @@ class Migrate extends AbstractCommand {
   }
 
   async run() {
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
+
     const files = await this.getFilesPathWithInheritance(
-      `${__dirname}/../../migrations`,
+      path.join(dirname, '/../../migrations'),
       this.app.foldersConfig.migrations,
     );
     files.sort(

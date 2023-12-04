@@ -1,4 +1,5 @@
 import path from 'node:path';
+import * as url from 'node:url';
 import Base from '../modules/Base.js';
 
 /**
@@ -14,8 +15,9 @@ class ControllerManager extends Base {
    * Load controllers
    */
   async initControllers() {
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const controllersToLoad = await this.getFilesPathWithInheritance(
-      __dirname,
+      dirname,
       this.app.foldersConfig.controllers,
     );
 

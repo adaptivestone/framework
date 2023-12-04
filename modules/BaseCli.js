@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import path from 'node:path';
-
+import * as url from 'node:url';
 import Base from './Base.js';
 
 class Cli extends Base {
@@ -14,8 +14,9 @@ class Cli extends Base {
     if (Object.keys(this.commands).length) {
       return true;
     }
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const commandsToLoad = await this.getFilesPathWithInheritance(
-      path.join(__dirname, '/../commands'),
+      path.join(dirname, '../commands'),
       this.server.app.foldersConfig.commands,
     );
     for (const com of commandsToLoad) {

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import * as url from 'node:url';
 import { promisify } from 'node:util';
 import nodemailer from 'nodemailer';
 import sendMail from 'nodemailer-sendmail-transport';
@@ -25,6 +26,7 @@ class Mail extends Base {
    */
   constructor(app, template, templateData = {}, i18n = null) {
     super(app);
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     if (!path.isAbsolute(template)) {
       if (
         fs.existsSync(
@@ -35,11 +37,16 @@ class Mail extends Base {
           template,
         )}`;
       } else if (
-        fs.existsSync(`${__dirname}/templates/${path.basename(template)}`)
+        fs.existsSync(
+          path.join(dirname, `/templates/${path.basename(template)}`),
+        )
       ) {
-        this.template = `${__dirname}/templates/${path.basename(template)}`;
+        this.template = path.join(
+          dirname,
+          `/templates/${path.basename(template)}`,
+        );
       } else {
-        this.template = `${__dirname}/templates/emptyTemplate`;
+        this.template = path.join(dirname, `/templates/emptyTemplate`);
         this.logger.error(
           `Template '${template}' not found. Using 'emptyTemplate' as a fallback`,
         );

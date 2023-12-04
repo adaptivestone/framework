@@ -1,5 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
+import * as url from 'node:url';
 import express from 'express';
 import RequestLoggerMiddleware from './middleware/RequestLogger.js';
 import I18nMiddleware from './middleware/I18n.js';
@@ -17,9 +18,10 @@ class HttpServer extends Base {
     super(app);
     this.express = express();
     this.express.disable('x-powered-by');
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     this.express.set('views', [
       this.app.foldersConfig.views,
-      path.join(__dirname, '../../views'),
+      path.join(dirname, '../../views'),
     ]);
     this.express.set('view engine', 'pug');
 
@@ -38,7 +40,7 @@ class HttpServer extends Base {
       new StaticFilesMiddleware(this.app, {
         folders: [
           this.app.foldersConfig.public,
-          path.join(__dirname, '../../public/files'),
+          path.join(dirname, '../../public/files'),
         ],
       }).getMiddleware(),
     );

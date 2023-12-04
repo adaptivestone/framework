@@ -36,12 +36,16 @@ const getFilesPathWithInheritance = async ({
   internalFiles = internalFiles
     .filter(filterIndexFile)
     .map((fileDirent) =>
-      join(fileDirent.path, fileDirent.name).replace(`${internalFolder}/`, ''),
+      join(fileDirent.path, fileDirent.name)
+        .replace(`${internalFolder}/`, '')
+        .replace(`${internalFolder}`, ''),
     );
   externalFiles = externalFiles
     .filter(filterIndexFile)
     .map((fileDirent) =>
-      join(fileDirent.path, fileDirent.name).replace(`${externalFolder}/`, ''),
+      join(fileDirent.path, fileDirent.name)
+        .replace(`${externalFolder}/`, '')
+        .replace(`${externalFolder}`, ''),
     );
 
   const filesToLoad = [];
@@ -54,7 +58,7 @@ const getFilesPathWithInheritance = async ({
       );
     } else {
       filesToLoad.push({
-        path: `${internalFolder}/${file}`,
+        path: join(internalFolder, file),
         file,
       });
     }
@@ -62,7 +66,7 @@ const getFilesPathWithInheritance = async ({
 
   for (const file of externalFiles) {
     filesToLoad.push({
-      path: `${externalFolder}/${file}`,
+      path: join(externalFolder, file),
       file,
     });
   }
