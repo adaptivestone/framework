@@ -12,7 +12,6 @@ describe('reqest parser limiter methods', () => {
   });
   it('middleware that works', async () => {
     expect.assertions(4);
-    console.log();
 
     await new Promise((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
