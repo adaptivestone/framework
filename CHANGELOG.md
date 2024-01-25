@@ -1,3 +1,7 @@
+### 5.0.0-alpha.2
+
+[UPDATE] deps update
+
 ### 5.0.0-alpha.1
 
 [BREAKING] Vitest 1.0.0 https://vitest.dev/guide/migration.html#migrating-from-vitest-0-34-6
