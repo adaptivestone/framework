@@ -1,3 +1,8 @@
+### 5.0.0-alpha.3
+
+[UPDATE] deps update
+[FIX] Migration commands apply
+
 ### 5.0.0-alpha.2
 
 [UPDATE] deps update
