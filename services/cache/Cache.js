@@ -69,12 +69,14 @@ class Cache extends Base {
         return Promise.reject(e);
       }
 
-      this.redisClient.setEx(
+      this.redisClient.set(
         key,
-        storeTime,
         JSON.stringify(result, (jsonkey, value) =>
           typeof value === 'bigint' ? `${value}n` : value,
         ),
+        {
+          EX: storeTime,
+        },
       );
     } else {
       this.logger.verbose(

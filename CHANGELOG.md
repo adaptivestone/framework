@@ -1,3 +1,8 @@
+### 5.0.0-alpha.4
+
+[UPDATE] Update rate-limiter-flexible to v5
+[CHANGE] Cache update redis.setEX to redis.set(..,..,{EX:xx}) as setEX deprecated
+
 ### 5.0.0-alpha.3
 
 [UPDATE] deps update

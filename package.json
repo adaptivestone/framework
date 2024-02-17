@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0-alpha.3",
+  "version": "5.0.0-alpha.4",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "type": "module",
@@ -45,7 +45,7 @@
     "nodemailer-sendmail-transport": "^1.0.2",
     "nodemailer-stub-transport": "^1.1.0",
     "pug": "^3.0.2",
-    "rate-limiter-flexible": "^4.0.0",
+    "rate-limiter-flexible": "^5.0.0",
     "redis": "^4.3.1",
     "winston": "^3.3.3",
     "winston-transport-sentry-node": "^2.0.0",
