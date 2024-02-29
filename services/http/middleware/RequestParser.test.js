@@ -79,12 +79,21 @@ d\r
       const server = createServer(async (req, res) => {
         req.appInfo = {};
         const middleware = new RequestParser(global.server.app);
-        middleware.middleware(req, {}, (err) => {
-          expect(err).toBeDefined();
+        let status;
 
-          res.writeHead(200);
-          res.end('ok');
-        });
+        const resp = {
+          status: (code) => {
+            status = code;
+            return resp;
+          },
+          json: () => resp,
+        };
+        await middleware.middleware(req, resp, () => {});
+        expect(status).toBe(400);
+        // expect(err).toBeDefined();
+
+        res.writeHead(200);
+        res.end('ok');
       });
       server.listen(null, async () => {
         const chosenPort = server.address().port;
