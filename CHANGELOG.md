@@ -1,3 +1,8 @@
+### 5.0.0-alpha.5
+
+[UPDATE] More verbose errors for rapsing body request.
+[UPDATE] deps update
+
 ### 5.0.0-alpha.4
 
 [UPDATE] Update rate-limiter-flexible to v5
