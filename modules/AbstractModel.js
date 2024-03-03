@@ -22,6 +22,9 @@ class AbstractModel extends Base {
     );
     if (!mongoose.connection.readyState) {
       this.app.events.on('shutdown', async () => {
+        this.logger.verbose(
+          'Shutdown was called. Closing all mongoose connections',
+        );
         for (const c of mongoose.connections) {
           c.close(true);
         }
