@@ -1,3 +1,7 @@
+### 5.0.0-alpha.6
+
+[UPDATE] Update internal documentation (jsdoc, d.ts)
+
 ### 5.0.0-alpha.5
 
 [UPDATE] More verbose errors for rapsing body request.

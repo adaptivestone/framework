@@ -57,7 +57,7 @@ class HttpServer extends Base {
       res.status(500).json({ message: 'Something broke!' });
     });
 
-    this.httpServer = http.Server(this.express);
+    this.httpServer = http.createServer(this.express);
 
     const listener = this.httpServer.listen(
       httpConfig.port,

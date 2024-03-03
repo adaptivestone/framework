@@ -9,6 +9,8 @@ import BaseCli from './modules/BaseCli';
 import Cache from './services/cache/Cache';
 import winston from 'winston';
 
+import HttpServer from './services/http/HttpServer.js';
+
 type ServerConfig = {
   folders: ExpandDeep<TFolderConfig>;
 };
@@ -24,7 +26,7 @@ declare class Server {
     events: EventEmitter;
     get cache(): Server['cacheService'];
     get logger(): winston.Logger;
-    httpServer: null;
+    httpServer: HttpServer | null;
     controllerManager: null;
   };
   cacheService: Cache;
@@ -33,7 +35,7 @@ declare class Server {
     configs: Map<string, {}>;
     models: Map<string, MongooseModel<any>>;
   };
-  cli: boolean;
+  cli: null | BaseCli;
 
   /**
    *  Construct new server
@@ -68,7 +70,7 @@ declare class Server {
    * @see updateConfig
    * @TODO generate that based on real data
    */
-  getConfig(configName: string): {};
+  getConfig(configName: string): { [key: string]: any };
 
   /**
    * Return or create new logger instance. This is a main logger instance
@@ -79,7 +81,7 @@ declare class Server {
    * Primary designed for tests when we need to update some configs before start testing
    * Should be called before any initialization was done
    */
-  updateConfig(configName: string, config: {}): {};
+  updateConfig(configName: string, config: {}): { [key: string]: any };
 
   /**
    * Return model from {modelName} (file name) on model folder.
@@ -93,4 +95,4 @@ declare class Server {
   runCliCommand(commandName: string, args: {}): Promise<BaseCli['run']>;
 }
 
-export = Server;
+export default Server;

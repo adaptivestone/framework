@@ -66,7 +66,8 @@ class Mail extends Base {
    * @param {object} templateData
    * @returns string
    */
-  static async #renderTemplateFile({ type, fullPath } = {}, templateData = {}) {
+  // eslint-disable-next-line class-methods-use-this
+  async #renderTemplateFile({ type, fullPath } = {}, templateData = {}) {
     if (!type) {
       return null;
     }
@@ -116,19 +117,10 @@ class Mail extends Base {
 
     const [htmlRendered, subjectRendered, textRendered, extraCss] =
       await Promise.all([
-        this.constructor.#renderTemplateFile(
-          templates.html,
-          templateDataToRender,
-        ),
-        this.constructor.#renderTemplateFile(
-          templates.subject,
-          templateDataToRender,
-        ),
-        this.constructor.#renderTemplateFile(
-          templates.text,
-          templateDataToRender,
-        ),
-        this.constructor.#renderTemplateFile(templates.style),
+        this.#renderTemplateFile(templates.html, templateDataToRender),
+        this.#renderTemplateFile(templates.subject, templateDataToRender),
+        this.#renderTemplateFile(templates.text, templateDataToRender),
+        this.#renderTemplateFile(templates.style),
       ]);
 
     juice.tableElements = ['TABLE'];
@@ -171,7 +163,7 @@ class Mail extends Base {
 
   /**
    * Send provided text (html) to email. Low level function. All data should be prepared before sending (like inline styles)
-   * @param {objetc} app application
+   * @param {import('../../../server.js').default['app']} app application
    * @param {string} to send to
    * @param {string} subject email topic
    * @param {string} html hmlt body of emain

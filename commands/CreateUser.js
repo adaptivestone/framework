@@ -60,7 +60,9 @@ class CreateUser extends AbstractCommand {
 
     await user.generateToken();
 
-    this.logger.info(`User was created/updated ${JSON.stringify(user, 0, 4)}`);
+    this.logger.info(
+      `User was created/updated ${JSON.stringify(user, null, 4)}`,
+    );
 
     return user;
   }

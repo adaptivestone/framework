@@ -19,6 +19,8 @@ class Server {
 
   #isInited = false;
 
+  cli = null;
+
   /**
    *  Construct new server
    * @param {Object} config main config object
@@ -56,8 +58,6 @@ class Server {
       models: new Map(),
       modelConstructors: new Map(),
     };
-
-    this.cli = false;
   }
 
   /**
@@ -350,7 +350,7 @@ class Server {
    * Return model from {modelName} (file name) on model folder.
    * Support cache
    * @param {String} modelName name on config file to load
-   * @returns {import('mongoose').Model}
+   * @returns {import('mongoose').Model | false| {}}
    */
   getModel(modelName) {
     if (modelName.endsWith('s')) {

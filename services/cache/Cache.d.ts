@@ -1,5 +1,5 @@
 import Base from '../../modules/Base';
-import Server from '../../server';
+import Server from '../../server.js';
 
 declare class Cache extends Base {
   app: Server['app'];
@@ -32,4 +32,4 @@ declare class Cache extends Base {
   removeKey(key: string): Promise<number>;
 }
 
-export = Cache;
+export default Cache;

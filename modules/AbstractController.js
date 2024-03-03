@@ -25,10 +25,12 @@ class AbstractController extends Base {
     const { routes } = this;
     let httpPath = this.getHttpPath();
 
+    // @ts-ignore
     if (this.getExpressPath) {
       this.logger.warn(
         `getExpressPath deprecated. Please use getHttpPath instead. Will be removed on v5`,
       );
+      // @ts-ignore
       httpPath = this.getExpressPath();
     }
 
@@ -58,6 +60,7 @@ class AbstractController extends Base {
       httpPath,
     );
     const middlewaresInfo = this.parseMiddlewares(
+      // @ts-ignore
       this.constructor.middleware,
       httpPath,
     );
@@ -370,6 +373,7 @@ class AbstractController extends Base {
    * You should provide path relative to controller and then array of middlewares to apply.
    * Order is matter.
    * Be default path apply to ANY' method, but you can preattach 'METHOD' into patch to scope patch to this METHOD
+   * @returns {Map<string, Array<AbstractMiddleware | [Function, ...any]>>}
    * @example
    * return new Map([
    *    ['/*', [GetUserByToken]] // for any method for this controller

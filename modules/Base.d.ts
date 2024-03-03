@@ -1,5 +1,6 @@
 import winston from 'winston';
-import Server from '../server';
+import Server from '../server.js';
+import type { Dirent } from 'fs';
 
 declare class Base {
   app: Server['app'];
@@ -26,11 +27,11 @@ declare class Base {
   getFilesPathWithInheritance(
     internalFolder: string,
     externalFolder: string,
-  ): Promise<string[]>;
+  ): Promise<Dirent[]>;
 
   /**
    * Return logger group. Just to have all logs groupped logically
    */
   static get loggerGroup(): string;
 }
-export = Base;
+export default Base;

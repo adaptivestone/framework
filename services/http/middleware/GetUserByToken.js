@@ -11,7 +11,7 @@ class GetUserByToken extends AbstractMiddleware {
         name: 'Authorization',
         type: 'apiKey',
         in: 'header',
-        description: this?.description,
+        description: this.constructor.description,
       },
     ];
   }
