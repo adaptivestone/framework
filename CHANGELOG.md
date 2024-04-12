@@ -1,3 +1,7 @@
+### 5.0.0-alpha.7
+
+[UPDATE] deps update
+
 ### 5.0.0-alpha.6
 
 [UPDATE] Update internal documentation (jsdoc, d.ts)
