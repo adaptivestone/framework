@@ -1,15 +1,20 @@
 /* eslint-disable no-console */
 import EventEmitter from 'node:events';
-import { hrtime } from 'node:process';
+import { hrtime, loadEnvFile } from 'node:process';
 import * as url from 'node:url';
 import path from 'node:path';
 
-import 'dotenv/config';
 import merge from 'deepmerge';
 import winston from 'winston';
 import { getFilesPathWithInheritance } from './helpers/files.js';
 import { consoleLogger } from './helpers/logger.js';
 import Cache from './services/cache/Cache.js';
+
+try {
+  loadEnvFile();
+} catch (e) {
+  console.warn('No env file found. This is ok. But please check youself.');
+}
 
 /**
  * Main framework class.
