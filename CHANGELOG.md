@@ -1,3 +1,9 @@
+### 5.0.0-alpha.8
+
+[UPDATE] replace dotenv with loadEnvFile
+[UPDATE] replace nodemon with node --watch (dev only)
+[BREAKING] Minimum node version is 20.12 as for now (process.loadEnvFile)
+
 ### 5.0.0-alpha.7
 
 [UPDATE] deps update

@@ -13,8 +13,8 @@
   },
   "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
-    "dev": "nodemon ./index.js",
-    "prod": "nodemon ./cluster.js",
+    "dev": "node --watch ./index.js",
+    "prod": "node --watch ./cluster.js",
     "test": "vitest run",
     "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
     "lint": "eslint '**/*.js'",
@@ -60,7 +60,6 @@
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",
     "mongodb-memory-server": "^9.0.0",
-    "nodemon": "^3.0.1",
     "prettier": "^3.0.0",
     "vitest": "^1.0.0"
   },
