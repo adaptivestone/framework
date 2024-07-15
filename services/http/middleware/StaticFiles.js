@@ -30,14 +30,20 @@ class StaticFiles extends AbstractMiddleware {
 
     for (const f of folders) {
       const filePath = path.join(f, req.url);
-      promises.push(
-        fsPromises
-          .stat(filePath)
-          .catch(() => {
-            // nothing there, file just not exists
-          })
-          .then((stats) => ({ stats, file: filePath })),
-      );
+      const normalizedPath = path.normalize(filePath);
+
+      if (normalizedPath.startsWith(f)) {
+        promises.push(
+          fsPromises
+            .stat(filePath)
+            .catch(() => {
+              // nothing there, file just not exists
+            })
+            .then((stats) => ({ stats, file: filePath })),
+        );
+      } else {
+        promises.push(Promise.resolve({ stats: null, file: null }));
+      }
     }
 
     const fileStats = await Promise.all(promises);
