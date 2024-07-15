@@ -1,3 +1,10 @@
+### 5.0.0-alpha.9
+
+[UPDATE] update deps
+[BREAKING] removing staticFiles middleware as it not used in projects anymore. Docs with nginx config will be provided
+[BREAKING] remove default AUTH_SALT. It should be provided on a app level now
+[BREAKING] Vitest 2.0.0 https://vitest.dev/guide/migration.html#migrating-to-vitest-2-0
+
 ### 5.0.0-alpha.8
 
 [UPDATE] replace dotenv with loadEnvFile

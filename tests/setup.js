@@ -1,5 +1,6 @@
 /* eslint-disable no-undef */
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 import redis from 'redis';
@@ -19,6 +20,8 @@ beforeAll(async () => {
   });
   await mongoMemoryServerInstance.waitUntilRunning();
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
+  process.env.AUTH_SALT = randomBytes(16).toString('hex');
+
   const connectionStringMongo = await mongoMemoryServerInstance.getUri();
   // console.info('MONGO_URI: ', connectionStringMongo);
   global.server = new Server({
@@ -27,7 +30,6 @@ beforeAll(async () => {
       controllers:
         process.env.TEST_FOLDER_CONTROLLERS || path.resolve('./controllers'),
       views: process.env.TEST_FOLDER_VIEWS || path.resolve('./views'),
-      public: process.env.TEST_FOLDER_PUBLIC || path.resolve('./public'),
       models: process.env.TEST_FOLDER_MODELS || path.resolve('./models'),
       emails:
         process.env.TEST_FOLDER_EMAIL ||

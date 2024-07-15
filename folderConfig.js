@@ -6,7 +6,6 @@ export default {
     models: path.resolve('./models'),
     controllers: path.resolve('./controllers'),
     views: path.resolve('./views'),
-    public: path.resolve('./public'),
     locales: path.resolve('./locales'),
     emails: path.resolve('./services/messaging/email/templates'),
     commands: path.resolve('./commands'),

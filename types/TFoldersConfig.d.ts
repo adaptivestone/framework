@@ -3,7 +3,6 @@
  * @param models path to folder with moidels files
  * @param controllers path to folder with controllers files
  * @param views path to folder with view files
- * @param public path to folder with public files
  * @param locales path to folder with locales files
  * @param emails path to folder with emails files
  */
@@ -12,7 +11,6 @@ type FolderConfig = {
   models: string;
   controllers: string;
   views: string;
-  public: string;
   emails: string;
 };
 

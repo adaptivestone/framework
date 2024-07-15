@@ -6,7 +6,6 @@ import RequestLoggerMiddleware from './middleware/RequestLogger.js';
 import I18nMiddleware from './middleware/I18n.js';
 import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.js';
 import RequestParserMiddleware from './middleware/RequestParser.js';
-import StaticFilesMiddleware from './middleware/StaticFiles.js';
 import Cors from './middleware/Cors.js';
 import Base from '../../modules/Base.js';
 
@@ -33,15 +32,6 @@ class HttpServer extends Base {
     this.express.use(
       new Cors(this.app, {
         origins: httpConfig.corsDomains,
-      }).getMiddleware(),
-    );
-    // todo whitelist
-    this.express.use(
-      new StaticFilesMiddleware(this.app, {
-        folders: [
-          this.app.foldersConfig.public,
-          path.join(dirname, '../../public/files'),
-        ],
       }).getMiddleware(),
     );
 

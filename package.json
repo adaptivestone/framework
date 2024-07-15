@@ -51,7 +51,7 @@
     "yup": "^1.0.0"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^1.0.0",
+    "@vitest/coverage-v8": "^2.0.0",
     "eslint": "^8.0.0",
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.0.0",
@@ -61,7 +61,7 @@
     "lint-staged": "^15.0.0",
     "mongodb-memory-server": "^9.0.0",
     "prettier": "^3.0.0",
-    "vitest": "^1.0.0"
+    "vitest": "^2.0.0"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [

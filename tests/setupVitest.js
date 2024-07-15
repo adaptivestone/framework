@@ -12,13 +12,13 @@ mongoose.set('autoIndex', false);
 
 beforeAll(async () => {
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
+  process.env.AUTH_SALT = crypto.randomBytes(16).toString('hex');
   global.server = new Server({
     folders: {
       config: process.env.TEST_FOLDER_CONFIG || path.resolve('./config'),
       controllers:
         process.env.TEST_FOLDER_CONTROLLERS || path.resolve('./controllers'),
       views: process.env.TEST_FOLDER_VIEWS || path.resolve('./views'),
-      public: process.env.TEST_FOLDER_PUBLIC || path.resolve('./public'),
       models: process.env.TEST_FOLDER_MODELS || path.resolve('./models'),
       emails:
         process.env.TEST_FOLDER_EMAIL ||
