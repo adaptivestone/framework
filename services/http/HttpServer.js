@@ -6,6 +6,7 @@ import RequestLoggerMiddleware from './middleware/RequestLogger.js';
 import I18nMiddleware from './middleware/I18n.js';
 import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.js';
 import RequestParserMiddleware from './middleware/RequestParser.js';
+import IpDetector from './middleware/IpDetector.js';
 import Cors from './middleware/Cors.js';
 import Base from '../../modules/Base.js';
 
@@ -25,6 +26,7 @@ class HttpServer extends Base {
     this.express.set('view engine', 'pug');
 
     this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
+    this.express.use(new IpDetector(this.app).getMiddleware());
     this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
     this.express.use(new I18nMiddleware(this.app).getMiddleware());
 

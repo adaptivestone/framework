@@ -58,8 +58,8 @@ describe('rate limiter methods', () => {
     });
 
     const res = await redisRateLimiter.gerenateConsumeKey({
-      ip: '192.168.0.0',
       appInfo: {
+        ip: '192.168.0.0',
         user: {
           id: 'someId',
         },
@@ -80,7 +80,9 @@ describe('rate limiter methods', () => {
     });
 
     const res = await redisRateLimiter.gerenateConsumeKey({
-      ip: '192.168.0.0',
+      appInfo: {
+        ip: '192.168.0.0',
+      },
       body: {
         email: 'foo@example.com',
       },

@@ -78,7 +78,13 @@ class RateLimiter extends AbstractMiddleware {
 
     const key = [];
     if (ip) {
-      key.push(req.ip);
+      if (!req.appInfo.ip) {
+        this.logger.error(
+          `RateLimiter: Can't get remote address from request. Please check that you used IpDetecor middleware before RateLimiter`,
+        );
+      } else {
+        key.push(req.appInfo.ip);
+      }
     }
     if (route) {
       key.push(req.originalUrl);
