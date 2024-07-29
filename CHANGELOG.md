@@ -1,3 +1,9 @@
+### 5.0.0-alpha.10
+
+[UPDATE] update deps
+[NEW] IpDetector middleware that support detecting proxy and X-Forwarded-For header
+[BREAKING] RateLimiter now need to have IpDetector middleware before
+
 ### 5.0.0-alpha.9
 
 [UPDATE] update deps
