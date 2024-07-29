@@ -16,6 +16,7 @@
     "dev": "node --watch ./index.js",
     "prod": "node --watch ./cluster.js",
     "test": "vitest run",
+    "t": "vitest --coverage=false --reporter=default",
     "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
     "lint": "eslint '**/*.js'",
     "lint:fix": "eslint '**/*.js' --fix",
@@ -59,7 +60,7 @@
     "eslint-plugin-vitest": "^0.4.0",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",
-    "mongodb-memory-server": "^9.0.0",
+    "mongodb-memory-server": "^10.0.0",
     "prettier": "^3.0.0",
     "vitest": "^2.0.0"
   },
