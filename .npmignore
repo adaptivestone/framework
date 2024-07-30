@@ -1,7 +1,8 @@
 .gitlab-ci.yml
 .eslintignore
-.eslintrc.js
+.eslintrc.cjs
 .gitignore
+.getkeep
 .prettierrc
 .editorconfig
 .husky
@@ -11,4 +12,5 @@ cliCommand.js
 /services/http/middleware/test/*
 /benchmark/*
 /coverage/*
+**/*.test.js
 
