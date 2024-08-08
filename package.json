@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0-alpha.10",
+  "version": "5.0.0-alpha.11",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "type": "module",
@@ -48,7 +48,7 @@
     "rate-limiter-flexible": "^5.0.0",
     "redis": "^4.3.1",
     "winston": "^3.3.3",
-    "winston-transport-sentry-node": "^2.0.0",
+    "winston-transport-sentry-node": "^3.0.0",
     "yup": "^1.0.0"
   },
   "devDependencies": {
