@@ -1,37 +1,36 @@
 import i18next from 'i18next';
 import BackendFS from 'i18next-fs-backend';
-import Backend from 'i18next-chained-backend';
 import AbstractMiddleware from './AbstractMiddleware.js';
 
 class I18n extends AbstractMiddleware {
+  cache = {};
+
+  enabled = true;
+
+  lookupQuerystring = '';
+
+  supportedLngs = [];
+
+  fallbackLng = 'en';
+
+  /** @type {i18next} */
+  i18n = {
+    // @ts-ignore
+    t: (text) => text,
+    language: 'en',
+  };
+
   constructor(app, params) {
     super(app, params);
     const I18NConfig = this.app.getConfig('i18n');
-    this.i18n = {
-      t: (text) => text,
-      language: I18NConfig.fallbackLng,
-    };
-    this.cache = {};
 
     if (I18NConfig.enabled) {
       this.logger.info('Enabling i18n support');
       this.i18n = i18next;
-      i18next.use(Backend).init({
+      i18next.use(BackendFS).init({
         backend: {
-          backends: [
-            BackendFS,
-            //  BackendFS,
-          ],
-          backendOptions: [
-            // {
-            //  loadPath: __dirname + '/../../locales/{{lng}}/{{ns}}.json',
-            //   addPath: __dirname + '/../../locales/{{lng}}/{{ns}}.missing.json'
-            // },
-            {
-              loadPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.json`,
-              addPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.missing.json`,
-            },
-          ],
+          loadPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.json`,
+          addPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.missing.json`,
         },
         fallbackLng: I18NConfig.fallbackLng,
         preload: I18NConfig.preload,

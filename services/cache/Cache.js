@@ -43,8 +43,10 @@ class Cache extends Base {
     }
     const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
-    let resolve = null;
-    let reject = null;
+    // eslint-disable-next-line no-unused-vars
+    let resolve = (value) => {};
+    // eslint-disable-next-line no-unused-vars
+    let reject = (value) => {};
     if (this.promiseMapping.has(key)) {
       return this.promiseMapping.get(key);
     }
@@ -71,7 +73,7 @@ class Cache extends Base {
 
       this.redisClient.set(
         key,
-        JSON.stringify(result, (jsonkey, value) =>
+        JSON.stringify(result, (_jsonkey, value) =>
           typeof value === 'bigint' ? `${value}n` : value,
         ),
         {
@@ -86,7 +88,7 @@ class Cache extends Base {
         )}`,
       );
       try {
-        result = JSON.parse(result, (jsonkey, value) => {
+        result = JSON.parse(result, (_jsonkey, value) => {
           if (typeof value === 'string' && /^\d+n$/.test(value)) {
             return BigInt(value.slice(0, value.length - 1));
           }

@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0-alpha.12",
+  "version": "5.0.0-alpha.13",
   "description": "Adaptive stone node js framework",
   "main": "index.js",
   "type": "module",
@@ -35,10 +35,8 @@
     "formidable": "^3.5.1",
     "html-to-text": "^9.0.3",
     "i18next": "^23.2.8",
-    "i18next-chained-backend": "^4.0.0",
     "i18next-fs-backend": "^2.0.0",
     "juice": "^11.0.0",
-    "mime": "^4.0.0",
     "minimist": "^1.2.5",
     "mongoose": "^8.0.0",
     "nodemailer": "^6.6.3",

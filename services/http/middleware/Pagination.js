@@ -19,8 +19,8 @@ class Pagination extends AbstractMiddleware {
   async middleware(req, res, next) {
     let { limit, maxLimit } = this.params;
 
-    limit = typeof limit === 'number' ? parseInt(limit, 10) : 10;
-    maxLimit = typeof maxLimit === 'number' ? parseInt(maxLimit, 10) : 100;
+    limit = typeof limit !== 'number' ? parseInt(limit, 10) : 10;
+    maxLimit = typeof maxLimit !== 'number' ? parseInt(maxLimit, 10) : 100;
 
     req.appInfo.pagination = {};
     req.appInfo.pagination.page =
