@@ -373,7 +373,7 @@ class AbstractController extends Base {
    * You should provide path relative to controller and then array of middlewares to apply.
    * Order is matter.
    * Be default path apply to ANY' method, but you can preattach 'METHOD' into patch to scope patch to this METHOD
-   * @returns {Map<string, Array<AbstractMiddleware | [Function, ...any]>>}
+   * @returns {Map<string, Array<typeof import('../services/http/middleware/AbstractMiddleware.js').default | [Function, ...any]>>}
    * @example
    * return new Map([
    *    ['/*', [GetUserByToken]] // for any method for this controller

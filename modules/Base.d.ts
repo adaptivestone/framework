@@ -27,7 +27,7 @@ declare class Base {
   getFilesPathWithInheritance(
     internalFolder: string,
     externalFolder: string,
-  ): Promise<Dirent[]>;
+  ): Promise<{ path: string; file: string }[]>;
 
   /**
    * Return logger group. Just to have all logs groupped logically

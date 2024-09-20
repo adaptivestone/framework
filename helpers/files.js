@@ -8,7 +8,7 @@ const getFilesPathWithInheritance = async ({
   loggerFileType = '',
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
 }) => {
-  let [internalFiles, externalFiles] = await Promise.all([
+  const [internalFiles, externalFiles] = await Promise.all([
     fs.readdir(internalFolder, { recursive: true, withFileTypes: true }),
     fs.readdir(externalFolder, { recursive: true, withFileTypes: true }),
   ]);
@@ -33,24 +33,24 @@ const getFilesPathWithInheritance = async ({
     return true;
   };
 
-  internalFiles = internalFiles
+  const internalFilesString = internalFiles
     .filter(filterIndexFile)
     .map((fileDirent) =>
-      join(fileDirent.path, fileDirent.name)
+      join(fileDirent.parentPath, fileDirent.name)
         .replace(`${internalFolder}/`, '')
         .replace(`${internalFolder}`, ''),
     );
-  externalFiles = externalFiles
+  const externalFilesString = externalFiles
     .filter(filterIndexFile)
     .map((fileDirent) =>
-      join(fileDirent.path, fileDirent.name)
+      join(fileDirent.parentPath, fileDirent.name)
         .replace(`${externalFolder}/`, '')
         .replace(`${externalFolder}`, ''),
     );
 
   const filesToLoad = [];
-  for (const file of internalFiles) {
-    if (externalFiles.includes(file)) {
+  for (const file of internalFilesString) {
+    if (externalFilesString.includes(file)) {
       logger(
         `Skipping register INTERNAL file '${file}' ${
           loggerFileType ? `of type ${loggerFileType}` : ''
@@ -64,7 +64,7 @@ const getFilesPathWithInheritance = async ({
     }
   }
 
-  for (const file of externalFiles) {
+  for (const file of externalFilesString) {
     filesToLoad.push({
       path: join(externalFolder, file),
       file,
