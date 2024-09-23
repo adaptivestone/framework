@@ -115,8 +115,8 @@ const testVectors = [
 describe('ipDetector methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
-    const middleware = new IpDetector(global.server.app);
-    expect(middleware.constructor.description).toBeDefined();
+    // const middleware = new IpDetector(global.server.app);
+    expect(IpDetector.description).toBeDefined();
   });
 
   it('middleware that works', async () => {
