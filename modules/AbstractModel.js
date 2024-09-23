@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 import Base from './Base.js';
 
 class AbstractModel extends Base {
+  mongooseSchema = null;
+
+  mongooseModel = null;
+
   /**
    * @param {import('../server.js').default['app']} app  //TODO change to *.d.ts as this is a Server, not app
    * @param function callback optional callback when connection ready

@@ -66,7 +66,7 @@ class Server {
 
   /**
    * Start server (http  + init all http ralated functions)
-   * @param <Promise>callbackBefore404 code that should be executed before adding page 404
+   * @param {Function} callbackBefore404 code that should be executed before adding page 404
    * @returns {Promise}
    */
   async startServer(callbackBefore404 = async () => Promise.resolve()) {
