@@ -1,3 +1,8 @@
+### 5.0.0-alpha.15
+
+[BUG] fix bug with pagination
+[UPDATE] update deps
+
 ### 5.0.0-alpha.14
 
 [NEW] add types for Abstract model (wip)
