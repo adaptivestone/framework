@@ -196,22 +196,22 @@ class AbstractController extends Base {
                 errors: err.message,
               });
             }
-            req.body = new Proxy(req.body, {
-              get: (target, prop) => {
-                this.logger.warn(
-                  'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
-                );
-                return target[prop];
-              },
-            });
-            req.query = new Proxy(req.query, {
-              get: (target, prop) => {
-                this.logger.warn(
-                  'Please not use "req.query" directly. Implement "query" and use "req.appInfo.query" ',
-                );
-                return target[prop];
-              },
-            });
+            // req.body = new Proxy(req.body, {
+            //   get: (target, prop) => {
+            //     this.logger.warn(
+            //       'Please not use "req.body" directly. Implement "request" and use "req.appInfo.request" ',
+            //     );
+            //     return target[prop];
+            //   },
+            // });
+            // req.query = new Proxy(req.query, {
+            //   get: (target, prop) => {
+            //     this.logger.warn(
+            //       'Please not use "req.query" directly. Implement "query" and use "req.appInfo.query" ',
+            //     );
+            //     return target[prop];
+            //   },
+            // });
 
             if (!routeObject.handler) {
               this.logger.error(`Route object have no handler defined`);

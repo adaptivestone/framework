@@ -1,3 +1,8 @@
+### 5.0.0-alpha.16
+
+[UPDATE] no warning of direct usage body and query
+[UPDATE] update deps
+
 ### 5.0.0-alpha.15
 
 [BUG] fix bug with pagination
