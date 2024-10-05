@@ -139,7 +139,7 @@ describe('auth', () => {
     });
 
     it('can login with normal creds and verified email', async () => {
-      expect.assertions(2);
+      expect.assertions(3);
 
       const user = await global.server.app
         .getModel('User')
