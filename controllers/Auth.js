@@ -83,7 +83,7 @@ class Auth extends AbstractController {
     }
     const token = await user.generateToken();
 
-    return res.status(200).json({ token, user: user.getPublic() });
+    return res.status(200).json({ data: { token, user: user.getPublic() } });
   }
 
   async postRegister(req, res) {

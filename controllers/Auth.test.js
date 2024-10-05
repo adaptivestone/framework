@@ -161,7 +161,8 @@ describe('auth', () => {
       const responseBody = await response.json();
 
       expect(response.status).toBe(200);
-      expect(responseBody.token).toBeDefined();
+      expect(responseBody.data).toBeDefined();
+      expect(responseBody.data.token).toBeDefined();
     });
   });
 
