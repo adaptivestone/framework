@@ -391,7 +391,7 @@ describe('auth', () => {
       expect(status).toBe(201);
       expect(status2).toBe(400);
       expect(response3.status).toBe(200);
-      expect(responseBody3.token).toBeDefined();
+      expect(responseBody3.data.token).toBeDefined();
     });
   });
 
