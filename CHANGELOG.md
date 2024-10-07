@@ -1,6 +1,7 @@
 ### 5.0.0-alpha.18
 
 [BREAKING] default aut responce changed to be unified. {token, user} = > {data:{token, user}}
+[UPDATE] RateLimiter updae key generation
 
 ### 5.0.0-alpha.17
 
