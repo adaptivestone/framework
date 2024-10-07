@@ -87,7 +87,7 @@ class RateLimiter extends AbstractMiddleware {
       }
     }
     if (route) {
-      key.push(req.baseUrl + req.path); // to avoid quesry params
+      key.push(`${req.baseUrl ?? ''}${req.path ?? ''}`); // to avoid quesry params
     }
     if (user && req.appInfo?.user) {
       key.push(req.appInfo?.user.id);
