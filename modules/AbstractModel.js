@@ -12,7 +12,10 @@ class AbstractModel extends Base {
    */
   constructor(app, callback = () => {}) {
     super(app);
-    this.mongooseSchema = new mongoose.Schema(this.modelSchema);
+    this.mongooseSchema = new mongoose.Schema(
+      this.modelSchema,
+      this.modelSchemaOptions,
+    );
     mongoose.set('strictQuery', true);
     this.mongooseSchema.set('timestamps', true);
     this.mongooseSchema.set('minimize', false);
@@ -55,6 +58,14 @@ class AbstractModel extends Base {
    */
   get modelSchema() {
     this.logger.warn('You should provide modelSchema');
+    return {};
+  }
+
+  /**
+   * Mongoose schema options
+   */
+  // eslint-disable-next-line class-methods-use-this
+  get modelSchemaOptions() {
     return {};
   }
 

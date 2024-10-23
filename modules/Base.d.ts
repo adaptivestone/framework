@@ -1,6 +1,6 @@
-import winston from 'winston';
-import Server from '../server.js';
-import type { Dirent } from 'fs';
+import type winston from 'winston';
+import type Server from '../server.js';
+import type { Dirent } from 'node.fs';
 
 declare class Base {
   app: Server['app'];

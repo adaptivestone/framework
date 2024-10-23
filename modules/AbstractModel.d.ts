@@ -1,6 +1,6 @@
-import Base from './Base.js';
+import type Base from './Base.js';
 import { Model, Schema } from 'mongoose';
-import Server from '../server.js';
+import type Server from '../server.js';
 
 interface AbstractModel<T extends Document> extends Model, Base {
   constructor(app: Server['app'], callback?: () => void);
