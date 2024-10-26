@@ -18,7 +18,17 @@ class Base {
    * Optimzation to lazy load logger. It will be inited only on request
    */
   get logger() {
-    if (!this.#realLogger) {
+    let l;
+    try {
+      l = this.#realLogger;
+    } catch (e) {
+      console.warn(
+        `You try to accees logger not from class. that can be ok in case of models.`,
+      );
+      return null;
+    }
+
+    if (!l) {
       this.#realLogger = this.getLogger(
         this.constructor.loggerGroup + this.getConstructorName(),
       );

@@ -1,3 +1,8 @@
+### 5.0.0-alpha.20
+
+[UPDATE] update deps
+[UPDATE] #realLogger do not throw error in a scecific cases (model toJSON({virtual:true}))
+
 ### 5.0.0-alpha.19
 
 [NEW] added modelSchemaOptions for models
