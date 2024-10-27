@@ -1,5 +1,6 @@
 ### 5.0.0-alpha.21
 
+[UPDATE] update deps
 [UPDATE] Mailer uses await import() for startup speedup
 
 ### 5.0.0-alpha.20
