@@ -25,9 +25,9 @@ class HttpServer extends Base {
     // ]);
     // this.express.set('view engine', 'pug');
 
+    this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
     this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
     this.express.use(new IpDetector(this.app).getMiddleware());
-    this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
     this.express.use(new I18nMiddleware(this.app).getMiddleware());
 
     const httpConfig = this.app.getConfig('http');
