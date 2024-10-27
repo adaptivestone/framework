@@ -26,7 +26,7 @@ class ValidateService extends Base {
     );
   }
 
-  static getDriverByValidatorBody(app, body) {
+  static getDriverByValidatorBody(app, body = {}) {
     if (this.isValidatorExists(body)) {
       return body;
     }

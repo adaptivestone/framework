@@ -376,14 +376,14 @@ class AbstractController extends Base {
    * @returns {Map<string, Array<typeof import('../services/http/middleware/AbstractMiddleware.js').default | [Function, ...any]>>}
    * @example
    * return new Map([
-   *    ['/*', [GetUserByToken]] // for any method for this controller
+   *    ['/*splat', [GetUserByToken]] // for any method for this controller
    *    ['POST/', [Auth]] // for POST method
    *    ['/superSecretMethod', [OnlySuperSecretUsers]] // route with ANY method
    *    ['PUT/superSecretMathod', [OnlySuperSecretAdmin]] // route with PUT method
    * ]);
    */
   static get middleware() {
-    return new Map([['/*', [GetUserByToken, Auth]]]);
+    return new Map([['/*splat', [GetUserByToken, Auth]]]);
   }
 
   /**

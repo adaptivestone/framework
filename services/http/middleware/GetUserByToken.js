@@ -22,7 +22,7 @@ class GetUserByToken extends AbstractMiddleware {
       this.logger.warn('You call GetUserByToken more then once');
       return next();
     }
-    let { token } = req.body;
+    let { token } = req.body || {};
     this.logger.verbose(
       `GetUserByToken token in BODY ${token}. Token in Authorization header ${req.get(
         'Authorization',

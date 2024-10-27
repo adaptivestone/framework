@@ -29,7 +29,7 @@ class RequestParser extends AbstractMiddleware {
 
     req.body = {
       // todo avoid body in next versions
-      ...req.body,
+      ...(req.body || {}),
       ...fields,
       ...files,
     };
