@@ -4,7 +4,6 @@ import { scrypt } from 'node:crypto';
 
 import { promisify } from 'node:util';
 import AbstractModel from '../modules/AbstractModel.js';
-import Mailer from '../services/messaging/email/index.js';
 
 class User extends AbstractModel {
   constructor(app) {
@@ -175,6 +174,10 @@ class User extends AbstractModel {
   async sendPasswordRecoveryEmail(i18n) {
     const passwordRecoveryToken =
       await User.generateUserPasswordRecoveryToken(this);
+    // speed optimisation
+    const Mailer = (await import('../services/messaging/email/index.js'))
+      .default;
+
     const mail = new Mailer(
       this.getSuper().app,
       'recovery',
@@ -241,6 +244,9 @@ class User extends AbstractModel {
 
   async sendVerificationEmail(i18n) {
     const verificationToken = await User.generateUserVerificationToken(this);
+    // speed optimisation
+    const Mailer = (await import('../services/messaging/email/index.js'))
+      .default;
     const mail = new Mailer(
       this.getSuper().app,
       'verification',
