@@ -6,13 +6,13 @@ class RequestLogger extends AbstractMiddleware {
   }
 
   async middleware(req, res, next) {
-    const startTime = Date.now();
+    const startTime = performance.now();
     const text = `Request is  [${req.method}] ${req.url}`;
     this.logger.info(text);
     res.on('finish', () => {
-      const duration = Date.now() - startTime;
+      const end = performance.now();
       this.logger.info(
-        `Finished ${text}. Status: ${res.statusCode}. Duration ${duration} ms`,
+        `Finished ${text}. Status: ${res.statusCode}.  [${(end - startTime).toFixed(2)} ms]`,
       );
     });
     next();
