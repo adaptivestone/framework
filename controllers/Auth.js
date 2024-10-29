@@ -203,7 +203,7 @@ class Auth extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/*splat', [GetUserByToken, RateLimiter]]]);
+    return new Map([['/{*splat}', [GetUserByToken, RateLimiter]]]);
   }
 }
 

@@ -1,3 +1,8 @@
+### 5.0.0-alpha.22
+
+[UPDATE] update deps
+[FIX] fix optional routing parameters
+
 ### 5.0.0-alpha.21
 
 [BREAKING] possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too https://expressjs.com/en/guide/migrating-5.html.

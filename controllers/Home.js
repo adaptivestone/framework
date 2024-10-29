@@ -21,7 +21,7 @@ class Home extends AbstractController {
   }
 
   static get middleware() {
-    return new Map([['/*splat', [GetUserByToken]]]);
+    return new Map([['{/*splat}', [GetUserByToken]]]);
   }
 }
 

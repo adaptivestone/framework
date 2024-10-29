@@ -152,9 +152,9 @@ class SomeController extends AbstractController {
 
   static get middleware() {
     return new Map([
-      ['/*splat', [GetUserByToken]],
+      ['/{*splat}', [GetUserByToken]],
       ['PATCH/userAvatar', [GetUserByToken, AuthMiddleware]],
-      ['PUT/*splat', [[RoleMiddleware, { roles: ['client'] }]]],
+      ['PUT/{*splat}', [[RoleMiddleware, { roles: ['client'] }]]],
     ]);
   }
 }
