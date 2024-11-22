@@ -1,3 +1,8 @@
+### 5.0.0-alpha.24
+
+[UPDATE] update deps
+[BREAKING] i18next v24 https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0
+
 ### 5.0.0-alpha.23
 
 [UPDATE] update deps

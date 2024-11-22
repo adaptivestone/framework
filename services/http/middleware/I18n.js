@@ -63,7 +63,7 @@ class I18n extends AbstractMiddleware {
 
       if (!this.cache[lang]) {
         this.cache[lang] = i18next.cloneInstance({
-          initImmediate: false,
+          initAsync: false,
           lng: lang,
         });
       }
