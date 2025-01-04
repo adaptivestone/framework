@@ -29,24 +29,31 @@ class Cli extends Base {
     return true;
   }
 
+  async printComandTable() {
+    const commands = Object.keys(this.commands);
+    const maxLength = commands.reduce((max, c) => Math.max(max, c.length), 0);
+    console.log('Available commands:');
+    for (const c of commands) {
+      // eslint-disable-next-line no-await-in-loop
+      const f = await import(this.commands[c]);
+      console.log(
+        ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${f.default.description}`,
+      );
+    }
+  }
+
   async run(command, args) {
     await this.loadCommands();
 
     if (!command) {
       console.log('Please provide command name');
-      console.log(
-        'Availalble commands:',
-        Object.keys(this.commands).join(', '),
-      );
+      await this.printComandTable();
       return false;
     }
 
     if (!this.commands[command]) {
       console.log(`Command ${command} not found `);
-      console.log(
-        'Availalble commands:',
-        Object.keys(this.commands).join(', '),
-      );
+      await this.printComandTable();
       return false;
     }
     const { default: Command } = await import(this.commands[command]);

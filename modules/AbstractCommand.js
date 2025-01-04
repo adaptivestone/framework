@@ -8,7 +8,7 @@ class AbstractCommand extends Base {
   }
 
   static get description() {
-    return 'Command description';
+    return 'Command description. PLEASE PROVIDE IT';
   }
 
   /**

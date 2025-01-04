@@ -5,6 +5,10 @@ import AbstractCommand from '../modules/AbstractCommand.js';
  * Command for generate documentation json file openApi
  */
 class GetOpenApiJson extends AbstractCommand {
+  static get description() {
+    return 'Generate documentation (openApi) ';
+  }
+
   async run() {
     const { myDomain } = this.app.getConfig('http');
     let jsonFile = process.env.npm_package_json;

@@ -2,6 +2,10 @@ import AbstractCommand from '../modules/AbstractCommand.js';
 
 // Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
 class CreateUser extends AbstractCommand {
+  static get description() {
+    return 'Create user in a database';
+  }
+
   async run() {
     const User = this.app.getModel('User');
     const { id, email, password, roles, update } = this.args;
