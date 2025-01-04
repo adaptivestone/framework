@@ -1,3 +1,8 @@
+### 5.0.0-alpha.26
+
+[UPDATE] update deps
+[UPDATE] new commands view in CLI
+
 ### 5.0.0-alpha.24
 
 [UPDATE] update deps

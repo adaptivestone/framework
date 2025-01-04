@@ -33,11 +33,19 @@ class Cli extends Base {
     const commands = Object.keys(this.commands);
     const maxLength = commands.reduce((max, c) => Math.max(max, c.length), 0);
     console.log('Available commands:');
+    let commandsClasses = [];
     for (const c of commands) {
       // eslint-disable-next-line no-await-in-loop
-      const f = await import(this.commands[c]);
+      commandsClasses.push(import(this.commands[c]));
+      // console.log(
+      //   ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${f.default.description}`,
+      // );
+    }
+    commandsClasses = await Promise.all(commandsClasses);
+    for (const [key, c] of Object.entries(commands)) {
+      // eslint-disable-next-line no-await-in-loop
       console.log(
-        ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${f.default.description}`,
+        ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${commandsClasses[key].default.description}`,
       );
     }
   }
