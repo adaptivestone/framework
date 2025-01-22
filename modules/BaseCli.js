@@ -30,7 +30,7 @@ class Cli extends Base {
   }
 
   async printComandTable() {
-    const commands = Object.keys(this.commands);
+    const commands = Object.keys(this.commands).sort();
     const maxLength = commands.reduce((max, c) => Math.max(max, c.length), 0);
     console.log('Available commands:');
     let commandsClasses = [];
