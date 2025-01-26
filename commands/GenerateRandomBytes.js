@@ -6,6 +6,8 @@ class GenerateRandomBytes extends AbstractCommand {
     return 'Generate random bytes ising randomBytes from  node:crypto';
   }
 
+  static isShouldInitModels = false;
+
   async run() {
     const sizes = [16, 32, 64, 128, 256];
     for (const size of sizes) {
