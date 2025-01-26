@@ -30,6 +30,24 @@ export default [
       'prefer-const': 'error',
       'import/no-extraneous-dependencies': ['error'],
       'import/first': ['error'],
+      camelcase: ['error', { properties: 'never', ignoreDestructuring: false }],
+      'prefer-destructuring': [
+        'error',
+        {
+          VariableDeclarator: {
+            array: false,
+            object: true,
+          },
+          AssignmentExpression: {
+            array: true,
+            object: false,
+          },
+        },
+        {
+          enforceForRenamedProperties: false,
+        },
+      ],
+      'no-plusplus': 'error',
     },
   },
   {
