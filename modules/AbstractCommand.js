@@ -23,7 +23,7 @@ class AbstractCommand extends Base {
    * @returns string
    */
   static getMongoConnectionName(commandName, args) {
-    return `CLI: ${commandName} ${args.join(' ')}`;
+    return `CLI: ${commandName} ${JSON.stringify(args)}`;
   }
 
   /**

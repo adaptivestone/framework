@@ -49,6 +49,10 @@ class AbstractModel extends Base {
             this.logger.info(
               `Mongo connection success ${connectionParams.appName}`,
             );
+            mongoose.connection.on('error', (err) => {
+              this.logger.error('Mongo connection error', err);
+              console.error(err);
+            });
 
             callback();
           },

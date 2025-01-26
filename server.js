@@ -66,6 +66,15 @@ class Server {
       models: new Map(),
       modelConstructors: new Map(),
     };
+
+    this.app.events.on('shutdown', () => {
+      const forceShutdownTimer = setTimeout(() => {
+        console.error('Shutdown timed out, forcing exit');
+        process.exit(1);
+      }, 5_000);
+      // Unref the timer so it doesn't keep the process alive
+      forceShutdownTimer.unref();
+    });
   }
 
   /**

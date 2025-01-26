@@ -1,3 +1,7 @@
+### 5.0.0-beta.4
+
+[NEW] on shutdown event now after timeout we are forcing to shutdown
+
 ### 5.0.0-beta.2
 
 [UPDATE] update deps
