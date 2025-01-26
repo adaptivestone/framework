@@ -37,17 +37,23 @@ class AbstractModel extends Base {
         }
         // await mongoose.disconnect(); // TODO it have problems with replica-set
       });
+      const connectionParams = {};
+      if (process.env.MONGO_APP_NAME) {
+        connectionParams.appName = process.env.MONGO_APP_NAME;
+      }
       // do not connect on test
-      mongoose.connect(this.app.getConfig('mongo').connectionString, {}).then(
-        () => {
-          this.logger.info('Mongo connection success');
+      mongoose
+        .connect(this.app.getConfig('mongo').connectionString, connectionParams)
+        .then(
+          () => {
+            this.logger.info('Mongo connection success');
 
-          callback();
-        },
-        (error) => {
-          this.logger.error("Can't install mongodb connection", error);
-        },
-      );
+            callback();
+          },
+          (error) => {
+            this.logger.error("Can't install mongodb connection", error);
+          },
+        );
     } else {
       callback();
     }
