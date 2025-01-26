@@ -18,7 +18,4 @@ class YupFile extends Schema {
   }
 }
 
-export {
-  // eslint-disable-next-line import/prefer-default-export
-  YupFile,
-};
+export { YupFile };

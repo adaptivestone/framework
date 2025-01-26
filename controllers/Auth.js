@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { object, string } from 'yup';
 import AbstractController from '../modules/AbstractController.js';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
 import RateLimiter from '../services/http/middleware/RateLimiter.js';
@@ -9,58 +9,52 @@ class Auth extends AbstractController {
       post: {
         '/login': {
           handler: this.postLogin,
-          request: yup.object().shape({
-            email: yup.string().email().required('auth.emailProvided'), // if not provided then error will be generated
-            password: yup.string().required('auth.passwordProvided'), // possible to provide values from translation
+          request: object().shape({
+            email: string().email().required('auth.emailProvided'), // if not provided then error will be generated
+            password: string().required('auth.passwordProvided'), // possible to provide values from translation
           }),
         },
         '/register': {
           handler: this.postRegister,
-          request: yup.object().shape({
-            email: yup
-              .string()
+          request: object().shape({
+            email: string()
               .email('auth.emailValid')
               .required('auth.emailProvided'),
-            password: yup
-              .string()
+            password: string()
               .matches(
                 /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
                 'auth.passwordValid',
               )
               .required('auth.passwordProvided'),
-            nickName: yup
-              .string()
-              .matches(/^[a-zA-Z0-9_\-.]+$/, 'auth.nickNameValid'),
-            firstName: yup.string(),
-            lastName: yup.string(),
+            nickName: string().matches(
+              /^[a-zA-Z0-9_\-.]+$/,
+              'auth.nickNameValid',
+            ),
+            firstName: string(),
+            lastName: string(),
           }),
         },
         '/logout': this.postLogout,
         '/verify': this.verifyUser,
         '/send-recovery-email': {
           handler: this.sendPasswordRecoveryEmail,
-          request: yup
-            .object()
-            .shape({ email: yup.string().email().required() }),
+          request: object().shape({ email: string().email().required() }),
         },
         '/recover-password': {
           handler: this.recoverPassword,
-          request: yup.object().shape({
-            password: yup
-              .string()
+          request: object().shape({
+            password: string()
               .matches(
                 /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
                 'auth.passwordValid',
               )
               .required(),
-            passwordRecoveryToken: yup.string().required(),
+            passwordRecoveryToken: string().required(),
           }),
         },
         '/send-verification': {
           handler: this.sendVerification,
-          request: yup
-            .object()
-            .shape({ email: yup.string().email().required() }),
+          request: object().shape({ email: string().email().required() }),
         },
       },
     };
@@ -136,7 +130,7 @@ class Auth extends AbstractController {
       user = await User.getUserByVerificationToken(
         req.query.verification_token,
       );
-    } catch (e) {
+    } catch {
       return res.status(400).json({
         message: req.i18n.t('email.alreadyVerifiedOrWrongToken'),
       });

@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { ValidationError } from 'yup';
 import AbstractValidator from './AbstractValidator.js';
 
 class CustomValidator extends AbstractValidator {
@@ -19,7 +19,7 @@ class CustomValidator extends AbstractValidator {
     } catch (e) {
       this.logger.warn(`CustomValidator validateFields ${e}`);
       if (e.path) {
-        throw new yup.ValidationError({
+        throw new ValidationError({
           [e.path]: e.message,
         });
       }

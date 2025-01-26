@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import EventEmitter from 'node:events';
 import { hrtime, loadEnvFile } from 'node:process';
 import * as url from 'node:url';
@@ -12,7 +11,7 @@ import Cache from './services/cache/Cache.js';
 
 try {
   loadEnvFile();
-} catch (e) {
+} catch {
   console.warn('No env file found. This is ok. But please check youself.');
 }
 
@@ -323,7 +322,7 @@ class Server {
     function IsConstructor(f) {
       try {
         Reflect.construct(String, [], f);
-      } catch (e) {
+      } catch {
         return false;
       }
       return true;

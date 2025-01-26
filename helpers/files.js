@@ -73,7 +73,4 @@ const getFilesPathWithInheritance = async ({
   return filesToLoad;
 };
 
-export {
-  // eslint-disable-next-line import/prefer-default-export
-  getFilesPathWithInheritance,
-};
+export { getFilesPathWithInheritance };

@@ -1,0 +1,44 @@
+import globals from 'globals';
+import pluginJs from '@eslint/js';
+import importPlugin from 'eslint-plugin-import';
+import vitest from '@vitest/eslint-plugin';
+import eslintConfigPrettier from 'eslint-config-prettier';
+import prettierPlugin from 'eslint-plugin-prettier/recommended';
+
+/** @type {import('eslint').Linter.Config[]} */
+export default [
+  pluginJs.configs.recommended,
+  importPlugin.flatConfigs.recommended,
+  eslintConfigPrettier,
+  prettierPlugin,
+  {
+    languageOptions: {
+      sourceType: 'module',
+      ecmaVersion: 'latest',
+      globals: {
+        ...globals.es2023,
+        ...globals.node,
+      },
+    },
+  },
+  {
+    rules: {
+      'no-await-in-loop': 'error',
+      'no-param-reassign': 'error',
+      'class-methods-use-this': 'error',
+      'no-shadow': 'error',
+      'prefer-const': 'error',
+      'import/no-extraneous-dependencies': ['error'],
+      'import/first': ['error'],
+    },
+  },
+  {
+    files: ['**/*.test.js'],
+    plugins: {
+      vitest,
+    },
+    rules: {
+      ...vitest.configs.recommended.rules,
+    },
+  },
+];

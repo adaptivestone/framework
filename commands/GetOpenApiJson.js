@@ -18,7 +18,7 @@ class GetOpenApiJson extends AbstractCommand {
 
     try {
       jsonFile = JSON.parse(await fs.readFile(jsonFile, 'utf8'));
-    } catch (e) {
+    } catch {
       this.logger.error(
         'No npm package detected. Please start this command via NPM as it depends on package.json',
       );
@@ -123,7 +123,6 @@ class GetOpenApiJson extends AbstractCommand {
 
         let routeName = Object.keys(route)[0];
         if (routeName === '/') {
-          // eslint-disable-next-line no-continue
           continue;
         }
 

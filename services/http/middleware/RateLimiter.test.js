@@ -22,11 +22,14 @@ describe('rate limiter methods', () => {
     // we need to wait because redis mongo ask mongo to create indexes
     await setTimeout(200);
   });
+
   it('have description fields', async () => {
     expect.assertions(1);
+
     const middleware = new RateLimiter(global.server.app, {
       driver: 'redis',
     });
+
     expect(middleware.constructor.description).toBeDefined();
   });
 
@@ -93,6 +96,7 @@ describe('rate limiter methods', () => {
 
   it('middleware without driver should fail', async () => {
     expect.assertions(2);
+
     const rateLimiter = new RateLimiter(global.server.app, {
       driver: 'unknown',
     });
@@ -114,6 +118,7 @@ describe('rate limiter methods', () => {
       },
       () => {},
     );
+
     expect(status).toBe(500);
     expect(isSend).toBeTruthy();
   });
@@ -152,28 +157,34 @@ describe('rate limiter methods', () => {
 
   it('middleware should works with a mongo drivers', async () => {
     expect.assertions(1);
+
     const { isNextCalled } = await makeOneRequest({
       rateLimiter: mongoRateLimiter,
       request: { ip: '10.10.0.1' },
     });
+
     expect(isNextCalled).toBeTruthy();
   });
 
   it('middleware should works with a memory drivers', async () => {
     expect.assertions(1);
+
     const { isNextCalled } = await makeOneRequest({
       driver: 'memory',
       request: { ip: '10.10.0.1' },
     });
+
     expect(isNextCalled).toBeTruthy();
   });
 
   it('middleware should works with a redis drivers', async () => {
     expect.assertions(1);
+
     const { isNextCalled } = await makeOneRequest({
       driver: 'redis',
       request: { ip: '10.10.0.1' },
     });
+
     expect(isNextCalled).toBeTruthy();
   });
 

@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { object, number } from 'yup';
 import AbstractMiddleware from './AbstractMiddleware.js';
 /**
  * Middleware for reusing pagination
@@ -10,9 +10,9 @@ class Pagination extends AbstractMiddleware {
 
   // eslint-disable-next-line class-methods-use-this
   get relatedQueryParameters() {
-    return yup.object().shape({
-      page: yup.number(),
-      limit: yup.number(),
+    return object().shape({
+      page: number(),
+      limit: number(),
     });
   }
 

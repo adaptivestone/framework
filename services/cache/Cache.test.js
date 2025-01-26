@@ -10,35 +10,43 @@ describe('cache', () => {
     const { cache } = global.server.app;
 
     const res = await cache.getSetValue('TEST_TIME', () => time);
+
     expect(res).toStrictEqual(time);
 
     const res2 = await cache.getSetValue('TEST_TIME', () => '123');
+
     expect(res2).toStrictEqual(time);
   });
 
   it('can delete values', async () => {
     expect.assertions(1);
+
     const { cache } = global.server.app;
 
     await cache.removeKey('TEST_TIME');
 
     const res2 = await cache.getSetValue('TEST_TIME', () => '123');
+
     expect(res2).toBe('123');
   });
 
   it('can works with big int', async () => {
     expect.assertions(2);
+
     const { cache } = global.server.app;
 
     const res = await cache.getSetValue('BIN_INT', () => 1n);
+
     expect(res).toBe(1n);
 
     const res2 = await cache.getSetValue('BIN_INT', () => '1111');
+
     expect(res2).toBe(1n);
   });
 
   it('can execute only one request per time', async () => {
     expect.assertions(3);
+
     const { cache } = global.server.app;
     let counter = 0;
 
@@ -61,6 +69,7 @@ describe('cache', () => {
 
   it('can handle problems on onNotFound', async () => {
     expect.assertions(1);
+
     const getAsyncThrow = async () => {
       throw new Error('err');
     };
@@ -76,6 +85,7 @@ describe('cache', () => {
     } catch (e) {
       err = e;
     }
+
     expect(err.message).toBe('err');
   });
 });

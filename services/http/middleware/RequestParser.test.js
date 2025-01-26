@@ -7,9 +7,12 @@ import RequestParser from './RequestParser.js';
 describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
+
     const middleware = new RequestParser(global.server.app);
+
     expect(middleware.constructor.description).toBeDefined();
   });
+
   it('middleware that works', async () => {
     expect.assertions(4);
 
@@ -70,6 +73,7 @@ d\r
       });
     });
   });
+
   it('middleware with a problem', async () => {
     expect.assertions(1);
 
@@ -89,6 +93,7 @@ d\r
           json: () => resp,
         };
         await middleware.middleware(req, resp, () => {});
+
         expect(status).toBe(400);
         // expect(err).toBeDefined();
 

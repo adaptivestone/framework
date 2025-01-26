@@ -8,6 +8,7 @@ let globalUser;
 describe('user model', () => {
   it('can create user', async () => {
     expect.assertions(1);
+
     globalUser = await global.server.app.getModel('User').create({
       email: userEmail,
       password: userPassword,
@@ -15,6 +16,7 @@ describe('user model', () => {
         nick: 'nickname',
       },
     });
+
     expect(globalUser.id).toBeDefined();
   });
 
@@ -24,11 +26,13 @@ describe('user model', () => {
     const user = await global.server.app.getModel('User').findOne({
       email: userEmail,
     });
+
     expect(user.password).not.toBe(userPassword);
   });
 
   it('passwords should not be changed on other fields save', async () => {
     expect.assertions(1);
+
     const user = await global.server.app.getModel('User').findOne({
       email: userEmail,
     });
@@ -44,31 +48,37 @@ describe('user model', () => {
   describe('getUserByEmailAndPassword', () => {
     it('should WORK with valid creds', async () => {
       expect.assertions(1);
+
       const userModel = await global.server.app.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         userPassword,
       );
+
       expect(user.id).toBe(globalUser.id);
     });
 
     it('should NOT with INvalid creds', async () => {
       expect.assertions(1);
+
       const userModel = await global.server.app.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         'wrongPassword',
       );
+
       expect(user).toBeFalsy();
     });
 
     it('should NOT with wrong email', async () => {
       expect.assertions(1);
+
       const userModel = await global.server.app.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         'not@exists.com',
         userPassword,
       );
+
       expect(user).toBeFalsy();
     });
   });
@@ -80,15 +90,18 @@ describe('user model', () => {
       const user = await global.server.app
         .getModel('User')
         .getUserByToken('fake one');
+
       expect(user).toBeFalsy();
     });
 
     it('should  work for VALID token', async () => {
       expect.assertions(1);
+
       const token = await globalUser.generateToken();
       const user = await global.server.app
         .getModel('User')
         .getUserByToken(token.token);
+
       expect(user.id).toBe(globalUser.id);
     });
   });
@@ -106,6 +119,7 @@ describe('user model', () => {
 
     it('should  work for VALID token', async () => {
       expect.assertions(1);
+
       const token = await global.server.app
         .getModel('User')
         .generateUserVerificationToken(globalUser);
@@ -113,6 +127,7 @@ describe('user model', () => {
       const user = await global.server.app
         .getModel('User')
         .getUserByVerificationToken(token.token);
+
       expect(user.id).toBe(globalUser.id);
     });
   });
@@ -130,6 +145,7 @@ describe('user model', () => {
 
     it('should  work for VALID token', async () => {
       expect.assertions(1);
+
       const token = await global.server.app
         .getModel('User')
         .generateUserPasswordRecoveryToken(globalUser);
@@ -137,6 +153,7 @@ describe('user model', () => {
       const user = await global.server.app
         .getModel('User')
         .getUserByPasswordRecoveryToken(token.token);
+
       expect(user.id).toBe(globalUser.id);
     });
   });

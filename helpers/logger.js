@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 const levels = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
 
 const consoleLogger = (level, message) => {

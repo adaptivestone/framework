@@ -4,7 +4,6 @@ import { cpus } from 'node:os';
 const numCPUs = cpus().length;
 
 if (cluster.isPrimary) {
-  // eslint-disable-next-line no-console
   console.log(`Master ${process.pid} is running`);
   // Fork workers.
   for (let i = 0; i < numCPUs; i += 1) {
@@ -12,7 +11,6 @@ if (cluster.isPrimary) {
   }
 
   cluster.on('exit', (worker, code, signal) => {
-    // eslint-disable-next-line no-console
     console.log(
       `Worker \x1B[45m ${
         worker.process.pid

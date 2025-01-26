@@ -3,9 +3,11 @@ import Auth from './Auth.js';
 
 describe('atuh middleware methods', () => {
   let middleware;
+
   beforeAll(() => {
     middleware = new Auth(global.server.app);
   });
+
   it('have description fields', async () => {
     expect.assertions(1);
     expect(middleware.constructor.description).toBeDefined();
@@ -13,6 +15,7 @@ describe('atuh middleware methods', () => {
 
   it('middleware pass when user presented', async () => {
     expect.assertions(1);
+
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -23,11 +26,13 @@ describe('atuh middleware methods', () => {
       },
     };
     await middleware.middleware(req, {}, nextFunction);
+
     expect(isCalled).toBeTruthy();
   });
 
   it('middleware NOT pass when user NOT presented', async () => {
     expect.assertions(3);
+
     let isCalled = false;
     let status;
     let isSend;
@@ -50,6 +55,7 @@ describe('atuh middleware methods', () => {
       },
       nextFunction,
     );
+
     expect(isCalled).toBeFalsy();
     expect(status).toBe(401);
     expect(isSend).toBeTruthy();

@@ -3,9 +3,11 @@ import I18n from './I18n.js';
 
 describe('i18n middleware methods', () => {
   let middleware;
+
   beforeAll(() => {
     middleware = new I18n(global.server.app);
   });
+
   it('have description fields', async () => {
     expect.assertions(1);
     expect(middleware.constructor.description).toBeDefined();
@@ -13,6 +15,7 @@ describe('i18n middleware methods', () => {
 
   it('detectors should works correctly', async () => {
     expect.assertions(6);
+
     const request = {
       get: () => 'en',
       query: {
@@ -20,6 +23,7 @@ describe('i18n middleware methods', () => {
       },
     };
     let lang = await middleware.detectLang(request);
+
     expect(lang).toBe('en');
 
     request.appInfo = {
@@ -28,27 +32,34 @@ describe('i18n middleware methods', () => {
       },
     };
     lang = await middleware.detectLang(request);
+
     expect(lang).toBe('en');
+
     request.get = () => null;
     lang = await middleware.detectLang(request);
+
     expect(lang).toBe('es');
 
     delete request.query;
     lang = await middleware.detectLang(request);
+
     expect(lang).toBe('be');
 
     request.query = {
       [middleware.lookupQuerystring]: 'en-GB',
     };
     lang = await middleware.detectLang(request);
+
     expect(lang).toBe('en');
 
     lang = await middleware.detectLang(request, false);
+
     expect(lang).toBe('en-GB');
   });
 
   it('middleware that works', async () => {
     expect.assertions(6);
+
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -58,6 +69,7 @@ describe('i18n middleware methods', () => {
       appInfo: {},
     };
     await middleware.middleware(req, {}, nextFunction);
+
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.i18n).toBeDefined();
     expect(req.appInfo.i18n.language).toBe('en');
@@ -70,11 +82,13 @@ describe('i18n middleware methods', () => {
     };
 
     await middleware.middleware(req2, {}, nextFunction);
+
     expect(req2.appInfo.i18n.language).toBe('en');
   });
 
   it('middleware disabled', async () => {
     expect.assertions(4);
+
     global.server.app.updateConfig('i18n', { enabled: false });
     middleware = new I18n(global.server.app);
 
@@ -87,10 +101,12 @@ describe('i18n middleware methods', () => {
       appInfo: {},
     };
     await middleware.middleware(req, {}, nextFunction);
+
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.i18n).toBeDefined();
     expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
     expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test
+
     global.server.app.updateConfig('i18n', { enabled: true });
   });
 });

@@ -43,7 +43,6 @@ class HttpServer extends Base {
     // eslint-disable-next-line no-unused-vars
     this.express.use((err, req, res, next) => {
       // error handling
-      // eslint-disable-next-line no-console
       console.error(err.stack);
       // TODO
       res.status(500).json({ message: 'Something broke!' });

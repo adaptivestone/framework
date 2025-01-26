@@ -21,7 +21,7 @@ class Base {
     let l;
     try {
       l = this.#realLogger;
-    } catch (e) {
+    } catch {
       console.warn(
         `You try to accees logger not from class. that can be ok in case of models.`,
       );

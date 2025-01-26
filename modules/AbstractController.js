@@ -1,5 +1,3 @@
-/* eslint-disable no-restricted-syntax */
-/* eslint-disable guard-for-in */
 import express from 'express';
 
 import Base from './Base.js';
@@ -88,7 +86,6 @@ class AbstractController extends Base {
         this.logger.error(
           `Method ${verb} not exist for router. Please check your codebase`,
         );
-        // eslint-disable-next-line no-continue
         continue;
       }
       for (const path in routes[verb]) {
@@ -112,7 +109,6 @@ class AbstractController extends Base {
                 routeObject.handler
               }' for controller '${this.getConstructorName()}'`,
             );
-            // eslint-disable-next-line no-continue
             continue;
           }
         }
@@ -300,14 +296,12 @@ class AbstractController extends Base {
         let realPath = path;
         if (typeof realPath !== 'string') {
           this.logger.error(`Path not a string ${realPath}. Please check it`);
-          // eslint-disable-next-line no-continue
           continue;
         }
         if (!realPath.startsWith('/')) {
           method = realPath.split('/')[0]?.toLowerCase();
           if (!method) {
             this.logger.error(`Method not found for ${realPath}`);
-            // eslint-disable-next-line no-continue
             continue;
           }
           realPath = realPath.substring(method.length);
@@ -316,7 +310,6 @@ class AbstractController extends Base {
           this.logger.error(
             `Method ${method} not exist for middleware. Please check your codebase`,
           );
-          // eslint-disable-next-line no-continue
           continue;
         }
         const fullPath = `/${httpPath}/${realPath.toUpperCase()}`

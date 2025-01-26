@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { ValidationError } from 'yup';
 import AbstractValidator from './AbstractValidator.js';
 
 class YupValidator extends AbstractValidator {
@@ -76,7 +76,7 @@ class YupValidator extends AbstractValidator {
         });
       }
 
-      throw new yup.ValidationError({
+      throw new ValidationError({
         ...errorAnswer,
       });
     }

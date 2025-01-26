@@ -121,6 +121,7 @@ describe('ipDetector methods', () => {
 
   it('middleware that works', async () => {
     expect.hasAssertions();
+
     const nextFunction = () => {};
     for (const vector of testVectors) {
       global.server.app.updateConfig('ipDetector', {
@@ -136,6 +137,7 @@ describe('ipDetector methods', () => {
         // eslint-disable-next-line no-await-in-loop
         await middleware.middleware(req, {}, nextFunction);
         const result = req.appInfo.ip === 'notAnIP';
+
         expect(result).toBe(test.matches);
       }
     }

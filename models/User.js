@@ -1,5 +1,3 @@
-/* eslint-disable no-param-reassign */
-
 import { scrypt } from 'node:crypto';
 
 import { promisify } from 'node:util';

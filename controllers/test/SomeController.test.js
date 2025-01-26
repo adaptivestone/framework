@@ -58,6 +58,7 @@ describe('middlewares correct works', () => {
 
   it('rateLimiter on route works correctly', async () => {
     expect.assertions(1);
+
     const requests = Array.from({ length: 11 }, () =>
       fetch(global.server.testingGetUrl('/test/somecontroller/')),
     );
@@ -162,6 +163,7 @@ describe('middlewares correct works', () => {
     );
 
     const responseBody = await response.json();
+
     expect(response.status).toBe(200);
     expect(responseBody.data.limit).toBe(50);
     expect(responseBody.data.name).toBe('123');

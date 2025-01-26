@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { isSchema } from 'yup';
 import YupValidator from './drivers/YupValidator.js';
 import CustomValidator from './drivers/CustomValidator.js';
 import Base from '../../modules/Base.js';
@@ -30,7 +30,7 @@ class ValidateService extends Base {
     if (this.isValidatorExists(body)) {
       return body;
     }
-    if (yup.isSchema(body)) {
+    if (isSchema(body)) {
       const yupValidator = new YupValidator(app, body);
       return yupValidator;
     }

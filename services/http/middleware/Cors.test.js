@@ -4,7 +4,9 @@ import Cors from './Cors.js';
 describe('cors middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
+
     const middleware = new Cors(global.server.app, { origins: ['something'] });
+
     expect(middleware.constructor.description).toBeDefined();
   });
 
@@ -30,6 +32,7 @@ describe('cors middleware methods', () => {
 
   it('non options should be different', async () => {
     expect.assertions(2);
+
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -50,12 +53,14 @@ describe('cors middleware methods', () => {
     });
 
     await middleware.middleware(req, res, nextFunction);
+
     expect(isCalled).toBeTruthy();
     expect(map.get('Vary')).toBe('Origin');
   });
 
   it('host the not match origin', async () => {
     expect.assertions(1);
+
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -69,11 +74,13 @@ describe('cors middleware methods', () => {
     });
 
     await middleware.middleware(req, {}, nextFunction);
+
     expect(isCalled).toBeTruthy();
   });
 
   it('string domain match', async () => {
     expect.assertions(5);
+
     let isEndCalled = false;
     const map = new Map();
     const req = {
@@ -97,6 +104,7 @@ describe('cors middleware methods', () => {
     });
 
     await middleware.middleware(req, res);
+
     expect(isEndCalled).toBeTruthy();
     expect(map.get('Vary')).toBe('Origin, Access-Control-Request-Headers');
     expect(map.get('Access-Control-Allow-Headers')).toBe(
@@ -110,6 +118,7 @@ describe('cors middleware methods', () => {
 
   it('regexp domain match', async () => {
     expect.assertions(5);
+
     let isEndCalled = false;
     const map = new Map();
     const req = {
@@ -134,6 +143,7 @@ describe('cors middleware methods', () => {
     });
 
     await middleware.middleware(req, res);
+
     expect(isEndCalled).toBeTruthy();
     expect(map.get('Vary')).toBe('Origin, Access-Control-Request-Headers');
     expect(map.get('Access-Control-Allow-Headers')).toBe(

@@ -94,7 +94,7 @@ class Cache extends Base {
           }
           return value;
         });
-      } catch (e) {
+      } catch {
         this.logger.warn(
           'Not able to parse json from redis cache. That can be a normal in case you store string here',
         );

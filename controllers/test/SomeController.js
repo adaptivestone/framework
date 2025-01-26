@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { object, boolean, string, number } from 'yup';
 import AbstractController from '../../modules/AbstractController.js';
 import AuthMiddleware from '../../services/http/middleware/Auth.js';
 import GetUserByToken from '../../services/http/middleware/GetUserByToken.js';
@@ -17,8 +17,8 @@ class SomeController extends AbstractController {
         },
         '/someData': {
           handler: this.getSomething,
-          query: yup.object().shape({
-            flag: yup.boolean().required(),
+          query: object().shape({
+            flag: boolean().required(),
           }),
           middleware: [RateLimiter, CheckFlag],
         },
@@ -28,20 +28,20 @@ class SomeController extends AbstractController {
         },
         '/grabSomeDataFromQuery': {
           handler: this.grabSomeDataFromQuery,
-          query: yup.object().shape({
-            name: yup.string(),
+          query: object().shape({
+            name: string(),
           }),
         },
         '/grabSomeDataFromQueryWithRequiredParam': {
           handler: this.grabSomeDataFromQuery,
-          query: yup.object().shape({
-            name: yup.number().required(),
+          query: object().shape({
+            name: number().required(),
           }),
         },
         '/grabSomeDataFromQueryWithMiddlewareParams': {
           handler: this.grabSomeDataFromQueryWithMiddlewareParams,
-          query: yup.object().shape({
-            name: yup.string(),
+          query: object().shape({
+            name: string(),
           }),
           middleware: [Pagination],
         },
@@ -49,31 +49,31 @@ class SomeController extends AbstractController {
       post: {
         '/postInfo': {
           handler: this.addPost,
-          request: yup.object().shape({
-            name: yup.string(),
-            discription: yup.string(),
+          request: object().shape({
+            name: string(),
+            discription: string(),
           }),
         },
         '/postQueryParamaters': {
           handler: this.postQueryParamaters,
-          request: yup.object().shape({
-            name: yup.string(),
+          request: object().shape({
+            name: string(),
           }),
         },
       },
       patch: {
         '/userAvatar': {
           handler: this.patchUserAvatar,
-          request: yup.object().shape({
-            avatar: yup.string(),
+          request: object().shape({
+            avatar: string(),
           }),
         },
       },
       put: {
         '/putInfo': {
           handler: this.putInfo,
-          request: yup.object().shape({
-            field: yup.string(),
+          request: object().shape({
+            field: string(),
           }),
           middleware: [[RoleMiddleware, { roles: ['admin'] }]],
         },

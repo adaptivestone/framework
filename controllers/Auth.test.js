@@ -9,6 +9,7 @@ describe('auth', () => {
   describe('registration', () => {
     it('code NOT able to create user with wrong email', async () => {
       expect.assertions(1);
+
       const { status } = await fetch(
         global.server.testingGetUrl('/auth/register'),
         {
@@ -29,6 +30,7 @@ describe('auth', () => {
 
     it('can create user', async () => {
       expect.assertions(1);
+
       const { status } = await fetch(
         global.server.testingGetUrl('/auth/register'),
         {
@@ -43,11 +45,13 @@ describe('auth', () => {
           }),
         },
       );
+
       expect(status).toBe(201);
     });
 
     it('can  not create user with the same nickname', async () => {
       expect.assertions(1);
+
       await fetch(global.server.testingGetUrl('/auth/register'), {
         method: 'POST',
         headers: {
@@ -103,6 +107,7 @@ describe('auth', () => {
   describe('login', () => {
     it('can NOT login with normal creds and not verified email', async () => {
       expect.assertions(1);
+
       const { status } = await fetch(
         global.server.testingGetUrl('/auth/login'),
         {
@@ -122,6 +127,7 @@ describe('auth', () => {
 
     it('can NOT login with WRONG creds', async () => {
       expect.assertions(1);
+
       const { status } = await fetch(
         global.server.testingGetUrl('/auth/login'),
         {
@@ -135,6 +141,7 @@ describe('auth', () => {
           }),
         },
       ).catch(() => {});
+
       expect(status).toBe(400);
     });
 
@@ -169,6 +176,7 @@ describe('auth', () => {
   describe('isAuthWithVefificationFlow auth option', () => {
     it('can verify user', async () => {
       expect.assertions(2);
+
       const user = await global.server.app.getModel('User').create({
         email: 'Test@gmail.com',
         password: 'userPassword',
@@ -202,6 +210,7 @@ describe('auth', () => {
 
     it('can not verify user with wrong token', async () => {
       expect.assertions(2);
+
       const user = await global.server.app.getModel('User').create({
         email: 'Test423@gmail.com',
         password: 'userPassword',
@@ -235,6 +244,7 @@ describe('auth', () => {
 
     it('can NOT send recovery to not exist email', async () => {
       expect.assertions(1);
+
       const { status } = await fetch(
         global.server.testingGetUrl('/auth/send-recovery-email'),
         {
@@ -253,6 +263,7 @@ describe('auth', () => {
 
     it('can send recovery to exist email', async () => {
       expect.assertions(1);
+
       const { status } = await fetch(
         global.server.testingGetUrl('/auth/send-recovery-email'),
         {

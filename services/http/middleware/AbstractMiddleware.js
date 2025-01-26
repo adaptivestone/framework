@@ -1,4 +1,4 @@
-import yup from 'yup';
+import { object } from 'yup';
 import Base from '../../../modules/Base.js';
 
 class AbstractMiddleware extends Base {
@@ -18,13 +18,13 @@ class AbstractMiddleware extends Base {
   // eslint-disable-next-line class-methods-use-this
   get relatedQueryParameters() {
     // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
-    return yup.object().shape({});
+    return object().shape({});
   }
 
   // eslint-disable-next-line class-methods-use-this
   get relatedRequestParameters() {
     // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
-    return yup.object().shape({});
+    return object().shape({});
   }
 
   get relatedReqParameters() {

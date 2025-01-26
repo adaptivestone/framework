@@ -4,12 +4,15 @@ import Role from './Role.js';
 describe('role middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
+
     const middleware = new Role(global.server.app);
+
     expect(middleware.constructor.description).toBeDefined();
   });
 
   it('middleware pass when user presented with a right role', async () => {
     expect.assertions(1);
+
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -26,11 +29,13 @@ describe('role middleware methods', () => {
     });
 
     await middleware.middleware(req, {}, nextFunction);
+
     expect(isCalled).toBeTruthy();
   });
 
   it('middleware NOT pass when user NOT presented', async () => {
     expect.assertions(3);
+
     let isCalled = false;
     let status;
     let isSend;
@@ -54,6 +59,7 @@ describe('role middleware methods', () => {
       },
       nextFunction,
     );
+
     expect(isCalled).toBeFalsy();
     expect(status).toBe(401);
     expect(isSend).toBeTruthy();
@@ -61,6 +67,7 @@ describe('role middleware methods', () => {
 
   it('middleware NOT pass when user  have a wrong role', async () => {
     expect.assertions(3);
+
     let isCalled = false;
     let status;
     let isSend;
@@ -86,6 +93,7 @@ describe('role middleware methods', () => {
       },
       nextFunction,
     );
+
     expect(isCalled).toBeFalsy();
     expect(status).toBe(403);
     expect(isSend).toBeTruthy();

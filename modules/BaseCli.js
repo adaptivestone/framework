@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import path from 'node:path';
 import * as url from 'node:url';
 import Base from './Base.js';
@@ -35,7 +34,6 @@ class Cli extends Base {
     console.log('Available commands:');
     let commandsClasses = [];
     for (const c of commands) {
-      // eslint-disable-next-line no-await-in-loop
       commandsClasses.push(import(this.commands[c]));
       // console.log(
       //   ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${f.default.description}`,
@@ -43,7 +41,6 @@ class Cli extends Base {
     }
     commandsClasses = await Promise.all(commandsClasses);
     for (const [key, c] of Object.entries(commands)) {
-      // eslint-disable-next-line no-await-in-loop
       console.log(
         ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${commandsClasses[key].default.description}`,
       );
