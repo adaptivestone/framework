@@ -1,3 +1,7 @@
+### 5.0.0-beta.5
+
+[UPDATE] migrate to eslint 9 and away from aibnb styles (they are abonded)
+
 ### 5.0.0-beta.4
 
 [NEW] on shutdown event now after timeout we are forcing to shutdown
