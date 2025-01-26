@@ -70,7 +70,10 @@ class Cli extends Base {
       this.logger.debug(
         `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in tyou command`,
       );
-      process.env.MONGO_APP_NAME = `CLI: ${command}`;
+      process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
+        command,
+        args,
+      );
       await this.server.initAllModels();
     } else {
       this.logger.debug(`Command ${command} NOT need to isShouldInitModels`);

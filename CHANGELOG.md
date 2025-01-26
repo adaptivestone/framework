@@ -1,3 +1,9 @@
+### 5.0.0-beta.2
+
+[UPDATE] update deps
+[NEW] add ability to skip mongo model init in CLI env
+[NEW] now each mongo connection on CLI have own name and inslude command name there too (getMongoConnectionName in command)
+
 ### 5.0.0-beta.1
 
 [UPDATE] update deps

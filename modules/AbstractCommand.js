@@ -17,6 +17,16 @@ class AbstractCommand extends Base {
   static isShouldInitModels = true;
 
   /**
+   * Get mongo connection name
+   * @param {String} commandName
+   * @param {array} args
+   * @returns string
+   */
+  static getMongoConnectionName(commandName, args) {
+    return `CLI: ${commandName} ${args.join(' ')}`;
+  }
+
+  /**
    * Entry point to every command. This method should be overridden
    * @return {Promise<boolean>} resut
    */
