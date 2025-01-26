@@ -12,7 +12,7 @@ class Cli extends BaseCli {
   }
 
   async run() {
-    await this.server.init();
+    await this.server.init({ isSkipModelInit: true, isSkipModelLoading: true });
     const command = process.argv[2]?.toLowerCase();
     await super.run(command, this.args);
     this.app.events.emit('shutdown');

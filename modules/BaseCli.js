@@ -29,7 +29,7 @@ class Cli extends Base {
     return true;
   }
 
-  async printComandTable() {
+  async printCommandTable() {
     const commands = Object.keys(this.commands).sort();
     const maxLength = commands.reduce((max, c) => Math.max(max, c.length), 0);
     console.log('Available commands:');
@@ -55,16 +55,25 @@ class Cli extends Base {
 
     if (!command) {
       console.log('Please provide command name');
-      await this.printComandTable();
+      await this.printCommandTable();
       return false;
     }
 
     if (!this.commands[command]) {
       console.log(`Command ${command} not found `);
-      await this.printComandTable();
+      await this.printCommandTable();
       return false;
     }
     const { default: Command } = await import(this.commands[command]);
+
+    if (Command.isShouldInitModels) {
+      this.logger.debug(
+        `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in tyou command`,
+      );
+      await this.server.initAllModels();
+    } else {
+      this.logger.debug(`Command ${command} NOT need to isShouldInitModels`);
+    }
 
     const c = new Command(this.app, this.commands, args);
     let result = false;

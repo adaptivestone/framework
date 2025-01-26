@@ -24,6 +24,10 @@ class Server {
 
   #isInited = false;
 
+  #isModelsInited = false;
+
+  #isModelsLoaded = false;
+
   cli = null;
 
   /**
@@ -93,14 +97,18 @@ class Server {
    * Do an initialization (config reading,  etc)
    * @returns {Promise}
    */
-  async init({ isSkipModelInit = false } = {}) {
+  async init({ isSkipModelInit = false, isSkipModelLoading = false } = {}) {
     if (this.#isInited) {
       return true;
     }
 
     console.time('Server init. Done');
     console.time('Loading config and model files. Time');
-    await Promise.all([this.#initConfigFiles(), this.#loadModelFiles()]);
+    const prom = [this.#initConfigFiles()];
+    if (!isSkipModelLoading) {
+      prom.push(this.#loadModelFiles());
+    }
+    await Promise.all(prom);
     console.timeEnd('Loading config and model files. Time');
 
     if (!isSkipModelInit) {
@@ -119,7 +127,15 @@ class Server {
    * @returns {Promise}
    */
   async initAllModels() {
-    console.time('Initing models. Time');
+    if (this.#isModelsInited) {
+      // already inited
+      return;
+    }
+    const now = performance.now();
+
+    if (!this.#isModelsLoaded) {
+      await this.#loadModelFiles();
+    }
 
     if (this.app.getConfig('mongo').connectionString) {
       for (const [modelName, ModelConstructor] of this.cache
@@ -140,7 +156,10 @@ class Server {
       );
     }
 
-    console.timeEnd('Initing models. Time');
+    this.app.logger.debug(
+      `Inited models in ${(performance.now() - now).toFixed(2)}ms`,
+    );
+    this.#isModelsInited = true;
   }
 
   async #initConfigFiles() {
@@ -198,6 +217,10 @@ class Server {
   }
 
   async #loadModelFiles() {
+    if (this.#isModelsLoaded) {
+      // already inited
+      return true;
+    }
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const files = await getFilesPathWithInheritance({
       internalFolder: path.join(dirname, '/models'),
@@ -223,6 +246,7 @@ class Server {
     for (const model of loadedModels) {
       this.cache.modelConstructors.set(model.name, model.file.default);
     }
+    this.#isModelsLoaded = true;
     return true;
   }
 

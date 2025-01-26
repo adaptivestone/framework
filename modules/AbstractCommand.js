@@ -12,6 +12,11 @@ class AbstractCommand extends Base {
   }
 
   /**
+   * If true, then this command will load models and init mongo connection
+   */
+  static isShouldInitModels = true;
+
+  /**
    * Entry point to every command. This method should be overridden
    * @return {Promise<boolean>} resut
    */
