@@ -19,7 +19,7 @@ class AbstractCommand extends Base {
   /**
    * Get mongo connection name
    * @param {String} commandName
-   * @param {array} args
+   * @param {object} args
    * @returns string
    */
   static getMongoConnectionName(commandName, args) {

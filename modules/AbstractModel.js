@@ -46,7 +46,9 @@ class AbstractModel extends Base {
         .connect(this.app.getConfig('mongo').connectionString, connectionParams)
         .then(
           () => {
-            this.logger.info('Mongo connection success');
+            this.logger.info(
+              `Mongo connection success ${connectionParams.appName}`,
+            );
 
             callback();
           },
