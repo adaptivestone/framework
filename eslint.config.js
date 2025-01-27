@@ -48,6 +48,11 @@ export default [
         },
       ],
       'no-plusplus': 'error',
+      'consistent-return': 'error',
+      'no-return-await': 'error',
+      'arrow-body-style': 'error',
+      'dot-notation': 'error',
+      curly: 'error',
     },
   },
   {
