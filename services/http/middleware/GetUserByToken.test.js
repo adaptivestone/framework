@@ -5,9 +5,9 @@ describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    const middleware = new GetUserByToken(global.server.app);
+    // const middleware = new GetUserByToken(global.server.app);
 
-    expect(middleware.constructor.description).toBeDefined();
+    expect(GetUserByToken.description).toBeDefined();
   });
 
   it('have description usedAuthParameters', async () => {

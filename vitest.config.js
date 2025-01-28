@@ -9,6 +9,7 @@ export default defineConfig({
     outputFile: './coverage/rspec.xml',
     reporters: ['default', 'junit'],
     coverage: {
+      provider: 'v8',
       enabled: true,
       reporter: ['text', 'html', 'clover', 'json', 'cobertura'],
     },

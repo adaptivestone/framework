@@ -8,9 +8,9 @@ describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    const middleware = new RequestParser(global.server.app);
+    // const middleware = new RequestParser(global.server.app);
 
-    expect(middleware.constructor.description).toBeDefined();
+    expect(RequestParser.description).toBeDefined();
   });
 
   it('middleware that works', async () => {
@@ -35,7 +35,8 @@ describe('reqest parser limiter methods', () => {
         });
       });
       server.listen(null, async () => {
-        const chosenPort = server.address().port;
+        const address = server.address();
+        const chosenPort = typeof address === 'string' ? 0 : address.port;
         const body = `----13068458571765726332503797717\r
 Content-Disposition: form-data; name="title"\r
 \r
@@ -55,9 +56,8 @@ d\r
 `;
         await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
           method: 'POST',
-
           headers: {
-            'Content-Length': body.length,
+            'Content-Length': body.length.toString(),
             Host: `localhost:${chosenPort}`,
             'Content-Type':
               'multipart/form-data; boundary=--13068458571765726332503797717',
@@ -101,14 +101,14 @@ d\r
         res.end('ok');
       });
       server.listen(null, async () => {
-        const chosenPort = server.address().port;
+        const address = server.address();
+        const chosenPort = typeof address === 'string' ? 0 : address.port;
         const body = 'someBadBody';
 
         await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
           method: 'POST',
-
           headers: {
-            'Content-Length': body.length,
+            'Content-Length': body.length.toString(),
             Host: `localhost:${chosenPort}`,
             'Content-Type': 'badContentType',
           },

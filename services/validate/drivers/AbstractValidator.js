@@ -18,8 +18,8 @@ class AbstractValidator extends Base {
     return {};
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async validateFields() {
+  // eslint-disable-next-line class-methods-use-this, no-unused-vars
+  async validateFields(data, { query, body, appInfo }) {
     // IMPLENT;
     return true;
   }

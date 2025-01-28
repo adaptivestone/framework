@@ -29,8 +29,9 @@ class Base {
     }
 
     if (!l) {
+      const { loggerGroup } = /** @type {typeof Base} */ (this.constructor);
       this.#realLogger = this.getLogger(
-        this.constructor.loggerGroup + this.getConstructorName(),
+        loggerGroup + this.getConstructorName(),
       );
     }
     return this.#realLogger;

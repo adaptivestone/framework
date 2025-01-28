@@ -5,9 +5,9 @@ describe('cors middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    const middleware = new Cors(global.server.app, { origins: ['something'] });
+    // const middleware = new Cors(global.server.app, { origins: ['something'] });
 
-    expect(middleware.constructor.description).toBeDefined();
+    expect(Cors.description).toBeDefined();
   });
 
   it('should throw without origns', async () => {

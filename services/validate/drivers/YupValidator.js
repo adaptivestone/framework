@@ -3,7 +3,7 @@ import AbstractValidator from './AbstractValidator.js';
 
 class YupValidator extends AbstractValidator {
   get fieldsInJsonFormat() {
-    return this.constructor.convertFieldsToJson(this.body);
+    return YupValidator.convertFieldsToJson(this.body);
   }
 
   static convertFieldsToJson(fields) {

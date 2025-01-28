@@ -28,7 +28,7 @@ class AbstractCommand extends Base {
 
   /**
    * Entry point to every command. This method should be overridden
-   * @return {Promise<boolean>} resut
+   * @return {Promise<boolean>} result
    */
   async run() {
     this.logger.error('You should implement run method');

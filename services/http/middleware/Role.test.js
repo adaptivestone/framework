@@ -5,9 +5,9 @@ describe('role middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    const middleware = new Role(global.server.app);
+    // const middleware = new Role(global.server.app);
 
-    expect(middleware.constructor.description).toBeDefined();
+    expect(Role.description).toBeDefined();
   });
 
   it('middleware pass when user presented with a right role', async () => {

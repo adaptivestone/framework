@@ -414,7 +414,7 @@ class Server {
    * @param {String} commandName name of command to load
    * @param {Object} args list of arguments to pass into command
    */
-  async runCliCommand(commandName, args) {
+  async runCliCommand(commandName, args = {}) {
     if (!this.cli) {
       const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
       this.cli = new BaseCli(this);

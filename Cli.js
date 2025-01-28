@@ -16,6 +16,7 @@ class Cli extends BaseCli {
     const command = process.argv[2]?.toLowerCase();
     await super.run(command, this.args);
     this.app.events.emit('shutdown');
+    return true;
   }
 }
 

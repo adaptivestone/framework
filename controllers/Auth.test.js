@@ -23,7 +23,7 @@ describe('auth', () => {
             nickName: 'test',
           }),
         },
-      ).catch(() => {});
+      ).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -77,7 +77,7 @@ describe('auth', () => {
             nickName: 'test',
           }),
         },
-      ).catch(() => {});
+      ).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -120,7 +120,7 @@ describe('auth', () => {
             password: userPassword,
           }),
         },
-      ).catch(() => {});
+      ).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -140,7 +140,7 @@ describe('auth', () => {
             password: 'noPassword$',
           }),
         },
-      ).catch(() => {});
+      ).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });

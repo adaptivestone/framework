@@ -123,6 +123,7 @@ class Mail extends Base {
         this.#renderTemplateFile(templates.style),
       ]);
 
+    // @ts-ignore
     juice.tableElements = ['TABLE'];
 
     const juiceResourcesAsync = promisify(juice.juiceResources);
@@ -139,7 +140,6 @@ class Mail extends Base {
       inlinedHTML,
     };
   }
-
   /**
    * Send email
    * @param {string} to email send to
@@ -150,7 +150,7 @@ class Mail extends Base {
   async send(to, from = null, aditionalNodemailerOptions = {}) {
     const { subject, text, inlinedHTML } = await this.renderTemplate();
 
-    return this.constructor.sendRaw(
+    return Mail.sendRaw(
       this.app,
       to,
       subject,

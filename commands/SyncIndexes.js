@@ -29,6 +29,7 @@ class SyncIndexes extends AbstractCommand {
         this.logger.info(`Model - ${modelName} NO removed indexes`);
       }
     }
+    return true;
   }
 
   static get description() {

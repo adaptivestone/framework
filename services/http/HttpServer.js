@@ -54,15 +54,15 @@ class HttpServer extends Base {
       httpConfig.port,
       httpConfig.hostname,
       () => {
-        this.logger.info(
-          `App started and listening on port ${listener.address().port}`,
-        );
-        if (+listener.address().port !== +httpConfig.port) {
+        const address = listener.address();
+        const port = typeof address === 'string' ? 0 : address.port;
+        this.logger.info(`App started and listening on port ${port}`);
+        if (+port !== +httpConfig.port) {
           // in case we using port 0
-          this.app.updateConfig('http', { port: listener.address().port });
+          this.app.updateConfig('http', { port });
           this.logger.info(
             `Updating http config to use new port ${
-              listener.address().port
+              port
             }. Old was ${httpConfig.port} `,
           );
         }

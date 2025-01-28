@@ -26,11 +26,11 @@ describe('rate limiter methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    const middleware = new RateLimiter(global.server.app, {
-      driver: 'redis',
-    });
+    // const middleware = new RateLimiter(global.server.app, {
+    //   driver: 'redis',
+    // });
 
-    expect(middleware.constructor.description).toBeDefined();
+    expect(RateLimiter.description).toBeDefined();
   });
 
   it('can create redis rateLimiter', async () => {
@@ -123,7 +123,11 @@ describe('rate limiter methods', () => {
     expect(isSend).toBeTruthy();
   });
 
-  const makeOneRequest = async ({ rateLimiter, driver, request }) => {
+  const makeOneRequest = async ({
+    rateLimiter = null,
+    driver = null,
+    request = {},
+  }) => {
     let realRateLimiter = rateLimiter;
     if (!realRateLimiter) {
       realRateLimiter = new RateLimiter(global.server.app, {

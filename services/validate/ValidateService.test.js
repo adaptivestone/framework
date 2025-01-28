@@ -17,7 +17,7 @@ describe('validate service', () => {
 
       const result = await new ValidateService(
         global.server.app,
-        new YupValidator(global.server.app, object().shape({ name: '123' })),
+        new YupValidator(global.server.app, object().shape({ name: string() })),
       ).validateSchema(req, undefined, data);
 
       expect(result).toStrictEqual({});
@@ -91,7 +91,7 @@ describe('validate service', () => {
       expect.assertions(1);
 
       const body = object().shape({
-        name: '1234',
+        name: string(),
       });
 
       const validator = ValidateService.getDriverByValidatorBody(

@@ -5,9 +5,9 @@ describe('prepareAppInfo methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    const middleware = new PrepareAppInfo(global.server.app);
+    // const middleware = new PrepareAppInfo(global.server.app);
 
-    expect(middleware.constructor.description).toBeDefined();
+    expect(PrepareAppInfo.description).toBeDefined();
   });
 
   it('middleware that works', async () => {

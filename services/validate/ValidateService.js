@@ -7,7 +7,7 @@ class ValidateService extends Base {
   constructor(app, validator) {
     super(app);
     this.validator = validator
-      ? this.constructor.getDriverByValidatorBody(app, validator)
+      ? ValidateService.getDriverByValidatorBody(app, validator)
       : null;
   }
 
@@ -104,7 +104,7 @@ class ValidateService extends Base {
     const result = [];
 
     for (const validator of validators) {
-      const formatedValidator = this.constructor.getDriverByValidatorBody(
+      const formatedValidator = ValidateService.getDriverByValidatorBody(
         this.app,
         validator,
       );

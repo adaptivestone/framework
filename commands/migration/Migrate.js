@@ -49,6 +49,7 @@ class Migrate extends AbstractCommand {
     this.logger.info(
       `=== Migration Finished. Migrated ${migrations.length} files ===`,
     );
+    return true;
   }
 }
 

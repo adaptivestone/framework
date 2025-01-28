@@ -12,7 +12,9 @@ mongoose.set('autoIndex', false);
 
 let mongoMemoryServerInstance;
 
+// @ts-ignore
 jest.setTimeout(1000000);
+// @ts-ignore
 beforeAll(async () => {
   mongoMemoryServerInstance = await MongoMemoryReplSet.create({
     // binary: { version: '4.4.6' },
@@ -77,6 +79,7 @@ beforeAll(async () => {
   await global.server.startServer();
 });
 
+// @ts-ignore
 beforeEach(() => {
   if (global.server) {
     const key = `test-${Math.random().toString(36).substring(7)}`;
@@ -86,6 +89,7 @@ beforeEach(() => {
   }
 });
 
+// @ts-ignore
 afterEach(async () => {
   if (global.server) {
     const { url, namespace } = global.server.getConfig('redis');
@@ -101,6 +105,7 @@ afterEach(async () => {
   }
 });
 
+// @ts-ignore
 afterAll(async () => {
   if (global.server) {
     global.server.app.httpServer.shutdown();

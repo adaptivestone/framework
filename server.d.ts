@@ -10,6 +10,7 @@ import Cache from './services/cache/Cache';
 import winston from 'winston';
 
 import HttpServer from './services/http/HttpServer.js';
+import ControllerManager from './services/http/ControllerManager.js';
 
 type ServerConfig = {
   folders: ExpandDeep<TFolderConfig>;
@@ -27,7 +28,7 @@ declare class Server {
     get cache(): Server['cacheService'];
     get logger(): winston.Logger;
     httpServer: HttpServer | null;
-    controllerManager: null;
+    controllerManager: ControllerManager | null;
   };
   cacheService: Cache;
 
@@ -92,7 +93,7 @@ declare class Server {
   /**
    * Run cli command into framework (http, ws, etc)
    */
-  runCliCommand(commandName: string, args: {}): Promise<BaseCli['run']>;
+  runCliCommand(commandName: string, args?: {}): Promise<BaseCli['run']>;
 }
 
 export default Server;

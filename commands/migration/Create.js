@@ -9,26 +9,29 @@ class CreateMigration extends AbstractCommand {
 
   async run() {
     if (!this.args.name) {
-      return this.logger.error(
+      this.logger.error(
         'Please provide migration name with key "--name={someName}"',
       );
+      return false;
     }
     if (this.args.name.match(/^\d/)) {
-      return this.logger.error('Command cant start from nubmer');
+      this.logger.error('Command cant start from nubmer');
+      return true;
     }
-    const fileName = `${Date.now()}_${this.constructor.camelSentence(
+    const fileName = `${Date.now()}_${CreateMigration.camelSentence(
       this.args.name,
     )}.js`;
 
-    const fileContent = this.constructor.getTemplate(
-      this.constructor.camelSentence(this.args.name),
+    const fileContent = CreateMigration.getTemplate(
+      CreateMigration.camelSentence(this.args.name),
     );
 
     await fs.writeFile(
       path.join(this.app.foldersConfig.migrations, fileName),
       fileContent,
     );
-    return this.logger.info(`Migration created ${fileName}`);
+    this.logger.info(`Migration created ${fileName}`);
+    return true;
   }
 
   static camelSentence(str) {
