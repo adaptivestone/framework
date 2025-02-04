@@ -1,5 +1,6 @@
 import path from 'node:path';
 import * as url from 'node:url';
+import { parseArgs } from 'node:util';
 import Base from './Base.js';
 
 class Cli extends Base {
@@ -45,9 +46,37 @@ class Cli extends Base {
         ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${commandsClasses[key].default.description}`,
       );
     }
+    console.log(
+      '\nUsage (use one of option): \n node cli.js <command> [options] \n npm run cli <command>  -- [options]',
+    );
   }
 
-  async run(command, args) {
+  static showHelp(Command, finalArguments) {
+    console.log(`\n\x1b[32m${Command.description}\x1b[0m`);
+    let output = '';
+
+    Object.entries(finalArguments).forEach(([key, opt]) => {
+      const outputLocal = [];
+      outputLocal.push(`\n\x1b[36m  --${key} \x1b[0m`);
+      if (opt.type !== 'boolean') {
+        outputLocal.push(`<${opt.type}>`);
+        // flag += `<${opt.type}>`;
+      }
+      if (opt.required) {
+        outputLocal.push('(required)');
+      }
+      outputLocal.push(`\n      \x1b[2m${opt.description}`);
+      if (opt.default !== undefined) {
+        outputLocal.push(` (default: ${opt.default})`);
+      }
+      outputLocal.push('\x1b[0m');
+      output += outputLocal.join(' ');
+    });
+
+    console.log(output);
+  }
+
+  async run(command) {
     await this.loadCommands();
 
     if (!command) {
@@ -63,20 +92,54 @@ class Cli extends Base {
     }
     const { default: Command } = await import(this.commands[command]);
 
+    const defaultArgs = {
+      help: {
+        type: 'boolean',
+        description: 'Show help',
+      },
+    };
+
+    const finalArguments = {
+      ...Command.commandArguments,
+      ...defaultArgs,
+    };
+
+    const parsedArgs = parseArgs({
+      args: process.argv.slice(3), // remove command name
+      options: finalArguments,
+      tokens: true,
+    });
+
+    // @ts-ignore
+    if (parsedArgs.values.help) {
+      Cli.showHelp(Command, finalArguments);
+      return true;
+    }
+
+    for (const [key, opt] of Object.entries(finalArguments)) {
+      if (opt.required && !parsedArgs.values[key]) {
+        console.log(
+          `\x1b[31mRequired field not proivded. Please provide "${key}" argument\x1b[0m`,
+        );
+        Cli.showHelp(Command, finalArguments);
+        return false;
+      }
+    }
+
     if (Command.isShouldInitModels) {
       this.logger.debug(
         `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in tyou command`,
       );
       process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
         command,
-        args,
+        parsedArgs.values,
       );
       await this.server.initAllModels();
     } else {
       this.logger.debug(`Command ${command} NOT need to isShouldInitModels`);
     }
 
-    const c = new Command(this.app, this.commands, args);
+    const c = new Command(this.app, this.commands, parsedArgs.values);
     let result = false;
 
     result = await c.run().catch((e) => {

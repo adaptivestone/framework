@@ -6,6 +6,37 @@ class CreateUser extends AbstractCommand {
     return 'Create user in a database';
   }
 
+  /**
+   * You able to add command arguments for parsing there.
+   * @returns {import("../types/ICommandArguments.js").ICommandArguments}
+   */
+  static get commandArguments() {
+    return {
+      id: {
+        type: 'string',
+        description: 'User id to find user',
+      },
+      email: {
+        type: 'string',
+        description: 'User id to find/create user',
+      },
+      password: {
+        type: 'string',
+        description: 'New password for user',
+      },
+      roles: {
+        type: 'string',
+        description:
+          'User roles comma separated string (--roles=user,admin,someOtherRoles)',
+      },
+      update: {
+        type: 'boolean',
+        default: false,
+        description: 'Update user if it exists',
+      },
+    };
+  }
+
   async run() {
     const User = this.app.getModel('User');
     const { id, email, password, roles, update } = this.args;

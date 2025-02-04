@@ -5,12 +5,21 @@ class DropIndex extends AbstractCommand {
     return 'Drop indexes of model';
   }
 
-  async run() {
-    if (!this.args.model) {
-      this.logger.error('Please provide model name as "--model=BestUserModel"');
-      return false;
-    }
+  /**
+   * You able to add command arguments for parsing there.
+   * @returns {import("../types/ICommandArguments.js").ICommandArguments}
+   */
+  static get commandArguments() {
+    return {
+      model: {
+        type: 'string',
+        description: 'Model name',
+        required: true,
+      },
+    };
+  }
 
+  async run() {
     const Model = this.app.getModel(this.args.model);
 
     if (!Model) {

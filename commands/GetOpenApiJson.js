@@ -8,6 +8,18 @@ class GetOpenApiJson extends AbstractCommand {
   static get description() {
     return 'Generate documentation (openApi) ';
   }
+  /**
+   * You able to add command arguments for parsing there.
+   * @returns {import("../types/ICommandArguments.js").ICommandArguments}
+   */
+  static get commandArguments() {
+    return {
+      output: {
+        type: 'string',
+        description: 'Output file path',
+      },
+    };
+  }
 
   async run() {
     const { myDomain } = this.app.getConfig('http');

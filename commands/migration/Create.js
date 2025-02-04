@@ -7,16 +7,24 @@ class CreateMigration extends AbstractCommand {
     return 'Create new migration';
   }
 
+  /**
+   * You able to add command arguments for parsing there.
+   * @returns {import("../../types/ICommandArguments.js").ICommandArguments}
+   */
+  static get commandArguments() {
+    return {
+      name: {
+        type: 'string',
+        description: 'Migration name',
+        required: true,
+      },
+    };
+  }
+
   async run() {
-    if (!this.args.name) {
-      this.logger.error(
-        'Please provide migration name with key "--name={someName}"',
-      );
-      return false;
-    }
     if (this.args.name.match(/^\d/)) {
       this.logger.error('Command cant start from nubmer');
-      return true;
+      return false;
     }
     const fileName = `${Date.now()}_${CreateMigration.camelSentence(
       this.args.name,
