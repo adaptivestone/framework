@@ -1,5 +1,10 @@
 ### 5.0.0-beta.5
 
+[BREAKING] remove minimist CLI parsing and replace it by commandArguments parser
+[UPDATE] migrated from eslint-plugin-import to eslint-plugin-import-x
+
+### 5.0.0-beta.5
+
 [UPDATE] migrate to eslint 9 and away from aibnb styles (they are abonded)
 
 ### 5.0.0-beta.4
