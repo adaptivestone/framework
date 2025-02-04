@@ -466,7 +466,7 @@ await doc.populate([
 [UPDATE] update deps
 [UPDATE] winston console transport now using timestapms
 [UPDATE] PrepareAppInfo middleware now a global one. Do not need to include it on every controller
-[NEW] Request anso works with req.query, but req.body have bigger priority
+[NEW] Request also works with req.query, but req.body have bigger priority
 
 ### 2.18.0
 
