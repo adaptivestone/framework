@@ -46,7 +46,7 @@ declare class Server {
   /**
    * Start server (http  + init all http ralated functions)
    */
-  startServer(callbackBefore404?: Promise<null>): Promise<null>;
+  startServer(callbackBefore404?: () => Promise<null>): Promise<null>;
 
   /**
    * Do an initialization (config reading,  etc)

@@ -102,6 +102,11 @@ afterAll(async () => {
   if (typeof global.testSetup.afterAll === 'function') {
     await global.testSetup.afterAll();
   }
-  await mongoose.connection.db.dropDatabase(); // clean database after test
+  try {
+    await mongoose.connection.db.dropDatabase(); // clean database after test
+  } catch {
+    // that ok. No mongoose connection
+  }
+
   await mongoose.disconnect();
 });

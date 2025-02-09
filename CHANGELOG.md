@@ -1,3 +1,8 @@
+### 5.0.0-beta.7
+
+[UPDATE] update deps
+[UPDATE] change vitest shutdown behavior as mongo driver v6.13 change befaviur that affect us (MongoClient.close now closes any outstanding cursors)
+
 ### 5.0.0-beta.5
 
 [BREAKING] remove minimist CLI parsing and replace it by commandArguments parser
