@@ -1,3 +1,8 @@
+### 5.0.0-beta.8
+
+[UPDATE] update deps
+[NEW] Lock model for workingwir locks via mongoDB
+
 ### 5.0.0-beta.7
 
 [UPDATE] update deps
