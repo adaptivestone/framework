@@ -16,6 +16,9 @@ const mailTransports = {
 };
 
 class Mail {
+  /**
+   * @param {import('../../../server.js').default['app']} app application
+   */
   app = null;
   /**
    * Template full path
@@ -36,8 +39,16 @@ class Mail {
   locale = 'en';
 
   /**
+   * i18n object. Fallback if you have no real i18n object
+   */
+  i18n = {
+    t: (str) => str,
+    language: 'en', // todo change it to config
+  };
+
+  /**
    * Construct mail class
-   * @param {object} app
+   * @param {import('../../../server.js').default['app']} app
    * @param {string} template template name
    * @param {object} [templateData={}] data to render in template. Object with value that available inside template
    * @param {object} [i18n] data to render in template
@@ -71,11 +82,10 @@ class Mail {
       }
     }
     this.templateData = templateData;
-    this.i18n = i18n ?? {
-      t: (str) => str,
-      locale: 'en', // todo change it to config
-    };
-    this.locale = this.i18n?.language;
+    if (i18n) {
+      this.i18n = i18n;
+      this.locale = this.i18n?.language;
+    }
   }
 
   /**
