@@ -8,7 +8,6 @@ import stub from 'nodemailer-stub-transport';
 import pug from 'pug';
 import juice from 'juice';
 import { convert } from 'html-to-text';
-import Base from '../../../modules/Base.js';
 
 const mailTransports = {
   sendMail,
@@ -16,7 +15,26 @@ const mailTransports = {
   smtp: (data) => data,
 };
 
-class Mail extends Base {
+class Mail {
+  app = null;
+  /**
+   * Template full path
+   * @type {string}
+   */
+  template = '';
+
+  /**
+   * Data to render in template. Object with value that available inside template
+   * @type {object}
+   */
+  templateData = {};
+
+  /**
+   * Locale to render template
+   * @type {string}
+   */
+  locale = 'en';
+
   /**
    * Construct mail class
    * @param {object} app
@@ -25,7 +43,7 @@ class Mail extends Base {
    * @param {object} [i18n] data to render in template
    */
   constructor(app, template, templateData = {}, i18n = null) {
-    super(app);
+    this.app = app;
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     if (!path.isAbsolute(template)) {
       if (
@@ -47,7 +65,7 @@ class Mail extends Base {
         );
       } else {
         this.template = path.join(dirname, `/templates/emptyTemplate`);
-        this.logger.error(
+        this.app.logger.error(
           `Template '${template}' not found. Using 'emptyTemplate' as a fallback`,
         );
       }
