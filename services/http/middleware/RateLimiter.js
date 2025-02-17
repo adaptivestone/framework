@@ -4,7 +4,7 @@ import {
   RateLimiterMongo,
 } from 'rate-limiter-flexible';
 import merge from 'deepmerge';
-import redis from 'redis';
+import { createClient } from '@redis/client';
 import mongoose from 'mongoose';
 import AbstractMiddleware from './AbstractMiddleware.js';
 
@@ -46,7 +46,7 @@ class RateLimiter extends AbstractMiddleware {
 
   initRedisLimiter() {
     const redisConfig = this.app.getConfig('redis');
-    const redisClient = redis.createClient({
+    const redisClient = createClient({
       url: redisConfig.url,
     });
 

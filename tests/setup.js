@@ -3,7 +3,7 @@ import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
-import redis from 'redis';
+import { createClient } from '@redis/client';
 import Server from '../server.js';
 
 import clearRedisNamespace from '../helpers/redis/clearNamespace.js';
@@ -93,7 +93,7 @@ beforeEach(() => {
 afterEach(async () => {
   if (global.server) {
     const { url, namespace } = global.server.getConfig('redis');
-    const redisClient = redis.createClient({ url });
+    const redisClient = createClient({ url });
 
     try {
       await redisClient.connect();

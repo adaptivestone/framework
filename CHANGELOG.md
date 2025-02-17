@@ -1,7 +1,11 @@
+### NEXT
+
+[UPDATE] change redis -> @redis/client as we are using only client from pakage
+
 ### 5.0.0-beta.8
 
 [UPDATE] update deps
-[NEW] Lock model for workingwir locks via mongoDB
+[NEW] Lock model for working locks via mongoDB
 
 ### 5.0.0-beta.7
 

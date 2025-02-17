@@ -11,9 +11,9 @@ class Cache extends Base {
     // at least memory and redis drivers should be presented
     // memory drives should works on master process level
     // we should support multiple cashe same time
-    const redis = await import('redis');
+    const { createClient } = await import('@redis/client');
     const conf = this.app.getConfig('redis');
-    this.redisClient = redis.createClient({
+    this.redisClient = createClient({
       url: conf.url,
     });
 

@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
 
 import mongoose from 'mongoose'; // we do not need create indexes on tests
 
-import redis from 'redis';
+import { createClient } from '@redis/client';
 import clearRedisNamespace from '../helpers/redis/clearNamespace.js';
 import Server from '../server.js';
 
@@ -82,7 +82,7 @@ beforeEach(() => {
 afterEach(async () => {
   if (global.server) {
     const { url, namespace } = global.server.getConfig('redis');
-    const redisClient = redis.createClient({ url });
+    const redisClient = createClient({ url });
 
     try {
       await redisClient.connect();
