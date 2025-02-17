@@ -1,6 +1,7 @@
 ### NEXT
 
 [UPDATE] change redis -> @redis/client as we are using only client from pakage
+[BREAKING] removed noidemailer-sendmail-transport. Not needed anymore and not recommended to use as well
 
 ### 5.0.0-beta.8
 

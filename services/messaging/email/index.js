@@ -3,14 +3,12 @@ import path from 'node:path';
 import * as url from 'node:url';
 import { promisify } from 'node:util';
 import nodemailer from 'nodemailer';
-import sendMail from 'nodemailer-sendmail-transport';
 import stub from 'nodemailer-stub-transport';
 import pug from 'pug';
 import juice from 'juice';
 import { convert } from 'html-to-text';
 
 const mailTransports = {
-  sendMail,
   stub,
   smtp: (data) => data,
 };

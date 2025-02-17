@@ -3,10 +3,6 @@ import path from 'node:path';
 export default {
   from: 'Localhost <info@localhost>',
   transports: {
-    sendMail: {
-      // path:  "path to the sendmail command (defaults to 'sendmail')"
-      // args: 'an array of extra command line options to pass to the sendmail command (ie. ["-f", "foo@blurdybloop.com"]).'
-    },
     stub: {},
     smtp: {
       // https://github.com/nodemailer/nodemailer#set-up-smtp
