@@ -59,6 +59,7 @@ class Server {
       },
       httpServer: null,
       controllerManager: null,
+      frameworkFolder: new URL('.', import.meta.url).pathname,
     };
 
     this.cache = {

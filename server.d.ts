@@ -29,6 +29,7 @@ declare class Server {
     get logger(): winston.Logger;
     httpServer: HttpServer | null;
     controllerManager: ControllerManager | null;
+    frameworkFolder: string;
   };
   cacheService: Cache;
 

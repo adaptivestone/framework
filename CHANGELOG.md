@@ -1,5 +1,6 @@
 ### NEXT
 
+[NEW] app now contains 'frameworkFolder' folder the framework located. Mostly for modules usage
 [BREAKING] remove VIEWS folders at all. Should not afffect any user as this was not used internally
 [UPDATE] update typing
 [UPDATE] change redis -> @redis/client as we are using only client from pakage
