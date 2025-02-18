@@ -36,7 +36,6 @@ class Server {
    * @param {String} config.folders.config path to folder with config files
    * @param {String} config.folders.models path to folder with moidels files
    * @param {String} config.folders.controllers path to folder with controllers files
-   * @param {String} config.folders.views path to folder with view files
    * @param {String} config.folders.locales path to folder with locales files
    * @param {String} config.folders.emails path to folder with emails files
    */

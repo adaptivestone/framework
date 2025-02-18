@@ -31,7 +31,6 @@ beforeAll(async () => {
       config: process.env.TEST_FOLDER_CONFIG || path.resolve('./config'),
       controllers:
         process.env.TEST_FOLDER_CONTROLLERS || path.resolve('./controllers'),
-      views: process.env.TEST_FOLDER_VIEWS || path.resolve('./views'),
       models: process.env.TEST_FOLDER_MODELS || path.resolve('./models'),
       emails:
         process.env.TEST_FOLDER_EMAIL ||

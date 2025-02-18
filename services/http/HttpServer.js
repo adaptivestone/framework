@@ -18,12 +18,6 @@ class HttpServer extends Base {
     super(app);
     this.express = express();
     this.express.disable('x-powered-by');
-    // const dirname = url.fileURLToPath(new URL('.', import.meta.url));
-    // this.express.set('views', [
-    //   this.app.foldersConfig.views,
-    //   path.join(dirname, '../../views'),
-    // ]);
-    // this.express.set('view engine', 'pug');
 
     this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
     this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());

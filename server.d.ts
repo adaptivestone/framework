@@ -1,5 +1,5 @@
-import TFolderConfig from './types/TFoldersConfig';
-import { ExpandDeep } from './types/Expand';
+import TFolderConfig from './types/TFoldersConfig.d.ts';
+import { ExpandDeep } from './types/Expand.d.ts';
 
 import EventEmitter from 'events';
 

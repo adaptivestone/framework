@@ -1,5 +1,7 @@
 ### NEXT
 
+[BREAKING] remove VIEWS folders at all. Should not afffect any user as this was not used internally
+[UPDATE] update typing
 [UPDATE] change redis -> @redis/client as we are using only client from pakage
 [BREAKING] removed noidemailer-sendmail-transport. Not needed anymore and not recommended to use as well
 
