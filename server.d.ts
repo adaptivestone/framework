@@ -5,8 +5,8 @@ import EventEmitter from 'events';
 
 import { Model as MongooseModel, Schema } from 'mongoose';
 
-import BaseCli from './modules/BaseCli';
-import Cache from './services/cache/Cache';
+import BaseCli from './modules/BaseCli.js';
+import Cache from './services/cache/Cache.d.ts';
 import winston from 'winston';
 
 import HttpServer from './services/http/HttpServer.js';

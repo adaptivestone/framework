@@ -1,4 +1,4 @@
-import Base from '../../modules/Base';
+import Base from '../../modules/Base.d.ts';
 import Server from '../../server.js';
 
 declare class Cache extends Base {

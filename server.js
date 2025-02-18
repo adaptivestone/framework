@@ -37,7 +37,9 @@ class Server {
    * @param {String} config.folders.models path to folder with moidels files
    * @param {String} config.folders.controllers path to folder with controllers files
    * @param {String} config.folders.locales path to folder with locales files
-   * @param {String} config.folders.emails path to folder with emails files
+   * @param {String} [config.folders.emails] path to folder with emails files
+   * @param {String} config.folders.commands path to folder with commands files
+   * @param {String} config.folders.migrations path to folder with migrations files
    */
   constructor(config) {
     this.config = config;
