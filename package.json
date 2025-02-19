@@ -34,14 +34,9 @@
     "deepmerge": "^4.2.2",
     "express": "^5.0.1",
     "formidable": "^3.5.1",
-    "html-to-text": "^9.0.3",
     "i18next": "^24.0.0",
     "i18next-fs-backend": "^2.0.0",
-    "juice": "^11.0.0",
     "mongoose": "^8.0.0",
-    "nodemailer": "^6.6.3",
-    "nodemailer-stub-transport": "^1.1.0",
-    "pug": "^3.0.2",
     "rate-limiter-flexible": "^5.0.0",
     "winston": "^3.3.3",
     "winston-transport-sentry-node": "^3.0.0",
@@ -62,6 +57,9 @@
     "mongodb-memory-server": "^10.0.0",
     "prettier": "^3.0.0",
     "vitest": "^3.0.0"
+  },
+  "optionalDependencies": {
+    "@adaptivestone/framework-module-email": "^1.0.0"
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [

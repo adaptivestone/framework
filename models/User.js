@@ -14,6 +14,7 @@ class User extends AbstractModel {
   initHooks() {
     this.mongooseSchema.pre('save', async function userPreSaveHook() {
       if (this.isModified('password')) {
+        // @ts-ignore
         this.password = await this.constructor.hashPassword(this.password);
       }
     });
@@ -172,9 +173,18 @@ class User extends AbstractModel {
   async sendPasswordRecoveryEmail(i18n) {
     const passwordRecoveryToken =
       await User.generateUserPasswordRecoveryToken(this);
+    let Mailer;
     // speed optimisation
-    const Mailer = (await import('../services/messaging/email/index.js'))
-      .default;
+    try {
+      // @ts-ignore
+      // eslint-disable-next-line import-x/no-unresolved
+      Mailer = (await import('@adaptivestone/framework-module-email')).default;
+    } catch (e) {
+      const error =
+        'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
+      this.logger.error(error);
+      throw e;
+    }
 
     const mail = new Mailer(
       this.getSuper().app,
@@ -243,6 +253,7 @@ class User extends AbstractModel {
   async sendVerificationEmail(i18n) {
     const verificationToken = await User.generateUserVerificationToken(this);
     // speed optimisation
+    // @ts-ignore
     const Mailer = (await import('../services/messaging/email/index.js'))
       .default;
     const mail = new Mailer(
