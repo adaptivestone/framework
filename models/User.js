@@ -253,9 +253,17 @@ class User extends AbstractModel {
   async sendVerificationEmail(i18n) {
     const verificationToken = await User.generateUserVerificationToken(this);
     // speed optimisation
-    // @ts-ignore
-    const Mailer = (await import('../services/messaging/email/index.js'))
-      .default;
+    let Mailer;
+    try {
+      // @ts-ignore
+      // eslint-disable-next-line import-x/no-unresolved
+      Mailer = (await import('@adaptivestone/framework-module-email')).default;
+    } catch (e) {
+      const error =
+        'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
+      this.logger.error(error);
+      throw e;
+    }
     const mail = new Mailer(
       this.getSuper().app,
       'verification',
