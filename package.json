@@ -58,8 +58,13 @@
     "prettier": "^3.0.0",
     "vitest": "^3.0.0"
   },
-  "optionalDependencies": {
+  "peerDependencies": {
     "@adaptivestone/framework-module-email": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@adaptivestone/framework-module-email": {
+      "optional": true
+    }
   },
   "lint-staged": {
     "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
