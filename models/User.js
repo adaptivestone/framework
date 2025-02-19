@@ -179,11 +179,11 @@ class User extends AbstractModel {
       // @ts-ignore
       // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
-    } catch (e) {
+    } catch {
       const error =
         'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
-      this.logger.error(error);
-      throw e;
+      this.getSuper().logger.error(error);
+      return false;
     }
 
     const mail = new Mailer(
@@ -258,11 +258,11 @@ class User extends AbstractModel {
       // @ts-ignore
       // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
-    } catch (e) {
+    } catch {
       const error =
         'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
-      this.logger.error(error);
-      throw e;
+      this.getSuper().logger.error(error);
+      return false;
     }
     const mail = new Mailer(
       this.getSuper().app,

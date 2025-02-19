@@ -107,12 +107,9 @@ class Auth extends AbstractController {
 
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
-      const answer = await user.sendVerificationEmail(req.i18n).catch((e) => {
+      await user.sendVerificationEmail(req.i18n).catch((e) => {
         this.logger.error(e);
       });
-      if (!answer) {
-        return res.status(500).json();
-      }
     }
     return res.status(201).json();
   }
