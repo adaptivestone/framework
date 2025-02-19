@@ -1,4 +1,4 @@
-### NEXT
+### 5.0.0-beta.9
 
 [BREAKING] move email module to separate package @adaptivestone/framework-module-email. Please use it if you want to send emails
 [NEW] app now contains 'frameworkFolder' folder the framework located. Mostly for modules usage
