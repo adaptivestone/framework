@@ -12,5 +12,6 @@ cliCommand.js
 /services/http/middleware/test/*
 /benchmark/*
 /coverage/*
+/.github/*
 **/*.test.js
 
