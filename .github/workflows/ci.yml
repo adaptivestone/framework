@@ -28,3 +28,39 @@ jobs:
         run: npm ci
       - name: Run Task
         run: npm run ${{ matrix.task }}
+
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    services:
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+
+    env:
+      LOGGER_CONSOLE_LEVEL: 'error'
+      REDIS_URI: redis://redis
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
+          cache: 'npm'
+
+      - name: npm clean install
+        run: npm ci
+
+      - name: Run Test
+        run: npm test
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
