@@ -42,7 +42,7 @@ jobs:
 
     env:
       LOGGER_CONSOLE_LEVEL: 'error'
-      REDIS_URI: redis://redis
+      REDIS_URI: redis://localhost
 
     steps:
       - uses: actions/checkout@v4
