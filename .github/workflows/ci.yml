@@ -7,11 +7,14 @@ on:
     branches: ['*']
 
 jobs:
-  prettier:
+  ci:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
+
+    strategy:
+      matrix:
+        task: [prettier, lint]
 
     steps:
       - uses: actions/checkout@v4
@@ -23,22 +26,5 @@ jobs:
           cache: 'npm'
       - name: npm clean install
         run: npm ci
-      - run: node --run prettier
-
-  lint:
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 'latest'
-          cache: 'npm'
-      - name: npm clean install
-        run: npm ci
-      - run: node --run lint
+      - name: Run Task
+        run: npm run ${{ matrix.task }}
