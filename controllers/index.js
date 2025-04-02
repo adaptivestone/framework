@@ -22,8 +22,14 @@ class ControllerManager extends Base {
     );
 
     controllersToLoad.sort((a, b) => {
-      if (a.file.toLowerCase().endsWith('index.js')) {
-        if (b.file.toLowerCase().endsWith('index.js')) {
+      if (
+        a.file.toLowerCase().endsWith('index.js') ||
+        a.file.toLowerCase().endsWith('index.ts')
+      ) {
+        if (
+          b.file.toLowerCase().endsWith('index.js') ||
+          b.file.toLowerCase().endsWith('index.ts')
+        ) {
           return 0;
         }
         return -1;

@@ -13,6 +13,9 @@ import DocumentationGenerator from '../services/documentation/DocumentationGener
  * In most cases you will want to have a 'home' route that not include controller name. For this case please check '  getHttpPath'
  */
 class AbstractController extends Base {
+  prefix = '';
+  router = null;
+
   constructor(app, prefix, isExpressMergeParams = false) {
     const time = Date.now();
     super(app);
@@ -21,16 +24,7 @@ class AbstractController extends Base {
       mergeParams: isExpressMergeParams,
     });
     const { routes } = this;
-    let httpPath = this.getHttpPath();
-
-    // @ts-ignore
-    if (this.getExpressPath) {
-      this.logger.warn(
-        `getExpressPath deprecated. Please use getHttpPath instead. Will be removed on v5`,
-      );
-      // @ts-ignore
-      httpPath = this.getExpressPath();
-    }
+    const httpPath = this.getHttpPath();
 
     /**
      * Grab route middleware onlo one Map
