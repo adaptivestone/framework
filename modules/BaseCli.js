@@ -20,9 +20,14 @@ class Cli extends Base {
       this.server.app.foldersConfig.commands,
     );
     for (const com of commandsToLoad) {
-      if (com.file.endsWith('.js')) {
-        const c = com.file.replace('.js', '');
-
+      if (com.file.endsWith('.js') || com.file.endsWith('.ts')) {
+        const c = com.file.replace('.js', '').replace('.ts', '');
+        if (this.commands[c.toLowerCase()]) {
+          this.logger.warn(
+            `Command ${c.toLowerCase()} already exists with full path ${this.commands[c.toLowerCase()]}. Possible problems - you have two commands with "ts" and "js" extensions. Skipping...`,
+          );
+          continue;
+        }
         this.commands[c.toLowerCase()] = com.path;
       }
     }

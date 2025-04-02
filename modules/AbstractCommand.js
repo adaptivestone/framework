@@ -29,7 +29,7 @@ class AbstractCommand extends Base {
   /**
    * You able to add command arguments for parsing there.
    * @see https://nodejs.org/api/util.html#utilparseargsconfig in config.options plus extended with description and required
-   * @returns {import("../types/ICommandArguments.js").ICommandArguments}
+   * @returns {import("../types/ICommandArguments.d.ts").ICommandArguments}
    */
   static get commandArguments() {
     return {};
