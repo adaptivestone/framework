@@ -1,4 +1,4 @@
-### next
+### 5.0.0-beta.11
 
 [NEW] commands typing
 [NEW] commands support TS files

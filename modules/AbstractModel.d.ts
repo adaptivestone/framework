@@ -2,7 +2,7 @@ import type Base from './Base.js';
 import { Model, Schema } from 'mongoose';
 import type Server from '../server.js';
 
-interface AbstractModel<T extends Document> extends Model, Base {
+interface AbstractModel<T extends Document = Document> extends Model, Base {
   constructor(app: Server['app'], callback?: () => void);
 
   /**
@@ -31,7 +31,7 @@ interface AbstractModel<T extends Document> extends Model, Base {
   initHooks(): void;
 }
 
-abstract class AbstractModel<T extends Document>
+abstract class AbstractModel<T extends Document = Document>
   extends Model
   implements AbstractModel
 {
