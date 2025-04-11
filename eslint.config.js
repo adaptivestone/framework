@@ -1,15 +1,16 @@
 import globals from 'globals';
 import pluginJs from '@eslint/js';
-import importPlugin from 'eslint-plugin-import-x';
+import { flatConfigs as importPlugin } from 'eslint-plugin-import-x';
 import vitest from '@vitest/eslint-plugin';
 import eslintConfigPrettier from 'eslint-config-prettier';
+// eslint-disable-next-line import-x/extensions
 import prettierPlugin from 'eslint-plugin-prettier/recommended';
 
 /** @type {import('eslint').Linter.Config[]} */
 // @ts-ignore
 export default [
   pluginJs.configs.recommended,
-  importPlugin.flatConfigs.recommended,
+  importPlugin.recommended,
   eslintConfigPrettier,
   prettierPlugin,
   {
@@ -30,6 +31,7 @@ export default [
       'no-shadow': 'error',
       'prefer-const': 'error',
       'import-x/no-extraneous-dependencies': ['error'],
+      'import-x/extensions': ['error', 'always'],
       'import-x/first': ['error'],
       camelcase: ['error', { properties: 'never', ignoreDestructuring: false }],
       'prefer-destructuring': [
