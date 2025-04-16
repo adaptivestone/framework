@@ -1,7 +1,21 @@
 import Base from '../../modules/Base.ts';
+import type { IApp } from '../../server.ts';
+import type { RedisClientType } from '@redis/client';
 
 class Cache extends Base {
-  constructor(app) {
+  whenReady: Promise<void>;
+
+  redisClient!: RedisClientType<
+    Record<string, never>,
+    Record<string, never>,
+    Record<string, never>
+  >;
+
+  redisNamespace: string = '';
+
+  promiseMapping = new Map();
+
+  constructor(app: IApp) {
     super(app);
     this.whenReady = this.#init();
   }
@@ -20,23 +34,36 @@ class Cache extends Base {
     this.redisNamespace = conf.namespace;
 
     this.redisClient.on('error', (error, b, c) => {
-      this.logger.error(error, b, c);
+      this.logger?.error(error, b, c);
     });
     this.redisClient.on('connect', () => {
-      this.logger.info('Redis connection success');
+      this.logger?.info('Redis connection success');
     });
     this.app.events.on('shutdown', () => {
       this.redisClient.quit();
     });
-
-    this.promiseMapping = new Map();
   }
 
-  getKeyWithNameSpace(key) {
+  /**
+   * As framework support namespaces all key for cache go through this function
+   * Function return new key with added namespace
+   * @param key key to add namespace
+   */
+  getKeyWithNameSpace(key: string) {
     return `${this.redisNamespace}-${key}`;
   }
 
-  async getSetValue(keyValue, onNotFound, storeTime = 60 * 5) {
+  /**
+   * Get value from cache. Set and get if not eists
+   * @param key key to check
+   * @param onNotFound callback that will be executed if value not found on cahce
+   * @param storeTime how long we should store value on cache
+   */
+  async getSetValue(
+    keyValue: string,
+    onNotFound: () => Promise<any>,
+    storeTime = 60 * 5,
+  ) {
     await this.whenReady;
     if (!this.redisClient.isOpen) {
       await this.redisClient.connect();
@@ -44,9 +71,9 @@ class Cache extends Base {
     const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
     // eslint-disable-next-line no-unused-vars
-    let resolve = (value) => {};
+    let resolve = (value: any) => {};
     // eslint-disable-next-line no-unused-vars
-    let reject = (value) => {};
+    let reject = (value: any) => {};
     if (this.promiseMapping.has(key)) {
       return this.promiseMapping.get(key);
     }
@@ -61,11 +88,11 @@ class Cache extends Base {
 
     let result = await this.redisClient.get(key);
     if (!result) {
-      this.logger.verbose(`getSetValueFromCache not found for key ${key}`);
+      this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
       try {
         result = await onNotFound();
       } catch (e) {
-        this.logger.error(`Cache onNotFound for key '${key}' error: ${e}`);
+        this.logger?.error(`Cache onNotFound for key '${key}' error: ${e}`);
         this.promiseMapping.delete(key);
         reject(e);
         return Promise.reject(e);
@@ -81,7 +108,7 @@ class Cache extends Base {
         },
       );
     } else {
-      this.logger.verbose(
+      this.logger?.verbose(
         `getSetValueFromCache FROM CACHE key ${key}, value ${result.substring(
           0,
           100,
@@ -95,7 +122,7 @@ class Cache extends Base {
           return value;
         });
       } catch {
-        this.logger.warn(
+        this.logger?.warn(
           'Not able to parse json from redis cache. That can be a normal in case you store string here',
         );
       }
@@ -106,7 +133,11 @@ class Cache extends Base {
     return result;
   }
 
-  async removeKey(keyValue) {
+  /**
+   * Remove key from cache
+   * @param key key to remove
+   */
+  async removeKey(keyValue: string) {
     await this.whenReady;
 
     if (!this.redisClient.isOpen) {
