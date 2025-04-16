@@ -1,19 +1,33 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 
+import type { Dirent } from 'node:fs';
+
+interface getFilesPathWithInheritanceProps {
+  internalFolder: string;
+  externalFolder: string;
+  logger: (val: string) => void;
+  loggerFileType?: string;
+  filter?: {
+    startWithCapital?: boolean;
+    notTests?: boolean;
+    notHidden?: boolean;
+  };
+}
+
 const getFilesPathWithInheritance = async ({
   internalFolder,
   externalFolder,
   logger,
   loggerFileType = '',
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
-}) => {
+}: getFilesPathWithInheritanceProps) => {
   const [internalFiles, externalFiles] = await Promise.all([
     fs.readdir(internalFolder, { recursive: true, withFileTypes: true }),
     fs.readdir(externalFolder, { recursive: true, withFileTypes: true }),
   ]);
 
-  const filterIndexFile = (fileDirent) => {
+  const filterIndexFile = (fileDirent: Dirent) => {
     if (!fileDirent.isFile()) {
       return false;
     }

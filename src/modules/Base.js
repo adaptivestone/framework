@@ -1,4 +1,4 @@
-import { getFilesPathWithInheritance } from '../helpers/files.js';
+import { getFilesPathWithInheritance } from '../helpers/files.ts';
 
 class Base {
   #realLogger = null;
