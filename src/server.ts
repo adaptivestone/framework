@@ -5,9 +5,29 @@ import path from 'node:path';
 
 import merge from 'deepmerge';
 import winston from 'winston';
-import { getFilesPathWithInheritance } from './helpers/files.ts';
-import { consoleLogger } from './helpers/logger.ts';
+import { getFilesPathWithInheritance } from './helpers/files.js';
+import { consoleLogger } from './helpers/logger.js';
 import Cache from './services/cache/Cache.js';
+
+import type { TFolderConfig, TFolderConfigFolders } from './folderConfig.ts';
+import type BaseCli from './modules/BaseCli.js';
+
+import type HttpServer from './services/http/HttpServer.js';
+import type ControllerManager from './controllers/index.js';
+
+interface IApp {
+  getConfig: (configName: string) => Record<string, any>;
+  getModel: (modelName: string) => any;
+  runCliCommand: (commandName: string) => Promise<boolean>;
+  updateConfig: (configName: string, config: {}) => Record<string, any>;
+  foldersConfig: TFolderConfigFolders;
+  events: EventEmitter<[never]>;
+  readonly cache: Cache;
+  readonly logger: winston.Logger;
+  httpServer: null | HttpServer;
+  controllerManager: null | ControllerManager;
+  frameworkFolder: string;
+}
 
 try {
   loadEnvFile();
@@ -19,7 +39,7 @@ try {
  * Main framework class.
  */
 class Server {
-  #realLogger = null;
+  #realLogger: null | winston.Logger = null;
 
   #isInited = false;
 
@@ -27,10 +47,22 @@ class Server {
 
   #isModelsLoaded = false;
 
-  cli = null;
+  cli: null | BaseCli = null;
+
+  config: TFolderConfig;
+
+  cache = {
+    configs: new Map(),
+    models: new Map(),
+    modelConstructors: new Map(),
+  };
+
+  cacheService: null | Cache = null;
+
+  app: IApp;
 
   /**
-   *  Construct new server
+   * Construct new server
    * @param {Object} config main config object
    * @param {Object} config.folders folders config
    * @param {String} config.folders.config path to folder with config files
@@ -41,7 +73,7 @@ class Server {
    * @param {String} config.folders.commands path to folder with commands files
    * @param {String} config.folders.migrations path to folder with migrations files
    */
-  constructor(config) {
+  constructor(config: TFolderConfig) {
     this.config = config;
     const that = this;
     this.app = {
@@ -62,12 +94,6 @@ class Server {
       frameworkFolder: new URL('.', import.meta.url).pathname,
     };
 
-    this.cache = {
-      configs: new Map(),
-      models: new Map(),
-      modelConstructors: new Map(),
-    };
-
     this.app.events.on('shutdown', () => {
       const forceShutdownTimer = setTimeout(() => {
         console.error('Shutdown timed out, forcing exit');
@@ -81,9 +107,10 @@ class Server {
   /**
    * Start server (http  + init all http ralated functions)
    * @param {Function} callbackBefore404 code that should be executed before adding page 404
-   * @returns {Promise}
    */
-  async startServer(callbackBefore404 = async () => Promise.resolve()) {
+  async startServer(
+    callbackBefore404 = async () => Promise.resolve(),
+  ): Promise<void> {
     const [{ default: HttpServer }, { default: ControllerManager }] =
       await Promise.all([
         import('./services/http/HttpServer.js'), // Speed optimisation
@@ -105,9 +132,11 @@ class Server {
 
   /**
    * Do an initialization (config reading,  etc)
-   * @returns {Promise}
    */
-  async init({ isSkipModelInit = false, isSkipModelLoading = false } = {}) {
+  async init({
+    isSkipModelInit = false,
+    isSkipModelLoading = false,
+  } = {}): Promise<boolean> {
     if (this.#isInited) {
       return true;
     }
@@ -134,9 +163,8 @@ class Server {
 
   /**
    * Load model and init them
-   * @returns {Promise}
    */
-  async initAllModels() {
+  async initAllModels(): Promise<void> {
     if (this.#isModelsInited) {
       // already inited
       return;
@@ -153,11 +181,17 @@ class Server {
         try {
           const model = new ModelConstructor(this.app);
           this.cache.models.set(modelName, model.mongooseModel);
-        } catch (e) {
-          this.app.logger.error(
-            `Problem with model ${modelName}, ${e.message}`,
-          );
-          this.app.logger.error(e);
+        } catch (e: unknown) {
+          if (e instanceof Error) {
+            this.app.logger.error(
+              `Problem with model ${modelName}, ${e.message}`,
+            );
+            this.app.logger.error(e);
+          } else {
+            this.app.logger.error(
+              `Problem with model ${modelName}, Unknown error`,
+            );
+          }
         }
       }
     } else {
@@ -172,7 +206,7 @@ class Server {
     this.#isModelsInited = true;
   }
 
-  async #initConfigFiles() {
+  async #initConfigFiles(): Promise<boolean> {
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const files = await getFilesPathWithInheritance({
       internalFolder: path.join(dirname, '/config'),
@@ -184,7 +218,7 @@ class Server {
       },
     });
 
-    const configFiles = {};
+    const configFiles: Record<string, Record<string, string>> = {};
 
     for (const file of files) {
       const config = file.file.split('.');
@@ -198,7 +232,10 @@ class Server {
       }
     }
 
-    const loadConfig = async (configName, values) => {
+    const loadConfig = async (
+      configName: string,
+      values: Record<string, string>,
+    ) => {
       const promises = [import(values.default)];
       if (process.env.NODE_ENV && values[process.env.NODE_ENV]) {
         promises.push(import(values[process.env.NODE_ENV]));
@@ -226,7 +263,7 @@ class Server {
     return true;
   }
 
-  async #loadModelFiles() {
+  async #loadModelFiles(): Promise<boolean> {
     if (this.#isModelsLoaded) {
       // already inited
       return true;
@@ -263,7 +300,7 @@ class Server {
   /**
    * Add error logging on promise reject
    */
-  addErrorHandling() {
+  addErrorHandling(): void {
     process.on('uncaughtException', (e) =>
       this.app.logger.error('uncaughtException', e),
     );
@@ -282,7 +319,7 @@ class Server {
    * @param {String} configName name on config file to load
    * @returns {Object} config object. Structure depends of config file
    */
-  getConfig(configName) {
+  getConfig(configName: string): Record<string, any> {
     if (!this.cache.configs.has(configName)) {
       if (!this.#isInited) {
         throw new Error('You should call Server.init() before using getConfig');
@@ -298,14 +335,14 @@ class Server {
   /**
    * Return or create new logger instance. This is a main logger instance
    */
-  getLogger() {
+  getLogger(): winston.Logger {
     if (!this.#realLogger) {
       this.#realLogger = this.#createLogger();
     }
     return this.#realLogger;
   }
 
-  #createLogger() {
+  #createLogger(): winston.Logger {
     const alignColorsAndTime = winston.format.combine(
       winston.format.colorize({
         all: true,
@@ -321,7 +358,7 @@ class Server {
       ),
     );
     const logConfig = this.app.getConfig('log').transports;
-    function IsConstructor(f) {
+    function IsConstructor(f: Function) {
       try {
         Reflect.construct(String, [], f);
       } catch {
@@ -376,7 +413,7 @@ class Server {
    * @param {String} configName
    * @param {Object} config
    */
-  updateConfig(configName, config) {
+  updateConfig(configName: string, config: Record<string, any>) {
     // const confName = configName.charAt(0).toUpperCase() + configName.slice(1);
     const conf = this.getConfig(configName);
     const newConf = Object.assign(conf, config); // TODO deep clone
@@ -390,7 +427,7 @@ class Server {
    * @param {String} modelName name on config file to load
    * @returns {import('mongoose').Model | false| {}}
    */
-  getModel(modelName) {
+  getModel(modelName: string) {
     if (modelName.endsWith('s')) {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
@@ -414,21 +451,19 @@ class Server {
   /**
    * Run cli command into framework (http, ws, etc)
    * @param {String} commandName name of command to load
-   * @param {Object} args list of arguments to pass into command
    */
-  async runCliCommand(commandName, args = {}) {
+  async runCliCommand(commandName: string) {
     if (!this.cli) {
       const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
       this.cli = new BaseCli(this);
     }
-    return this.cli.run(commandName, args);
+    return this.cli.run(commandName);
   }
 
   /**
    * Get internal cache service
-   * @returns
    */
-  getCache() {
+  getCache(): Cache {
     if (!this.cacheService) {
       this.cacheService = new Cache(this.app);
     }
@@ -437,3 +472,4 @@ class Server {
 }
 
 export default Server;
+export { type IApp };

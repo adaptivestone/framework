@@ -21,5 +21,5 @@ if (cluster.isPrimary) {
     cluster.fork();
   });
 } else {
-  import('./server.js');
+  import('./server.ts');
 }

@@ -115,7 +115,6 @@ class Cli extends Base {
       tokens: true,
     });
 
-    // @ts-ignore
     if (parsedArgs.values.help) {
       Cli.showHelp(Command, finalArguments);
       return true;

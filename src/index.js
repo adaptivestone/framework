@@ -1,4 +1,4 @@
-import Server from './server.js';
+import Server from './server.ts';
 import folderConfig from './folderConfig.ts';
 
 const server = new Server(folderConfig);

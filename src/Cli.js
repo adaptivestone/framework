@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import BaseCli from './modules/BaseCli.js';
-import Server from './server.js';
+import Server from './server.ts';
 
 class Cli extends BaseCli {
   constructor(serverConfig) {

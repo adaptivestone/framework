@@ -6,7 +6,7 @@ import mongoose from 'mongoose'; // we do not need create indexes on tests
 
 import { createClient } from '@redis/client';
 import clearRedisNamespace from '../helpers/redis/clearNamespace.js';
-import Server from '../server.js';
+import Server from '../server.ts';
 
 mongoose.set('autoIndex', false);
 
