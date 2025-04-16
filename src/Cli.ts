@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 import BaseCli from './modules/BaseCli.ts';
 import Server from './server.ts';
+import type { TFolderConfig } from './folderConfig.ts';
 
 class Cli extends BaseCli {
-  constructor(serverConfig) {
+  constructor(serverConfig: TFolderConfig) {
     mongoose.set('autoIndex', false); // we do not need create indexes on CLI.
     const server = new Server(serverConfig);
     super(server);

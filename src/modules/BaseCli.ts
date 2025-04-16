@@ -73,7 +73,7 @@ class Cli extends Base {
       );
     }
     console.log(
-      '\nUsage (use one of option): \n node cli.js <command> [options] \n npm run cli <command>  -- [options]',
+      '\nUsage (use one of option): \n node cli.ts <command> [options] \n npm run cli <command>  -- [options]',
     );
   }
 

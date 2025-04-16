@@ -9,6 +9,7 @@
     "target": "ESNext",
     "module": "NodeNext",
     "rewriteRelativeImportExtensions": true,
+    "forceConsistentCasingInFileNames": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true

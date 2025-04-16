@@ -10,7 +10,7 @@ import { consoleLogger } from './helpers/logger.ts';
 import Cache from './services/cache/Cache.js';
 
 import type { TFolderConfig, TFolderConfigFolders } from './folderConfig.ts';
-import type BaseCli from './modules/BaseCli.js';
+import type BaseCli from './modules/BaseCli.ts';
 
 import type HttpServer from './services/http/HttpServer.js';
 import type ControllerManager from './controllers/index.js';
@@ -454,7 +454,7 @@ class Server {
    */
   async runCliCommand(commandName: string) {
     if (!this.cli) {
-      const { default: BaseCli } = await import('./modules/BaseCli.js'); // Speed optimisation
+      const { default: BaseCli } = await import('./modules/BaseCli.ts'); // Speed optimisation
       this.cli = new BaseCli(this);
     }
     return this.cli.run(commandName);
