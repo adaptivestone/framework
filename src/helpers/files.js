@@ -23,7 +23,12 @@ const getFilesPathWithInheritance = async ({
       // not start with capital
       return false;
     }
-    if (notTests && (file.endsWith('.test.js') || file.endsWith('.test.ts'))) {
+    if (
+      notTests &&
+      (file.endsWith('.test.js') ||
+        file.endsWith('.test.ts') ||
+        file.endsWith('.d.ts'))
+    ) {
       return false;
     }
     if (notHidden && file[0] === '.') {
