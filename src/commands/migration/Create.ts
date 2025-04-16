@@ -9,12 +9,11 @@ class CreateMigration extends AbstractCommand {
 
   /**
    * You able to add command arguments for parsing there.
-   * @returns {import("../../types/ICommandArguments.js").ICommandArguments}
    */
   static get commandArguments() {
     return {
       name: {
-        type: 'string',
+        type: 'string' as const,
         description: 'Migration name',
         required: true,
       },
@@ -23,12 +22,12 @@ class CreateMigration extends AbstractCommand {
 
   async run() {
     if (this.args.name.match(/^\d/)) {
-      this.logger.error('Command cant start from nubmer');
+      this.logger?.error('Command cant start from nubmer');
       return false;
     }
     const fileName = `${Date.now()}_${CreateMigration.camelSentence(
       this.args.name,
-    )}.js`;
+    )}.ts`;
 
     const fileContent = CreateMigration.getTemplate(
       CreateMigration.camelSentence(this.args.name),
@@ -38,17 +37,17 @@ class CreateMigration extends AbstractCommand {
       path.join(this.app.foldersConfig.migrations, fileName),
       fileContent,
     );
-    this.logger.info(`Migration created ${fileName}`);
+    this.logger?.info(`Migration created ${fileName}`);
     return true;
   }
 
-  static camelSentence(str) {
+  static camelSentence(str: string) {
     return ` ${str}`
       .toLowerCase()
       .replace(/[^a-zA-Z0-9]+(.)/g, (match, chr) => chr.toUpperCase());
   }
 
-  static getTemplate(name) {
+  static getTemplate(name: string) {
     return `/* eslint-disable class-methods-use-this */
 
 import Base from '@adaptivestone/framework/modules/Base.js';

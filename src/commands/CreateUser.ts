@@ -13,24 +13,24 @@ class CreateUser extends AbstractCommand {
   static get commandArguments() {
     return {
       id: {
-        type: 'string',
+        type: 'string' as const,
         description: 'User id to find user',
       },
       email: {
-        type: 'string',
+        type: 'string' as const,
         description: 'User id to find/create user',
       },
       password: {
-        type: 'string',
+        type: 'string' as const,
         description: 'New password for user',
       },
       roles: {
-        type: 'string',
+        type: 'string' as const,
         description:
           'User roles comma separated string (--roles=user,admin,someOtherRoles)',
       },
       update: {
-        type: 'boolean',
+        type: 'boolean' as const,
         default: false,
         description: 'Update user if it exists',
       },
@@ -42,8 +42,8 @@ class CreateUser extends AbstractCommand {
     const { id, email, password, roles, update } = this.args;
 
     if (!email && !id) {
-      this.logger.error('Input validation failded');
-      this.logger.error('Please add "email" or "id" variables');
+      this.logger?.error('Input validation failded');
+      this.logger?.error('Please add "email" or "id" variables');
       return false;
     }
 
@@ -56,21 +56,21 @@ class CreateUser extends AbstractCommand {
     }
 
     if (user && !update) {
-      this.logger.error(
+      this.logger?.error(
         'We are found a user in database. But "update" option is not providing. Exitin',
       );
       return false;
     }
 
     if (!user && !password) {
-      this.logger.error(
+      this.logger?.error(
         'For a new user we alway asking for a password. Please provide it and rerun command',
       );
       return false;
     }
 
     if (!user && !email) {
-      this.logger.error(
+      this.logger?.error(
         'For a new user we alway asking for a email. Please provide it and rerun command',
       );
       return false;
@@ -95,7 +95,7 @@ class CreateUser extends AbstractCommand {
 
     await user.generateToken();
 
-    this.logger.info(
+    this.logger?.info(
       `User was created/updated ${JSON.stringify(user, null, 4)}`,
     );
 

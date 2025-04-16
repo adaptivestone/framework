@@ -7,12 +7,11 @@ class DropIndex extends AbstractCommand {
 
   /**
    * You able to add command arguments for parsing there.
-   * @returns {import("../types/ICommandArguments.js").ICommandArguments}
    */
   static get commandArguments() {
     return {
       model: {
-        type: 'string',
+        type: 'string' as const,
         description: 'Model name',
         required: true,
       },
@@ -23,13 +22,13 @@ class DropIndex extends AbstractCommand {
     const Model = this.app.getModel(this.args.model);
 
     if (!Model) {
-      this.logger.error('Not able to find model');
+      this.logger?.error('Not able to find model');
       return false;
     }
 
     await Model.collection.dropIndexes();
 
-    this.logger.info('Success');
+    this.logger?.info('Success');
 
     return true;
   }

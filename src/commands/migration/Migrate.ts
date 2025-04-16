@@ -34,7 +34,7 @@ class Migrate extends AbstractCommand {
     }
 
     for (const migration of migrations) {
-      this.logger.info(`=== Start migration ${migration.file} ===`);
+      this.logger?.info(`=== Start migration ${migration.file} ===`);
       // eslint-disable-next-line no-await-in-loop
       const { default: MigrationCommand } = await import(migration.path);
       const migrationCommand = new MigrationCommand(this.app);
@@ -46,7 +46,7 @@ class Migrate extends AbstractCommand {
       });
     }
 
-    this.logger.info(
+    this.logger?.info(
       `=== Migration Finished. Migrated ${migrations.length} files ===`,
     );
     return true;

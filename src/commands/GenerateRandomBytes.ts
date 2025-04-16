@@ -12,7 +12,7 @@ class GenerateRandomBytes extends AbstractCommand {
     const sizes = [16, 32, 64, 128, 256];
     for (const size of sizes) {
       const bytes = randomBytes(size).toString('hex');
-      this.logger.info(`${size} bytes: ${bytes}`);
+      this.logger?.info(`${size} bytes: ${bytes}`);
     }
     return true;
   }
