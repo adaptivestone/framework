@@ -8,10 +8,11 @@
 .husky
 .env
 cliCommand.js
-/controllers/test/*
-/services/http/middleware/test/*
+/dist/controllers/test/*
+/dist/services/http/middleware/test/*
 /benchmark/*
 /coverage/*
 /.github/*
 **/*.test.js
+/src/**
 
