@@ -1,6 +1,6 @@
 import express from 'express';
 
-import Base from './Base.js';
+import Base from './Base.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
 import Auth from '../services/http/middleware/Auth.js';
 import ValidateService from '../services/validate/ValidateService.js';

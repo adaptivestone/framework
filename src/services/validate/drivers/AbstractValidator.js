@@ -1,4 +1,4 @@
-import Base from '../../../modules/Base.js';
+import Base from '../../../modules/Base.ts';
 
 class AbstractValidator extends Base {
   constructor(app, body) {

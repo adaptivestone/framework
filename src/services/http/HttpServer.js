@@ -8,7 +8,7 @@ import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.js';
 import RequestParserMiddleware from './middleware/RequestParser.js';
 import IpDetector from './middleware/IpDetector.js';
 import Cors from './middleware/Cors.js';
-import Base from '../../modules/Base.js';
+import Base from '../../modules/Base.ts';
 
 /**
  * HTTP server based on Express

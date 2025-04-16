@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Base from './Base.js';
+import Base from './Base.ts';
 
 class AbstractModel extends Base {
   mongooseSchema = null;

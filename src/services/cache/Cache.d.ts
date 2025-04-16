@@ -1,5 +1,5 @@
-import Base from '../../modules/Base.d.ts';
-import Server from '../../server.js';
+import Base from '../../modules/Base.ts';
+import Server from '../../server.ts';
 
 declare class Cache extends Base {
   app: Server['app'];

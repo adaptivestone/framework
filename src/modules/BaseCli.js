@@ -1,7 +1,7 @@
 import path from 'node:path';
 import * as url from 'node:url';
 import { parseArgs } from 'node:util';
-import Base from './Base.js';
+import Base from './Base.ts';
 
 class Cli extends Base {
   constructor(server) {

@@ -1,4 +1,4 @@
-import Base from '../../modules/Base.js';
+import Base from '../../modules/Base.ts';
 
 class Cache extends Base {
   constructor(app) {

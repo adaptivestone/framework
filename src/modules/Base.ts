@@ -1,9 +1,13 @@
 import { getFilesPathWithInheritance } from '../helpers/files.ts';
+import type { IApp } from '../server.ts';
+import type winston from 'winston';
 
 class Base {
-  #realLogger = null;
+  #realLogger: null | winston.Logger = null;
 
-  constructor(app) {
+  app: IApp;
+
+  constructor(app: IApp) {
     this.app = app;
   }
 
@@ -17,7 +21,7 @@ class Base {
   /**
    * Optimzation to lazy load logger. It will be inited only on request
    */
-  get logger() {
+  get logger(): winston.Logger | null {
     let l;
     try {
       l = this.#realLogger;
@@ -29,7 +33,7 @@ class Base {
     }
 
     if (!l) {
-      const { loggerGroup } = /** @type {typeof Base} */ (this.constructor);
+      const { loggerGroup } = this.constructor as typeof Base;
       this.#realLogger = this.getLogger(
         loggerGroup + this.getConstructorName(),
       );
@@ -41,15 +45,18 @@ class Base {
    * Get winston loger for given label
    * @param {string} label name of logger
    */
-  getLogger(label) {
+  getLogger(label: string): winston.Logger {
     return this.app.logger.child({ label });
   }
 
-  async getFilesPathWithInheritance(internalFolder, externalFolder) {
+  async getFilesPathWithInheritance(
+    internalFolder: string,
+    externalFolder: string,
+  ) {
     return getFilesPathWithInheritance({
       internalFolder,
       externalFolder,
-      logger: (text) => this.logger.verbose(text),
+      logger: (text) => this.logger?.verbose(text),
     });
   }
 

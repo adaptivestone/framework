@@ -1,4 +1,4 @@
-import Base from '../../modules/Base.js';
+import Base from '../../modules/Base.ts';
 import ValidateService from '../validate/ValidateService.js';
 
 class DocumentationGenerator extends Base {

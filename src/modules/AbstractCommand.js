@@ -1,4 +1,4 @@
-import Base from './Base.js';
+import Base from './Base.ts';
 
 class AbstractCommand extends Base {
   constructor(app, commands, args) {

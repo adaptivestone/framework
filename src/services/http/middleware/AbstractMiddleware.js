@@ -1,5 +1,5 @@
 import { object } from 'yup';
-import Base from '../../../modules/Base.js';
+import Base from '../../../modules/Base.ts';
 
 class AbstractMiddleware extends Base {
   constructor(app, params) {

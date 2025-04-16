@@ -1,6 +1,6 @@
 import path from 'node:path';
 import * as url from 'node:url';
-import Base from '../modules/Base.js';
+import Base from '../modules/Base.ts';
 
 /**
  * Class do autoloading a http controllers
