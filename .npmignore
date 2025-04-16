@@ -7,7 +7,7 @@
 .editorconfig
 .husky
 .env
-cliCommand.js
+/cliCommand.js
 /dist/controllers/test/*
 /dist/services/http/middleware/test/*
 /benchmark/*
@@ -15,4 +15,7 @@ cliCommand.js
 /.github/*
 **/*.test.js
 /src/**
+eslint.config.js
+tsconfig.json
+vitest.config.ts
 
