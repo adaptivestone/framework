@@ -8,7 +8,7 @@
     "declaration": true,
     "target": "ESNext",
     "module": "NodeNext",
-    // "rewriteRelativeImportExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
