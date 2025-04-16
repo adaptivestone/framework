@@ -6,7 +6,7 @@ import path from 'node:path';
 import merge from 'deepmerge';
 import winston from 'winston';
 import { getFilesPathWithInheritance } from './helpers/files.ts';
-import { consoleLogger } from './helpers/logger.js';
+import { consoleLogger } from './helpers/logger.ts';
 import Cache from './services/cache/Cache.js';
 
 try {
