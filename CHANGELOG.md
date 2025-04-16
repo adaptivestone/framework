@@ -1,6 +1,7 @@
 ### 5.0.0-beta.12
 
 [BREAKING] Remove jest support for testing
+[NEW] initial move to typescript
 
 ### 5.0.0-beta.11
 
