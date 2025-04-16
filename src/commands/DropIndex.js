@@ -1,4 +1,4 @@
-import AbstractCommand from '../modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 
 class DropIndex extends AbstractCommand {
   static get description() {

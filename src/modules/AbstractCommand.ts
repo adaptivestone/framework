@@ -1,7 +1,17 @@
 import Base from './Base.ts';
+import type { IApp } from '../server.ts';
+import type { ParseArgsOptionsConfigExtended } from './BaseCli.ts';
 
 class AbstractCommand extends Base {
-  constructor(app, commands, args) {
+  commands: Record<string, string>;
+
+  args: Record<string, any>;
+
+  constructor(
+    app: IApp,
+    commands: Record<string, string>,
+    args: Record<string, any>,
+  ) {
     super(app);
     this.args = args;
     this.commands = commands;
@@ -20,27 +30,30 @@ class AbstractCommand extends Base {
    * Get mongo connection name
    * @param {String} commandName
    * @param {object} args
-   * @returns string
    */
-  static getMongoConnectionName(commandName, args) {
+  static getMongoConnectionName(
+    commandName: string,
+    args: Record<string, any>,
+  ) {
     return `CLI: ${commandName} ${JSON.stringify(args)}`;
   }
 
   /**
    * You able to add command arguments for parsing there.
    * @see https://nodejs.org/api/util.html#utilparseargsconfig in config.options plus extended with description and required
-   * @returns {import("../types/ICommandArguments.d.ts").ICommandArguments}
    */
-  static get commandArguments() {
+  static get commandArguments(): Record<
+    string,
+    ParseArgsOptionsConfigExtended
+  > {
     return {};
   }
 
   /**
    * Entry point to every command. This method should be overridden
-   * @return {Promise<boolean>} result
    */
-  async run() {
-    this.logger.error('You should implement run method');
+  async run(): Promise<boolean> {
+    this.logger?.error('You should implement run method');
     return false;
   }
 

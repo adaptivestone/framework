@@ -1,6 +1,6 @@
 import * as url from 'node:url';
 import path from 'node:path';
-import AbstractCommand from '../../modules/AbstractCommand.js';
+import AbstractCommand from '../../modules/AbstractCommand.ts';
 
 class Migrate extends AbstractCommand {
   static get description() {

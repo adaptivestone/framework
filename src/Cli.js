@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import BaseCli from './modules/BaseCli.js';
+import BaseCli from './modules/BaseCli.ts';
 import Server from './server.ts';
 
 class Cli extends BaseCli {

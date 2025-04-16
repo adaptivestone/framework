@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import AbstractCommand from '../../modules/AbstractCommand.js';
+import AbstractCommand from '../../modules/AbstractCommand.ts';
 
 class CreateMigration extends AbstractCommand {
   static get description() {

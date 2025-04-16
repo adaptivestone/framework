@@ -2,15 +2,34 @@ import path from 'node:path';
 import * as url from 'node:url';
 import { parseArgs } from 'node:util';
 import Base from './Base.ts';
+import type Server from '../server.ts';
+import type { ParseArgsOptionDescriptor } from 'node:util';
+import type AbstractCommand from '../modules/AbstractCommand.ts';
+
+export interface ParseArgsOptionsConfigExtended
+  extends ParseArgsOptionDescriptor {
+  /**
+   * A description of the option.
+   */
+  description?: string;
+
+  /**
+   * Is it required?
+   */
+  required?: boolean;
+}
 
 class Cli extends Base {
-  constructor(server) {
+  server: Server;
+  commands: Record<string, string>;
+
+  constructor(server: Server) {
     super(server.app);
     this.server = server;
     this.commands = {};
   }
 
-  async loadCommands() {
+  async loadCommands(): Promise<boolean> {
     if (Object.keys(this.commands).length) {
       return true;
     }
@@ -23,7 +42,7 @@ class Cli extends Base {
       if (com.file.endsWith('.js') || com.file.endsWith('.ts')) {
         const c = com.file.replace('.js', '').replace('.ts', '');
         if (this.commands[c.toLowerCase()]) {
-          this.logger.warn(
+          this.logger?.warn(
             `Command ${c.toLowerCase()} already exists with full path ${this.commands[c.toLowerCase()]}. Possible problems - you have two commands with "ts" and "js" extensions. Skipping...`,
           );
           continue;
@@ -38,17 +57,19 @@ class Cli extends Base {
     const commands = Object.keys(this.commands).sort();
     const maxLength = commands.reduce((max, c) => Math.max(max, c.length), 0);
     console.log('Available commands:');
-    let commandsClasses = [];
+    const commandsClasses = [];
     for (const c of commands) {
       commandsClasses.push(import(this.commands[c]));
       // console.log(
       //   ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${f.default.description}`,
       // );
     }
-    commandsClasses = await Promise.all(commandsClasses);
+    const commandsClassesLoaded: Array<
+      Record<'default', typeof AbstractCommand>
+    > = await Promise.all(commandsClasses);
     for (const [key, c] of Object.entries(commands)) {
       console.log(
-        ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${commandsClasses[key].default.description}`,
+        ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${commandsClassesLoaded[+key].default.description}`,
       );
     }
     console.log(
@@ -56,7 +77,10 @@ class Cli extends Base {
     );
   }
 
-  static showHelp(Command, finalArguments) {
+  static showHelp(
+    Command: typeof AbstractCommand,
+    finalArguments: Record<string, ParseArgsOptionsConfigExtended>,
+  ) {
     console.log(`\n\x1b[32m${Command.description}\x1b[0m`);
     let output = '';
 
@@ -81,7 +105,7 @@ class Cli extends Base {
     console.log(output);
   }
 
-  async run(command) {
+  async run(command: string) {
     await this.loadCommands();
 
     if (!command) {
@@ -95,9 +119,12 @@ class Cli extends Base {
       await this.printCommandTable();
       return false;
     }
-    const { default: Command } = await import(this.commands[command]);
+    const commandModule: { default: typeof AbstractCommand } = await import(
+      this.commands[command]
+    );
+    const Command: typeof AbstractCommand = commandModule.default;
 
-    const defaultArgs = {
+    const defaultArgs: Record<string, ParseArgsOptionsConfigExtended> = {
       help: {
         type: 'boolean',
         description: 'Show help',
@@ -131,7 +158,7 @@ class Cli extends Base {
     }
 
     if (Command.isShouldInitModels) {
-      this.logger.debug(
+      this.logger?.debug(
         `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in tyou command`,
       );
       process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
@@ -140,14 +167,14 @@ class Cli extends Base {
       );
       await this.server.initAllModels();
     } else {
-      this.logger.debug(`Command ${command} NOT need to isShouldInitModels`);
+      this.logger?.debug(`Command ${command} NOT need to isShouldInitModels`);
     }
 
     const c = new Command(this.app, this.commands, parsedArgs.values);
-    let result = false;
+    let result;
 
-    result = await c.run().catch((e) => {
-      this.logger.error(e.stack);
+    result = await c.run().catch((e: { stack: any }) => {
+      this.logger?.error(e.stack);
     });
 
     return result;

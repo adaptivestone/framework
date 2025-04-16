@@ -1,4 +1,4 @@
-import AbstractCommand from '../modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 import ControllerManager from '../controllers/index.js';
 
 class Documentation extends AbstractCommand {

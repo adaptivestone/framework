@@ -1,4 +1,4 @@
-import AbstractCommand from '../modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 
 // Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
 class CreateUser extends AbstractCommand {

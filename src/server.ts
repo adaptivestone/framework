@@ -18,7 +18,7 @@ import type ControllerManager from './controllers/index.js';
 interface IApp {
   getConfig: (configName: string) => Record<string, any>;
   getModel: (modelName: string) => any;
-  runCliCommand: (commandName: string) => Promise<boolean>;
+  runCliCommand: (commandName: string) => Promise<boolean | void>;
   updateConfig: (configName: string, config: {}) => Record<string, any>;
   foldersConfig: TFolderConfigFolders;
   events: EventEmitter<[never]>;

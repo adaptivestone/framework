@@ -1,6 +1,6 @@
 import path from 'node:path';
 import * as url from 'node:url';
-import AbstractCommand from '../modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 
 class SyncIndexes extends AbstractCommand {
   async run() {

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import AbstractCommand from '../modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 
 class GenerateRandomBytes extends AbstractCommand {
   static get description() {

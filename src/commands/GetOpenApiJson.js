@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import AbstractCommand from '../modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 
 /**
  * Command for generate documentation json file openApi
