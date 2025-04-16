@@ -1,9 +1,0 @@
-{
-  "compilerOptions": {
-    "module": "NodeNext",
-    "target": "ES2024",
-    "moduleResolution": "nodenext",
-    "checkJs": true
-  },
-  "exclude": ["node_modules", "coverage"]
-}
