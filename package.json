@@ -2,10 +2,12 @@
   "name": "@adaptivestone/framework",
   "version": "5.0.0-beta.11",
   "description": "Adaptive stone node js framework",
-  "main": "index.js",
   "type": "module",
   "engines": {
-    "node": ">=20.12.0"
+    "node": ">=23.6.0"
+  },
+  "exports": {
+    "./*": "./dist/*"
   },
   "repository": {
     "type": "git",
@@ -14,6 +16,7 @@
   "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
     "build": "tsc",
+    "check:types": "tsc --noEmit",
     "dev": "node --watch ./src/index.js",
     "prod": "node --watch ./src/cluster.js",
     "test": "vitest run",
