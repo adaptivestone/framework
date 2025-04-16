@@ -10,23 +10,32 @@ import Server from '../server.js';
 
 mongoose.set('autoIndex', false);
 
+const basePath = new URL('.', import.meta.url).pathname;
+
 beforeAll(async () => {
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
   process.env.AUTH_SALT = crypto.randomBytes(16).toString('hex');
   global.server = new Server({
     folders: {
-      config: process.env.TEST_FOLDER_CONFIG || path.resolve('./config'),
+      config:
+        process.env.TEST_FOLDER_CONFIG || path.resolve(basePath, '../config'),
       controllers:
-        process.env.TEST_FOLDER_CONTROLLERS || path.resolve('./controllers'),
-      models: process.env.TEST_FOLDER_MODELS || path.resolve('./models'),
+        process.env.TEST_FOLDER_CONTROLLERS ||
+        path.resolve(basePath, '../controllers'),
+      models:
+        process.env.TEST_FOLDER_MODELS || path.resolve(basePath, '../models'),
       emails:
         process.env.TEST_FOLDER_EMAIL ||
         process.env.TEST_FOLDER_EMAILS ||
-        path.resolve('./services/messaging/email/templates'),
-      locales: process.env.TEST_FOLDER_LOCALES || path.resolve('./locales'),
-      commands: process.env.TEST_FOLDER_COMMANDS || path.resolve('./commands'),
+        path.resolve(basePath, '../services/messaging/email/templates'),
+      locales:
+        process.env.TEST_FOLDER_LOCALES || path.resolve(basePath, '../locales'),
+      commands:
+        process.env.TEST_FOLDER_COMMANDS ||
+        path.resolve(basePath, '../commands'),
       migrations:
-        process.env.TEST_FOLDER_MIGRATIONS || path.resolve('./migrations'),
+        process.env.TEST_FOLDER_MIGRATIONS ||
+        path.resolve(basePath, '../migrations'),
     },
   });
   await global.server.init({ isSkipModelInit: true });

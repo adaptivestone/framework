@@ -13,8 +13,9 @@
   },
   "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
-    "dev": "node --watch ./index.js",
-    "prod": "node --watch ./cluster.js",
+    "build": "tsc",
+    "dev": "node --watch ./src/index.js",
+    "prod": "node --watch ./src/cluster.js",
     "test": "vitest run",
     "t": "vitest --coverage=false --reporter=default",
     "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
@@ -22,7 +23,7 @@
     "lint:fix": "eslint --fix",
     "codestyle": "npm run prettier && npm run lint",
     "prepare": "husky",
-    "cli": "node cliCommand",
+    "cli": "node src/cliCommand",
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
     "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
     "redis:docker": "docker run --rm  -p 6379:6379 redis"
@@ -34,7 +35,7 @@
     "deepmerge": "^4.2.2",
     "express": "^5.0.1",
     "formidable": "^3.5.1",
-    "i18next": "^24.0.0",
+    "i18next": "^25.0.0",
     "i18next-fs-backend": "^2.0.0",
     "mongoose": "^8.0.0",
     "rate-limiter-flexible": "^7.0.0",
@@ -56,6 +57,7 @@
     "lint-staged": "^15.0.0",
     "mongodb-memory-server": "^10.0.0",
     "prettier": "^3.0.0",
+    "typescript": "^5.8.3",
     "vitest": "^3.0.0"
   },
   "peerDependencies": {

@@ -1,3 +1,7 @@
+### 5.0.0-beta.12
+
+[BREAKING] Remove jest support for testing
+
 ### 5.0.0-beta.11
 
 [NEW] commands typing
