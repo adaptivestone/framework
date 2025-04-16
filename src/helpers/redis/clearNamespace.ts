@@ -1,7 +1,12 @@
-async function clearNamespace(redisClient, namespace) {
+import type { RedisClientType } from '@redis/client';
+
+async function clearNamespace(redisClient: RedisClientType, namespace: string) {
   const deletedKeys = [];
 
-  const keys = await redisClient.sendCommand(['keys', `*${namespace}*`]);
+  const keys = await redisClient.sendCommand<string[]>([
+    'keys',
+    `*${namespace}*`,
+  ]);
 
   if (keys && keys.length > 0) {
     for (const key of keys) {

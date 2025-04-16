@@ -5,11 +5,7 @@ import type { RedisClientType } from '@redis/client';
 class Cache extends Base {
   whenReady: Promise<void>;
 
-  redisClient!: RedisClientType<
-    Record<string, never>,
-    Record<string, never>,
-    Record<string, never>
-  >;
+  redisClient!: RedisClientType;
 
   redisNamespace: string = '';
 
