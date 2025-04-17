@@ -1,5 +1,5 @@
 import express from 'express';
-import type { IRouter, Request, Response, NextFunction } from 'express';
+import type { IRouter, Response, NextFunction } from 'express';
 
 import Base from './Base.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
@@ -10,8 +10,26 @@ import DocumentationGenerator from '../services/documentation/DocumentationGener
 import type { IApp } from '../server.ts';
 import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
-type MiddlewareWithParamsTuple = [typeof AbstractMiddleware, Array<any>];
-type TMiddleware = Array<typeof AbstractMiddleware | MiddlewareWithParamsTuple>;
+type MiddlewareWithParamsTuple = [
+  typeof AbstractMiddleware,
+  Record<string, any>,
+];
+export type TMiddleware = Array<
+  typeof AbstractMiddleware | MiddlewareWithParamsTuple
+>;
+type RouteObject = {
+  handler: Function;
+  description?: string;
+  middleware?: TMiddleware | null;
+  request?: any;
+  query?: any;
+};
+
+export type RouteParams = {
+  [method: string]: {
+    [path: string]: RouteObject | Function;
+  };
+};
 
 /**
  * Abstract controller. You should extend any controller from them.
@@ -40,7 +58,12 @@ class AbstractController extends Base {
     const routeMiddlewares = new Map();
     Object.entries(routes).forEach(([method, methodRoutes]) => {
       Object.entries(methodRoutes).forEach(([route, routeParam]) => {
-        if (routeParam?.middleware) {
+        if (
+          typeof routeParam === 'object' &&
+          routeParam !== null &&
+          'middleware' in routeParam &&
+          routeParam.middleware
+        ) {
           const fullRoute = method.toUpperCase() + route;
 
           if (!routeMiddlewares.has(fullRoute)) {
@@ -95,8 +118,9 @@ class AbstractController extends Base {
             middleware.path === path && middleware.method === verb,
         );
 
-        let routeObject = routes[verb][path];
+        let routeObject = routes[verb][path] as RouteObject;
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
+          // for support firect pass function instead of object
           routeObject = {
             handler: routeObject as unknown as Function,
             request: null,
@@ -365,17 +389,7 @@ class AbstractController extends Base {
    *   },
    * };
    */
-  get routes(): {
-    [method: string]: {
-      [path: string]: {
-        handler: Function;
-        description?: string;
-        middleware?: TMiddleware | null;
-        request?: any;
-        query?: any;
-      };
-    };
-  } {
+  get routes(): RouteParams {
     this.logger?.warn('Please implement "routes" method on controller.');
     return {};
   }

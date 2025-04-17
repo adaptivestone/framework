@@ -13,13 +13,18 @@ import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
 import type { Express, Request, Response, NextFunction } from 'express';
 import type { Server } from 'node:http';
+import type { TFunction } from 'i18next';
 
 export interface FrameworkRequest extends Request {
   appInfo: {
     app: IApp;
-    request?: Record<string, any>;
-    query?: Record<string, any>;
+    request: Record<string, any>;
+    query: Record<string, any>;
     user?: any;
+    i18n?: {
+      t: TFunction;
+      language: string;
+    };
   };
 }
 

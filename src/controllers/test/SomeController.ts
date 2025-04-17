@@ -7,8 +7,15 @@ import CheckFlag from '../../services/http/middleware/test/CheckFlag.ts';
 import RoleMiddleware from '../../services/http/middleware/Role.js';
 import Pagination from '../../services/http/middleware/Pagination.js';
 
+import type { Response } from 'express';
+import type { FrameworkRequest } from '../../services/http/HttpServer.ts';
+import type {
+  TMiddleware,
+  RouteParams,
+} from '../../modules/AbstractController.ts';
+
 class SomeController extends AbstractController {
-  get routes() {
+  get routes(): RouteParams {
     return {
       get: {
         '/': {
@@ -70,35 +77,38 @@ class SomeController extends AbstractController {
         },
       },
       put: {
-        '/putInfo': {
-          handler: this.putInfo,
-          request: object().shape({
-            field: string(),
-          }),
-          middleware: [[RoleMiddleware, { roles: ['admin'] }]],
-        },
+        // '/putInfo': {
+        //   handler: this.putInfo,
+        //   request: object().shape({
+        //     field: string(),
+        //   }),
+        //   middleware: [[RoleMiddleware, { roles: ['admin'] }]],
+        // },
       },
     };
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async getSomething(req, res) {
+  async getSomething(req: FrameworkRequest, res: Response) {
     return res.status(200).json({ data: { text: 'Available text' } });
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async grabSomeDataFromQuery(req, res) {
+  async grabSomeDataFromQuery(req: FrameworkRequest, res: Response) {
     return res.status(200).json({ data: { name: req.appInfo.query.name } });
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async grabSomeDataFromQueryWithMiddlewareParams(req, res) {
+  async grabSomeDataFromQueryWithMiddlewareParams(
+    req: FrameworkRequest,
+    res: Response,
+  ) {
     const { page, limit, name } = req.appInfo.query;
     return res.status(200).json({ data: { page, limit, name } });
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async postQueryParamaters(req, res) {
+  async postQueryParamaters(req: FrameworkRequest, res: Response) {
     const { name } = req.appInfo.request;
     return res.status(200).json({
       data: {
@@ -108,7 +118,7 @@ class SomeController extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async addPost(req, res) {
+  async addPost(req: FrameworkRequest, res: Response) {
     const { name, discription } = req.appInfo.request;
 
     return res.status(200).json({
@@ -122,7 +132,7 @@ class SomeController extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async patchUserAvatar(req, res) {
+  async patchUserAvatar(req: FrameworkRequest, res: Response) {
     const { avatar } = req.appInfo.request;
     const { user } = req.appInfo;
 
@@ -138,7 +148,7 @@ class SomeController extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async putInfo(req, res) {
+  async putInfo(req: FrameworkRequest, res: Response) {
     const { field } = req.appInfo.request;
 
     return res.status(200).json({
@@ -150,7 +160,7 @@ class SomeController extends AbstractController {
     });
   }
 
-  static get middleware() {
+  static get middleware(): Map<string, TMiddleware> {
     return new Map([
       ['/{*splat}', [GetUserByToken]],
       ['PATCH/userAvatar', [GetUserByToken, AuthMiddleware]],

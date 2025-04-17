@@ -1,6 +1,9 @@
 import AbstractController from '../modules/AbstractController.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 
+import type { Response } from 'express';
+import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+
 class Home extends AbstractController {
   get routes() {
     return {
@@ -11,7 +14,7 @@ class Home extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async home(req, res) {
+  async home(req: FrameworkRequest, res: Response) {
     return res.json({ message: 'Home' });
   }
 

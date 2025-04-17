@@ -3,6 +3,9 @@ import AbstractController from '../modules/AbstractController.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.js';
 
+import type { Response } from 'express';
+import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+
 class Auth extends AbstractController {
   get routes() {
     return {
@@ -60,38 +63,43 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(req, res) {
+  async postLogin(req: FrameworkRequest, res: Response) {
     const User = this.app.getModel('User');
     const user = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
       req.appInfo.request.password, // we do a request casting
     );
     if (!user) {
-      return res.status(400).json({ message: req.i18n.t('auth.errorUPValid') });
+      return res
+        .status(400)
+        .json({ message: req.appInfo.i18n?.t('auth.errorUPValid') });
     }
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow && !user.isVerified) {
-      return res
-        .status(400)
-        .json({ message: req.i18n.t('email.notVerified'), notVerified: true });
+      return res.status(400).json({
+        message: req.appInfo.i18n?.t('email.notVerified'),
+        notVerified: true,
+      });
     }
     const token = await user.generateToken();
 
     return res.status(200).json({ data: { token, user: user.getPublic() } });
   }
 
-  async postRegister(req, res) {
+  async postRegister(req: FrameworkRequest, res: Response) {
     const User = req.appInfo.app.getModel('User');
     let user = await User.getUserByEmail(req.appInfo.request.email);
     if (user) {
-      return res.status(400).json({ message: req.i18n.t('email.registered') });
+      return res
+        .status(400)
+        .json({ message: req.appInfo.i18n?.t('email.registered') });
     }
     if (req.appInfo.request.nickName) {
       user = await User.findOne({ 'name.nick': req.appInfo.request.nickName });
       if (user) {
         return res
           .status(400)
-          .json({ message: req.i18n.t('auth.nicknameExists') });
+          .json({ message: req.appInfo.i18n?.t('auth.nicknameExists') });
       }
     }
 
@@ -107,20 +115,20 @@ class Auth extends AbstractController {
 
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
-      await user.sendVerificationEmail(req.i18n).catch((e) => {
-        this.logger.error(e);
+      await user.sendVerificationEmail(req.appInfo.i18n).catch((e: Error) => {
+        this.logger?.error(e);
       });
     }
     return res.status(201).json();
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async postLogout(req, res) {
+  async postLogout(req: FrameworkRequest, res: Response) {
     // todo remove token
     return res.status(200).json();
   }
 
-  async verifyUser(req, res) {
+  async verifyUser(req: FrameworkRequest, res: Response) {
     const User = req.appInfo.app.getModel('User');
     let user;
     try {
@@ -129,13 +137,13 @@ class Auth extends AbstractController {
       );
     } catch {
       return res.status(400).json({
-        message: req.i18n.t('email.alreadyVerifiedOrWrongToken'),
+        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
       });
     }
-    this.logger.debug(`Verify user user is :${user}`);
+    this.logger?.debug(`Verify user user is :${user}`);
     if (!user) {
       return res.status(400).json({
-        message: req.i18n.t('email.alreadyVerifiedOrWrongToken'),
+        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
       });
     }
 
@@ -144,38 +152,40 @@ class Auth extends AbstractController {
     return res.status(200).json();
   }
 
-  async sendPasswordRecoveryEmail(req, res) {
+  async sendPasswordRecoveryEmail(req: FrameworkRequest, res: Response) {
     const User = req.appInfo.app.getModel('User');
     try {
       const user = await User.getUserByEmail(req.appInfo.request.email);
       if (!user) {
         return res
           .status(400)
-          .json({ message: req.i18n.t('auth.errorUExist') });
+          .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
       }
-      await user.sendPasswordRecoveryEmail(req.i18n);
+      await user.sendPasswordRecoveryEmail(req.appInfo.i18n);
       return res.status(200).json();
     } catch (e) {
-      this.logger.error(e);
-      return res.status(400).json({ message: req.i18n.t('auth.errorUExist') });
+      this.logger?.error(e);
+      return res
+        .status(400)
+        .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
   }
 
-  async recoverPassword(req, res) {
+  async recoverPassword(req: FrameworkRequest, res: Response) {
     const User = this.app.getModel('User');
     const user = await User.getUserByPasswordRecoveryToken(
       req.appInfo.request.passwordRecoveryToken,
-    ).catch((e) => {
-      this.logger.error(e);
+    ).catch((e: Error) => {
+      this.logger?.error(e);
     });
 
     if (!user) {
       return res
         .status(400)
-        .json({ message: req.i18n.t('password.wrongToken') });
+        .json({ message: req.appInfo.i18n?.t('password.wrongToken') });
     }
 
-    this.logger.debug(`Password recovery user is :${user}`);
+    this.logger?.debug(`Password recovery user is :${user}`);
 
     user.password = req.appInfo.request.password;
     user.isVerified = true;
@@ -183,13 +193,15 @@ class Auth extends AbstractController {
     return res.status(200).json();
   }
 
-  async sendVerification(req, res) {
+  async sendVerification(req: FrameworkRequest, res: Response) {
     const User = this.app.getModel('User');
     const user = await User.getUserByEmail(req.appInfo.request.email);
     if (!user) {
-      return res.status(400).json({ message: req.i18n.t('auth.errorUExist') });
+      return res
+        .status(400)
+        .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
-    await user.sendVerificationEmail(req.i18n);
+    await user.sendVerificationEmail(req.appInfo.i18n);
     return res.status(200).json();
   }
 
