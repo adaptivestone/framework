@@ -4,7 +4,7 @@ import AuthMiddleware from '../../services/http/middleware/Auth.js';
 import GetUserByToken from '../../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../../services/http/middleware/RateLimiter.js';
 import CheckFlag from '../../services/http/middleware/test/CheckFlag.ts';
-import RoleMiddleware from '../../services/http/middleware/Role.js';
+import RoleMiddleware from '../../services/http/middleware/Role.ts';
 import Pagination from '../../services/http/middleware/Pagination.js';
 
 import type { Response } from 'express';

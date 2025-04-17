@@ -7,8 +7,11 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 import prettierPlugin from 'eslint-plugin-prettier/recommended';
 
 /** @type {import('eslint').Linter.Config[]} */
-// @ts-ignore
 export default [
+  {
+    ignores: ['dist/'],
+  },
+
   pluginJs.configs.recommended,
   importPlugin.recommended,
   eslintConfigPrettier,
