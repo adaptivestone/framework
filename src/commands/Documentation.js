@@ -1,5 +1,5 @@
 import AbstractCommand from '../modules/AbstractCommand.ts';
-import ControllerManager from '../controllers/index.js';
+import ControllerManager from '../controllers/index.ts';
 
 class Documentation extends AbstractCommand {
   static get description() {

@@ -2,11 +2,15 @@ import path from 'node:path';
 import * as url from 'node:url';
 import Base from '../modules/Base.ts';
 
+import type { IApp } from '../server.ts';
+import type AbstractController from '../modules/AbstractController.ts';
+
 /**
  * Class do autoloading a http controllers
  */
 class ControllerManager extends Base {
-  constructor(app) {
+  controllers: Record<string, AbstractController>;
+  constructor(app: IApp) {
     super(app);
     this.controllers = {};
   }

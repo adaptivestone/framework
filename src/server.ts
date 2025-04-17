@@ -13,7 +13,7 @@ import type { TFolderConfig, TFolderConfigFolders } from './folderConfig.ts';
 import type BaseCli from './modules/BaseCli.ts';
 
 import type HttpServer from './services/http/HttpServer.ts';
-import type ControllerManager from './controllers/index.js';
+import type ControllerManager from './controllers/index.ts';
 
 interface IApp {
   getConfig: (configName: string) => Record<string, any>;
@@ -115,7 +115,7 @@ class Server {
     const [{ default: HttpServer }, { default: ControllerManager }] =
       await Promise.all([
         import('./services/http/HttpServer.ts'), // Speed optimisation
-        import('./controllers/index.js'), // Speed optimisation
+        import('./controllers/index.ts'), // Speed optimisation
         this.init(),
       ]);
 
