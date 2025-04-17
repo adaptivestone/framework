@@ -1,17 +1,20 @@
 import globals from 'globals';
 import pluginJs from '@eslint/js';
+// eslint-disable-next-line import-x/no-unresolved
+import tseslint from 'typescript-eslint';
+
 import { flatConfigs as importPlugin } from 'eslint-plugin-import-x';
 import vitest from '@vitest/eslint-plugin';
 import eslintConfigPrettier from 'eslint-config-prettier';
 // eslint-disable-next-line import-x/extensions
 import prettierPlugin from 'eslint-plugin-prettier/recommended';
 
-/** @type {import('eslint').Linter.Config[]} */
-export default [
+// /** @type {import('eslint').Linter.Config[]} */
+export default tseslint.config([
   {
     ignores: ['dist/'],
   },
-
+  // tseslint.configs.recommended,
   pluginJs.configs.recommended,
   importPlugin.recommended,
   eslintConfigPrettier,
@@ -70,4 +73,4 @@ export default [
       ...vitest.configs.recommended.rules,
     },
   },
-];
+]);
