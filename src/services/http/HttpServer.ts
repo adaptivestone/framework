@@ -21,7 +21,7 @@ export interface FrameworkRequest extends Request {
     ip?: string | undefined;
     request: Record<string, any>;
     query: Record<string, any>;
-    user?: any;
+    // user?: any;
     i18n?: {
       t: TFunction;
       language: string;

@@ -4,6 +4,8 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
 
 import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+
 import type { IApp } from '../../../server.ts';
 
 class I18n extends AbstractMiddleware {
@@ -92,12 +94,15 @@ class I18n extends AbstractMiddleware {
 
   detectors: Record<
     string,
-    (req: FrameworkRequest) => string | undefined | false
+    (
+      req: FrameworkRequest & GetUserByTokenAppInfo,
+    ) => string | undefined | false
   > = {
     XLang: (req: FrameworkRequest) => req.get('X-Lang'), // grab from header
     query: (req: FrameworkRequest) =>
       req.query ? (req.query[this.lookupQuerystring] as string) : false, // grab from query
-    user: (req: FrameworkRequest) => req.appInfo?.user?.locale, // what if we have a user and user have a defined locale?
+    user: (req: FrameworkRequest & GetUserByTokenAppInfo) =>
+      req.appInfo?.user?.locale, // what if we have a user and user have a defined locale?
   };
 
   detectorOrder = ['XLang', 'query', 'user'];

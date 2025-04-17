@@ -2,13 +2,18 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
 
 import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
 class RoleMiddleware extends AbstractMiddleware {
   static get description() {
     return 'Check user role (user.roles property). If the user has no role then stop request and return error. OR logic (any role will pass user)';
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(
+    req: FrameworkRequest & GetUserByTokenAppInfo,
+    res: Response,
+    next: NextFunction,
+  ) {
     const { user } = req.appInfo;
 
     if (!user) {

@@ -9,6 +9,7 @@ import Pagination from '../../services/http/middleware/Pagination.ts';
 
 import type { Response } from 'express';
 import type { FrameworkRequest } from '../../services/http/HttpServer.ts';
+import type { GetUserByTokenAppInfo } from '../../services/http/middleware/GetUserByToken.ts';
 import type {
   TMiddleware,
   RouteParams,
@@ -132,7 +133,10 @@ class SomeController extends AbstractController {
   }
 
   // eslint-disable-next-line class-methods-use-this
-  async patchUserAvatar(req: FrameworkRequest, res: Response) {
+  async patchUserAvatar(
+    req: FrameworkRequest & GetUserByTokenAppInfo,
+    res: Response,
+  ) {
     const { avatar } = req.appInfo.request;
     const { user } = req.appInfo;
 

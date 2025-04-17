@@ -2,6 +2,12 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
+export interface GetUserByTokenAppInfo {
+  appInfo: {
+    user?: any; // TODO
+  };
+}
+
 class GetUserByToken extends AbstractMiddleware {
   static get description() {
     return 'Grab a token and try to parse the user from it. It user exist will add req.appInfo.user variable';
@@ -19,7 +25,11 @@ class GetUserByToken extends AbstractMiddleware {
     ];
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(
+    req: FrameworkRequest & GetUserByTokenAppInfo,
+    res: Response,
+    next: NextFunction,
+  ) {
     if (req.appInfo.user) {
       this.logger?.warn('You call GetUserByToken more then once');
       return next();

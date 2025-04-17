@@ -11,6 +11,8 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { Response, NextFunction } from 'express';
 import type { RateLimiterAbstract } from 'rate-limiter-flexible';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+
 import type { IApp } from '../../../server.ts';
 import type rateLimiterConfig from '../../../config/rateLimiter.js';
 
@@ -84,7 +86,7 @@ class RateLimiter extends AbstractMiddleware {
     });
   }
 
-  gerenateConsumeKey(req: FrameworkRequest) {
+  gerenateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
     const { ip, route, user, request } = this.finalOptions.consumeKeyComponents;
 
     const key = [];
