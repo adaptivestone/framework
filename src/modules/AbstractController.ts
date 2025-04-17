@@ -1,10 +1,18 @@
 import express from 'express';
+import type { IRouter, Request, Response, NextFunction } from 'express';
 
 import Base from './Base.ts';
-import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import Auth from '../services/http/middleware/Auth.js';
 import ValidateService from '../services/validate/ValidateService.js';
 import DocumentationGenerator from '../services/documentation/DocumentationGenerator.js';
+
+import type { IApp } from '../server.ts';
+import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
+import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+type MiddlewareWithParamsTuple = [typeof AbstractMiddleware, Array<any>];
+type TMiddleware = Array<typeof AbstractMiddleware | MiddlewareWithParamsTuple>;
+
 /**
  * Abstract controller. You should extend any controller from them.
  * Place you cintroller into controller folder and it be inited in auto way.
@@ -14,9 +22,9 @@ import DocumentationGenerator from '../services/documentation/DocumentationGener
  */
 class AbstractController extends Base {
   prefix = '';
-  router = null;
+  router: IRouter;
 
-  constructor(app, prefix, isExpressMergeParams = false) {
+  constructor(app: IApp, prefix: string, isExpressMergeParams = false) {
     const time = Date.now();
     super(app);
     this.prefix = prefix;
@@ -52,8 +60,7 @@ class AbstractController extends Base {
       httpPath,
     );
     const middlewaresInfo = this.parseMiddlewares(
-      // @ts-ignore
-      this.constructor.middleware,
+      (this.constructor as typeof AbstractController).middleware,
       httpPath,
     );
 
@@ -63,7 +70,7 @@ class AbstractController extends Base {
      *  Register controller middleware
      */
     for (const middleware of middlewaresInfo) {
-      this.router[middleware.method](
+      (this.router[middleware.method as keyof IRouter] as Function)(
         middleware.path,
         new middleware.MiddlewareFunction(
           this.app,
@@ -76,8 +83,8 @@ class AbstractController extends Base {
      *  Register routes itself
      */
     for (const verb in routes) {
-      if (typeof this.router[verb] !== 'function') {
-        this.logger.error(
+      if (typeof this.router[verb as keyof IRouter] !== 'function') {
+        this.logger?.error(
           `Method ${verb} not exist for router. Please check your codebase`,
         );
         continue;
@@ -91,14 +98,14 @@ class AbstractController extends Base {
         let routeObject = routes[verb][path];
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           routeObject = {
-            handler: routeObject,
+            handler: routeObject as unknown as Function,
             request: null,
             query: null,
             middleware: null,
           };
 
           if (typeof routeObject.handler !== 'function') {
-            this.logger.error(
+            this.logger?.error(
               `Can't resolve function '${
                 routeObject.handler
               }' for controller '${this.getConstructorName()}'`,
@@ -107,9 +114,12 @@ class AbstractController extends Base {
           }
         }
 
-        let fnName = routeObject.handler;
-        if (typeof fnName === 'function') {
-          fnName = fnName.name;
+        const handler = routeObject.handler;
+        let fnName: string | undefined;
+        if (typeof handler === 'function') {
+          fnName = handler.name;
+        } else {
+          fnName = undefined;
         }
 
         const fullPath = `/${httpPath}/${path}`
@@ -141,10 +151,10 @@ class AbstractController extends Base {
           );
         }
 
-        this.router[verb](
+        (this.router[verb as keyof IRouter] as Function)(
           path,
           additionalMiddlewares || [],
-          async (req, res, next) => {
+          async (req: FrameworkRequest, res: Response, next: NextFunction) => {
             const requestObj = {
               query: req.query,
               body: req.body,
@@ -181,7 +191,7 @@ class AbstractController extends Base {
                   },
                 },
               });
-            } catch (err) {
+            } catch (err: any) {
               return res.status(400).json({
                 errors: err.message,
               });
@@ -204,7 +214,7 @@ class AbstractController extends Base {
             // });
 
             if (!routeObject.handler) {
-              this.logger.error(`Route object have no handler defined`);
+              this.logger?.error(`Route object have no handler defined`);
               return res.status(500).json({
                 message:
                   'Platform error 2. Please check later or contact support',
@@ -214,19 +224,21 @@ class AbstractController extends Base {
             if (routeObject.handler.constructor.name !== 'AsyncFunction') {
               const error =
                 "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
-              this.logger.error(error);
+              this.logger?.error(error);
               return res.status(500).json({
                 message:
                   'Platform error. Please check later or contact support',
               });
             }
-            return routeObject.handler.call(this, req, res, next).catch((e) => {
-              this.logger.error(e);
-              return res.status(500).json({
-                message:
-                  'Platform error. Please check later or contact support',
+            return routeObject.handler
+              .call(this, req, res, next)
+              .catch((e: Error) => {
+                this.logger?.error(e);
+                return res.status(500).json({
+                  message:
+                    'Platform error. Please check later or contact support',
+                });
               });
-            });
           },
         );
       }
@@ -237,7 +249,7 @@ class AbstractController extends Base {
      */
     const text = ['', `Controller '${this.getConstructorName()}' registered.`];
 
-    const reports = {
+    const reports: { [key: string]: any[] } = {
       'Middlewares:': middlewaresInfo,
       'Route middlewares:': routeMiddlewaresReg,
       'Callbacks:': routesInfo,
@@ -255,14 +267,13 @@ class AbstractController extends Base {
 
     text.push(`Time: ${Date.now() - time} ms`);
 
-    this.logger.verbose(text.join('\n'));
-    this.loadedTime = Date.now() - time;
+    this.logger?.verbose(text.join('\n'));
 
     /**
      * Generate documentation
      */
     if (!this.app.httpServer) {
-      this.app.documentation.push(
+      this.app.documentation?.push(
         new DocumentationGenerator(this.app).convertDataToDocumentationElement(
           this.getConstructorName(),
           routesInfo,
@@ -278,7 +289,8 @@ class AbstractController extends Base {
   /**
    * Parse middlewares to be an object.
    */
-  parseMiddlewares(middlewareMap, httpPath) {
+  parseMiddlewares(middlewareMap: Map<string, TMiddleware>, httpPath: string) {
+    console.log('middlewareMap', middlewareMap);
     const middlewaresInfo = [];
     // eslint-disable-next-line prefer-const
     for (let [path, middleware] of middlewareMap) {
@@ -289,19 +301,19 @@ class AbstractController extends Base {
         let method = 'all';
         let realPath = path;
         if (typeof realPath !== 'string') {
-          this.logger.error(`Path not a string ${realPath}. Please check it`);
+          this.logger?.error(`Path not a string ${realPath}. Please check it`);
           continue;
         }
         if (!realPath.startsWith('/')) {
           method = realPath.split('/')[0]?.toLowerCase();
           if (!method) {
-            this.logger.error(`Method not found for ${realPath}`);
+            this.logger?.error(`Method not found for ${realPath}`);
             continue;
           }
           realPath = realPath.substring(method.length);
         }
-        if (typeof this.router[method] !== 'function') {
-          this.logger.error(
+        if (typeof this.router[method as keyof IRouter] !== 'function') {
+          this.logger?.error(
             `Method ${method} not exist for middleware. Please check your codebase`,
           );
           continue;
@@ -311,10 +323,13 @@ class AbstractController extends Base {
           .join('/')
           .split('//')
           .join('/');
-        let MiddlewareFunction = M;
+        let MiddlewareFunction: typeof AbstractMiddleware;
         let middlewareParams = {};
+        console.log('M', M);
         if (Array.isArray(M)) {
           [MiddlewareFunction, middlewareParams] = M;
+        } else {
+          MiddlewareFunction = M;
         }
 
         middlewaresInfo.push({
@@ -350,8 +365,18 @@ class AbstractController extends Base {
    *   },
    * };
    */
-  get routes() {
-    this.logger.warn('Please implement "routes" method on controller.');
+  get routes(): {
+    [method: string]: {
+      [path: string]: {
+        handler: Function;
+        description?: string;
+        middleware?: TMiddleware | null;
+        request?: any;
+        query?: any;
+      };
+    };
+  } {
+    this.logger?.warn('Please implement "routes" method on controller.');
     return {};
   }
 
@@ -360,7 +385,6 @@ class AbstractController extends Base {
    * You should provide path relative to controller and then array of middlewares to apply.
    * Order is matter.
    * Be default path apply to ANY' method, but you can preattach 'METHOD' into patch to scope patch to this METHOD
-   * @returns {Map<string, Array<typeof import('../services/http/middleware/AbstractMiddleware.js').default | [Function, ...any]>>}
    * @example
    * return new Map([
    *    ['/{*splat}', [GetUserByToken]] // for any method for this controller
@@ -369,7 +393,7 @@ class AbstractController extends Base {
    *    ['PUT/superSecretMathod', [OnlySuperSecretAdmin]] // route with PUT method
    * ]);
    */
-  static get middleware() {
+  static get middleware(): Map<string, TMiddleware> {
     return new Map([['/{*splat}', [GetUserByToken, Auth]]]);
   }
 

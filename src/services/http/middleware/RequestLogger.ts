@@ -1,17 +1,19 @@
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
+import type { Response, NextFunction } from 'express';
+import type { FrameworkRequest } from '../HttpServer.ts';
 
 class RequestLogger extends AbstractMiddleware {
   static get description() {
     return 'Log info about the request';
   }
 
-  async middleware(req, res, next) {
+  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     const startTime = performance.now();
     const text = `Request is  [${req.method}] ${req.url}`;
-    this.logger.info(text);
+    this.logger?.info(text);
     res.on('finish', () => {
       const end = performance.now();
-      this.logger.info(
+      this.logger?.info(
         `Finished ${text}. Status: ${res.statusCode}.  [${(end - startTime).toFixed(2)} ms]`,
       );
     });

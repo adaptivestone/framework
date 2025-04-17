@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import GetUserByToken from './GetUserByToken.js';
+import GetUserByToken from './GetUserByToken.ts';
 
 describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {

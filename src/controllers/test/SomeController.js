@@ -1,9 +1,9 @@
 import { object, boolean, string, number } from 'yup';
-import AbstractController from '../../modules/AbstractController.js';
+import AbstractController from '../../modules/AbstractController.ts';
 import AuthMiddleware from '../../services/http/middleware/Auth.js';
-import GetUserByToken from '../../services/http/middleware/GetUserByToken.js';
+import GetUserByToken from '../../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../../services/http/middleware/RateLimiter.js';
-import CheckFlag from '../../services/http/middleware/test/CheckFlag.js';
+import CheckFlag from '../../services/http/middleware/test/CheckFlag.ts';
 import RoleMiddleware from '../../services/http/middleware/Role.js';
 import Pagination from '../../services/http/middleware/Pagination.js';
 

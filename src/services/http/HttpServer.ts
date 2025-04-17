@@ -2,7 +2,7 @@ import http from 'node:http';
 // import path from 'node:path';
 // import * as url from 'node:url';
 import express from 'express';
-import RequestLoggerMiddleware from './middleware/RequestLogger.js';
+import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import I18nMiddleware from './middleware/I18n.js';
 import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.js';
 import RequestParserMiddleware from './middleware/RequestParser.js';
@@ -10,37 +10,62 @@ import IpDetector from './middleware/IpDetector.js';
 import Cors from './middleware/Cors.js';
 import Base from '../../modules/Base.ts';
 
+import type { IApp } from '../../server.ts';
+import type { Express, Request, Response, NextFunction } from 'express';
+import type { Server } from 'node:http';
+
+export interface FrameworkRequest extends Request {
+  appInfo: {
+    app: IApp;
+    request?: Record<string, any>;
+    query?: Record<string, any>;
+    user?: any;
+  };
+}
+
 /**
  * HTTP server based on Express
  */
 class HttpServer extends Base {
-  constructor(app) {
+  express: Express;
+
+  httpServer: Server;
+
+  constructor(app: IApp) {
     super(app);
     this.express = express();
     this.express.disable('x-powered-by');
 
-    this.express.use(new RequestLoggerMiddleware(this.app).getMiddleware());
-    this.express.use(new PrepareAppInfoMiddleware(this.app).getMiddleware());
-    this.express.use(new IpDetector(this.app).getMiddleware());
-    this.express.use(new I18nMiddleware(this.app).getMiddleware());
+    this.express.use(
+      new RequestLoggerMiddleware(this.app).getMiddleware() as any,
+    );
+    this.express.use(
+      new PrepareAppInfoMiddleware(this.app).getMiddleware() as any,
+    );
+    this.express.use(new IpDetector(this.app).getMiddleware() as any);
+    this.express.use(new I18nMiddleware(this.app).getMiddleware() as any);
 
     const httpConfig = this.app.getConfig('http');
     this.express.use(
       new Cors(this.app, {
         origins: httpConfig.corsDomains,
-      }).getMiddleware(),
+      }).getMiddleware() as any,
     );
 
-    this.express.use(new RequestParserMiddleware(this.app).getMiddleware());
+    this.express.use(
+      new RequestParserMiddleware(this.app).getMiddleware() as any,
+    );
 
     // As exprress will check numbersof arguments
     // eslint-disable-next-line no-unused-vars
-    this.express.use((err, req, res, next) => {
-      // error handling
-      console.error(err.stack);
-      // TODO
-      res.status(500).json({ message: 'Something broke!' });
-    });
+    this.express.use(
+      (err: Error, req: Request, res: Response, next: NextFunction) => {
+        // error handling
+        console.error(err.stack);
+        // TODO
+        res.status(500).json({ message: 'Something broke!' });
+      },
+    );
 
     this.httpServer = http.createServer(this.express);
 
@@ -49,12 +74,12 @@ class HttpServer extends Base {
       httpConfig.hostname,
       () => {
         const address = listener.address();
-        const port = typeof address === 'string' ? 0 : address.port;
-        this.logger.info(`App started and listening on port ${port}`);
+        const port = typeof address === 'string' ? 0 : address?.port || 0;
+        this.logger?.info(`App started and listening on port ${port}`);
         if (+port !== +httpConfig.port) {
           // in case we using port 0
           this.app.updateConfig('http', { port });
-          this.logger.info(
+          this.logger?.info(
             `Updating http config to use new port ${
               port
             }. Old was ${httpConfig.port} `,

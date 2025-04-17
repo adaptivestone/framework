@@ -1,5 +1,5 @@
-import AbstractController from '../modules/AbstractController.js';
-import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
+import AbstractController from '../modules/AbstractController.ts';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 
 class Home extends AbstractController {
   get routes() {

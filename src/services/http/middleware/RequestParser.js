@@ -1,5 +1,5 @@
 import formidable from 'formidable';
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 class RequestParser extends AbstractMiddleware {
   static get description() {

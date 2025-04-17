@@ -1,8 +1,13 @@
 import { object } from 'yup';
 import Base from '../../../modules/Base.ts';
+import type { IApp } from '../../../server.ts';
+import type { Response, NextFunction } from 'express';
+import type { FrameworkRequest } from '../HttpServer.ts';
 
 class AbstractMiddleware extends Base {
-  constructor(app, params) {
+  params: any;
+
+  constructor(app: IApp, params?: any) {
     super(app);
     this.params = params;
   }
@@ -11,7 +16,12 @@ class AbstractMiddleware extends Base {
     return 'Middleware description. Please provide own';
   }
 
-  static get usedAuthParameters() {
+  get usedAuthParameters(): Array<{
+    name: string;
+    type: string;
+    in: string;
+    description: string;
+  }> {
     return [];
   }
 
@@ -34,9 +44,13 @@ class AbstractMiddleware extends Base {
     };
   }
 
-  async middleware(req, res, next) {
-    this.logger.warn('Middleware is not implemented');
-    next();
+  async middleware(
+    req: FrameworkRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void | Response> {
+    this.logger?.warn('Middleware is not implemented');
+    return next();
   }
 
   getMiddleware() {

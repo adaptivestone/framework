@@ -1,4 +1,4 @@
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 class Cors extends AbstractMiddleware {
   constructor(app, params) {

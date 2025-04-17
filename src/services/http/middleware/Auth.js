@@ -1,4 +1,4 @@
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 class AuthMiddleware extends AbstractMiddleware {
   static get description() {

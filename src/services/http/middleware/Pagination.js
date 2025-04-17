@@ -1,5 +1,5 @@
 import { object, number } from 'yup';
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 /**
  * Middleware for reusing pagination
  */

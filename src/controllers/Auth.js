@@ -1,6 +1,6 @@
 import { object, string } from 'yup';
-import AbstractController from '../modules/AbstractController.js';
-import GetUserByToken from '../services/http/middleware/GetUserByToken.js';
+import AbstractController from '../modules/AbstractController.ts';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.js';
 
 class Auth extends AbstractController {

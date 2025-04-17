@@ -6,7 +6,7 @@ import {
 import merge from 'deepmerge';
 import { createClient } from '@redis/client';
 import mongoose from 'mongoose';
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 class RateLimiter extends AbstractMiddleware {
   static get description() {

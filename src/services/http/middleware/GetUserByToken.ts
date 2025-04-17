@@ -1,4 +1,6 @@
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
+import type { Response, NextFunction } from 'express';
+import type { FrameworkRequest } from '../HttpServer.ts';
 
 class GetUserByToken extends AbstractMiddleware {
   static get description() {
@@ -17,13 +19,13 @@ class GetUserByToken extends AbstractMiddleware {
     ];
   }
 
-  async middleware(req, res, next) {
+  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     if (req.appInfo.user) {
-      this.logger.warn('You call GetUserByToken more then once');
+      this.logger?.warn('You call GetUserByToken more then once');
       return next();
     }
     let { token } = req.body || {};
-    this.logger.verbose(
+    this.logger?.verbose(
       `GetUserByToken token in BODY ${token}. Token in Authorization header ${req.get(
         'Authorization',
       )}`,

@@ -1,6 +1,6 @@
 import i18next from 'i18next';
 import BackendFS from 'i18next-fs-backend';
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 class I18n extends AbstractMiddleware {
   cache = {};

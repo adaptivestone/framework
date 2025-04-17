@@ -1,6 +1,6 @@
 import { BlockList } from 'node:net';
 
-import AbstractMiddleware from './AbstractMiddleware.js';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 class IpDetector extends AbstractMiddleware {
   static get description() {
