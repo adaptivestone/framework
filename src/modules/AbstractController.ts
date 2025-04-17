@@ -3,7 +3,7 @@ import type { IRouter, Response, NextFunction } from 'express';
 
 import Base from './Base.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
-import Auth from '../services/http/middleware/Auth.js';
+import Auth from '../services/http/middleware/Auth.ts';
 import ValidateService from '../services/validate/ValidateService.js';
 import DocumentationGenerator from '../services/documentation/DocumentationGenerator.js';
 

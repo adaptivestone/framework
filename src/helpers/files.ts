@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { join, parse, format } from 'node:path';
 
 import type { Dirent } from 'node:fs';
 
@@ -69,7 +69,23 @@ const getFilesPathWithInheritance = async ({
 
   const filesToLoad = [];
   for (const file of internalFilesString) {
-    if (externalFilesString.includes(file)) {
+    const fileDetails = parse(file);
+    const jsFile = format({
+      dir: fileDetails.dir,
+      name: fileDetails.name,
+      ext: '.js',
+    });
+
+    const tsFile = format({
+      dir: fileDetails.dir,
+      name: fileDetails.name,
+      ext: '.ts',
+    });
+
+    if (
+      externalFilesString.includes(jsFile) ||
+      externalFilesString.includes(tsFile)
+    ) {
       logger(
         `Skipping register INTERNAL file '${file}' ${
           loggerFileType ? `of type ${loggerFileType}` : ''
