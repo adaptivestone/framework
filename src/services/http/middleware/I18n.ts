@@ -1,31 +1,33 @@
-import i18next from 'i18next';
+import i18next, { type TFunction } from 'i18next';
 import BackendFS from 'i18next-fs-backend';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
+import type { Response, NextFunction } from 'express';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { IApp } from '../../../server.ts';
+
 class I18n extends AbstractMiddleware {
-  cache = {};
+  cache: { [key: string]: any } = {};
 
   enabled = true;
 
   lookupQuerystring = '';
 
-  supportedLngs = [];
+  supportedLngs: Array<string> = [];
 
   fallbackLng = 'en';
 
-  /** @type {i18next} */
-  i18n = {
-    // @ts-ignore
-    t: (text) => text,
+  i18n: { t: TFunction; language: string } = {
+    t: ((text) => text) as TFunction,
     language: 'en',
   };
 
-  constructor(app, params) {
+  constructor(app: IApp, params?: any) {
     super(app, params);
     const I18NConfig = this.app.getConfig('i18n');
 
     if (I18NConfig.enabled) {
-      this.logger.info('Enabling i18n support');
+      this.logger?.info('Enabling i18n support');
       this.i18n = i18next;
       // eslint-disable-next-line import-x/no-named-as-default-member
       i18next.use(BackendFS).init({
@@ -50,13 +52,13 @@ class I18n extends AbstractMiddleware {
     return 'Provide language detection and translation';
   }
 
-  async middleware(req, res, next) {
+  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     let i18n;
 
     if (this.enabled) {
       let lang = this.detectLang(req);
       if (!lang || this.supportedLngs.indexOf(lang) === -1) {
-        this.logger.verbose(
+        this.logger?.verbose(
           `Language "${lang}" is not supported or not detected. Using fallback on ${this.fallbackLng}`,
         );
         lang = this.fallbackLng;
@@ -76,9 +78,11 @@ class I18n extends AbstractMiddleware {
     }
 
     req.appInfo.i18n = i18n;
+    //@ts-ignore
     req.i18n = new Proxy(req.appInfo.i18n, {
       get: (target, prop) => {
-        this.logger.warn('Please not use "req.i18n" Use "req.appInfo.i18n"');
+        this.logger?.warn('Please not use "req.i18n" Use "req.appInfo.i18n"');
+        //@ts-ignore
         return target[prop];
       },
     });
@@ -86,15 +90,19 @@ class I18n extends AbstractMiddleware {
     return next();
   }
 
-  detectors = {
-    XLang: (req) => req.get('X-Lang'), // grab from header
-    query: (req) => (req.query ? req.query[this.lookupQuerystring] : false), // grab from query
-    user: (req) => req.appInfo?.user?.locale, // what if we have a user and user have a defined locale?
+  detectors: Record<
+    string,
+    (req: FrameworkRequest) => string | undefined | false
+  > = {
+    XLang: (req: FrameworkRequest) => req.get('X-Lang'), // grab from header
+    query: (req: FrameworkRequest) =>
+      req.query ? (req.query[this.lookupQuerystring] as string) : false, // grab from query
+    user: (req: FrameworkRequest) => req.appInfo?.user?.locale, // what if we have a user and user have a defined locale?
   };
 
   detectorOrder = ['XLang', 'query', 'user'];
 
-  detectLang(req, isUseShortCode = true) {
+  detectLang(req: FrameworkRequest, isUseShortCode = true): string {
     let lang = '';
     for (const detectorName of this.detectorOrder) {
       const lng = this.detectors[detectorName](req);

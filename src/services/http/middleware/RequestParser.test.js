@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { describe, it, expect } from 'vitest';
 import { PersistentFile } from 'formidable';
 
-import RequestParser from './RequestParser.js';
+import RequestParser from './RequestParser.ts';
 
 describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {

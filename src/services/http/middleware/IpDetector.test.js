@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import IpDetector from './IpDetector.js';
+import IpDetector from './IpDetector.ts';
 
 const testVectors = [
   // IPv4 CIDR blocks

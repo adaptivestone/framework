@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import PrepareAppInfo from './PrepareAppInfo.js';
+import PrepareAppInfo from './PrepareAppInfo.ts';
 
 describe('prepareAppInfo methods', () => {
   it('have description fields', async () => {

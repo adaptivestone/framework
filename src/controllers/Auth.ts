@@ -1,7 +1,7 @@
 import { object, string } from 'yup';
 import AbstractController from '../modules/AbstractController.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
-import RateLimiter from '../services/http/middleware/RateLimiter.js';
+import RateLimiter from '../services/http/middleware/RateLimiter.ts';
 
 import type { Response } from 'express';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';

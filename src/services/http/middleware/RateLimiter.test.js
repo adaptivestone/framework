@@ -2,7 +2,7 @@ import { setTimeout } from 'node:timers/promises';
 import crypto from 'node:crypto';
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 
-import RateLimiter from './RateLimiter.js';
+import RateLimiter from './RateLimiter.ts';
 
 let mongoRateLimiter;
 

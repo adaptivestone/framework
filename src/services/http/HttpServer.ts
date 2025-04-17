@@ -3,11 +3,11 @@ import http from 'node:http';
 // import * as url from 'node:url';
 import express from 'express';
 import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
-import I18nMiddleware from './middleware/I18n.js';
-import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.js';
-import RequestParserMiddleware from './middleware/RequestParser.js';
-import IpDetector from './middleware/IpDetector.js';
-import Cors from './middleware/Cors.js';
+import I18nMiddleware from './middleware/I18n.ts';
+import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
+import RequestParserMiddleware from './middleware/RequestParser.ts';
+import IpDetector from './middleware/IpDetector.ts';
+import Cors from './middleware/Cors.ts';
 import Base from '../../modules/Base.ts';
 
 import type { IApp } from '../../server.ts';
@@ -18,12 +18,18 @@ import type { TFunction } from 'i18next';
 export interface FrameworkRequest extends Request {
   appInfo: {
     app: IApp;
+    ip?: string | undefined;
     request: Record<string, any>;
     query: Record<string, any>;
     user?: any;
     i18n?: {
       t: TFunction;
       language: string;
+    };
+    pagination?: {
+      page: number;
+      limit: number;
+      skip: number;
     };
   };
 }

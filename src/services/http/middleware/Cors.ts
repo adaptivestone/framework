@@ -1,7 +1,11 @@
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
+import type { Response, NextFunction } from 'express';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { IApp } from '../../../server.ts';
+
 class Cors extends AbstractMiddleware {
-  constructor(app, params) {
+  constructor(app: IApp, params: any) {
     super(app);
     this.params = params;
     if (!Array.isArray(params?.origins) || !params.origins.length) {
@@ -13,11 +17,11 @@ class Cors extends AbstractMiddleware {
     return 'Add CORS headers to request';
   }
 
-  async middleware(req, res, next) {
+  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     for (const host of this.params.origins) {
       if (
         (typeof host === 'string' && req.headers.origin === host) ||
-        (host instanceof RegExp && host.test(req.headers.origin))
+        (host instanceof RegExp && host.test(req.headers.origin ?? ''))
       ) {
         res.set('Access-Control-Allow-Origin', req.headers.origin);
         res.set('Vary', 'Origin');

@@ -10,7 +10,6 @@ class GetOpenApiJson extends AbstractCommand {
   }
   /**
    * You able to add command arguments for parsing there.
-   * @returns {import("../types/ICommandArguments.js").ICommandArguments}
    */
   static get commandArguments() {
     return {

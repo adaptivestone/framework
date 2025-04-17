@@ -1,11 +1,11 @@
 import { object, boolean, string, number } from 'yup';
 import AbstractController from '../../modules/AbstractController.ts';
-import AuthMiddleware from '../../services/http/middleware/Auth.js';
+import AuthMiddleware from '../../services/http/middleware/Auth.ts';
 import GetUserByToken from '../../services/http/middleware/GetUserByToken.ts';
-import RateLimiter from '../../services/http/middleware/RateLimiter.js';
+import RateLimiter from '../../services/http/middleware/RateLimiter.ts';
 import CheckFlag from '../../services/http/middleware/test/CheckFlag.ts';
 import RoleMiddleware from '../../services/http/middleware/Role.ts';
-import Pagination from '../../services/http/middleware/Pagination.js';
+import Pagination from '../../services/http/middleware/Pagination.ts';
 
 import type { Response } from 'express';
 import type { FrameworkRequest } from '../../services/http/HttpServer.ts';
