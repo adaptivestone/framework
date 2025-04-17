@@ -50,7 +50,7 @@ describe('rate limiter methods', () => {
       driver: 'unknown',
     });
 
-    expect(rateLimiter.limiter).toBeNull();
+    expect(rateLimiter.limiter).toBeUndefined();
   });
 
   it('generateConsumeKey works correctly', async () => {
