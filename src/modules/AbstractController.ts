@@ -314,7 +314,6 @@ class AbstractController extends Base {
    * Parse middlewares to be an object.
    */
   parseMiddlewares(middlewareMap: Map<string, TMiddleware>, httpPath: string) {
-    console.log('middlewareMap', middlewareMap);
     const middlewaresInfo = [];
     // eslint-disable-next-line prefer-const
     for (let [path, middleware] of middlewareMap) {
@@ -349,7 +348,6 @@ class AbstractController extends Base {
           .join('/');
         let MiddlewareFunction: typeof AbstractMiddleware;
         let middlewareParams = {};
-        console.log('M', M);
         if (Array.isArray(M)) {
           [MiddlewareFunction, middlewareParams] = M;
         } else {
