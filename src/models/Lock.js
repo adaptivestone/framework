@@ -1,4 +1,4 @@
-import AbstractModel from '../modules/AbstractModel.js';
+import AbstractModel from '../modules/AbstractModel.ts';
 
 class Lock extends AbstractModel {
   initHooks() {

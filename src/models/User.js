@@ -1,7 +1,7 @@
 import { scrypt } from 'node:crypto';
 
 import { promisify } from 'node:util';
-import AbstractModel from '../modules/AbstractModel.js';
+import AbstractModel from '../modules/AbstractModel.ts';
 
 class User extends AbstractModel {
   constructor(app) {

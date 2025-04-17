@@ -1,4 +1,4 @@
-import AbstractModel from '../modules/AbstractModel.js';
+import AbstractModel from '../modules/AbstractModel.ts';
 
 class Sequence extends AbstractModel {
   // eslint-disable-next-line class-methods-use-this

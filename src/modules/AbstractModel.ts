@@ -1,20 +1,44 @@
 import mongoose from 'mongoose';
 import Base from './Base.ts';
 
-class AbstractModel extends Base {
-  mongooseSchema = null;
+import type { IApp } from '../server.ts';
+import type {
+  Schema,
+  SchemaOptions,
+  Model,
+  HydratedDocument,
+  SchemaDefinition,
+  SchemaDefinitionType,
+} from 'mongoose';
 
-  mongooseModel = null;
+export interface BaseDocument extends Document {
+  // getSuper(): AbstractModel<any, any>;
+}
+
+export interface BaseModel<
+  TDoc extends BaseDocument,
+  TQueryHelpers = {}, // Add if you use query helpers
+> extends Model<HydratedDocument<TDoc>, TQueryHelpers> {
+  // getSuper(): AbstractModel<any, any>;
+}
+
+class AbstractModel<
+  TDocument extends BaseDocument,
+  TModel extends BaseModel<TDocument>,
+> extends Base {
+  mongooseSchema: Schema<TDocument, TModel>;
+
+  mongooseModel: TModel;
 
   /**
-   * @param {import('../server.ts').default['app']} app  //TODO change to *.d.ts as this is a Server, not app
+   * @param IApp app
    * @param function callback optional callback when connection ready
    */
-  constructor(app, callback = () => {}) {
+  constructor(app: IApp, callback = () => {}) {
     super(app);
-    this.mongooseSchema = new mongoose.Schema(
+    this.mongooseSchema = new mongoose.Schema<TDocument, TModel>(
       this.modelSchema,
-      this.modelSchemaOptions,
+      this.modelSchemaOptions as any,
     );
     mongoose.set('strictQuery', true);
     this.mongooseSchema.set('timestamps', true);
@@ -23,13 +47,13 @@ class AbstractModel extends Base {
     this.mongooseSchema.statics.getSuper = () => this;
     this.mongooseSchema.methods.getSuper = () => this;
     this.initHooks();
-    this.mongooseModel = mongoose.model(
+    this.mongooseModel = mongoose.model<TDocument, TModel>(
       this.constructor.name,
       this.mongooseSchema,
     );
     if (!mongoose.connection.readyState) {
       this.app.events.on('shutdown', async () => {
-        this.logger.verbose(
+        this.logger?.verbose(
           'Shutdown was called. Closing all mongoose connections',
         );
         for (const c of mongoose.connections) {
@@ -37,7 +61,9 @@ class AbstractModel extends Base {
         }
         // await mongoose.disconnect(); // TODO it have problems with replica-set
       });
-      const connectionParams = {};
+      const connectionParams: {
+        appName?: string;
+      } = {};
       if (process.env.MONGO_APP_NAME) {
         connectionParams.appName = process.env.MONGO_APP_NAME;
       }
@@ -46,18 +72,18 @@ class AbstractModel extends Base {
         .connect(this.app.getConfig('mongo').connectionString, connectionParams)
         .then(
           () => {
-            this.logger.info(
+            this.logger?.info(
               `Mongo connection success ${connectionParams.appName}`,
             );
             mongoose.connection.on('error', (err) => {
-              this.logger.error('Mongo connection error', err);
+              this.logger?.error('Mongo connection error', err);
               console.error(err);
             });
 
             callback();
           },
           (error) => {
-            this.logger.error("Can't install mongodb connection", error);
+            this.logger?.error("Can't install mongodb connection", error);
           },
         );
     } else {
@@ -68,17 +94,17 @@ class AbstractModel extends Base {
   /**
    * Mongoose schema
    */
-  get modelSchema() {
-    this.logger.warn('You should provide modelSchema');
-    return {};
+  get modelSchema(): SchemaDefinition<SchemaDefinitionType<TDocument>> {
+    this.logger?.warn('You should provide modelSchema');
+    return {} as SchemaDefinition<SchemaDefinitionType<TDocument>>;
   }
 
   /**
    * Mongoose schema options
    */
   // eslint-disable-next-line class-methods-use-this
-  get modelSchemaOptions() {
-    return {};
+  get modelSchemaOptions(): SchemaOptions<TDocument> {
+    return {} as SchemaOptions<TDocument>;
   }
 
   static get loggerGroup() {
@@ -86,7 +112,7 @@ class AbstractModel extends Base {
   }
 
   initHooks() {
-    this.logger.verbose('Model have no hooks');
+    this.logger?.verbose('Model have no hooks');
   }
 }
 export default AbstractModel;
