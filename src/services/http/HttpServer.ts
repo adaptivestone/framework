@@ -26,11 +26,11 @@ export interface FrameworkRequest extends Request {
       t: TFunction;
       language: string;
     };
-    pagination?: {
-      page: number;
-      limit: number;
-      skip: number;
-    };
+    // pagination?: {
+    //   page: number;
+    //   limit: number;
+    //   skip: number;
+    // };
   };
 }
 
