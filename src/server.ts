@@ -14,10 +14,11 @@ import type BaseCli from './modules/BaseCli.ts';
 
 import type HttpServer from './services/http/HttpServer.ts';
 import type ControllerManager from './controllers/index.ts';
+import type AbstractModel from './modules/AbstractModel.ts';
 
 interface IApp {
   getConfig: (configName: string) => Record<string, any>;
-  getModel: (modelName: string) => any;
+  getModel: (modelName: string) => AbstractModel['mongooseModel'] | false;
   runCliCommand: (commandName: string) => Promise<boolean | void>;
   updateConfig: (configName: string, config: {}) => Record<string, any>;
   foldersConfig: TFolderConfigFolders;
@@ -426,9 +427,8 @@ class Server {
    * Return model from {modelName} (file name) on model folder.
    * Support cache
    * @param {String} modelName name on config file to load
-   * @returns {import('mongoose').Model | false| {}}
    */
-  getModel(modelName: string) {
+  getModel(modelName: string): AbstractModel['mongooseModel'] | false {
     if (modelName.endsWith('s')) {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
@@ -444,7 +444,7 @@ class Server {
       this.app.logger.warn(
         `You asked for model ${modelName} that not exists. Please check you codebase `,
       );
-      return {};
+      return false;
     }
     return this.cache.models.get(modelName);
   }
