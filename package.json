@@ -23,7 +23,7 @@
     "test": "vitest run",
     "t": "vitest --coverage=false --reporter=default",
     "prettier": "prettier --check '**/*.(js|jsx|ts|tsx|json|css|scss|md)'",
-    "lint": "eslint",
+    "lint": "eslint --flag unstable_native_nodejs_ts_config",
     "lint:fix": "eslint --fix",
     "codestyle": "npm run prettier && npm run lint",
     "prepare": "husky",

@@ -24,7 +24,7 @@ export default tseslint.config([
       sourceType: 'module',
       ecmaVersion: 'latest',
       globals: {
-        ...globals.es2023,
+        ...globals.es2024,
         ...globals.node,
       },
     },
@@ -65,7 +65,7 @@ export default tseslint.config([
     },
   },
   {
-    files: ['**/*.test.js'],
+    files: ['**/*.test.js', '**/*.test.ts'],
     plugins: {
       vitest,
     },
