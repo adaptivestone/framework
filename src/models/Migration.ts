@@ -1,6 +1,10 @@
 import AbstractModel from '../modules/AbstractModel.ts';
 
-class Migration extends AbstractModel {
+interface IMigration {
+  migrationFile: string;
+}
+
+class Migration extends AbstractModel<IMigration> {
   // eslint-disable-next-line class-methods-use-this
   get modelSchema() {
     return {
