@@ -3,8 +3,81 @@ import { scrypt } from 'node:crypto';
 import { promisify } from 'node:util';
 import AbstractModel from '../modules/AbstractModel.ts';
 
-class User extends AbstractModel {
-  constructor(app) {
+import type { TFunction } from 'i18next';
+
+import type { IApp } from '../server.ts';
+import type {
+  IAbstractModel,
+  IAbstractModelMethods,
+} from '../modules/AbstractModel.ts';
+
+interface IUser {
+  avatar: string;
+  name: {
+    first: string;
+    last: string;
+    nick: string;
+  };
+  password: string;
+  email: string;
+  sessionTokens: {
+    token: string;
+    valid: Date;
+  }[];
+  verificationTokens: {
+    until: Date;
+    token: string;
+  }[];
+  passwordRecoveryTokens: {
+    until: Date;
+    token: string;
+  }[];
+  permissions: string[];
+  roles: string[];
+  isVerified: boolean;
+  locale: string;
+  languages: string[];
+}
+
+interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {
+  getUserByEmailAndPassword(
+    email: string,
+    password: string,
+  ): Promise<InstanceType<User['mongooseModel']> | false>;
+  hashPassword(password: string): Promise<string>;
+  getUserByToken(
+    token: string,
+  ): Promise<InstanceType<User['mongooseModel']> | false>;
+  getUserByEmail(
+    email: string,
+  ): Promise<InstanceType<User['mongooseModel']> | false>;
+  getUserByPasswordRecoveryToken(
+    token: string,
+  ): Promise<InstanceType<User['mongooseModel']> | false>;
+  generateUserPasswordRecoveryToken(
+    user: InstanceType<User['mongooseModel']>,
+  ): Promise<{ token: string; until: Date }>;
+  getUserByVerificationToken(
+    token: string,
+  ): Promise<InstanceType<User['mongooseModel']> | false>;
+  generateUserVerificationToken(
+    user: InstanceType<User['mongooseModel']>,
+  ): Promise<{ token: string; until: Date }>;
+}
+
+const scryptAsync = promisify<
+  string | Buffer | NodeJS.TypedArray | DataView,
+  string | Buffer | NodeJS.TypedArray | DataView,
+  number,
+  Buffer
+>(scrypt);
+
+class User extends AbstractModel<IUser, IAbstractModelMethods<IUser>, IStatic> {
+  hashRounds: number;
+
+  saltSecret: string;
+
+  constructor(app: IApp) {
     super(app);
     const authConfig = this.app.getConfig('auth');
     this.hashRounds = authConfig.hashRounds;
@@ -66,7 +139,11 @@ class User extends AbstractModel {
     };
   }
 
-  static async getUserByEmailAndPassword(email, password) {
+  static async getUserByEmailAndPassword(
+    this: User['mongooseModel'],
+    email: string,
+    password: string,
+  ) {
     const data = await this.findOne({ email: String(email) });
     if (!data) {
       return false;
@@ -79,13 +156,14 @@ class User extends AbstractModel {
     return data;
   }
 
-  async generateToken() {
+  async generateToken(this: InstanceType<User['mongooseModel']>) {
     const timestamp = new Date();
     timestamp.setDate(timestamp.getDate() + 30);
-    const scryptAsync = promisify(scrypt);
     const data = await scryptAsync(
       this.email + Date.now(),
+      // @ts-ignore
       this.getSuper().saltSecret,
+      // @ts-ignore
       this.getSuper().hashRounds,
     );
     const token = data.toString('base64url');
@@ -94,7 +172,7 @@ class User extends AbstractModel {
     return { token, valid: timestamp };
   }
 
-  getPublic() {
+  getPublic(this: InstanceType<User['mongooseModel']>) {
     return {
       avatar: this.avatar,
       name: this.name,
@@ -106,22 +184,23 @@ class User extends AbstractModel {
     };
   }
 
-  static async hashPassword(password) {
-    const scryptAsync = promisify(scrypt);
+  static async hashPassword(this: User['mongooseModel'], password: string) {
     const data = await scryptAsync(
       String(password),
+      // @ts-ignore
       this.getSuper().saltSecret,
+      // @ts-ignore
       this.getSuper().hashRounds,
     );
     return data.toString('base64url');
   }
 
-  static async getUserByToken(token) {
+  static async getUserByToken(this: User['mongooseModel'], token: string) {
     const data = await this.findOne({ 'sessionTokens.token': String(token) });
     return data || false;
   }
 
-  static async getUserByEmail(email) {
+  static async getUserByEmail(this: User['mongooseModel'], email: string) {
     const data = await this.findOne({ email: String(email) });
     if (!data) {
       return false;
@@ -129,15 +208,19 @@ class User extends AbstractModel {
     return data;
   }
 
-  static async generateUserPasswordRecoveryToken(userMongoose) {
+  static async generateUserPasswordRecoveryToken(
+    userMongoose: InstanceType<User['mongooseModel']>,
+  ) {
     const date = new Date();
     date.setDate(date.getDate() + 14);
-    const scryptAsync = promisify(scrypt);
     const data = await scryptAsync(
       userMongoose.email + Date.now(),
+      // @ts-ignore
       userMongoose.getSuper().saltSecret,
+      // @ts-ignore
       userMongoose.getSuper().hashRounds,
     );
+
     const token = data.toString('base64url');
     //       if (err) {
     //     this.logger.error("Hash 2 error ", err);
@@ -153,7 +236,10 @@ class User extends AbstractModel {
     return { token, until: date.getTime() };
   }
 
-  static async getUserByPasswordRecoveryToken(passwordRecoveryToken) {
+  static async getUserByPasswordRecoveryToken(
+    this: User['mongooseModel'],
+    passwordRecoveryToken: string,
+  ) {
     const data = await this.findOne({
       passwordRecoveryTokens: {
         $elemMatch: { token: String(passwordRecoveryToken) },
@@ -170,7 +256,10 @@ class User extends AbstractModel {
     return result;
   }
 
-  async sendPasswordRecoveryEmail(i18n) {
+  async sendPasswordRecoveryEmail(
+    this: InstanceType<User['mongooseModel']>,
+    i18n: { t: TFunction; language: string },
+  ) {
     const passwordRecoveryToken =
       await User.generateUserPasswordRecoveryToken(this);
     let Mailer;
@@ -182,7 +271,7 @@ class User extends AbstractModel {
     } catch {
       const error =
         'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
-      this.getSuper().logger.error(error);
+      this.getSuper().logger?.error(error);
       return false;
     }
 
@@ -198,13 +287,16 @@ class User extends AbstractModel {
     return mail.send(this.email);
   }
 
-  static async generateUserVerificationToken(userMongoose) {
+  static async generateUserVerificationToken(
+    userMongoose: InstanceType<User['mongooseModel']>,
+  ) {
     const date = new Date();
     date.setDate(date.getDate() + 14);
-    const scryptAsync = promisify(scrypt);
     const data = await scryptAsync(
       userMongoose.email + Date.now(),
+      // @ts-ignore
       userMongoose.getSuper().saltSecret,
+      // @ts-ignore
       userMongoose.getSuper().hashRounds,
     );
     const token = data.toString('base64url');
@@ -222,7 +314,10 @@ class User extends AbstractModel {
     return { token, until: date.getTime() };
   }
 
-  static async getUserByVerificationToken(verificationToken) {
+  static async getUserByVerificationToken(
+    this: User['mongooseModel'],
+    verificationToken: string,
+  ) {
     const data = await this.findOne({
       verificationTokens: {
         $elemMatch: { token: String(verificationToken) },
@@ -250,18 +345,20 @@ class User extends AbstractModel {
   //   );
   // }
 
-  async sendVerificationEmail(i18n) {
+  async sendVerificationEmail(
+    this: InstanceType<User['mongooseModel']>,
+    i18n: { t: TFunction; language: string },
+  ) {
     const verificationToken = await User.generateUserVerificationToken(this);
     // speed optimisation
     let Mailer;
     try {
       // @ts-ignore
-      // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
     } catch {
       const error =
         'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
-      this.getSuper().logger.error(error);
+      this.getSuper().logger?.error(error);
       return false;
     }
     const mail = new Mailer(

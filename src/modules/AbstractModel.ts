@@ -4,17 +4,13 @@ import Base from './Base.ts';
 import type { IApp } from '../server.ts';
 import type { Schema, Model } from 'mongoose';
 
-export interface IAbstractModelStatics<T> {
-  getSuper(): AbstractModel<T>;
-}
-
 export interface IAbstractModelMethods<T> {
-  getSuper(): AbstractModel<T>;
+  getSuper(): AbstractModel<T> & this;
 }
 
 export interface IAbstractModel<IDocument, IMethods>
   extends Model<IDocument, {}, IMethods> {
-  getSuper(): AbstractModel<IDocument>;
+  getSuper(): AbstractModel<IDocument> & this;
 }
 
 class AbstractModel<
@@ -112,7 +108,7 @@ class AbstractModel<
   }
 
   initHooks() {
-    this.logger?.verbose('Model have no hooks');
+    this.logger?.verbose(`Model ${this.constructor.name} has no custom hooks.`);
   }
 }
 export default AbstractModel;
