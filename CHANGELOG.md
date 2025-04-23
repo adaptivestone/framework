@@ -1,7 +1,8 @@
 ### 5.0.0-beta.12
 
 [BREAKING] Remove jest support for testing
-[NEW] initial move to typescript
+[NEW] initial move to typescript. Potencially breaking.
+[NEW] introduce src and dist folders
 
 ### 5.0.0-beta.11
 
