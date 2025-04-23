@@ -12,6 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
+    "sourceMap": true,
     "skipLibCheck": true
   },
   "include": ["src/**/*"],

@@ -2,33 +2,33 @@ import mongoose from 'mongoose';
 import Base from './Base.ts';
 
 import type { IApp } from '../server.ts';
-import type {
-  Schema,
-  SchemaOptions,
-  Model,
-  HydratedDocument,
-  SchemaDefinition,
-  SchemaDefinitionType,
-} from 'mongoose';
+import type { Schema, Model } from 'mongoose';
 
-export interface BaseDocument extends Document {
-  // getSuper(): AbstractModel<any, any>;
+export interface IAbstractModelStatics<T> {
+  getSuper(): AbstractModel<T>;
 }
 
-export interface BaseModel<
-  TDoc extends BaseDocument,
-  TQueryHelpers = {}, // Add if you use query helpers
-> extends Model<HydratedDocument<TDoc>, TQueryHelpers> {
-  // getSuper(): AbstractModel<any, any>;
+export interface IAbstractModelMethods<T> {
+  getSuper(): AbstractModel<T>;
+}
+
+export interface IAbstractModel<IDocument, IMethods>
+  extends Model<IDocument, {}, IMethods> {
+  getSuper(): AbstractModel<IDocument>;
 }
 
 class AbstractModel<
-  TDocument extends BaseDocument,
-  TModel extends BaseModel<TDocument>,
+  IDocument = {},
+  IMethods extends
+    IAbstractModelMethods<IDocument> = IAbstractModelMethods<IDocument>,
+  IModel extends IAbstractModel<IDocument, IMethods> = IAbstractModel<
+    IDocument,
+    IMethods
+  >,
 > extends Base {
-  mongooseSchema: Schema<TDocument, TModel>;
+  mongooseSchema: Schema<IDocument, IModel, IMethods>;
 
-  mongooseModel: TModel;
+  mongooseModel: IModel;
 
   /**
    * @param IApp app
@@ -36,18 +36,18 @@ class AbstractModel<
    */
   constructor(app: IApp, callback = () => {}) {
     super(app);
-    this.mongooseSchema = new mongoose.Schema<TDocument, TModel>(
+    this.mongooseSchema = new mongoose.Schema<IDocument, IModel, IMethods>(
       this.modelSchema,
-      this.modelSchemaOptions as any,
+      this.modelSchemaOptions,
     );
     mongoose.set('strictQuery', true);
     this.mongooseSchema.set('timestamps', true);
     this.mongooseSchema.set('minimize', false);
     this.mongooseSchema.loadClass(this.constructor);
-    this.mongooseSchema.statics.getSuper = () => this;
-    this.mongooseSchema.methods.getSuper = () => this;
+    this.mongooseSchema.static('getSuper', () => this);
+    this.mongooseSchema.method('getSuper', () => this);
     this.initHooks();
-    this.mongooseModel = mongoose.model<TDocument, TModel>(
+    this.mongooseModel = mongoose.model<IDocument, IModel>(
       this.constructor.name,
       this.mongooseSchema,
     );
@@ -94,17 +94,17 @@ class AbstractModel<
   /**
    * Mongoose schema
    */
-  get modelSchema(): SchemaDefinition<SchemaDefinitionType<TDocument>> {
+  get modelSchema() {
     this.logger?.warn('You should provide modelSchema');
-    return {} as SchemaDefinition<SchemaDefinitionType<TDocument>>;
+    return {};
   }
 
   /**
    * Mongoose schema options
    */
   // eslint-disable-next-line class-methods-use-this
-  get modelSchemaOptions(): SchemaOptions<TDocument> {
-    return {} as SchemaOptions<TDocument>;
+  get modelSchemaOptions() {
+    return {};
   }
 
   static get loggerGroup() {

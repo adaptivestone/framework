@@ -18,7 +18,7 @@ import type AbstractModel from './modules/AbstractModel.ts';
 
 interface IApp {
   getConfig: (configName: string) => Record<string, any>;
-  getModel: (modelName: string) => AbstractModel['mongooseModel'] | false;
+  getModel: (modelName: string) => AbstractModel['mongooseModel'] | false | any;
   runCliCommand: (commandName: string) => Promise<boolean | void>;
   updateConfig: (configName: string, config: {}) => Record<string, any>;
   foldersConfig: TFolderConfigFolders;

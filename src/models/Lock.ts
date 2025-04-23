@@ -1,6 +1,25 @@
 import AbstractModel from '../modules/AbstractModel.ts';
+import type {
+  IAbstractModel,
+  IAbstractModelMethods,
+} from '../modules/AbstractModel.ts';
 
-class Lock extends AbstractModel {
+import type { MongoError } from 'mongodb';
+
+interface ILock {
+  _id: string;
+  expiredAt: Date;
+}
+
+interface IStatic extends IAbstractModel<ILock, IAbstractModelMethods<ILock>> {
+  acquireLock(name: string, ttlSeconds?: number): Promise<boolean>;
+  releaseLock(name: string): Promise<boolean>;
+  waitForUnlock(name: string): Promise<void>;
+  getLockData(name: string): Promise<{ ttl: number }>;
+  getLocksData(names: string[]): Promise<{ name: string; ttl: number }[]>;
+}
+
+class Lock extends AbstractModel<ILock, IAbstractModelMethods<ILock>, IStatic> {
   initHooks() {
     this.mongooseSchema.index({ expiredAt: 1 }, { expireAfterSeconds: 0 });
   }
@@ -19,16 +38,19 @@ class Lock extends AbstractModel {
    * acquire lock based on lock name
    * @param {string} name
    * @param {number} [ttlSeconds=30]
-   * @returns {Promise<boolean>}
    */
-  static async acquireLock(name, ttlSeconds = 30) {
+  static async acquireLock(
+    this: Lock['mongooseModel'],
+    name: string,
+    ttlSeconds = 30,
+  ) {
     try {
       await this.create({
         _id: name,
         expiredAt: new Date(Date.now() + ttlSeconds * 1000),
       });
-    } catch (error) {
-      if (error.code !== 11000) {
+    } catch (error: unknown) {
+      if ((error as MongoError).code !== 11000) {
         // not a duplicate leys
         throw error;
       }
@@ -40,9 +62,8 @@ class Lock extends AbstractModel {
   /**
    * release lock based on lock name
    * @param {string} name
-   * @returns {Promise<boolean>}
    */
-  static async releaseLock(name) {
+  static async releaseLock(this: Lock['mongooseModel'], name: string) {
     const res = await this.deleteOne({ _id: name });
     if (res.acknowledged && res.deletedCount) {
       return true;
@@ -53,9 +74,8 @@ class Lock extends AbstractModel {
   /**
    * wait lock based on lock name
    * @param {string} name
-   * @returns {Promise}
    */
-  static async waitForUnlock(name) {
+  static async waitForUnlock(this: Lock['mongooseModel'], name: string) {
     const res = await this.findOne({ _id: name });
     if (!res) {
       return Promise.resolve();
@@ -67,7 +87,7 @@ class Lock extends AbstractModel {
       ]);
       stream.on('change', () => {
         stream.close();
-        resolve();
+        resolve(true);
       });
     });
   }
@@ -75,9 +95,8 @@ class Lock extends AbstractModel {
   /**
    * get lock remaining time based on lock name
    * @param {string} name
-   * @returns {Promise<{ttl: number}>}
    */
-  static async getLockData(name) {
+  static async getLockData(this: Lock['mongooseModel'], name: string) {
     const res = await this.findOne({ _id: name });
     if (!res) {
       return { ttl: 0 };
@@ -88,9 +107,8 @@ class Lock extends AbstractModel {
   /**
    * get lock remaining time based on lock name
    * @param {string[]} names
-   * @returns {Promise<{name: string, ttl: number}[]>}
    */
-  static async getLocksData(names) {
+  static async getLocksData(this: Lock['mongooseModel'], names: string[]) {
     const res = await this.find({ _id: { $in: names } });
     const lockMap = new Map(res.map((lock) => [lock._id, lock]));
 
