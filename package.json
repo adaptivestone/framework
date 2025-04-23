@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/adaptivestone/framework"
+    "url": "git+https://github.com/adaptivestone/framework.git"
   },
   "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
@@ -27,6 +27,7 @@
     "lint:fix": "eslint --fix",
     "codestyle": "npm run prettier && npm run lint",
     "prepare": "husky",
+    "prepublishOnly": "npm run build",
     "cli": "node cliCommand.ts",
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
     "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
