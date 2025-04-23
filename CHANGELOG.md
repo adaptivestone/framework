@@ -1,3 +1,7 @@
+### 5.0.0-beta.13
+
+[UPDATE] only process .ts or .js files (not .map files)
+
 ### 5.0.0-beta.12
 
 [BREAKING] Remove jest support for testing

@@ -45,6 +45,10 @@ const getFilesPathWithInheritance = async ({
     ) {
       return false;
     }
+
+    if (!file.endsWith('.js') && !file.endsWith('.ts')) {
+      return false;
+    }
     if (notHidden && file[0] === '.') {
       // not start with dot
       return false;
