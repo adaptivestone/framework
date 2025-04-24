@@ -1,3 +1,7 @@
+### 5.0.0-beta.14
+
+[FIX] fix missing folder migrations in dist folder
+
 ### 5.0.0-beta.13
 
 [UPDATE] only process .ts or .js files (not .map files)
