@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0-beta.14",
+  "version": "5.0.0-beta.15",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
@@ -17,7 +17,7 @@
   "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "postbuild": "mkdir ./dist/migrations",
+    "postbuild": "cp -R ./src/migrations ./dist/migrations",
     "check:types": "tsc --noEmit",
     "dev": "node --watch ./src/index.ts",
     "prod": "node --watch ./src/cluster.ts",

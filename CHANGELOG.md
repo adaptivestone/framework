@@ -1,3 +1,7 @@
+### 5.0.0-beta.15
+
+[FIX] fix missing folder migrations in dist folder (hope that will be finally)
+
 ### 5.0.0-beta.14
 
 [FIX] fix missing folder migrations in dist folder
