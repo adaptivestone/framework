@@ -53,7 +53,7 @@ class AbstractController extends Base {
     const httpPath = this.getHttpPath();
 
     /**
-     * Grab route middleware onlo one Map
+     * Grab route middleware into one Map
      */
     const routeMiddlewares = new Map();
     Object.entries(routes).forEach(([method, methodRoutes]) => {
