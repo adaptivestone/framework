@@ -306,8 +306,6 @@ class Server {
 
     const files = await this.getModelFilesPathsWithInheritance();
 
-    console.log('Loading model files', files);
-
     const promises = [];
     for (const file of files) {
       const t = hrtime.bigint();
