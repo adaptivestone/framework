@@ -1,4 +1,6 @@
 import { getFilesPathWithInheritance } from '../helpers/files.ts';
+import { consoleLogger } from '../helpers/logger.ts';
+
 import type { IApp } from '../server.ts';
 import type winston from 'winston';
 
@@ -52,11 +54,15 @@ class Base {
   async getFilesPathWithInheritance(
     internalFolder: string,
     externalFolder: string,
+    isUseSimpleLogger = false, // just to speed up to load logger in some cases
   ) {
+    const logger = isUseSimpleLogger
+      ? (m: string) => consoleLogger('info', m)
+      : (m: string) => this.logger?.verbose(m);
     return getFilesPathWithInheritance({
       internalFolder,
       externalFolder,
-      logger: (text) => this.logger?.verbose(text),
+      logger,
     });
   }
 

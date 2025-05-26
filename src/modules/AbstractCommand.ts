@@ -27,6 +27,11 @@ class AbstractCommand extends Base {
   static isShouldInitModels = true;
 
   /**
+   * If true, then this command will get model paths with inheritance
+   */
+  static isShouldGetModelPaths = true;
+
+  /**
    * Get mongo connection name
    * @param {String} commandName
    * @param {object} args

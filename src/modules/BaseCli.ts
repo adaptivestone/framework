@@ -3,6 +3,7 @@ import * as url from 'node:url';
 import { parseArgs } from 'node:util';
 import Base from './Base.ts';
 import type Server from '../server.ts';
+
 import type { ParseArgsOptionDescriptor } from 'node:util';
 import type AbstractCommand from '../modules/AbstractCommand.ts';
 
@@ -33,10 +34,13 @@ class Cli extends Base {
     if (Object.keys(this.commands).length) {
       return true;
     }
+    console.info('Loading commands...');
+    console.time('Loading commands. Time');
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const commandsToLoad = await this.getFilesPathWithInheritance(
       path.join(dirname, '../commands'),
       this.server.app.foldersConfig.commands,
+      true,
     );
     for (const com of commandsToLoad) {
       if (com.file.endsWith('.js') || com.file.endsWith('.ts')) {
@@ -50,6 +54,9 @@ class Cli extends Base {
         this.commands[c.toLowerCase()] = com.path;
       }
     }
+    console.timeEnd('Loading commands. Time');
+    console.log(' ');
+
     return true;
   }
 
@@ -119,6 +126,7 @@ class Cli extends Base {
       await this.printCommandTable();
       return false;
     }
+    console.info(`Running command: '${command}'`);
     const commandModule: { default: typeof AbstractCommand } = await import(
       this.commands[command]
     );
@@ -157,8 +165,15 @@ class Cli extends Base {
       }
     }
 
+    if (Command.isShouldGetModelPaths) {
+      console.info(
+        `Command ${command} isShouldGetModelPaths called. We are loading model paths`,
+      );
+      await this.server.getModelFilesPathsWithInheritance();
+    }
+
     if (Command.isShouldInitModels) {
-      this.logger?.debug(
+      console.info(
         `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in tyou command`,
       );
       process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
@@ -167,7 +182,7 @@ class Cli extends Base {
       );
       await this.server.initAllModels();
     } else {
-      this.logger?.debug(`Command ${command} NOT need to isShouldInitModels`);
+      console.info(`Command ${command} NOT need to isShouldInitModels`);
     }
 
     const c = new Command(this.app, this.commands, parsedArgs.values);

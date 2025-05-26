@@ -16,11 +16,18 @@ import type HttpServer from './services/http/HttpServer.ts';
 import type ControllerManager from './controllers/index.ts';
 import type AbstractModel from './modules/AbstractModel.ts';
 
-interface IApp {
-  getConfig: (configName: string) => Record<string, any>;
-  getModel: (modelName: string) => AbstractModel['mongooseModel'] | false | any;
-  runCliCommand: (commandName: string) => Promise<boolean | void>;
-  updateConfig: (configName: string, config: {}) => Record<string, any>;
+interface AppCache {
+  configs: Map<string, unknown>;
+  models: Map<string, AbstractModel['mongooseModel']>;
+  modelConstructors: Map<string, typeof AbstractModel>;
+  modelPaths: { path: string; file: string }[];
+}
+
+export interface IApp {
+  getConfig(configName: string): Record<string, any>;
+  getModel(modelName: string): AbstractModel['mongooseModel'] | false | any;
+  runCliCommand(commandName: string): Promise<boolean | void>;
+  updateConfig(configName: string, config: {}): Record<string, any>;
   foldersConfig: TFolderConfigFolders;
   events: EventEmitter<[never]>;
   readonly cache: Cache;
@@ -29,6 +36,7 @@ interface IApp {
   controllerManager: null | ControllerManager;
   frameworkFolder: string;
   documentation?: any[];
+  internalFilesCache: AppCache;
 }
 
 try {
@@ -53,10 +61,11 @@ class Server {
 
   config: TFolderConfig;
 
-  cache = {
-    configs: new Map(),
-    models: new Map(),
-    modelConstructors: new Map(),
+  cache: AppCache = {
+    configs: new Map<string, unknown>(),
+    models: new Map<string, AbstractModel['mongooseModel']>(),
+    modelConstructors: new Map<string, typeof AbstractModel>(),
+    modelPaths: [],
   };
 
   cacheService: null | Cache = null;
@@ -94,6 +103,7 @@ class Server {
       httpServer: null,
       controllerManager: null,
       frameworkFolder: new URL('.', import.meta.url).pathname,
+      internalFilesCache: that.cache,
     };
 
     this.app.events.on('shutdown', () => {
@@ -142,7 +152,7 @@ class Server {
     if (this.#isInited) {
       return true;
     }
-
+    console.log('Server init...');
     console.time('Server init. Done');
     console.time('Loading config and model files. Time');
     const prom = [this.#initConfigFiles()];
@@ -159,6 +169,7 @@ class Server {
     this.#isInited = true;
 
     console.timeEnd('Server init. Done');
+    console.log(' ');
 
     return true;
   }
@@ -197,7 +208,7 @@ class Server {
         }
       }
     } else {
-      this.app.logger.info(
+      this.app.logger.warn(
         'Skipping inited models as we have no mongo connection string',
       );
     }
@@ -265,25 +276,44 @@ class Server {
     return true;
   }
 
+  async getModelFilesPathsWithInheritance(): Promise<
+    { path: string; file: string }[]
+  > {
+    if (this.cache.modelPaths.length === 0) {
+      const dirname = url.fileURLToPath(new URL('.', import.meta.url));
+      const files = await getFilesPathWithInheritance({
+        internalFolder: path.join(dirname, '/models'),
+        externalFolder: this.app.foldersConfig.models,
+        loggerFileType: 'MODEL',
+        logger: (m) => consoleLogger('info', m),
+      });
+      for (const file of files) {
+        this.cache.modelPaths.push({
+          file: file.file.split('.')[0],
+          path: file.path,
+        });
+      }
+    }
+
+    return this.cache.modelPaths;
+  }
+
   async #loadModelFiles(): Promise<boolean> {
     if (this.#isModelsLoaded) {
       // already inited
       return true;
     }
-    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
-    const files = await getFilesPathWithInheritance({
-      internalFolder: path.join(dirname, '/models'),
-      externalFolder: this.app.foldersConfig.models,
-      loggerFileType: 'MODEL',
-      logger: (m) => consoleLogger('info', m),
-    });
+
+    const files = await this.getModelFilesPathsWithInheritance();
+
+    console.log('Loading model files', files);
 
     const promises = [];
     for (const file of files) {
       const t = hrtime.bigint();
       promises.push(
         import(file.path).then((f) => ({
-          name: file.file.split('.')[0],
+          name: file.file,
           file: f,
           took: hrtime.bigint() - t,
         })),
@@ -331,7 +361,7 @@ class Server {
       );
       return {};
     }
-    return this.cache.configs.get(configName);
+    return this.cache.configs.get(configName) || {};
   }
 
   /**
@@ -339,7 +369,9 @@ class Server {
    */
   getLogger(): winston.Logger {
     if (!this.#realLogger) {
+      console.time('Creating real logger for server. Time');
       this.#realLogger = this.#createLogger();
+      console.timeEnd('Creating real logger for server. Time');
     }
     return this.#realLogger;
   }
@@ -440,13 +472,14 @@ class Server {
       );
       return false;
     }
-    if (!this.cache.models.has(modelName)) {
+    const model = this.cache.models.get(modelName);
+    if (!model) {
       this.app.logger.warn(
         `You asked for model ${modelName} that not exists. Please check you codebase `,
       );
       return false;
     }
-    return this.cache.models.get(modelName);
+    return model;
   }
 
   /**
@@ -473,4 +506,3 @@ class Server {
 }
 
 export default Server;
-export { type IApp };

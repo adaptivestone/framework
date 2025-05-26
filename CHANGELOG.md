@@ -1,3 +1,9 @@
+### 5.0.0-beta.16
+
+[UPDATE] update deps
+[UPDATE] new app getter internalFilesCache
+[UPDATE] command new static props to load isShouldGetModelPaths
+
 ### 5.0.0-beta.15
 
 [FIX] fix missing folder migrations in dist folder (hope that will be finally)
