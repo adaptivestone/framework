@@ -5,3 +5,4 @@ node_modules/
 .vscode
 coverage/
 dist/*
+genTypes.d.ts

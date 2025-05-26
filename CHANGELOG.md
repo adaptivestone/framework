@@ -1,3 +1,7 @@
+### 5.0.0-beta.17
+
+[NEW] add GenerateTypes command
+
 ### 5.0.0-beta.16
 
 [UPDATE] update deps
