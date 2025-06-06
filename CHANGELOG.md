@@ -2,6 +2,7 @@
 
 [UPDATE] move away connection from mongooseModels to server itself (preparation for different model types)
 [BREAKING] potencial. We are removed callback from mongooseModels contrctuctor. It was not used in code.
+[NEW] add appInstance helper to access app instance from anywhere without passing it
 
 ### 5.0.0-beta.17
 

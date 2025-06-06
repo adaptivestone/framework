@@ -7,6 +7,7 @@ import merge from 'deepmerge';
 import winston from 'winston';
 import { getFilesPathWithInheritance } from './helpers/files.ts';
 import { consoleLogger } from './helpers/logger.ts';
+import { setAppInstance } from './helpers/appInstance.ts';
 import Cache from './services/cache/Cache.ts';
 
 import type { TFolderConfig, TFolderConfigFolders } from './folderConfig.ts';
@@ -114,6 +115,7 @@ class Server {
       // Unref the timer so it doesn't keep the process alive
       forceShutdownTimer.unref();
     });
+    setAppInstance(this.app);
   }
 
   /**
