@@ -1,3 +1,8 @@
+### 5.0.0-beta.18
+
+[UPDATE] move away connection from mongooseModels to server itself (preparation for different model types)
+[BREAKING] potencial. We are removed callback from mongooseModels contrctuctor. It was not used in code.
+
 ### 5.0.0-beta.17
 
 [NEW] add GenerateTypes command
