@@ -30,13 +30,12 @@ class AbstractModel<
    * @param IApp app
    * @param function callback optional callback when connection ready
    */
-  constructor(app: IApp, callback = () => {}) {
+  constructor(app: IApp) {
     super(app);
     this.mongooseSchema = new mongoose.Schema<IDocument, IModel, IMethods>(
       this.modelSchema,
       this.modelSchemaOptions,
     );
-    mongoose.set('strictQuery', true);
     this.mongooseSchema.set('timestamps', true);
     this.mongooseSchema.set('minimize', false);
     this.mongooseSchema.loadClass(this.constructor);
@@ -47,44 +46,6 @@ class AbstractModel<
       this.constructor.name,
       this.mongooseSchema,
     );
-    if (!mongoose.connection.readyState) {
-      this.app.events.on('shutdown', async () => {
-        this.logger?.verbose(
-          'Shutdown was called. Closing all mongoose connections',
-        );
-        for (const c of mongoose.connections) {
-          c.close(true);
-        }
-        // await mongoose.disconnect(); // TODO it have problems with replica-set
-      });
-      const connectionParams: {
-        appName?: string;
-      } = {};
-      if (process.env.MONGO_APP_NAME) {
-        connectionParams.appName = process.env.MONGO_APP_NAME;
-      }
-      // do not connect on test
-      mongoose
-        .connect(this.app.getConfig('mongo').connectionString, connectionParams)
-        .then(
-          () => {
-            this.logger?.info(
-              `Mongo connection success ${connectionParams.appName}`,
-            );
-            mongoose.connection.on('error', (err) => {
-              this.logger?.error('Mongo connection error', err);
-              console.error(err);
-            });
-
-            callback();
-          },
-          (error) => {
-            this.logger?.error("Can't install mongodb connection", error);
-          },
-        );
-    } else {
-      callback();
-    }
   }
 
   /**

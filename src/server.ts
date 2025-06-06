@@ -175,6 +175,48 @@ class Server {
   }
 
   /**
+   * Connect to mongoose if needed
+   */
+  async #mongooseConnect(): Promise<void> {
+    const mongoose = (await import('mongoose')).default;
+    mongoose.set('strictQuery', true);
+
+    if (!mongoose.connection.readyState) {
+      this.app.events.on('shutdown', async () => {
+        this.app.logger?.verbose(
+          'Shutdown was called. Closing all mongoose connections',
+        );
+        for (const c of mongoose.connections) {
+          c.close(true);
+        }
+        // await mongoose.disconnect(); // TODO it have problems with replica-set
+      });
+      const connectionParams: {
+        appName?: string;
+      } = {};
+      if (process.env.MONGO_APP_NAME) {
+        connectionParams.appName = process.env.MONGO_APP_NAME;
+      }
+      mongoose
+        .connect(this.app.getConfig('mongo').connectionString, connectionParams)
+        .then(
+          () => {
+            this.app.logger?.info(
+              `Mongo connection success ${connectionParams.appName}`,
+            );
+            mongoose.connection.on('error', (err) => {
+              this.app.logger?.error('Mongo connection error', err);
+              console.error(err);
+            });
+          },
+          (error) => {
+            this.app.logger?.error("Can't install mongodb connection", error);
+          },
+        );
+    }
+  }
+
+  /**
    * Load model and init them
    */
   async initAllModels(): Promise<void> {
@@ -189,6 +231,7 @@ class Server {
     }
 
     if (this.app.getConfig('mongo').connectionString) {
+      this.#mongooseConnect(); //do not wait for connection. Any time for us it ok
       for (const [modelName, ModelConstructor] of this.cache
         .modelConstructors) {
         try {
