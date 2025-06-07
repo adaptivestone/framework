@@ -1,18 +1,13 @@
-import AbstractModel from '../modules/AbstractModel.ts';
+import { BaseModel } from '../modules/BaseModel.ts';
 
-interface IMigration {
-  migrationFile: string;
-}
-
-class Migration extends AbstractModel<IMigration> {
-  // eslint-disable-next-line class-methods-use-this
-  get modelSchema() {
+class Migration extends BaseModel {
+  static get modelSchema() {
     return {
       migrationFile: {
         type: String,
         unique: true,
       },
-    };
+    } as const;
   }
 }
 

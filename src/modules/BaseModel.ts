@@ -99,7 +99,7 @@ export class BaseModel {
     }) as GetModelSchemaTypeFromClass<T>;
 
     const mongooseModel = mongoose.model(
-      this.constructor.name,
+      this.name,
       schema,
     ) as GetModelTypeFromClass<T>;
 

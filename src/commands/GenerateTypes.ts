@@ -47,8 +47,6 @@ class GenerateTypes extends AbstractCommand {
         modelPaths.map(async (modelPath) => {
           const modelModule = await import(modelPath.path);
           const path = modelPath.path.replace(dir, '.');
-          console.log(modelModule.default);
-          console.log(modelModule.default.prototype instanceof BaseModel);
           if (modelModule.default.prototype instanceof BaseModel) {
             return `    getModel(modelName: '${modelPath.file}'): GetModelTypeFromClass<typeof import('${path}').default>`;
           } else {
