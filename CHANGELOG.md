@@ -1,3 +1,8 @@
+### 5.0.0-beta.19
+
+[NEW] intruducing new model type. BaseModel. Features - simplifie works with typescript. And based on statics
+[BREAKING] all models now should be extended from BaseModel. This is a potencial breaking change specially for User model.
+
 ### 5.0.0-beta.18
 
 [UPDATE] move away connection from mongooseModels to server itself (preparation for different model types)
