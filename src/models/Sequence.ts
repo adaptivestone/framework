@@ -1,40 +1,48 @@
-import AbstractModel from '../modules/AbstractModel.ts';
-
+import { BaseModel } from '../modules/BaseModel.ts';
 import type {
-  IAbstractModel,
-  IAbstractModelMethods,
-} from '../modules/AbstractModel.ts';
+  GetModelTypeLiteFromSchema,
+  ModelOptionsReturnType,
+} from '../modules/BaseModel.ts';
 
-interface ISequence {
-  _id: string;
-  seq: Number;
-}
-
-interface IStatic
-  extends IAbstractModel<ISequence, IAbstractModelMethods<ISequence>> {
-  getSequence(forType: string): Promise<number>;
-}
-
-class Sequence extends AbstractModel<
-  ISequence,
-  IAbstractModelMethods<ISequence>,
-  IStatic
-> {
-  // eslint-disable-next-line class-methods-use-this
-  get modelSchema() {
+class Sequence extends BaseModel {
+  static get modelSchema() {
     return {
       _id: { type: String, required: true },
       seq: { type: Number, default: 1 },
-    };
+    } as const;
   }
 
-  static async getSequence(this: Sequence['mongooseModel'], forType: string) {
-    const sequence = await this.findByIdAndUpdate(
-      { _id: forType },
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true },
-    );
-    return sequence.seq;
+  // static get modelMethods() {
+  //   type SequenceModelLite = GetModelTypeLiteFromSchema<
+  //     typeof Sequence.modelSchema,
+  //     ModelOptionsReturnType<typeof Sequence>
+  //   >;
+
+  //   return {
+  //     getPublic: async function (this: InstanceType<SequenceModelLite>) {
+  //       return {
+  //         _id: this._id,
+  //         seq: this.seq,
+  //       };
+  //     },
+  //   } as const;
+  // }
+
+  static get modelStatics() {
+    type SequenceModelLite = GetModelTypeLiteFromSchema<
+      typeof Sequence.modelSchema,
+      ModelOptionsReturnType<typeof Sequence>
+    >;
+    return {
+      getSequence: async function (this: SequenceModelLite, forType: string) {
+        const sequence = await this.findByIdAndUpdate(
+          { _id: forType },
+          { $inc: { seq: 1 } },
+          { new: true, upsert: true },
+        );
+        return sequence.seq;
+      },
+    } as const;
   }
 }
 

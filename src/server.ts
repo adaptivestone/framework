@@ -16,11 +16,13 @@ import type BaseCli from './modules/BaseCli.ts';
 import type HttpServer from './services/http/HttpServer.ts';
 import type ControllerManager from './controllers/index.ts';
 import type AbstractModel from './modules/AbstractModel.ts';
+import type { BaseModel } from './modules/BaseModel.ts';
+import type { Model } from 'mongoose';
 
 interface AppCache {
   configs: Map<string, unknown>;
-  models: Map<string, AbstractModel['mongooseModel']>;
-  modelConstructors: Map<string, typeof AbstractModel>;
+  models: Map<string, AbstractModel['mongooseModel'] | Model<any>>;
+  modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
 }
 
@@ -233,12 +235,21 @@ class Server {
     }
 
     if (this.app.getConfig('mongo').connectionString) {
+      const BaseModel = (await import('./modules/BaseModel.ts')).BaseModel;
       this.#mongooseConnect(); //do not wait for connection. Any time for us it ok
       for (const [modelName, ModelConstructor] of this.cache
         .modelConstructors) {
         try {
-          const model = new ModelConstructor(this.app);
-          this.cache.models.set(modelName, model.mongooseModel);
+          if (ModelConstructor.prototype instanceof BaseModel) {
+            const model = (ModelConstructor as typeof BaseModel).initialize();
+            this.cache.models.set(modelName, model);
+          } else {
+            this.app.logger?.warn(
+              `Model ${modelName} is old type model. Please update it to BaseModel`,
+            );
+            const model = new ModelConstructor(this.app) as AbstractModel;
+            this.cache.models.set(modelName, model.mongooseModel);
+          }
         } catch (e: unknown) {
           if (e instanceof Error) {
             this.app.logger.error(
@@ -503,7 +514,9 @@ class Server {
    * Support cache
    * @param {String} modelName name on config file to load
    */
-  getModel(modelName: string): AbstractModel['mongooseModel'] | false {
+  getModel(
+    modelName: string,
+  ): AbstractModel['mongooseModel'] | Model<any> | false {
     if (modelName.endsWith('s')) {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
