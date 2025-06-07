@@ -2,10 +2,11 @@ import { scrypt } from 'node:crypto';
 
 import { promisify } from 'node:util';
 import AbstractModel from '../modules/AbstractModel.ts';
+import { appInstance } from '../helpers/appInstance.ts';
+import type { IApp } from '../server.ts';
 
 import type { TFunction } from 'i18next';
 
-import type { IApp } from '../server.ts';
 import type {
   IAbstractModel,
   IAbstractModelMethods,
@@ -73,17 +74,12 @@ const scryptAsync = promisify<
 >(scrypt);
 
 class User extends AbstractModel<IUser, IAbstractModelMethods<IUser>, IStatic> {
-  hashRounds: number;
-
-  saltSecret: string;
-
   constructor(app: IApp) {
+    console.warn(
+      'UserOld model is deprecated. Please use User Model instead of UserOld',
+    );
     super(app);
-    const authConfig = this.app.getConfig('auth');
-    this.hashRounds = authConfig.hashRounds;
-    this.saltSecret = authConfig.saltSecret;
   }
-
   initHooks() {
     this.mongooseSchema.pre('save', async function userPreSaveHook() {
       if (this.isModified('password')) {
@@ -157,14 +153,13 @@ class User extends AbstractModel<IUser, IAbstractModelMethods<IUser>, IStatic> {
   }
 
   async generateToken(this: InstanceType<User['mongooseModel']>) {
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
     const timestamp = new Date();
     timestamp.setDate(timestamp.getDate() + 30);
     const data = await scryptAsync(
       this.email + Date.now(),
-      // @ts-ignore
-      this.getSuper().saltSecret,
-      // @ts-ignore
-      this.getSuper().hashRounds,
+      saltSecret,
+      hashRounds,
     );
     const token = data.toString('base64url');
     this.sessionTokens.push({ token, valid: timestamp });
@@ -185,13 +180,8 @@ class User extends AbstractModel<IUser, IAbstractModelMethods<IUser>, IStatic> {
   }
 
   static async hashPassword(this: User['mongooseModel'], password: string) {
-    const data = await scryptAsync(
-      String(password),
-      // @ts-ignore
-      this.getSuper().saltSecret,
-      // @ts-ignore
-      this.getSuper().hashRounds,
-    );
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+    const data = await scryptAsync(String(password), saltSecret, hashRounds);
     return data.toString('base64url');
   }
 
@@ -211,14 +201,14 @@ class User extends AbstractModel<IUser, IAbstractModelMethods<IUser>, IStatic> {
   static async generateUserPasswordRecoveryToken(
     userMongoose: InstanceType<User['mongooseModel']>,
   ) {
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+
     const date = new Date();
     date.setDate(date.getDate() + 14);
     const data = await scryptAsync(
       userMongoose.email + Date.now(),
-      // @ts-ignore
-      userMongoose.getSuper().saltSecret,
-      // @ts-ignore
-      userMongoose.getSuper().hashRounds,
+      saltSecret,
+      hashRounds,
     );
 
     const token = data.toString('base64url');
@@ -290,14 +280,14 @@ class User extends AbstractModel<IUser, IAbstractModelMethods<IUser>, IStatic> {
   static async generateUserVerificationToken(
     userMongoose: InstanceType<User['mongooseModel']>,
   ) {
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+
     const date = new Date();
     date.setDate(date.getDate() + 14);
     const data = await scryptAsync(
       userMongoose.email + Date.now(),
-      // @ts-ignore
-      userMongoose.getSuper().saltSecret,
-      // @ts-ignore
-      userMongoose.getSuper().hashRounds,
+      saltSecret,
+      hashRounds,
     );
     const token = data.toString('base64url');
     // if (err) {
