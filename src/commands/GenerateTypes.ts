@@ -1,4 +1,5 @@
-import AbstractCommand from '@adaptivestone/framework/modules/AbstractCommand.js';
+import AbstractCommand from '../modules/AbstractCommand.ts';
+import { BaseModel } from '../modules/BaseModel.ts';
 import * as url from 'url';
 import fs from 'node:fs/promises';
 
@@ -19,7 +20,7 @@ class GenerateTypes extends AbstractCommand {
   static isShouldInitModels = false;
 
   async run(): Promise<boolean> {
-    const template = GenerateTypes.getTemplate(
+    const template = await GenerateTypes.getTemplate(
       this.app.internalFilesCache.configs,
       this.app.internalFilesCache.modelPaths,
     );
@@ -30,10 +31,10 @@ class GenerateTypes extends AbstractCommand {
     return Promise.resolve(true);
   }
 
-  static getTemplate(
+  static async getTemplate(
     configs: Map<string, any>,
     modelPaths: { file: string; path: string }[],
-  ): string {
+  ): Promise<string> {
     const dir = process.cwd();
     const configTypes = Array.from(configs)
       .map((config) => {
@@ -41,14 +42,25 @@ class GenerateTypes extends AbstractCommand {
       })
       .join('\n');
 
-    const modelTypes = modelPaths
-      .map((modelPath) => {
-        const path = modelPath.path.replace(dir, '.');
-        return `    getModel(modelName: '${modelPath.file}'): import('${path}').default['mongooseModel']`;
-      })
-      .join('\n');
+    const modelTypes = (
+      await Promise.all(
+        modelPaths.map(async (modelPath) => {
+          const modelModule = await import(modelPath.path);
+          const path = modelPath.path.replace(dir, '.');
+          console.log(modelModule.default);
+          console.log(modelModule.default.prototype instanceof BaseModel);
+          if (modelModule.default.prototype instanceof BaseModel) {
+            return `    getModel(modelName: '${modelPath.file}'): GetModelTypeFromClass<typeof import('${path}').default>`;
+          } else {
+            return `    getModel(modelName: '${modelPath.file}'): import('${path}').default['mongooseModel']`;
+          }
+        }),
+      )
+    ).join('\n');
+
     return `
 import type {} from '@adaptivestone/framework/server.js';
+import type { GetModelTypeFromClass } from './src/modules/BaseModel.ts';
 
 declare module '@adaptivestone/framework/server.js' {
   export interface IApp {
