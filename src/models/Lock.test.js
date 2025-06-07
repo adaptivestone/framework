@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { appInstance } from '../helpers/appInstance.ts';
 
 describe('Lock Model', () => {
   let Lock;
@@ -6,7 +7,7 @@ describe('Lock Model', () => {
   const testTtl = 30; // seconds
 
   beforeAll(async () => {
-    Lock = global.server.app.getModel('Lock');
+    Lock = appInstance.getModel('Lock');
   });
 
   describe('acquireLock()', () => {

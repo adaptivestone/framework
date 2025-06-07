@@ -1,124 +1,123 @@
-import AbstractModel from '../modules/AbstractModel.ts';
+import { BaseModel } from '../modules/BaseModel.ts';
 import type {
-  IAbstractModel,
-  IAbstractModelMethods,
-} from '../modules/AbstractModel.ts';
+  GetModelTypeLiteFromSchema,
+  SchemaOptionsReturnType,
+} from '../modules/BaseModel.ts';
 
 import type { MongoError } from 'mongodb';
+import type { Schema } from 'mongoose';
 
-interface ILock {
-  _id: string;
-  expiredAt: Date;
-}
-
-interface IStatic extends IAbstractModel<ILock, IAbstractModelMethods<ILock>> {
-  acquireLock(name: string, ttlSeconds?: number): Promise<boolean>;
-  releaseLock(name: string): Promise<boolean>;
-  waitForUnlock(name: string): Promise<void>;
-  getLockData(name: string): Promise<{ ttl: number }>;
-  getLocksData(names: string[]): Promise<{ name: string; ttl: number }[]>;
-}
-
-class Lock extends AbstractModel<ILock, IAbstractModelMethods<ILock>, IStatic> {
-  initHooks() {
-    this.mongooseSchema.index({ expiredAt: 1 }, { expireAfterSeconds: 0 });
-  }
-
-  // eslint-disable-next-line class-methods-use-this
-  get modelSchema() {
+class Lock extends BaseModel {
+  static get modelSchema() {
     return {
       _id: { type: String, required: true },
       expiredAt: {
         type: Date,
       },
-    };
+    } as const;
   }
 
-  /**
-   * acquire lock based on lock name
-   * @param {string} name
-   * @param {number} [ttlSeconds=30]
-   */
-  static async acquireLock(
-    this: Lock['mongooseModel'],
-    name: string,
-    ttlSeconds = 30,
-  ) {
-    try {
-      await this.create({
-        _id: name,
-        expiredAt: new Date(Date.now() + ttlSeconds * 1000),
-      });
-    } catch (error: unknown) {
-      if ((error as MongoError).code !== 11000) {
-        // not a duplicate leys
-        throw error;
-      }
-      return false;
-    }
-    return true;
+  static get modelStatics() {
+    type LockModelLite = GetModelTypeLiteFromSchema<
+      typeof Lock.modelSchema,
+      SchemaOptionsReturnType<typeof Lock>
+    >;
+
+    return {
+      /**
+       * acquire lock based on lock name
+       * @param {string} name
+       * @param {number} [ttlSeconds=30]
+       */
+      acquireLock: async function (
+        this: LockModelLite,
+        name: string,
+        ttlSeconds = 30,
+      ) {
+        try {
+          await this.create({
+            _id: name,
+            expiredAt: new Date(Date.now() + ttlSeconds * 1000),
+          });
+        } catch (error: unknown) {
+          if ((error as MongoError).code !== 11000) {
+            // not a duplicate keys
+            throw error;
+          }
+          return false;
+        }
+        return true;
+      },
+
+      /**
+       * release lock based on lock name
+       * @param {string} name
+       */
+      releaseLock: async function (this: LockModelLite, name: string) {
+        const res = await this.deleteOne({ _id: name });
+        if (res.acknowledged && res.deletedCount) {
+          return true;
+        }
+        return false;
+      },
+
+      /**
+       * wait lock based on lock name
+       * @param {string} name
+       */
+      waitForUnlock: async function (this: LockModelLite, name: string) {
+        const res = await this.findOne({ _id: name });
+        if (!res) {
+          return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+          const stream = this.watch([
+            { $match: { operationType: 'delete', 'documentKey._id': name } },
+          ]);
+          stream.on('change', () => {
+            stream.close();
+            resolve(true);
+          });
+        });
+      },
+
+      /**
+       * get lock remaining time based on lock name
+       * @param {string} name
+       */
+      getLockData: async function (this: LockModelLite, name: string) {
+        const res = await this.findOne({ _id: name });
+        if (!res || !res.expiredAt) {
+          return { ttl: 0 };
+        }
+        return { ttl: res.expiredAt.getTime() - Date.now() };
+      },
+
+      /**
+       * get lock remaining time based on lock name
+       * @param {string[]} names
+       */
+      getLocksData: async function (this: LockModelLite, names: string[]) {
+        const res = await this.find({ _id: { $in: names } });
+        const lockMap = new Map(res.map((lock) => [lock._id, lock]));
+
+        return names.map((name) => {
+          const lock = lockMap.get(name);
+          return {
+            name,
+            ttl:
+              lock && lock.expiredAt
+                ? lock.expiredAt.getTime() - Date.now()
+                : 0,
+          };
+        });
+      },
+    } as const;
   }
 
-  /**
-   * release lock based on lock name
-   * @param {string} name
-   */
-  static async releaseLock(this: Lock['mongooseModel'], name: string) {
-    const res = await this.deleteOne({ _id: name });
-    if (res.acknowledged && res.deletedCount) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * wait lock based on lock name
-   * @param {string} name
-   */
-  static async waitForUnlock(this: Lock['mongooseModel'], name: string) {
-    const res = await this.findOne({ _id: name });
-    if (!res) {
-      return Promise.resolve();
-    }
-
-    return new Promise((resolve) => {
-      const stream = this.watch([
-        { $match: { operationType: 'delete', 'documentKey._id': name } },
-      ]);
-      stream.on('change', () => {
-        stream.close();
-        resolve(true);
-      });
-    });
-  }
-
-  /**
-   * get lock remaining time based on lock name
-   * @param {string} name
-   */
-  static async getLockData(this: Lock['mongooseModel'], name: string) {
-    const res = await this.findOne({ _id: name });
-    if (!res) {
-      return { ttl: 0 };
-    }
-    return { ttl: res.expiredAt.getTime() - Date.now() };
-  }
-
-  /**
-   * get lock remaining time based on lock name
-   * @param {string[]} names
-   */
-  static async getLocksData(this: Lock['mongooseModel'], names: string[]) {
-    const res = await this.find({ _id: { $in: names } });
-    const lockMap = new Map(res.map((lock) => [lock._id, lock]));
-
-    return names.map((name) => {
-      const lock = lockMap.get(name);
-      return {
-        name,
-        ttl: lock ? lock.expiredAt.getTime() - Date.now() : 0,
-      };
-    });
+  initHooks(schema: Schema) {
+    schema.index({ expiredAt: 1 }, { expireAfterSeconds: 0 });
   }
 }
 

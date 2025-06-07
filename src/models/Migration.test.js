@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { appInstance } from '../helpers/appInstance';
+import { appInstance } from '../helpers/appInstance.ts';
 
 describe('migration model', () => {
   it('migrationFile should be uniqe', async () => {

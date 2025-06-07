@@ -1,7 +1,7 @@
 import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
-  ModelOptionsReturnType,
+  SchemaOptionsReturnType,
 } from '../modules/BaseModel.ts';
 
 class Sequence extends BaseModel {
@@ -31,7 +31,7 @@ class Sequence extends BaseModel {
   static get modelStatics() {
     type SequenceModelLite = GetModelTypeLiteFromSchema<
       typeof Sequence.modelSchema,
-      ModelOptionsReturnType<typeof Sequence>
+      SchemaOptionsReturnType<typeof Sequence>
     >;
     return {
       getSequence: async function (this: SequenceModelLite, forType: string) {

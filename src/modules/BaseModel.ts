@@ -32,8 +32,8 @@ export type ModelStaticsReturnType<T> = T extends {
 }
   ? R
   : {};
-export type ModelOptionsReturnType<T> = T extends {
-  modelOptions: infer R;
+export type SchemaOptionsReturnType<T> = T extends {
+  schemaOptions: infer R;
 }
   ? R
   : {};
@@ -42,20 +42,20 @@ export type ModelOptionsReturnType<T> = T extends {
 export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
   InferRawDocType<
     ModelSchemaReturnType<T> &
-      WithTimestamps<Merge<typeof defaultOptions, ModelOptionsReturnType<T>>>
+      WithTimestamps<Merge<typeof defaultOptions, SchemaOptionsReturnType<T>>>
   >, // TRawDocType
   Model<any>, // TModel
   ModelMethodsReturnType<T>, // TInstanceMethods
   {}, // TQueryHelpers
   {}, // TVirtuals
   ModelStaticsReturnType<T>, // TStaticMethods
-  ModelOptionsReturnType<T> // TSchemaOptions
+  SchemaOptionsReturnType<T> // TSchemaOptions
 >;
 
 export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
   InferRawDocType<
     ModelSchemaReturnType<T> &
-      WithTimestamps<Merge<typeof defaultOptions, ModelOptionsReturnType<T>>>
+      WithTimestamps<Merge<typeof defaultOptions, SchemaOptionsReturnType<T>>>
   >, // TRawDocType
   ModelMethodsReturnType<T>, // TInstanceMethods
   GetModelSchemaTypeFromClass<T> // TSchema
@@ -78,7 +78,7 @@ export class BaseModel {
     return {} as const;
   }
 
-  static get modelOptions() {
+  static get schemaOptions() {
     return {} as const;
   }
 
@@ -90,13 +90,19 @@ export class BaseModel {
     return {} as const;
   }
 
+  static initHooks(schema: Schema) {
+    // Add hooks here
+  }
+
   // Properly typed static method with generic constraints
   public static initialize<T extends typeof BaseModel>(this: T) {
     const schema = new mongoose.Schema(this.modelSchema, {
-      ...(this.modelOptions as SchemaOptions),
+      ...(this.schemaOptions as SchemaOptions),
       methods: this.modelMethods,
       statics: this.modelStatics,
     }) as GetModelSchemaTypeFromClass<T>;
+
+    this.initHooks(schema);
 
     const mongooseModel = mongoose.model(
       this.name,
