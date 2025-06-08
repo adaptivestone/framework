@@ -189,7 +189,7 @@ class User extends BaseModel {
     } as const;
   }
 
-  static get modelMethods() {
+  static get modelInstanceMethods() {
     type UserInstanceType = InstanceType<UserModelLite>;
     return {
       /**

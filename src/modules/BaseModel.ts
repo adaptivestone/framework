@@ -31,7 +31,7 @@ export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
       >
   >, // TRawDocType
   Model<any>, // TModel
-  ExtractProperty<T, 'modelMethods'>, // TInstanceMethods
+  ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
   {}, // TQueryHelpers
   ExtractProperty<T, 'modelVirtuals'>, // TVirtuals
   ExtractProperty<T, 'modelStatics'>, // TStaticMethods
@@ -45,7 +45,7 @@ export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
         Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
       >
   >, // TRawDocType
-  ExtractProperty<T, 'modelMethods'>, // TInstanceMethods
+  ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
   GetModelSchemaTypeFromClass<T> // TSchema
 > &
   ExtractProperty<T, 'modelStatics'>; // Add intersection with static methods
@@ -68,7 +68,7 @@ export class BaseModel {
     return {} as const;
   }
 
-  static get modelMethods() {
+  static get modelInstanceMethods() {
     return {} as const;
   }
 
@@ -88,7 +88,7 @@ export class BaseModel {
   public static initialize<T extends typeof BaseModel>(this: T) {
     const schema = new mongoose.Schema(this.modelSchema, {
       ...(this.schemaOptions as SchemaOptions),
-      methods: this.modelMethods,
+      methods: this.modelInstanceMethods,
       statics: this.modelStatics,
       virtuals: this.modelVirtuals,
     }) as GetModelSchemaTypeFromClass<T>;
