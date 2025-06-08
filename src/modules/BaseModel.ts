@@ -72,8 +72,6 @@ export type GetModelTypeLiteFromSchema<
 export const defaultOptions = { timestamps: true, minimize: false } as const;
 
 export class BaseModel {
-  static isABaseModel = true; // Flag to identify BaseModel instances
-
   static get modelSchema() {
     return {} as const;
   }

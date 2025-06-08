@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { userHelpers } from '../models/User.ts';
 
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
@@ -120,9 +121,7 @@ describe('user model', () => {
     it('should  work for VALID token', async () => {
       expect.assertions(1);
 
-      const token = await global.server.app
-        .getModel('User')
-        .generateUserVerificationToken(globalUser);
+      const token = await userHelpers.generateUserVerificationToken(globalUser);
 
       const user = await global.server.app
         .getModel('User')
@@ -146,9 +145,8 @@ describe('user model', () => {
     it('should  work for VALID token', async () => {
       expect.assertions(1);
 
-      const token = await global.server.app
-        .getModel('User')
-        .generateUserPasswordRecoveryToken(globalUser);
+      const token =
+        await userHelpers.generateUserPasswordRecoveryToken(globalUser);
 
       const user = await global.server.app
         .getModel('User')

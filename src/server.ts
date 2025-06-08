@@ -66,8 +66,11 @@ class Server {
 
   cache: AppCache = {
     configs: new Map<string, unknown>(),
-    models: new Map<string, AbstractModel['mongooseModel']>(),
-    modelConstructors: new Map<string, typeof AbstractModel>(),
+    models: new Map<string, AbstractModel['mongooseModel'] | Model<any>>(),
+    modelConstructors: new Map<
+      string,
+      typeof AbstractModel | typeof BaseModel
+    >(),
     modelPaths: [],
   };
 

@@ -1,9 +1,7 @@
-import { scrypt } from 'node:crypto';
-
-import { promisify } from 'node:util';
 import AbstractModel from '../modules/AbstractModel.ts';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { IApp } from '../server.ts';
+import { scryptAsync } from '../helpers/crypto.ts';
 
 import type { TFunction } from 'i18next';
 
@@ -65,13 +63,6 @@ interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {
     user: InstanceType<UserOld['mongooseModel']>,
   ): Promise<{ token: string; until: Date }>;
 }
-
-const scryptAsync = promisify<
-  string | Buffer | NodeJS.TypedArray | DataView,
-  string | Buffer | NodeJS.TypedArray | DataView,
-  number,
-  Buffer
->(scrypt);
 
 class UserOld extends AbstractModel<
   IUser,
