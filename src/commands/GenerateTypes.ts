@@ -58,7 +58,7 @@ class GenerateTypes extends AbstractCommand {
 
     return `
 import type {} from '@adaptivestone/framework/server.js';
-import type { GetModelTypeFromClass } from './src/modules/BaseModel.ts';
+import type { GetModelTypeFromClass } from '@adaptivestone/framework/modules/BaseModel.js';
 
 declare module '@adaptivestone/framework/server.js' {
   export interface IApp {

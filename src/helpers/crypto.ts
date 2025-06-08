@@ -2,7 +2,7 @@ import { scrypt } from 'node:crypto';
 
 import { promisify } from 'node:util';
 
-import { appInstance } from './appInstance.js';
+import { appInstance } from './appInstance.ts';
 
 export const scryptAsync = promisify<
   string | Buffer | NodeJS.TypedArray | DataView,
