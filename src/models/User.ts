@@ -1,7 +1,7 @@
 import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
-  SchemaOptionsReturnType,
+  ExtractProperty,
 } from '../modules/BaseModel.ts';
 import { scryptAsyncWithSaltAsString } from '../helpers/crypto.ts';
 import { appInstance } from '../helpers/appInstance.ts';
@@ -11,7 +11,7 @@ import type { TFunction } from 'i18next';
 
 type UserModelLite = GetModelTypeLiteFromSchema<
   typeof User.modelSchema,
-  SchemaOptionsReturnType<typeof User>
+  ExtractProperty<typeof User, 'schemaOptions'>
 >;
 class User extends BaseModel {
   static initHooks(schema: Schema) {

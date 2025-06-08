@@ -1,7 +1,7 @@
 import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
-  SchemaOptionsReturnType,
+  ExtractProperty,
 } from '../modules/BaseModel.ts';
 
 import type { MongoError } from 'mongodb';
@@ -20,7 +20,7 @@ class Lock extends BaseModel {
   static get modelStatics() {
     type LockModelLite = GetModelTypeLiteFromSchema<
       typeof Lock.modelSchema,
-      SchemaOptionsReturnType<typeof Lock>
+      ExtractProperty<typeof Lock, 'schemaOptions'>
     >;
 
     return {

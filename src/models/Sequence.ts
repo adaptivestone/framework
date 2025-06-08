@@ -1,7 +1,7 @@
 import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
-  SchemaOptionsReturnType,
+  ExtractProperty,
 } from '../modules/BaseModel.ts';
 
 class Sequence extends BaseModel {
@@ -12,26 +12,10 @@ class Sequence extends BaseModel {
     } as const;
   }
 
-  // static get modelMethods() {
-  //   type SequenceModelLite = GetModelTypeLiteFromSchema<
-  //     typeof Sequence.modelSchema,
-  //     ModelOptionsReturnType<typeof Sequence>
-  //   >;
-
-  //   return {
-  //     getPublic: async function (this: InstanceType<SequenceModelLite>) {
-  //       return {
-  //         _id: this._id,
-  //         seq: this.seq,
-  //       };
-  //     },
-  //   } as const;
-  // }
-
   static get modelStatics() {
     type SequenceModelLite = GetModelTypeLiteFromSchema<
       typeof Sequence.modelSchema,
-      SchemaOptionsReturnType<typeof Sequence>
+      ExtractProperty<typeof Sequence, 'schemaOptions'>
     >;
     return {
       getSequence: async function (this: SequenceModelLite, forType: string) {
