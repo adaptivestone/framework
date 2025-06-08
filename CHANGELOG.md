@@ -1,3 +1,42 @@
+### 5.0.0-next
+
+This is a big release that contains a lot of new features and breaking changes.
+Main feature of that release is full TypeScript support insluding mongoose models.
+
+#### New Features
+
+[NEW] Full TypeScript support, including Mongoose models.
+[NEW] New model type: BaseModel, simplifying work with TypeScript and based on statics.
+[NEW] AppInstance helper to access the app instance from anywhere without passing it.
+[NEW] GenerateTypes command added.
+[NEW] Lock model for working with locks via MongoDB.
+[NEW] FrameworkFolder folder added to the app for module usage.
+[NEW] Ability to skip Mongo model initialization in CLI environments.
+[NEW] Mongo connections in CLI now have unique names, including the command name.
+[NEW] On shutdown event, force shutdown after a timeout.
+[NEW] GenerateRandomBytes command added.
+[NEW] IpDetector middleware for detecting proxies and X-Forwarded-For headers.
+
+#### Breaking changes (please read carefully)
+
+[BREAKING] all models now should be extended from BaseModel. This is a potencial breaking change specially for User model.
+[BREAKING] Remove jest support for testing
+[BREAKING] move email module to separate package @adaptivestone/framework-module-email. Please use it if you want to send emails
+[BREAKING] remove VIEWS folders at all. Should not afffect any user as this was not used internally
+[BREAKING] removed noidemailer-sendmail-transport. Not needed anymore and not recommended to use as well
+[BREAKING] remove minimist CLI parsing and replace it by commandArguments parser
+[BREAKING] vitest v3 https://vitest.dev/guide/migration.html
+[BREAKING] i18next v24 https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0
+[BREAKING] possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too https://expressjs.com/en/guide/migrating-5.html.
+[BREAKING] AS part of express 5 migration _ in rotes (middlewares) should have perameter. please replace _ to \*splat
+[BREAKING] default auth responce changed to be unified. {token, user} = > {data:{token, user}}
+[BREAKING] RateLimiter now need to have IpDetector middleware before
+[BREAKING] removing staticFiles middleware as it not used in projects anymore. Docs with nginx config will be provided
+[BREAKING] remove default AUTH_SALT. It should be provided on a app level now
+[BREAKING] Minimum node version is 20.12 as for now (process.loadEnvFile)
+[BREAKING] ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience
+[BREAKING] Mongoose v8. https://mongoosejs.com/docs/migrating_to_8.html
+
 ### 5.0.0-beta.19
 
 [NEW] intruducing new model type. BaseModel. Features - simplifie works with typescript. And based on statics

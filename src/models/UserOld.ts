@@ -64,6 +64,9 @@ interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {
   ): Promise<{ token: string; until: Date }>;
 }
 
+/**
+ * @deprecated use User Model instead of UserOld
+ */
 class UserOld extends AbstractModel<
   IUser,
   IAbstractModelMethods<IUser>,
