@@ -2,6 +2,7 @@ import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
   ExtractProperty,
+  GetModelTypeFromClass,
 } from '../modules/BaseModel.ts';
 import { scryptAsyncWithSaltAsString } from '../helpers/crypto.ts';
 import { appInstance } from '../helpers/appInstance.ts';
@@ -173,19 +174,19 @@ class User extends BaseModel {
         return result;
       },
       // TODO
-      removeVerificationToken: async function removeVerificationToken(
-        this: UserModelLite,
-        verificationToken: string,
-      ) {
-        this.updateOne(
-          {
-            verificationTokens: {
-              $elemMatch: { token: String(verificationToken) },
-            },
-          },
-          { $pop: { verificationTokens: 1 } },
-        );
-      },
+      // removeVerificationToken: async function removeVerificationToken(
+      //   this: UserModelLite,
+      //   verificationToken: string,
+      // ) {
+      //   this.updateOne(
+      //     {
+      //       verificationTokens: {
+      //         $elemMatch: { token: String(verificationToken) },
+      //       },
+      //     },
+      //     { $pop: { verificationTokens: 1 } },
+      //   );
+      // },
     } as const;
   }
 
@@ -351,3 +352,4 @@ export const userHelpers = {
 };
 
 export default User;
+export type TUserModel = GetModelTypeFromClass<typeof User>;

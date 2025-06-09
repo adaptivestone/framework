@@ -8,6 +8,10 @@ import type { MongoError } from 'mongodb';
 import type { Schema } from 'mongoose';
 
 class Lock extends BaseModel {
+  static initHooks(schema: Schema) {
+    schema.index({ expiredAt: 1 }, { expireAfterSeconds: 0 });
+  }
+
   static get modelSchema() {
     return {
       _id: { type: String, required: true },
@@ -114,10 +118,6 @@ class Lock extends BaseModel {
         });
       },
     } as const;
-  }
-
-  initHooks(schema: Schema) {
-    schema.index({ expiredAt: 1 }, { expireAfterSeconds: 0 });
   }
 }
 
