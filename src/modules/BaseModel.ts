@@ -87,6 +87,7 @@ export class BaseModel {
   // Properly typed static method with generic constraints
   public static initialize<T extends typeof BaseModel>(this: T) {
     const schema = new mongoose.Schema(this.modelSchema, {
+      ...defaultOptions,
       ...(this.schemaOptions as SchemaOptions),
       methods: this.modelInstanceMethods,
       statics: this.modelStatics,
