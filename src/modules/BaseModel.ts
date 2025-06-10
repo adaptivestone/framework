@@ -5,7 +5,7 @@ import type {
   Schema,
   InferRawDocType,
   // DefaultSchemaOptions,
-  // HydratedDocument,
+  HydratedDocument,
 } from 'mongoose';
 
 export type Merge<M, N> = Omit<M, keyof N> & N;
@@ -30,7 +30,17 @@ export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
         Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
       >
   >, // TRawDocType
-  Model<any>, // TModel
+  Model<
+    InferRawDocType<
+      ExtractProperty<T, 'modelSchema'> &
+        WithTimestamps<
+          Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
+        >
+    >,
+    {}, // TQueryHelpers
+    ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
+    ExtractProperty<T, 'modelVirtuals'> // TVirtuals
+  >, // TModelType
   ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
   {}, // TQueryHelpers
   ExtractProperty<T, 'modelVirtuals'>, // TVirtuals
@@ -38,6 +48,7 @@ export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
   ExtractProperty<T, 'schemaOptions'> // TSchemaOptions
 >;
 
+// this came from moongose. Look at the Model and Schema types.
 export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
   InferRawDocType<
     ExtractProperty<T, 'modelSchema'> &
@@ -45,7 +56,21 @@ export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
         Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
       >
   >, // TRawDocType
+  {}, // TQueryHelpers
   ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
+  ExtractProperty<T, 'modelVirtuals'>, // TVirtuals
+  HydratedDocument<
+    InferRawDocType<
+      ExtractProperty<T, 'modelSchema'> &
+        WithTimestamps<
+          Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
+        >
+    >, //TRawDocType
+    ExtractProperty<T, 'modelVirtuals'> &
+      ExtractProperty<T, 'modelInstanceMethods'>, // TVirtuals & TInstanceMethods
+    {}, // TQueryHelpers
+    ExtractProperty<T, 'modelVirtuals'> // TVirtuals
+  >,
   GetModelSchemaTypeFromClass<T> // TSchema
 > &
   ExtractProperty<T, 'modelStatics'>; // Add intersection with static methods
