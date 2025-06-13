@@ -1,647 +1,857 @@
-### 5.0.0-next
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [5.0.0-next]
 
 This is a big release that contains a lot of new features and breaking changes.
 Main feature of that release is full TypeScript support insluding mongoose models.
 
-#### New Features
+### New Features
 
-[NEW] Full TypeScript support, including Mongoose models.
-[NEW] New model type: BaseModel, simplifying work with TypeScript and based on statics.
-[NEW] AppInstance helper to access the app instance from anywhere without passing it.
-[NEW] GenerateTypes command added.
-[NEW] Lock model for working with locks via MongoDB.
-[NEW] FrameworkFolder folder added to the app for module usage.
-[NEW] Ability to skip Mongo model initialization in CLI environments.
-[NEW] Mongo connections in CLI now have unique names, including the command name.
-[NEW] On shutdown event, force shutdown after a timeout.
-[NEW] GenerateRandomBytes command added.
-[NEW] IpDetector middleware for detecting proxies and X-Forwarded-For headers.
+- **[NEW]** Full TypeScript support, including Mongoose models.
+- **[NEW]** New model type: `BaseModel`, simplifying work with TypeScript and based on statics.
+- **[NEW]** `AppInstance` helper to access the app instance from anywhere without passing it.
+- **[NEW]** `GenerateTypes` command added.
+- **[NEW]** `Lock` model for working with locks via MongoDB.
+- **[NEW]** `FrameworkFolder` folder added to the app for module usage.
+- **[NEW]** Ability to skip Mongo model initialization in CLI environments.
+- **[NEW]** Mongo connections in CLI now have unique names, including the command name.
+- **[NEW]** On shutdown event, force shutdown after a timeout.
+- **[NEW]** `GenerateRandomBytes` command added.
+- **[NEW]** `IpDetector` middleware for detecting proxies and `X-Forwarded-For` headers.
 
-#### Breaking changes (please read carefully)
+### Breaking changes (please read carefully)
 
-[BREAKING] all models now should be extended from BaseModel. This is a potencial breaking change specially for User model.
-[BREAKING] Remove jest support for testing
-[BREAKING] move email module to separate package @adaptivestone/framework-module-email. Please use it if you want to send emails
-[BREAKING] remove VIEWS folders at all. Should not afffect any user as this was not used internally
-[BREAKING] removed noidemailer-sendmail-transport. Not needed anymore and not recommended to use as well
-[BREAKING] remove minimist CLI parsing and replace it by commandArguments parser
-[BREAKING] vitest v3 https://vitest.dev/guide/migration.html
-[BREAKING] i18next v24 https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0
-[BREAKING] possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too https://expressjs.com/en/guide/migrating-5.html.
-[BREAKING] AS part of express 5 migration _ in rotes (middlewares) should have perameter. please replace _ to \*splat
-[BREAKING] default auth responce changed to be unified. {token, user} = > {data:{token, user}}
-[BREAKING] RateLimiter now need to have IpDetector middleware before
-[BREAKING] removing staticFiles middleware as it not used in projects anymore. Docs with nginx config will be provided
-[BREAKING] remove default AUTH_SALT. It should be provided on a app level now
-[BREAKING] Minimum node version is 20.12 as for now (process.loadEnvFile)
-[BREAKING] ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience
-[BREAKING] Mongoose v8. https://mongoosejs.com/docs/migrating_to_8.html
+- **[BREAKING]** All models now should be extended from `BaseModel`. This is a potencial breaking change specially for `User` model.
+- **[BREAKING]** Remove jest support for testing.
+- **[BREAKING]** Move email module to separate package `@adaptivestone/framework-module-email`. Please use it if you want to send emails.
+- **[BREAKING]** Remove `VIEWS` folders at all. Should not affect any user as this was not used internally.
+- **[BREAKING]** Removed `noidemailer-sendmail-transport`. Not needed anymore and not recommended to use as well.
+- **[BREAKING]** Remove `minimist` CLI parsing and replace it by `commandArguments` parser.
+- **[BREAKING]** `vitest` v3 <https://vitest.dev/guide/migration.html>.
+- **[BREAKING]** `i18next` v24 <https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0>.
+- **[BREAKING]** Possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too <https://expressjs.com/en/guide/migrating-5.html>.
+- **[BREAKING]** As part of express 5 migration `_` in rotes (middlewares) should have perameter. please replace `_` to `*splat`.
+- **[BREAKING]** Default auth responce changed to be unified. `{token, user}` => `{data:{token, user}}`.
+- **[BREAKING]** `RateLimiter` now need to have `IpDetector` middleware before.
+- **[BREAKING]** Removing `staticFiles` middleware as it not used in projects anymore. Docs with nginx config will be provided.
+- **[BREAKING]** Remove default `AUTH_SALT`. It should be provided on a app level now.
+- **[BREAKING]** Minimum node version is 20.12 as for now (`process.loadEnvFile`).
+- **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
+- **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 
-### 5.0.0-beta.22
+---
 
-[UPDATE] update types
+## [5.0.0-beta.22]
 
-### 5.0.0-beta.21
+- **[UPDATE]** Update types.
 
-[FIX] fix bug with missed model options
+---
 
-### 5.0.0-beta.20
+## [5.0.0-beta.21]
 
-[FIX] fix bug with Lock model index
-[NEW] BaseModel add Virtuals
+- **[FIX]** Fix bug with missed model options.
 
-### 5.0.0-beta.19
+---
 
-[NEW] intruducing new model type. BaseModel. Features - simplifie works with typescript. And based on statics
-[BREAKING] all models now should be extended from BaseModel. This is a potencial breaking change specially for User model.
+## [5.0.0-beta.20]
 
-### 5.0.0-beta.18
+- **[FIX]** Fix bug with `Lock` model index.
+- **[NEW]** `BaseModel` add `Virtuals`.
 
-[UPDATE] move away connection from mongooseModels to server itself (preparation for different model types)
-[BREAKING] potencial. We are removed callback from mongooseModels contrctuctor. It was not used in code.
-[NEW] add appInstance helper to access app instance from anywhere without passing it
+---
 
-### 5.0.0-beta.17
+## [5.0.0-beta.19]
 
-[NEW] add GenerateTypes command
+- **[NEW]** Introducing new model type. `BaseModel`. Features - simplifie works with typescript. And based on statics.
+- **[BREAKING]** All models now should be extended from `BaseModel`. This is a potencial breaking change specially for `User` model.
 
-### 5.0.0-beta.16
+---
 
-[UPDATE] update deps
-[UPDATE] new app getter internalFilesCache
-[UPDATE] command new static props to load isShouldGetModelPaths
+## [5.0.0-beta.18]
 
-### 5.0.0-beta.15
+- **[UPDATE]** Move away connection from `mongooseModels` to server itself (preparation for different model types).
+- **[BREAKING]** Potencial. We are removed callback from `mongooseModels` contrctuctor. It was not used in code.
+- **[NEW]** Add `appInstance` helper to access app instance from anywhere without passing it.
 
-[FIX] fix missing folder migrations in dist folder (hope that will be finally)
+---
 
-### 5.0.0-beta.14
+## [5.0.0-beta.17]
 
-[FIX] fix missing folder migrations in dist folder
+- **[NEW]** Add `GenerateTypes` command.
 
-### 5.0.0-beta.13
+---
 
-[UPDATE] only process .ts or .js files (not .map files)
+## [5.0.0-beta.16]
 
-### 5.0.0-beta.12
+- **[UPDATE]** Update deps.
+- **[UPDATE]** New app getter `internalFilesCache`.
+- **[UPDATE]** Command new static props to load `isShouldGetModelPaths`.
 
-[BREAKING] Remove jest support for testing
-[NEW] initial move to typescript. Potencially breaking.
-[NEW] introduce src and dist folders
+---
 
-### 5.0.0-beta.11
+## [5.0.0-beta.15]
 
-[NEW] commands typing
-[NEW] commands support TS files
-[UPDATE] update deps
+- **[FIX]** Fix missing folder `migrations` in `dist` folder (hope that will be finally).
 
-### 5.0.0-beta.9
+---
 
-[BREAKING] move email module to separate package @adaptivestone/framework-module-email. Please use it if you want to send emails
-[NEW] app now contains 'frameworkFolder' folder the framework located. Mostly for modules usage
-[BREAKING] remove VIEWS folders at all. Should not afffect any user as this was not used internally
-[UPDATE] update typing
-[UPDATE] change redis -> @redis/client as we are using only client from pakage
-[BREAKING] removed noidemailer-sendmail-transport. Not needed anymore and not recommended to use as well
+## [5.0.0-beta.14]
 
-### 5.0.0-beta.8
+- **[FIX]** Fix missing folder `migrations` in `dist` folder.
 
-[UPDATE] update deps
-[NEW] Lock model for working locks via mongoDB
+---
 
-### 5.0.0-beta.7
+## [5.0.0-beta.13]
 
-[UPDATE] update deps
-[UPDATE] change vitest shutdown behavior as mongo driver v6.13 change befaviur that affect us (MongoClient.close now closes any outstanding cursors)
+- **[UPDATE]** Only process `.ts` or `.js` files (not `.map` files).
 
-### 5.0.0-beta.5
+---
 
-[BREAKING] remove minimist CLI parsing and replace it by commandArguments parser
-[UPDATE] migrated from eslint-plugin-import to eslint-plugin-import-x
+## [5.0.0-beta.12]
 
-### 5.0.0-beta.5
+- **[BREAKING]** Remove jest support for testing.
+- **[NEW]** Initial move to typescript. Potencially breaking.
+- **[NEW]** Introduce `src` and `dist` folders.
 
-[UPDATE] migrate to eslint 9 and away from aibnb styles (they are abonded)
+---
 
-### 5.0.0-beta.4
+## [5.0.0-beta.11]
 
-[NEW] on shutdown event now after timeout we are forcing to shutdown
+- **[NEW]** Commands typing.
+- **[NEW]** Commands support TS files.
+- **[UPDATE]** Update deps.
 
-### 5.0.0-beta.2
+---
 
-[UPDATE] update deps
-[NEW] add ability to skip mongo model init in CLI env
-[NEW] now each mongo connection on CLI have own name and inslude command name there too (getMongoConnectionName in command)
+## [5.0.0-beta.9]
 
-### 5.0.0-beta.1
+- **[BREAKING]** Move email module to separate package `@adaptivestone/framework-module-email`. Please use it if you want to send emails.
+- **[NEW]** App now contains `frameworkFolder` folder the framework located. Mostly for modules usage.
+- **[BREAKING]** Remove `VIEWS` folders at all. Should not afffect any user as this was not used internally.
+- **[UPDATE]** Update typing.
+- **[UPDATE]** Change `redis` -> `@redis/client` as we are using only client from pakage.
+- **[BREAKING]** Removed `noidemailer-sendmail-transport`. Not needed anymore and not recommended to use as well.
 
-[UPDATE] update deps
-[BREAKING] vitest v3 https://vitest.dev/guide/migration.html
+---
 
-### 5.0.0-alpha.26
+## [5.0.0-beta.8]
 
-[UPDATE] update deps
-[UPDATE] new commands view in CLI
+- **[UPDATE]** Update deps.
+- **[NEW]** `Lock` model for working locks via mongoDB.
 
-### 5.0.0-alpha.24
+---
 
-[UPDATE] update deps
-[BREAKING] i18next v24 https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0
+## [5.0.0-beta.7]
 
-### 5.0.0-alpha.23
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Change `vitest` shutdown behavior as mongo driver v6.13 change befaviur that affect us (`MongoClient.close` now closes any outstanding cursors).
 
-[UPDATE] update deps
+---
 
-### 5.0.0-alpha.22
+## [5.0.0-beta.5]
 
-[UPDATE] update deps
-[FIX] fix optional routing parameters
+- **[BREAKING]** Remove `minimist` CLI parsing and replace it by `commandArguments` parser.
+- **[UPDATE]** Migrated from `eslint-plugin-import` to `eslint-plugin-import-x`.
+- **[UPDATE]** Migrate to eslint 9 and away from aibnb styles (they are abonded).
 
-### 5.0.0-alpha.21
+---
 
-[BREAKING] possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too https://expressjs.com/en/guide/migrating-5.html.
-[BREAKING] AS part of express 5 migration _ in rotes (middlewares) should have perameter. please replace _ to \*splat
-[UPDATE] update deps
-[UPDATE] Mailer uses await import() for startup speedup
+## [5.0.0-beta.4]
 
-### 5.0.0-alpha.20
+- **[NEW]** On shutdown event now after timeout we are forcing to shutdown.
 
-[UPDATE] update deps
-[UPDATE] #realLogger do not throw error in a scecific cases (model toJSON({virtual:true}))
+---
 
-### 5.0.0-alpha.19
+## [5.0.0-beta.2]
 
-[NEW] added modelSchemaOptions for models
+- **[UPDATE]** Update deps.
+- **[NEW]** Add ability to skip mongo model init in CLI env.
+- **[NEW]** Now each mongo connection on CLI have own name and inslude command name there too (`getMongoConnectionName` in command).
 
-### 5.0.0-alpha.18
+---
 
-[BREAKING] default auth responce changed to be unified. {token, user} = > {data:{token, user}}
-[UPDATE] RateLimiter updae key generation
+## [5.0.0-beta.1]
 
-### 5.0.0-alpha.17
+- **[UPDATE]** Update deps.
+- **[BREAKING]** `vitest` v3 <https://vitest.dev/guide/migration.html>.
 
-[NEW] generateRandomBytes command
-[UPDATE] update deps
+---
 
-### 5.0.0-alpha.16
+## [5.0.0-alpha.26]
 
-[UPDATE] no warning of direct usage body and query
-[UPDATE] update deps
+- **[UPDATE]** Update deps.
+- **[UPDATE]** New commands view in CLI.
 
-### 5.0.0-alpha.15
+---
 
-[BUG] fix bug with pagination
-[UPDATE] update deps
+## [5.0.0-alpha.24]
 
-### 5.0.0-alpha.14
+- **[UPDATE]** Update deps.
+- **[BREAKING]** `i18next` v24 <https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0>.
 
-[NEW] add types for Abstract model (wip)
+---
 
-### 5.0.0-alpha.13
+## [5.0.0-alpha.23]
 
-[UPDATE] update deps
-[UPDATE] update i18n internal implementation
-[CHANGE] disable https server view
+- **[UPDATE]** Update deps.
 
-### 5.0.0-alpha.12
+---
 
-[UPDATE] update deps
+## [5.0.0-alpha.22]
 
-### 5.0.0-alpha.11
+- **[UPDATE]** Update deps.
+- **[FIX]** Fix optional routing parameters.
 
-[UPDATE] update deps
+---
 
-### 5.0.0-alpha.10
+## [5.0.0-alpha.21]
 
-[UPDATE] update deps
-[NEW] IpDetector middleware that support detecting proxy and X-Forwarded-For header
-[BREAKING] RateLimiter now need to have IpDetector middleware before
+- **[BREAKING]** Possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too <https://expressjs.com/en/guide/migrating-5.html>.
+- **[BREAKING]** As part of express 5 migration `_` in rotes (middlewares) should have perameter. please replace `_` to `*splat`.
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Mailer uses `await import()` for startup speedup.
 
-### 5.0.0-alpha.9
+---
 
-[UPDATE] update deps
-[BREAKING] removing staticFiles middleware as it not used in projects anymore. Docs with nginx config will be provided
-[BREAKING] remove default AUTH_SALT. It should be provided on a app level now
-[BREAKING] Vitest 2.0.0 https://vitest.dev/guide/migration.html#migrating-to-vitest-2-0
+## [5.0.0-alpha.20]
 
-### 5.0.0-alpha.8
+- **[UPDATE]** Update deps.
+- **[UPDATE]** `#realLogger` do not throw error in a scecific cases (`model.toJSON({virtual:true})`).
 
-[UPDATE] replace dotenv with loadEnvFile
-[UPDATE] replace nodemon with node --watch (dev only)
-[BREAKING] Minimum node version is 20.12 as for now (process.loadEnvFile)
+---
 
-### 5.0.0-alpha.7
+## [5.0.0-alpha.19]
 
-[UPDATE] deps update
+- **[NEW]** Added `modelSchemaOptions` for models.
 
-### 5.0.0-alpha.6
+---
 
-[UPDATE] Update internal documentation (jsdoc, d.ts)
+## [5.0.0-alpha.18]
 
-### 5.0.0-alpha.5
+- **[BREAKING]** Default auth responce changed to be unified. `{token, user}` => `{data:{token, user}}`.
+- **[UPDATE]** `RateLimiter` updae key generation.
 
-[UPDATE] More verbose errors for rapsing body request.
-[UPDATE] deps update
+---
 
-### 5.0.0-alpha.4
+## [5.0.0-alpha.17]
 
-[UPDATE] Update rate-limiter-flexible to v5
-[CHANGE] Cache update redis.setEX to redis.set(..,..,{EX:xx}) as setEX deprecated
+- **[NEW]** `generateRandomBytes` command.
+- **[UPDATE]** Update deps.
 
-### 5.0.0-alpha.3
+---
 
-[UPDATE] deps update
-[FIX] Migration commands apply
+## [5.0.0-alpha.16]
 
-### 5.0.0-alpha.2
+- **[UPDATE]** No warning of direct usage `body` and `query`.
+- **[UPDATE]** Update deps.
 
-[UPDATE] deps update
+---
 
-### 5.0.0-alpha.1
+## [5.0.0-alpha.15]
 
-[BREAKING] Vitest 1.0.0 https://vitest.dev/guide/migration.html#migrating-from-vitest-0-34-6
-[BREAKING] ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience
-[BREAKING] Mongoose v8. https://mongoosejs.com/docs/migrating_to_8.html
+- **[BUG]** Fix bug with pagination.
+- **[UPDATE]** Update deps.
 
-### 4.11.4
+---
 
-[UPDATE] deps update
+## [5.0.0-alpha.14]
 
-### 4.11.3
+- **[NEW]** Add types for `Abstract` model (wip).
 
-[UPDATE] deps update
+---
 
-### 4.11.2
+## [5.0.0-alpha.13]
 
-[FIX] Cors middleware return proper headers on multidomains
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Update `i18n` internal implementation.
+- **[CHANGE]** Disable https server view.
 
-### 4.11.1
+---
 
-[FIX] Cors middleware return proper status
+## [5.0.0-alpha.12]
 
-### 4.11.0
+- **[UPDATE]** Update deps.
 
-[NEW] Cors middleware
-[BREAKING] This is a potencial breaking change as we switched from cors external package to internal middleware. From API nothing was changed. This is a potencial breaking changes, but it should keep working as it
+---
 
-### 4.10.0
+## [5.0.0-alpha.11]
 
-[UPDATE] deps update
-[NEW] Static file middleware
-[BREAKING] This is a potencial breaking change as we switched from express.static to internal middleware that provide less features but faster. From API nothing was changed
+- **[UPDATE]** Update deps.
 
-### 4.9.2
+---
 
-[UPDATE] deps update
+## [5.0.0-alpha.10]
 
-### 4.9.1
+- **[UPDATE]** Update deps.
+- **[NEW]** `IpDetector` middleware that support detecting proxy and `X-Forwarded-For` header.
+- **[BREAKING]** `RateLimiter` now need to have `IpDetector` middleware before.
 
-[UPDATE] all responces from framework now happens in JSON. Previouls sometime aswers was in plan text
+---
 
-### 4.9.0
+## [5.0.0-alpha.9]
 
-[BREAKING] We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memoery server is spinned up. If you are using vitest please add "globalSetup: node_modules/@adaptivestone/framework/tests/globalSetupVitest" to your vitest config
+- **[UPDATE]** Update deps.
+- **[BREAKING]** Removing `staticFiles` middleware as it not used in projects anymore. Docs with nginx config will be provided.
+- **[BREAKING]** Remove default `AUTH_SALT`. It should be provided on a app level now.
+- **[BREAKING]** Vitest 2.0.0 <https://vitest.dev/guide/migration.html#migrating-to-vitest-2-0>.
 
-### 4.8.3
+---
 
-[UPDATE] Fix problme with fat start and closing connections after
+## [5.0.0-alpha.8]
 
-### 4.8.2
+- **[UPDATE]** Replace `dotenv` with `loadEnvFile`.
+- **[UPDATE]** Replace `nodemon` with `node --watch` (dev only).
+- **[BREAKING]** Minimum node version is 20.12 as for now (`process.loadEnvFile`).
 
-[UPDATE] CLI - disable mongoose index creation
+---
 
-### 4.8.1
+## [5.0.0-alpha.7]
 
-[UPDATE] Model inited on server inited.
-[NEW] New options to skip model init isSkipModelInit
-[NEW] New method server method initAllModels()
+- **[UPDATE]** Deps update.
 
-### 4.8.0
+---
 
-[BREAKING] Minimum node js version id 18.17.0 now.
-[BREAKING] Removed getFileWithExtendingInhirence. This was internal method and not suppose to use externally
-[UPDATE] update Base getFilesPathWithInheritance to use fs.read dir resursive option
-[UPDATE] update cache (refactor+tets)
-[UPDATE] update config and model inits
+## [5.0.0-alpha.6]
 
-### 4.7.0
+- **[UPDATE]** Update internal documentation (`jsdoc`, `d.ts`).
 
-[UPDATE] update logger init (refactor)
-[UPDATE] updated deps
+---
 
-### 4.6.0
+## [5.0.0-alpha.5]
 
-[NEW] migrated from JEST to vitest
+- **[UPDATE]** More verbose errors for rapsing body request.
+- **[UPDATE]** Deps update.
 
-### 4.5.0
+---
 
-[NEW] Now getSuper() available as a method on mongoose models
-[UPDATE] Update rate-limiter-flexible to v3
-[UPDATE] Update test runner to suport ESM. In case problem with test please copy babel.config.js from framework to your project directory
+## [5.0.0-alpha.4]
 
-### 4.4.0
+- **[UPDATE]** Update `rate-limiter-flexible` to v5.
+- **[CHANGE]** Cache update `redis.setEX` to `redis.set(..,..,{EX:xx})` as `setEX` deprecated.
 
-[NEW] New method to grab url of server it testing enviroument global.server.testingGetUrl("/some/endpoint")
+---
 
-### 4.3.1
+## [5.0.0-alpha.3]
 
-[UPDATE] Yup file validator update. As formidable now return all fields as an array
+- **[UPDATE]** Deps update.
+- **[FIX]** `Migration` commands apply.
 
-### 4.3.0
+---
 
-[BREAKING] updated formidable with a new version + tests. Marked as breaking because of a new major version, but this is internal of framework and exernal still the same. Should break nothing
+## [5.0.0-alpha.2]
 
-### 4.2.0
+- **[UPDATE]** Deps update.
 
-[UPDATE] updated deps
-[NEW] CreateUser cli command. Ability to update user by email or id.
+---
 
-### 4.1.0
+## [5.0.0-alpha.1]
 
-[UPDATE] updated deps
-[NEW] email - Ability to render templae to string for future usage
+- **[BREAKING]** Vitest 1.0.0 <https://vitest.dev/guide/migration.html#migrating-from-vitest-0-34-6>.
+- **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
+- **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 
-### 4.0.0
+---
 
-[BREAKING] change bcrypt encryption with scrypt
-[BREAKING] change internal express parser to formidable parser. Affect you if external formidable is used
-[BREAKING] should not affect any user. Changed email-templates module to internal implementation. Idea to keep dependensy list smaller
-[BREAKING] change i18n middleware to internal one. Nothing should be affected
-[BREAKING] now validation of request splitted between request and query
-[BREAKING] supportedLngs option added to i18n config
-[BREAKING] email inliner now looking for src/services/messaging/email/resources folder instead of 'build' folder.
+## [4.11.4]
 
-[BREAKING] Mongoose v7. https://mongoosejs.com/docs/migrating_to_7.html
-[BREAKING] Yup validation was updated to v1 https://github.com/jquense/yup/issues/1906
+- **[UPDATE]** Deps update.
 
-[DEPRECATED] getExpress path is deprecated. Renamed to getHttpPath
+---
 
-[NEW] pagination middleware
-[NEW] requestLogger middleware. Migrated from core server to be an middleware
-[NEW] CreateUser command
-[NEW] custom yup validator for validate File requests
-[UPDATE] updated deps
-[UPDATE] openApi generator support files
-[UPDATE] updated 18n middleware. Introduced internal cachce. Speed up of request processing up to 100%
-[UPDATE] cache drivers to JSON support BigInt numbers
+## [4.11.3]
 
-### 3.4.3
+- **[UPDATE]** Deps update.
 
-[UPDATE] updated deps
-[FIX] fix tests for redis
-[FIX] support in tests TEST_FOLDER_EMAILS
+---
 
-### 3.4.2
+## [4.11.2]
 
-[UPDATE] updated deps
-[FIX] fix documentation generation
+- **[FIX]** `Cors` middleware return proper headers on multidomains.
 
-### 3.4.1
+---
 
-[FIX] fix documentation generation
+## [4.11.1]
 
-### 3.4.0
+- **[FIX]** `Cors` middleware return proper status.
 
-[NEW] now we pass 'req' to validation and casting as a second parameter. This done mostly for custom validators
+---
 
-### 3.3.0
+## [4.11.0]
 
-[NEW] new command 'SyncIndexes' to sync indexes for mongodb https://framework.adaptivestone.com/docs/cli#syncindexes
-[UPDATE] updated deps
-[FIX] fix documentation generation
+- **[NEW]** `Cors` middleware.
+- **[BREAKING]** This is a potencial breaking change as we switched from `cors` external package to internal middleware. From API nothing was changed. This is a potencial breaking changes, but it should keep working as it.
 
-### 3.2.2
+---
 
-[UPDATE] add options for i18n to config.
-[CHANGE] by default i18n not writing missed keys. Can be enabled via config
+## [4.10.0]
 
-### 3.2.1
+- **[UPDATE]** Deps update.
+- **[NEW]** Static file middleware.
+- **[BREAKING]** This is a potencial breaking change as we switched from `express.static` to internal middleware that provide less features but faster. From API nothing was changed.
 
-[UPDATE] updated deps
-[FIX] fix documentation generation
+---
 
-### 3.2.0
+## [4.9.2]
 
-[UPDATE] updated deps
-[NEW] cache.removeKey(key) - function to remove key from cache
+- **[UPDATE]** Deps update.
 
-### 3.1.1
+---
 
-[UPDATE] updated deps
-[FIX] fix cache error handling.
+## [4.9.1]
 
-### 3.1.0
+- **[UPDATE]** All responces from framework now happens in JSON. Previouls sometime aswers was in plan text.
 
-[NEW] new comand to generate open API documentation (wip)
-[NEW] coverage report
-[UPDATE] updated deps
+---
 
-### 3.0.23
+## [4.9.0]
 
-[UPDATE] updated deps
-[FIX] fix custom errors
+- **[BREAKING]** We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memoery server is spinned up. If you are using `vitest` please add `"globalSetup": "node_modules/@adaptivestone/framework/tests/globalSetupVitest"` to your vitest config.
 
-### 3.0.22
+---
 
-[UPDATE] updated deps
-[UPDATE] cast function now can be ASYNC too
+## [4.8.3]
 
-### 3.0.21
+- **[UPDATE]** Fix problme with fat start and closing connections after.
 
-[UPDATE] updated redis to v4
-[NEW] updates tests to have own namespace on redis
+---
 
-### 3.0.20
+## [4.8.2]
 
-[UPDATE] update deps
+- **[UPDATE]** CLI - disable mongoose index creation.
 
-### 3.0.19
+---
 
-[UPDATE] update deps
+## [4.8.1]
 
-### 3.0.18
+- **[UPDATE]** Model inited on server inited.
+- **[NEW]** New options to skip model init `isSkipModelInit`.
+- **[NEW]** New method server method `initAllModels()`.
 
-[UPDATE] update deps
-[UPDATE] change default branch to 'main'
+---
 
-### 3.0.17
+## [4.8.0]
 
-[UPDATE] update deps
+- **[BREAKING]** Minimum node js version id 18.17.0 now.
+- **[BREAKING]** Removed `getFileWithExtendingInhirence`. This was internal method and not suppose to use externally.
+- **[UPDATE]** Update `Base.getFilesPathWithInheritance` to use `fs.read` dir resursive option.
+- **[UPDATE]** Update cache (refactor+tets).
+- **[UPDATE]** Update config and model inits.
 
-### 3.0.16
+---
 
-[UPDATE] update deps
-[FIX] fix bug with route level middleware
+## [4.7.0]
 
-### 3.0.15
+- **[UPDATE]** Update logger init (refactor).
+- **[UPDATE]** Updated deps.
 
-[UPDATE] update deps
-[UPDATE] minimum node version 16
+---
 
-### 3.0.14
+## [4.6.0]
 
-[NEW] now possible to show all errors during validation (default one) by parameter controllerValidationAbortEarly
-[UPDATE] update deps
+- **[NEW]** Migrated from JEST to `vitest`.
 
-### 3.0.13
+---
 
-[UPDATE] bug fix with "mergeParams"
+## [4.5.0]
 
-### 3.0.12
+- **[NEW]** Now `getSuper()` available as a method on mongoose models.
+- **[UPDATE]** Update `rate-limiter-flexible` to v3.
+- **[UPDATE]** Update test runner to suport ESM. In case problem with test please copy `babel.config.js` from framework to your project directory.
 
-[NEW] ability to pass "mergeParams" options to express router
-[UPDATE] update deps
+---
 
-### 3.0.11
+## [4.4.0]
 
-[UPDATE] more verbose email error
+- **[NEW]** New method to grab url of server it testing enviroument `global.server.testingGetUrl("/some/endpoint")`.
 
-### 3.0.10
+---
 
-[UPDATE] update deps
-[CHANGE] tests afterAll not using timeout anymore (conflict with jest 28-alpha)
-[NEW] config for mail now supports "EMAIL_TRANSPORT" env variable. SMTP by default (as was)
+## [4.3.1]
 
-### 3.0.9
+- **[UPDATE]** `Yup` file validator update. As formidable now return all fields as an array.
 
-[UPDATE] update deps
+---
 
-### 3.0.8
+## [4.3.0]
 
-[UPDATE] update deps
+- **[BREAKING]** Updated `formidable` with a new version + tests. Marked as breaking because of a new major version, but this is internal of framework and exernal still the same. Should break nothing.
 
-### 3.0.7
+---
 
-[UPDATE] update deps
-[CHANGE] change default getConfig method
+## [4.2.0]
 
-### 3.0.6
+- **[UPDATE]** Updated deps.
+- **[NEW]** `CreateUser` cli command. Ability to update user by email or id.
 
-[UPDATE] update deps
+---
 
-### 3.0.5
+## [4.1.0]
 
-[UPDATE] update deps
+- **[UPDATE]** Updated deps.
+- **[NEW]** Email - Ability to render templae to string for future usage.
 
-### 3.0.4
+---
 
-[UPDATE] fix bug with app shutdown
+## [4.0.0]
 
-### 3.0.3
+- **[BREAKING]** Change `bcrypt` encryption with `scrypt`.
+- **[BREAKING]** Change internal express parser to `formidable` parser. Affect you if external `formidable` is used.
+- **[BREAKING]** Should not affect any user. Changed `email-templates` module to internal implementation. Idea to keep dependensy list smaller.
+- **[BREAKING]** Change `i18n` middleware to internal one. Nothing should be affected.
+- **[BREAKING]** Now validation of request splitted between `request` and `query`.
+- **[BREAKING]** `supportedLngs` option added to `i18n` config.
+- **[BREAKING]** Email inliner now looking for `src/services/messaging/email/resources` folder instead of `build` folder.
+- **[BREAKING]** Mongoose v7. <https://mongoosejs.com/docs/migrating_to_7.html>.
+- **[BREAKING]** `Yup` validation was updated to v1 <https://github.com/jquense/yup/issues/1906>.
+- **[DEPRECATED]** `getExpress` path is deprecated. Renamed to `getHttpPath`.
+- **[NEW]** Pagination middleware.
+- **[NEW]** `requestLogger` middleware. Migrated from core server to be an middleware.
+- **[NEW]** `CreateUser` command.
+- **[NEW]** Custom `yup` validator for validate File requests.
+- **[UPDATE]** Updated deps.
+- **[UPDATE]** `openApi` generator support files.
+- **[UPDATE]** Updated `18n` middleware. Introduced internal cachce. Speed up of request processing up to 100%.
+- **[UPDATE]** Cache drivers to JSON support `BigInt` numbers.
 
-[UPDATE] update deps
+---
 
-### 3.0.2
+## [3.4.3]
 
-[UPDATE] update deps
+- **[UPDATE]** Updated deps.
+- **[FIX]** Fix tests for redis.
+- **[FIX]** Support in tests `TEST_FOLDER_EMAILS`.
 
-### 3.0.1
+---
 
-[UPDATE] update deps
-[UPDATE] getUserByTokens more logs
+## [3.4.2]
 
-### 3.0.0
+- **[UPDATE]** Updated deps.
+- **[FIX]** Fix documentation generation.
 
-[BREAKING] Mongoose v6. Than a lot of changes:[mongoDB drive changes](https://github.com/mongodb/node-mongodb-native/blob/4.0/docs/CHANGES_4.0.0.md), [Mongoose changes](https://mongoosejs.com/docs/migrating_to_6.html).
-Notable changes from migration
-Removed `execPopulate()`[link](https://mongoosejs.com/docs/migrating_to_6.html#removed-execpopulate)
+---
 
-```js
-// Document#populate() now returns a promise and is now no longer chainable.
+## [3.4.1]
 
-//Replace
-await doc.populate('path1').populate('path2').execPopulate();
-// with
-await doc.populate(['path1', 'path2']);
-//Replace
-await doc
-  .populate('path1', 'select1')
-  .populate('path2', 'select2')
-  .execPopulate();
-// with
-await doc.populate([
-  { path: 'path1', select: 'select1' },
-  { path: 'path2', select: 'select2' },
-]);
-```
+- **[FIX]** Fix documentation generation.
 
-[REMOVED] removed deprecated router handler string not allowed anymore. Use functions by itself
-[REMOVED] removed deprecated someSecretSalt() on user model (use this.saltSecret instead)
-[REMOVED] removed deprecated validate() on abstract controller and as result validator dependency. Use request validators instead
-[REMOVED] removed deprecated isUseControllerNameForRouting() on abstract controller. Use getExpressPath() instead
-[REMOVED] removed deprecated Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
-[BREAKING] Removed "success" field on Auth contreoller. Please use http status instead
-[BREAKING] Auth controller - "error" error responce renamed to "message"
+---
 
-```js
-// Before
-{
-  error: 'Some error';
-}
-// After
-{
-  message: 'Some error';
-}
-```
+## [3.4.0]
 
-[UPDATE] update deps
-[UPDATE] winston console transport now using timestapms
-[UPDATE] PrepareAppInfo middleware now a global one. Do not need to include it on every controller
-[NEW] Request also works with req.query, but req.body have bigger priority
+- **[NEW]** Now we pass `req` to validation and casting as a second parameter. This done mostly for custom validators.
 
-### 2.18.0
+---
 
-[UPDATE] update deps
-[UPDATE] replace body-parser with express.json
-[NEW] role middleware
+## [3.3.0]
 
-### 2.17.0
+- **[NEW]** New command `SyncIndexes` to sync indexes for mongodb <https://framework.adaptivestone.com/docs/cli#syncindexes>.
+- **[UPDATE]** Updated deps.
+- **[FIX]** Fix documentation generation.
 
-[UPDATE] update deps
-[NEW] new env variable LOGGER_SENTRY_LEVEL (default=info)
-[NEW] new env variable LOGGER_CONSOLE_ENABLE (default=true)
-[BREAKING] on translation we changed i18next. Please convert files if you have plurals inside it https://i18next.github.io/i18next-v4-format-converter-web/
+---
 
-#### 2.16.0
+## [3.2.2]
 
-[UPDATE] update deps
-[NEW] begin adding type script definitions
+- **[UPDATE]** Add options for `i18n` to config.
+- **[CHANGE]** By default `i18n` not writing missed keys. Can be enabled via config.
 
-#### 2.15.4
+---
 
-[UPDATE] update deps
-[UPDATE] update tests timeout
+## [3.2.1]
 
-#### 2.15.0
+- **[UPDATE]** Updated deps.
+- **[FIX]** Fix documentation generation.
 
-[UPDATE] update deps
-[NEW] Ability to configure Auth flow with 'isAuthWithVefificationFlow' option.
-[BREAKING] Register not return status 201 instead of 200
+---
 
-#### 2.14.0
+## [3.2.0]
 
-[NEW] Add Sequence. It provide ability to easily generate sequences for given types. It save to use on distributed environments
+- **[UPDATE]** Updated deps.
+- **[NEW]** `cache.removeKey(key)` - function to remove key from cache.
 
-```javascript
-const SequenceModel = this.app.getModel('Sequence');
-// will be 1
-const someTypeSequence = await SequenceModel.getSequence('someType');
-// will be 2
-const someTypeSequence2 = await SequenceModel.getSequence('someType');
-// will be 1 as type is another
-const someAnotherTypeSequence =
-  await SequenceModel.getSequence('someAnotherType');
-```
+---
 
-#### 2.13.1
+## [3.1.1]
 
-[FIX] fix documentation about not using req.appInfo.request, but using req.body for RateLimiter
+- **[UPDATE]** Updated deps.
+- **[FIX]** Fix cache error handling.
 
-#### 2.13.0
+---
 
-[NEW] Rate limited middleware - ability to include request components (req.body) for key generation. Please not that you have no access to req.appInfo.request on this stage
+## [3.1.0]
 
-```javascript
+- **[NEW]** New comand to generate open API documentation (wip).
+- **[NEW]** Coverage report.
+- **[UPDATE]** Updated deps.
+
+---
+
+## [3.0.23]
+
+- **[UPDATE]** Updated deps.
+- **[FIX]** Fix custom errors.
+
+---
+
+## [3.0.22]
+
+- **[UPDATE]** Updated deps.
+- **[UPDATE]** Cast function now can be ASYNC too.
+
+---
+
+## [3.0.21]
+
+- **[UPDATE]** Updated redis to v4.
+- **[NEW]** Updates tests to have own namespace on redis.
+
+---
+
+## [3.0.20]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.19]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.18]
+
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Change default branch to `main`.
+
+---
+
+## [3.0.17]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.16]
+
+- **[UPDATE]** Update deps.
+- **[FIX]** Fix bug with route level middleware.
+
+---
+
+## [3.0.15]
+
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Minimum node version 16.
+
+---
+
+## [3.0.14]
+
+- **[NEW]** Now possible to show all errors during validation (default one) by parameter `controllerValidationAbortEarly`.
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.13]
+
+- **[UPDATE]** Bug fix with "mergeParams".
+
+---
+
+## [3.0.12]
+
+- **[NEW]** Ability to pass "mergeParams" options to express router.
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.11]
+
+- **[UPDATE]** More verbose email error.
+
+---
+
+## [3.0.10]
+
+- **[UPDATE]** Update deps.
+- **[CHANGE]** Tests `afterAll` not using timeout anymore (conflict with jest 28-alpha).
+- **[NEW]** Config for mail now supports "EMAIL_TRANSPORT" env variable. SMTP by default (as was).
+
+---
+
+## [3.0.9]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.8]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.7]
+
+- **[UPDATE]** Update deps.
+- **[CHANGE]** Change default `getConfig` method.
+
+---
+
+## [3.0.6]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.5]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.4]
+
+- **[UPDATE]** Fix bug with app shutdown.
+
+---
+
+## [3.0.3]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.2]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [3.0.1]
+
+- **[UPDATE]** Update deps.
+- **[UPDATE]** `getUserByTokens` more logs.
+
+---
+
+## [3.0.0]
+
+- **[BREAKING]** Mongoose v6. Than a lot of changes:[mongoDB drive changes](https://github.com/mongodb/node-mongodb-native/blob/4.0/docs/CHANGES_4.0.0.md), [Mongoose changes](https://mongoosejs.com/docs/migrating_to_6.html).
+  Notable changes from migration
+  Removed `execPopulate()`[link](https://mongoosejs.com/docs/migrating_to_6.html#removed-execpopulate)
+  ```js
+  // Document#populate() now returns a promise and is now no longer chainable.
+  //Replace
+  await doc.populate('path1').populate('path2').execPopulate();
+  // with
+  await doc.populate(['path1', 'path2']);
+  //Replace
+  await doc
+    .populate('path1', 'select1')
+    .populate('path2', 'select2')
+    .execPopulate();
+  // with
+  await doc.populate([
+    { path: 'path1', select: 'select1' },
+    { path: 'path2', select: 'select2' },
+  ]);
+  ```
+- **[REMOVED]** Removed deprecated router handler string not allowed anymore. Use functions by itself.
+- **[REMOVED]** Removed deprecated `someSecretSalt()` on user model (use `this.saltSecret` instead).
+- **[REMOVED]** Removed deprecated `validate()` on abstract controller and as result validator dependency. Use request validators instead.
+- **[REMOVED]** Removed deprecated `isUseControllerNameForRouting()` on abstract controller. Use `getExpressPath()` instead.
+- **[REMOVED]** Removed deprecated `Base.loadFilesWithInheritance` please use `getFilesPathWithInheritance` that produce almost the same output.
+- **[BREAKING]** Removed "success" field on Auth contreoller. Please use http status instead.
+- **[BREAKING]** Auth controller - "error" error responce renamed to "message".
+  ```js
+  // Before
+  {
+    error: 'Some error';
+  }
+  // After
+  {
+    message: 'Some error';
+  }
+  ```
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Winston console transport now using timestapms.
+- **[UPDATE]** `PrepareAppInfo` middleware now a global one. Do not need to include it on every controller.
+- **[NEW]** Request also works with `req.query`, but `req.body` have bigger priority.
+
+---
+
+## [2.18.0]
+
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Replace `body-parser` with `express.json`.
+- **[NEW]** Role middleware.
+
+---
+
+## [2.17.0]
+
+- **[UPDATE]** Update deps.
+- **[NEW]** New env variable `LOGGER_SENTRY_LEVEL` (default=`info`).
+- **[NEW]** New env variable `LOGGER_CONSOLE_ENABLE` (default=`true`).
+- **[BREAKING]** On translation we changed `i18next`. Please convert files if you have plurals inside it <https://i18next.github.io/i18next-v4-format-converter-web/>.
+
+---
+
+## [2.16.0]
+
+- **[UPDATE]** Update deps.
+- **[NEW]** Begin adding type script definitions.
+
+---
+
+## [2.15.4]
+
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Update tests timeout.
+
+---
+
+## [2.15.0]
+
+- **[UPDATE]** Update deps.
+- **[NEW]** Ability to configure Auth flow with `isAuthWithVefificationFlow` option.
+- **[BREAKING]** Register not return status 201 instead of 200.
+
+---
+
+## [2.14.0]
+
+- **[NEW]** Add `Sequence`. It provide ability to easily generate sequences for given types. It save to use on distributed environments.
+  ```javascript
+  const SequenceModel = this.app.getModel('Sequence');
+  // will be 1
+  const someTypeSequence = await SequenceModel.getSequence('someType');
+  // will be 2
+  const someTypeSequence2 = await SequenceModel.getSequence('someType');
+  // will be 1 as type is another
+  const someAnotherTypeSequence =
+    await SequenceModel.getSequence('someAnotherType');
+  ```
+
+---
+
+## [2.13.1]
+
+- **[FIX]** Fix documentation about not using `req.appInfo.request`, but using `req.body` for `RateLimiter`.
+
+---
+
+## [2.13.0]
+
+- **[NEW]** Rate limited middleware - ability to include request components (`req.body`) for key generation. Please not that you have no access to `req.appInfo.request` on this stage.
+  ```javascript
   static get middleware() {
     return new Map([
       ['POST/login', [
@@ -651,16 +861,16 @@ const someAnotherTypeSequence =
       ]]
     ]);
   }
-```
+  ```
 
-#### 2.12.0
+---
 
-[UPDATE] update deps
-[NEW] Rate limited middleware
+## [2.12.0]
 
-As rate limited we using https://github.com/animir/node-rate-limiter-flexible
-
-```javascript
+- **[UPDATE]** Update deps.
+- **[NEW]** Rate limited middleware.
+  As rate limited we using <https://github.com/animir/node-rate-limiter-flexible>
+  ```javascript
   static get middleware() {
     return new Map([
       ['POST/login', [
@@ -670,13 +880,10 @@ As rate limited we using https://github.com/animir/node-rate-limiter-flexible
       ]]
     ]);
   }
-```
-
-Be default rate key generated based on Route, IP and userID. But you can adjust it vie config (global) or via middleware parameters (see v 2.10.0)
-
-Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memory' backend activated
-
-```javascript
+  ```
+  Be default rate key generated based on Route, IP and userID. But you can adjust it vie config (global) or via middleware parameters (see v 2.10.0)
+  Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memory' backend activated
+  ```javascript
   static get middleware() {
     return new Map([
       [
@@ -695,18 +902,21 @@ Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memo
       ],
     ]);
   }
-```
+  ```
 
-#### 2.11.0
+---
 
-[NEW] Added env variable HTTP_HOST for configure host to listen
+## [2.11.0]
 
-#### 2.10.0
+- **[NEW]** Added env variable `HTTP_HOST` for configure host to listen.
 
-[UPDATE] update deps
-[NEW] ability to pass parameters to middleware
+---
 
-```javascript
+## [2.10.0]
+
+- **[UPDATE]** Update deps.
+- **[NEW]** Ability to pass parameters to middleware.
+  ```javascript
   static get middleware() {
     return new Map([
       ['POST/someUrl', [
@@ -716,113 +926,150 @@ Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memo
       ]]
     ]);
   }
-```
+  ```
+  All this params goes to constructor as a second paramater.
 
-All this params goes to constructor as a second paramater
+---
 
-#### 2.9.2
+## [2.9.2]
 
-[UPDATE] update deps
-[FIX] fix auth nick
+- **[UPDATE]** Update deps.
+- **[FIX]** Fix auth nick.
 
-#### 2.9.1
+---
 
-[UPDATE] update deps
+## [2.9.1]
 
-#### 2.9.0
+- **[UPDATE]** Update deps.
 
-[BREAKING] Auth controller update
+---
 
-#### 2.8.3
+## [2.9.0]
 
-[FIX] update recovery email template
+- **[BREAKING]** Auth controller update.
 
-#### 2.8.2
+---
 
-[FIX] update AUTH controller
+## [2.8.3]
 
-#### 2.8.1
+- **[FIX]** Update recovery email template.
 
-[UPDATE] update deps
-[FIX] update AUTH controller
+---
 
-#### 2.8.0
+## [2.8.2]
 
-[UPDATE] change controllers to reflect latest changes
-[UPDATE] add warning when using 'req.body' directly
-[BREAKING] Possible breaking. AsyncFunction now required for router handler (it always was but without checking of code)
-[DEPRECATE] usage of 'validator' of controllers
-[DEPRECATE] usage of 'isUseControllerNameForRouting' of controllers.
+- **[FIX]** Update AUTH controller.
 
-#### 2.7.4
+---
 
-[UPDATE] update deps
+## [2.8.1]
 
-#### 2.7.3
+- **[UPDATE]** Update deps.
+- **[FIX]** Update AUTH controller.
 
-[UPDATE] replace i18next-node-fs-backend to i18next-fs-backend (drop in replacement)
+---
 
-#### 2.7.2
+## [2.8.0]
 
-[UPDATE] update deps
+- **[UPDATE]** Change controllers to reflect latest changes.
+- **[UPDATE]** Add warning when using `req.body` directly.
+- **[BREAKING]** Possible breaking. `AsyncFunction` now required for router handler (it always was but without checking of code).
+- **[DEPRECATE]** Usage of `validator` of controllers.
+- **[DEPRECATE]** Usage of `isUseControllerNameForRouting` of controllers.
 
-#### 2.7.1
+---
 
-[REMOVE] remove unused websocket
+## [2.7.4]
 
-#### 2.7.0
+- **[UPDATE]** Update deps.
 
-[UPDATE] change winston sentry transport
+---
 
-#### 2.6.5
+## [2.7.3]
 
-[UPDATE] update deps
-[UPDATE] optimize deps
+- **[UPDATE]** Replace `i18next-node-fs-backend` to `i18next-fs-backend` (drop in replacement).
 
-#### 2.6.4
+---
 
-[UPDATE] update deps
+## [2.7.2]
 
-#### 2.6.3
+- **[UPDATE]** Update deps.
 
-[UPDATE] update deps
-[UPDATE] update handling exceptions loging
+---
 
-#### 2.6.2
+## [2.7.1]
 
-[UPDATE] normalize auth config
+- **[REMOVE]** Remove unused websocket.
 
-#### 2.6.1
+---
 
-[FIX] fix error on cache system
-[UPDATE] stripUnknown=true by default on casting
+## [2.7.0]
 
-#### 2.6.0
+- **[UPDATE]** Change winston sentry transport.
 
-[UPDATE] deps update
-[NEW]new cache system (alpha, subject of change)
+---
 
-```javascript
-const cacheTime = 60 * 5;
-this.app.cache.getSetValue(
-  'someKey',
-  async () => {
-    // function that will execute in case cache value is missed
-  },
-  cacheTime,
-);
-```
+## [2.6.5]
 
-#### 2.5.1
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Optimize deps.
 
-[UPDATE] deps update
-[FIX] fix error logging on unhadled rejection
+---
 
-#### 2.5.0
+## [2.6.4]
 
-[NEW] new route handler format with request validations and casting (yup based)
+- **[UPDATE]** Update deps.
 
-```javascript
+---
+
+## [2.6.3]
+
+- **[UPDATE]** Update deps.
+- **[UPDATE]** Update handling exceptions loging.
+
+---
+
+## [2.6.2]
+
+- **[UPDATE]** Normalize auth config.
+
+---
+
+## [2.6.1]
+
+- **[FIX]** Fix error on cache system.
+- **[UPDATE]** `stripUnknown=true` by default on casting.
+
+---
+
+## [2.6.0]
+
+- **[UPDATE]** Deps update.
+- **[NEW]** New cache system (alpha, subject of change).
+  ```javascript
+  const cacheTime = 60 * 5;
+  this.app.cache.getSetValue(
+    'someKey',
+    async () => {
+      // function that will execute in case cache value is missed
+    },
+    cacheTime,
+  );
+  ```
+
+---
+
+## [2.5.1]
+
+- **[UPDATE]** Deps update.
+- **[FIX]** Fix error logging on unhadled rejection.
+
+---
+
+## [2.5.0]
+
+- **[NEW]** New route handler format with request validations and casting (yup based).
+  ```javascript
   get routes() {
     return {
       post: {
@@ -837,217 +1084,301 @@ this.app.cache.getSetValue(
   }
   // send request with data  {count: "5000"}
   // will produce error with status 400 and {errors: {count:['Text error']}}
-
-
   postSample(req,res) =>{
     // on success validate we pass here.
     // {count: "5000"}
     console.log(req.appInfo.request)
     // {count: 5000} -> casted to number
   }
-```
+  ```
 
-#### 2.4.4
+---
 
-[UPDATE] deps update
-[NEW] controller unhandled rejection now handled with default error
-[NEW] handle error with wrong model name
+## [2.4.4]
 
-#### 2.4.3
+- **[UPDATE]** Deps update.
+- **[NEW]** Controller unhandled rejection now handled with default error.
+- **[NEW]** Handle error with wrong model name.
 
-[UPDATE] deps update
+---
 
-#### 2.4.2
+## [2.4.3]
 
-[FIX] abstract controlled middleware
-[UPDATE] deps update
+- **[UPDATE]** Deps update.
 
-#### 2.4.1
+---
 
-[FIX] updated test because of previous breaking changes
+## [2.4.2]
 
-#### 2.4.0
+- **[FIX]** Abstract controlled middleware.
+- **[UPDATE]** Deps update.
 
-[BREAKING] possible that bug fix of middleware can affect your code. Previous route middleware was GLOBAL (router.use) now in router level only (route.any). Previous Home controller (/ route be default) middleware affect ANY routes on app. Right now that fixed.
+---
 
-[NEW] Controller middleware now support methods. Previous only ALL was supported. Possible to start router with any method that supported by Express and middleware will be scoped by this method. If middleware route started from "/" then ALL method will be used (like previous bahaviour)
+## [2.4.1]
 
-```javascript
+- **[FIX]** Updated test because of previous breaking changes.
+
+---
+
+## [2.4.0]
+
+- **[BREAKING]** Possible that bug fix of middleware can affect your code. Previous route middleware was GLOBAL (`router.use`) now in router level only (`route.any`). Previous Home controller (`/` route be default) middleware affect ANY routes on app. Right now that fixed.
+- **[NEW]** Controller middleware now support methods. Previous only `ALL` was supported. Possible to start router with any method that supported by Express and middleware will be scoped by this method. If middleware route started from "/" then `ALL` method will be used (like previous bahaviour).
+  ```javascript
   static get middleware() {
     return new Map([['GET/*', [PrepareAppInfo, GetUserByToken]]]);
   }
-```
+  ```
 
-#### 2.3.14
+---
 
-[FIX] fix validate controller method for non strings
+## [2.3.14]
 
-#### 2.3.13
+- **[FIX]** Fix validate controller method for non strings.
 
-[UPDATE] testing now with mongoDB Replica
-[UPDATE] refactor CLI
+---
 
-#### 2.3.12
+## [2.3.13]
 
-[UPDATE] testing update
+- **[UPDATE]** Testing now with mongoDB Replica.
+- **[UPDATE]** Refactor CLI.
 
-#### 2.3.11
+---
 
-[UPDATE] refactor CLI for testing
+## [2.3.12]
 
-#### 2.3.10
+- **[UPDATE]** Testing update.
 
-[UPDATE] update user model indexes to allow null email and nick
-[UPDATE] deps update
+---
 
-#### 2.3.9
+## [2.3.11]
 
-[FIX] test fix
+- **[UPDATE]** Refactor CLI for testing.
 
-#### 2.3.8
+---
 
-[NEW] add 'global.testSetup.beforeAll' 'global.testSetup.afterAll' functions and 'global.testSetup.disableUserCreate' flag for testing testing
+## [2.3.10]
 
-#### 2.3.7
+- **[UPDATE]** Update user model indexes to allow null email and nick.
+- **[UPDATE]** Deps update.
 
-[UPDATE] deps update
-[NEW] add 'global.testSetup.userCreate' function for testing
+---
 
-#### 2.3.6
+## [2.3.9]
 
-[UPDATE] deps update
-[FIX] test fix
+- **[FIX]** Test fix.
 
-#### 2.3.5
+---
 
-[NEW] Add command DropIndex
-[UPDATE] deps update
+## [2.3.8]
 
-#### 2.3.4
+- **[NEW]** Add `global.testSetup.beforeAll` `global.testSetup.afterAll` functions and `global.testSetup.disableUserCreate` flag for testing testing.
 
-[NEW] Add webResources option to email service
-[UPDATE] deps update
+---
 
-#### 2.3.3
+## [2.3.7]
 
-[UPDATE] deps update
+- **[UPDATE]** Deps update.
+- **[NEW]** Add `global.testSetup.userCreate` function for testing.
 
-#### 2.3.2
+---
 
-[FIX] Fix controllers order to load
+## [2.3.6]
 
-#### 2.3.1
+- **[UPDATE]** Deps update.
+- **[FIX]** Test fix.
 
-[FIX] Fix parsing token
+---
 
-#### 2.3.0
+## [2.3.5]
 
-[NEW] Migration/create migration/migrate commands
+- **[NEW]** Add command `DropIndex`.
+- **[UPDATE]** Deps update.
 
-#### 2.2.6
+---
 
-[NEW] CLI command receiving parsed arguments
+## [2.3.4]
 
-#### 2.2.5
+- **[NEW]** Add `webResources` option to email service.
+- **[UPDATE]** Deps update.
 
-[FIX] Fix disconnecting problems with replica set
+---
 
-#### 2.2.4
+## [2.3.3]
 
-[UPDATE] Internal update for speed up cli init
+- **[UPDATE]** Deps update.
 
-#### 2.2.3
+---
 
-[FIX] fix language detection
+## [2.3.2]
 
-#### 2.2.2
+- **[FIX]** Fix controllers order to load.
 
-[FIX] fix test as part of docker image update. This just a mongo-memory-server problems
-[NEW] add config to configure language detecting order and types
+---
 
-#### 2.2.1
+## [2.3.1]
 
-[UPDATE] deps update
+- **[FIX]** Fix parsing token.
 
-#### 2.2.0
+---
 
-[DEPRECATED] Base.loadFilesWithInheritance please use getFilesPathWithInheritance that produce almost the same output
-[UPDATE] deps update
-[UPDATE] https logs now contains request time
-[NEW] Ability to put controllers into folders with path inheritance
-[NEW] Ability to replace expressPath on controller - getExpressPath() methos
-[NEW] Ability to put commands into folders with path inheritance
+## [2.3.0]
 
-#### 2.1.2
+- **[NEW]** `Migration/create` `migration/migrate` commands.
 
-[UPDATE] disconnect of mongoose when command was finished
+---
 
-#### 2.1.1
+## [2.2.6]
 
-[UPDATE] deps update
+- **[NEW]** CLI command receiving parsed arguments.
 
-#### 2.1.0
+---
 
-[DEV] added codestyle checker
-[NEW] Initial CLI module
+## [2.2.5]
 
-#### 2.0.2 released
+- **[FIX]** Fix disconnecting problems with replica set.
 
-[UPDATE] socket.io v3
-[UPDATE] deps update
+---
 
-#### 2.0.1
+## [2.2.4]
 
-[NEW] Added config to websocket
+- **[UPDATE]** Internal update for speed up cli init.
 
-#### 2.0.0
+---
 
-[BREAKING] Change config format of log config. Now configs can be only objects
+## [2.2.3]
 
-#### 1.5.0
+- **[FIX]** Fix language detection.
 
-[NEW] Support for environment configs (config.js and config.{NODE_ENV}.js) with overwrite
-[UPDATE] deps update
+---
 
-#### 1.4.0
+## [2.2.2]
 
-Ability to pass additional parameter to server that will be executed before adding page 404
+- **[FIX]** Fix test as part of docker image update. This just a `mongo-memory-server` problems.
+- **[NEW]** Add config to configure language detecting order and types.
 
-#### 1.3.0
+---
 
-Models now support optional callback that will executed on connection ready. If mongo already connected then callback will be executed immediately
+## [2.2.1]
 
-#### 1.2.9
+- **[UPDATE]** Deps update.
 
-Update deps
+---
 
-#### 1.2.8
+## [2.2.0]
 
-Update deps
+- **[DEPRECATED]** `Base.loadFilesWithInheritance` please use `getFilesPathWithInheritance` that produce almost the same output.
+- **[UPDATE]** Deps update.
+- **[UPDATE]** Https logs now contains request time.
+- **[NEW]** Ability to put controllers into folders with path inheritance.
+- **[NEW]** Ability to replace `expressPath` on controller - `getExpressPath()` methos.
+- **[NEW]** Ability to put commands into folders with path inheritance.
 
-#### 1.2.7
+---
 
-Add abilty to return error from custom validation functions
+## [2.1.2]
 
-#### 1.2.6
+- **[UPDATE]** Disconnect of mongoose when command was finished.
 
-Validator documentation (jsdoc) update
-Validator support pass parameters to validator
+---
 
-#### 1.2.5
+## [2.1.1]
 
-Fix problem with test (user should be global on tests)
+- **[UPDATE]** Deps update.
 
-#### 1.2.4
+---
 
-Add eslint
-Code refactor
+## [2.1.0]
 
-#### 1.2.3
+- **[DEV]** Added codestyle checker.
+- **[NEW]** Initial CLI module.
 
-Add prettier
-Code reformat
+---
 
-#### 1.2.2
+## [2.0.2]
 
-Update deps
+- **[UPDATE]** Socket.io v3.
+- **[UPDATE]** Deps update.
+
+---
+
+## [2.0.1]
+
+- **[NEW]** Added config to websocket.
+
+---
+
+## [2.0.0]
+
+- **[BREAKING]** Change config format of log config. Now configs can be only objects.
+
+---
+
+## [1.5.0]
+
+- **[NEW]** Support for environment configs (`config.js` and `config.{NODE_ENV}.js`) with overwrite.
+- **[UPDATE]** Deps update.
+
+---
+
+## [1.4.0]
+
+- **[NEW]** Ability to pass additional parameter to server that will be executed before adding page 404.
+
+---
+
+## [1.3.0]
+
+- **[NEW]** Models now support optional callback that will executed on connection ready. If mongo already connected then callback will be executed immediately.
+
+---
+
+## [1.2.9]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [1.2.8]
+
+- **[UPDATE]** Update deps.
+
+---
+
+## [1.2.7]
+
+- **[NEW]** Add abilty to return error from custom validation functions.
+
+---
+
+## [1.2.6]
+
+- **[UPDATE]** Validator documentation (jsdoc) update.
+- **[UPDATE]** Validator support pass parameters to validator.
+
+---
+
+## [1.2.5]
+
+- **[FIX]** Fix problem with test (user should be global on tests).
+
+---
+
+## [1.2.4]
+
+- **[NEW]** Add eslint.
+- **[UPDATE]** Code refactor.
+
+---
+
+## [1.2.3]
+
+- **[NEW]** Add prettier.
+- **[UPDATE]** Code reformat.
+
+---
+
+## [1.2.2]
+
+- **[UPDATE]** Update deps.
