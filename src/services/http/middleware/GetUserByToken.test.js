@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import GetUserByToken from './GetUserByToken.ts';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { defaultAuthToken } from '../../../tests/testHelpers.ts';
 
 describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {
@@ -90,7 +91,7 @@ describe('getUserByToken middleware methods', () => {
     const req = {
       appInfo: {},
       body: {
-        token: global.authToken.token,
+        token: defaultAuthToken,
       },
       get: () => {},
     };
@@ -112,7 +113,7 @@ describe('getUserByToken middleware methods', () => {
     const req = {
       appInfo: {},
       body: {},
-      get: () => global.authToken.token,
+      get: () => defaultAuthToken,
     };
 
     await middleware.middleware(req, {}, nextFunction);

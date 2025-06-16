@@ -1,7 +1,11 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import { setServerInstance, serverInstance } from './testHelpers.ts';
+import {
+  setServerInstance,
+  serverInstance,
+  createDefaultTestUser,
+} from './testHelpers.ts';
 
 import mongoose from 'mongoose'; // we do not need create indexes on tests
 
@@ -63,26 +67,14 @@ beforeAll(async () => {
     return `http://127.0.0.1:${global.server.getConfig('http').port}${urlPart}`;
   };
   if (!global.testSetup.disableUserCreate) {
-    const User = server.app.getModel('User');
-    global.user = await User.create({
-      email: 'test@test.com',
-      password: 'testPassword',
-      isVerified: true,
-      name: {
-        nick: 'testUserNickName',
-      },
-    }).catch((e) => {
-      console.error(e);
-      console.info(
-        'That error can happens in case you have custom user model. Please use global.testSetup.disableUserCreate flag to skip user creating',
-      );
-    });
-    global.authToken = await global.user.generateToken();
+    const answer = await createDefaultTestUser();
+
+    if (answer) {
+      global.User = answer.user;
+
+      global.authToken = { token: answer.token };
+    }
   }
-  if (typeof global.testSetup.beforeAll === 'function') {
-    await global.testSetup.beforeAll();
-  }
-  await server.startServer();
 
   global.server = new Proxy(server, {
     get(target, prop, receiver) {
@@ -93,6 +85,11 @@ beforeAll(async () => {
       return Reflect.get(target, prop, receiver);
     },
   });
+
+  if (typeof global.testSetup.beforeAll === 'function') {
+    await global.testSetup.beforeAll();
+  }
+  await server.startServer();
 });
 
 beforeEach(() => {
