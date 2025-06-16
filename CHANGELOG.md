@@ -27,6 +27,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ### Breaking changes (please read carefully)
 
+- **[BREAKING]** No more global variables for testing and default user will not be created by default
 - **[BREAKING]** All models now should be extended from `BaseModel`. This is a potencial breaking change specially for `User` model.
 - **[BREAKING]** Remove jest support for testing.
 - **[BREAKING]** Move email module to separate package `@adaptivestone/framework-module-email`. Please use it if you want to send emails.
@@ -47,11 +48,16 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ---
 
+## [5.0.0-beta.24]
+
+- **[UPDATE]** Update types.
+
+---
+
 ## [5.0.0-beta.23]
 
 - **[BREAKING]** No more global variables for testing and default user will not be created by default
 - **[NEW]** Test helpers getTestServerURL, serverInstance, setDefaultUser, setDefaultAuthToken and createDefaultTestUser.
-- **[DEPRECATION]** global usage in testing is deprecated
 
 ---
 
