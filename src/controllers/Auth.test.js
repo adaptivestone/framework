@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { appInstance } from '../helpers/appInstance.ts';
+import { getTestServerURL } from '../tests/testHelpers.ts';
 
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
@@ -10,20 +12,17 @@ describe('auth', () => {
     it('code NOT able to create user with wrong email', async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/register'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: 'bad email',
-            password: userPassword,
-            nickName: 'test',
-          }),
+      const { status } = await fetch(getTestServerURL('/auth/register'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      ).catch(() => ({ status: 500 }));
+        body: JSON.stringify({
+          email: 'bad email',
+          password: userPassword,
+          nickName: 'test',
+        }),
+      }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -31,28 +30,7 @@ describe('auth', () => {
     it('can create user', async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/register'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail,
-            password: userPassword,
-            nickName: 'test',
-          }),
-        },
-      );
-
-      expect(status).toBe(201);
-    });
-
-    it('can  not create user with the same nickname', async () => {
-      expect.assertions(1);
-
-      await fetch(global.server.testingGetUrl('/auth/register'), {
+      const { status } = await fetch(getTestServerURL('/auth/register'), {
         method: 'POST',
         headers: {
           'Content-type': 'application/json',
@@ -64,20 +42,35 @@ describe('auth', () => {
         }),
       });
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/register'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail2,
-            password: '123',
-            nickName: 'test',
-          }),
+      expect(status).toBe(201);
+    });
+
+    it('can  not create user with the same nickname', async () => {
+      expect.assertions(1);
+
+      await fetch(getTestServerURL('/auth/register'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      ).catch(() => ({ status: 500 }));
+        body: JSON.stringify({
+          email: userEmail,
+          password: userPassword,
+          nickName: 'test',
+        }),
+      });
+
+      const { status } = await fetch(getTestServerURL('/auth/register'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: userEmail2,
+          password: '123',
+          nickName: 'test',
+        }),
+      }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -85,20 +78,17 @@ describe('auth', () => {
     it('can NOT create SAME user', async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/register'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail,
-            password: userPassword,
-            nickName: 'test',
-          }),
+      const { status } = await fetch(getTestServerURL('/auth/register'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          email: userEmail,
+          password: userPassword,
+          nickName: 'test',
+        }),
+      });
 
       expect(status).toBe(400);
     });
@@ -108,19 +98,16 @@ describe('auth', () => {
     it('can NOT login with normal creds and not verified email', async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/login'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail,
-            password: userPassword,
-          }),
+      const { status } = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      ).catch(() => ({ status: 500 }));
+        body: JSON.stringify({
+          email: userEmail,
+          password: userPassword,
+        }),
+      }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -128,19 +115,16 @@ describe('auth', () => {
     it('can NOT login with WRONG creds', async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/login'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: 'test@test.by',
-            password: 'noPassword$',
-          }),
+      const { status } = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      ).catch(() => ({ status: 500 }));
+        body: JSON.stringify({
+          email: 'test@test.by',
+          password: 'noPassword$',
+        }),
+      }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
@@ -148,13 +132,13 @@ describe('auth', () => {
     it('can login with normal creds and verified email', async () => {
       expect.assertions(3);
 
-      const user = await global.server.app
+      const user = await appInstance
         .getModel('User')
         .findOne({ email: userEmail });
       user.isVerified = true;
       await user.save();
 
-      const response = await fetch(global.server.testingGetUrl('/auth/login'), {
+      const response = await fetch(getTestServerURL('/auth/login'), {
         method: 'POST',
         headers: {
           'Content-type': 'application/json',
@@ -177,7 +161,7 @@ describe('auth', () => {
     it('can verify user', async () => {
       expect.assertions(2);
 
-      const user = await global.server.app.getModel('User').create({
+      const user = await appInstance.getModel('User').create({
         email: 'Test@gmail.com',
         password: 'userPassword',
         name: {
@@ -192,15 +176,13 @@ describe('auth', () => {
       await user.save();
 
       const { status } = await fetch(
-        `${global.server.testingGetUrl(
-          '/auth/verify',
-        )}?verification_token=testToken`,
+        `${getTestServerURL('/auth/verify')}?verification_token=testToken`,
         {
           method: 'POST',
         },
       );
 
-      const { isVerified } = await global.server.app.getModel('User').findOne({
+      const { isVerified } = await appInstance.getModel('User').findOne({
         email: 'Test@gmail.com',
       });
 
@@ -211,7 +193,7 @@ describe('auth', () => {
     it('can not verify user with wrong token', async () => {
       expect.assertions(2);
 
-      const user = await global.server.app.getModel('User').create({
+      const user = await appInstance.getModel('User').create({
         email: 'Test423@gmail.com',
         password: 'userPassword',
         name: {
@@ -226,7 +208,7 @@ describe('auth', () => {
       await user.save();
 
       const { status } = await fetch(
-        `${global.server.testingGetUrl(
+        `${getTestServerURL(
           '/auth/verify',
         )}?verification_token=testToken123wrong`,
         {
@@ -234,7 +216,7 @@ describe('auth', () => {
         },
       );
 
-      const { isVerified } = await global.server.app.getModel('User').findOne({
+      const { isVerified } = await appInstance.getModel('User').findOne({
         email: 'Test423@gmail.com',
       });
 
@@ -246,7 +228,7 @@ describe('auth', () => {
       expect.assertions(1);
 
       const { status } = await fetch(
-        global.server.testingGetUrl('/auth/send-recovery-email'),
+        getTestServerURL('/auth/send-recovery-email'),
         {
           method: 'POST',
           headers: {
@@ -265,7 +247,7 @@ describe('auth', () => {
       expect.assertions(1);
 
       const { status } = await fetch(
-        global.server.testingGetUrl('/auth/send-recovery-email'),
+        getTestServerURL('/auth/send-recovery-email'),
         {
           method: 'POST',
           headers: {
@@ -283,7 +265,7 @@ describe('auth', () => {
     it('can recover password', async () => {
       expect.assertions(1);
 
-      const user = await global.server.app.getModel('User').create({
+      const user = await appInstance.getModel('User').create({
         email: 'Test1@gmail.com',
         password: 'userPassword',
         name: {
@@ -298,7 +280,7 @@ describe('auth', () => {
       await user.save();
 
       const { status } = await fetch(
-        global.server.testingGetUrl('/auth/recover-password'),
+        getTestServerURL('/auth/recover-password'),
         {
           method: 'POST',
           headers: {
@@ -317,7 +299,7 @@ describe('auth', () => {
     it('can not recover password with wrong token', async () => {
       expect.assertions(1);
 
-      const user = await global.server.app.getModel('User').create({
+      const user = await appInstance.getModel('User').create({
         email: 'Test2@gmail.com',
         password: 'userPassword',
         name: {
@@ -332,7 +314,7 @@ describe('auth', () => {
       await user.save();
 
       const { status } = await fetch(
-        global.server.testingGetUrl('/auth/recover-password'),
+        getTestServerURL('/auth/recover-password'),
         {
           method: 'POST',
           headers: {
@@ -351,51 +333,42 @@ describe('auth', () => {
     it('can login with normal creds and NOT verifyed email if option isAuthWithVefificationFlow is set', async () => {
       expect.assertions(4);
 
-      const { status } = await fetch(
-        global.server.testingGetUrl('/auth/register'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail2,
-            password: userPassword,
-          }),
+      const { status } = await fetch(getTestServerURL('/auth/register'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          email: userEmail2,
+          password: userPassword,
+        }),
+      });
 
-      const { status: status2 } = await fetch(
-        global.server.testingGetUrl('/auth/login'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail2,
-            password: userPassword,
-          }),
+      const { status: status2 } = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          email: userEmail2,
+          password: userPassword,
+        }),
+      });
 
-      global.server.app.updateConfig('auth', {
+      appInstance.updateConfig('auth', {
         isAuthWithVefificationFlow: false,
       });
 
-      const response3 = await fetch(
-        global.server.testingGetUrl('/auth/login'),
-        {
-          method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: userEmail2,
-            password: userPassword,
-          }),
+      const response3 = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          email: userEmail2,
+          password: userPassword,
+        }),
+      });
 
       const responseBody3 = await response3.json();
 
@@ -410,7 +383,7 @@ describe('auth', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl('/auth/send-verification'),
+      getTestServerURL('/auth/send-verification'),
       {
         method: 'POST',
         headers: {
@@ -429,7 +402,7 @@ describe('auth', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl('/auth/send-verification'),
+      getTestServerURL('/auth/send-verification'),
       {
         method: 'POST',
         headers: {
@@ -449,7 +422,7 @@ describe('auth', () => {
       expect.assertions(1);
 
       const requests = Array.from({ length: 11 }, () =>
-        fetch(global.server.testingGetUrl('/auth/logout'), {
+        fetch(getTestServerURL('/auth/logout'), {
           method: 'POST',
         }),
       );

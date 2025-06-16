@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
+import { appInstance } from '../helpers/appInstance.ts';
 
 describe('sequence model', () => {
   it('should produce sequence', async () => {
     expect.assertions(1);
 
-    const SequenceModel = global.server.app.getModel('Sequence');
+    const SequenceModel = appInstance.getModel('Sequence');
 
     const number1 = await SequenceModel.getSequence('typeOne');
 
@@ -14,7 +15,7 @@ describe('sequence model', () => {
   it('should produce sequence different for different types', async () => {
     expect.assertions(3);
 
-    const SequenceModel = global.server.app.getModel('Sequence');
+    const SequenceModel = appInstance.getModel('Sequence');
 
     const number1 = await SequenceModel.getSequence('typeOneAgain');
     const number2 = await SequenceModel.getSequence('typeTwo');
@@ -28,7 +29,7 @@ describe('sequence model', () => {
   it('should works on async env', async () => {
     expect.assertions(1);
 
-    const SequenceModel = global.server.app.getModel('Sequence');
+    const SequenceModel = appInstance.getModel('Sequence');
 
     const promises = [];
     const upTo = 100;

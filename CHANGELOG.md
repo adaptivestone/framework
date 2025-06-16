@@ -23,6 +23,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** On shutdown event, force shutdown after a timeout.
 - **[NEW]** `GenerateRandomBytes` command added.
 - **[NEW]** `IpDetector` middleware for detecting proxies and `X-Forwarded-For` headers.
+- **[NEW]** Test helpers getTestServerURL and serverInstance.
 
 ### Breaking changes (please read carefully)
 
@@ -43,6 +44,13 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Minimum node version is 20.12 as for now (`process.loadEnvFile`).
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
+
+---
+
+## [5.0.0-beta.23]
+
+- **[NEW]** Test helpers getTestServerURL and serverInstance.
+- **[EPRECATION]** global.server is deprecated
 
 ---
 

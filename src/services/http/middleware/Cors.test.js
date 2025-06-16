@@ -1,33 +1,34 @@
 import { describe, it, expect } from 'vitest';
 import Cors from './Cors.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 describe('cors middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    // const middleware = new Cors(global.server.app, { origins: ['something'] });
+    // const middleware = new Cors(appInstance, { origins: ['something'] });
 
     expect(Cors.description).toBeDefined();
   });
 
   it('should throw without origns', async () => {
     expect.assertions(1);
-    expect(() => new Cors(global.server.app)).toThrow();
+    expect(() => new Cors(appInstance)).toThrow();
   });
 
   it('should throw with empty options', async () => {
     expect.assertions(1);
-    expect(() => new Cors(global.server.app, {})).toThrow();
+    expect(() => new Cors(appInstance, {})).toThrow();
   });
 
   it('should throw with empty origins', async () => {
     expect.assertions(1);
-    expect(() => new Cors(global.server.app, { origins: [] })).toThrow();
+    expect(() => new Cors(appInstance, { origins: [] })).toThrow();
   });
 
   it('should throw with empty origins not array', async () => {
     expect.assertions(1);
-    expect(() => new Cors(global.server.app, { origins: 'origins' })).toThrow();
+    expect(() => new Cors(appInstance, { origins: 'origins' })).toThrow();
   });
 
   it('non options should be different', async () => {
@@ -48,7 +49,7 @@ describe('cors middleware methods', () => {
         map.set(key, val);
       },
     };
-    const middleware = new Cors(global.server.app, {
+    const middleware = new Cors(appInstance, {
       origins: ['https://localhost'],
     });
 
@@ -69,7 +70,7 @@ describe('cors middleware methods', () => {
       method: 'OPTIONS',
       headers: { origin: 'http://anotherDomain.com' },
     };
-    const middleware = new Cors(global.server.app, {
+    const middleware = new Cors(appInstance, {
       origins: ['https://localhost'],
     });
 
@@ -99,7 +100,7 @@ describe('cors middleware methods', () => {
         isEndCalled = true;
       },
     };
-    const middleware = new Cors(global.server.app, {
+    const middleware = new Cors(appInstance, {
       origins: ['https://localhost'],
     });
 
@@ -138,7 +139,7 @@ describe('cors middleware methods', () => {
         isEndCalled = true;
       },
     };
-    const middleware = new Cors(global.server.app, {
+    const middleware = new Cors(appInstance, {
       origins: [/./],
     });
 

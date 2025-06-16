@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import Role from './Role.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 describe('role middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    // const middleware = new Role(global.server.app);
+    // const middleware = new Role(appInstance);
 
     expect(Role.description).toBeDefined();
   });
@@ -24,7 +25,7 @@ describe('role middleware methods', () => {
         },
       },
     };
-    const middleware = new Role(global.server.app, {
+    const middleware = new Role(appInstance, {
       roles: ['admin', 'role1'],
     });
 
@@ -45,7 +46,7 @@ describe('role middleware methods', () => {
     const req = {
       appInfo: {}, // no user
     };
-    const middleware = new Role(global.server.app);
+    const middleware = new Role(appInstance);
     await middleware.middleware(
       req,
       {
@@ -79,7 +80,7 @@ describe('role middleware methods', () => {
         user: { roles: ['role1', 'role2'] },
       },
     };
-    const middleware = new Role(global.server.app, { roles: ['admin'] });
+    const middleware = new Role(appInstance, { roles: ['admin'] });
     await middleware.middleware(
       req,
       {

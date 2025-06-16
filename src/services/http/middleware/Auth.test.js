@@ -1,11 +1,12 @@
 import { beforeAll, describe, it, expect } from 'vitest';
 import Auth from './Auth.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 describe('atuh middleware methods', () => {
   let middleware;
 
   beforeAll(() => {
-    middleware = new Auth(global.server.app);
+    middleware = new Auth(appInstance);
   });
 
   it('have description fields', async () => {

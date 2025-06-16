@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import GetUserByToken from './GetUserByToken.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    // const middleware = new GetUserByToken(global.server.app);
+    // const middleware = new GetUserByToken(appInstance);
 
     expect(GetUserByToken.description).toBeDefined();
   });
@@ -13,7 +14,7 @@ describe('getUserByToken middleware methods', () => {
   it('have description usedAuthParameters', async () => {
     expect.assertions(2);
 
-    const middleware = new GetUserByToken(global.server.app);
+    const middleware = new GetUserByToken(appInstance);
     const params = middleware.usedAuthParameters;
 
     expect(params).toHaveLength(1);
@@ -23,7 +24,7 @@ describe('getUserByToken middleware methods', () => {
   it('should not called twice', async () => {
     expect.assertions(1);
 
-    const middleware = new GetUserByToken(global.server.app);
+    const middleware = new GetUserByToken(appInstance);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -41,7 +42,7 @@ describe('getUserByToken middleware methods', () => {
   it('should not getuser without token', async () => {
     expect.assertions(1);
 
-    const middleware = new GetUserByToken(global.server.app);
+    const middleware = new GetUserByToken(appInstance);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -60,7 +61,7 @@ describe('getUserByToken middleware methods', () => {
   it('should not getuser with a wrong token', async () => {
     expect.assertions(2);
 
-    const middleware = new GetUserByToken(global.server.app);
+    const middleware = new GetUserByToken(appInstance);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -81,7 +82,7 @@ describe('getUserByToken middleware methods', () => {
   it('should not getuser with a good token in body', async () => {
     expect.assertions(2);
 
-    const middleware = new GetUserByToken(global.server.app);
+    const middleware = new GetUserByToken(appInstance);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -103,7 +104,7 @@ describe('getUserByToken middleware methods', () => {
   it('should not getuser with a good token in header', async () => {
     expect.assertions(2);
 
-    const middleware = new GetUserByToken(global.server.app);
+    const middleware = new GetUserByToken(appInstance);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;

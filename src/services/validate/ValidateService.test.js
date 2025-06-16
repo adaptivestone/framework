@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { appInstance } from '../../helpers/appInstance.ts';
 
 import { object, string } from 'yup';
 import ValidateService from './ValidateService.js';
@@ -16,8 +17,8 @@ describe('validate service', () => {
       expect.assertions(1);
 
       const result = await new ValidateService(
-        global.server.app,
-        new YupValidator(global.server.app, object().shape({ name: string() })),
+        appInstance,
+        new YupValidator(appInstance, object().shape({ name: string() })),
       ).validateSchema(req, undefined, data);
 
       expect(result).toStrictEqual({});
@@ -27,13 +28,14 @@ describe('validate service', () => {
       expect.assertions(1);
 
       const validator = new YupValidator(
-        global.server.app,
+        appInstance,
         object().shape({ name: string() }),
       );
-      const result = await new ValidateService(
-        global.server.app,
-        {},
-      ).validateSchema(req, validator, data);
+      const result = await new ValidateService(appInstance, {}).validateSchema(
+        req,
+        validator,
+        data,
+      );
 
       expect(result).toStrictEqual({
         name: '1213123123',
@@ -75,12 +77,12 @@ describe('validate service', () => {
       expect.assertions(1);
 
       const body = new YupValidator(
-        global.server.app,
+        appInstance,
         object().shape({ name: string() }),
       );
 
       const validator = ValidateService.getDriverByValidatorBody(
-        global.server.app,
+        appInstance,
         body,
       );
 
@@ -95,7 +97,7 @@ describe('validate service', () => {
       });
 
       const validator = ValidateService.getDriverByValidatorBody(
-        global.server.app,
+        appInstance,
         body,
       );
 
@@ -107,7 +109,7 @@ describe('validate service', () => {
 
       const body = 'string';
       const validator = ValidateService.getDriverByValidatorBody(
-        global.server.app,
+        appInstance,
         body,
       );
 

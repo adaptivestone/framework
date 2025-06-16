@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import PrepareAppInfo from './PrepareAppInfo.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 describe('prepareAppInfo methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    // const middleware = new PrepareAppInfo(global.server.app);
+    // const middleware = new PrepareAppInfo(appInstance);
 
     expect(PrepareAppInfo.description).toBeDefined();
   });
@@ -13,7 +14,7 @@ describe('prepareAppInfo methods', () => {
   it('middleware that works', async () => {
     expect.assertions(3);
 
-    const middleware = new PrepareAppInfo(global.server.app);
+    const middleware = new PrepareAppInfo(appInstance);
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;

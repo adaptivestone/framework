@@ -1,11 +1,12 @@
 import { beforeAll, describe, it, expect } from 'vitest';
 import I18n from './I18n.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 describe('i18n middleware methods', () => {
   let middleware;
 
   beforeAll(() => {
-    middleware = new I18n(global.server.app);
+    middleware = new I18n(appInstance);
   });
 
   it('have description fields', async () => {
@@ -89,8 +90,8 @@ describe('i18n middleware methods', () => {
   it('middleware disabled', async () => {
     expect.assertions(4);
 
-    global.server.app.updateConfig('i18n', { enabled: false });
-    middleware = new I18n(global.server.app);
+    appInstance.updateConfig('i18n', { enabled: false });
+    middleware = new I18n(appInstance);
 
     let isCalled = false;
     const nextFunction = () => {
@@ -107,6 +108,6 @@ describe('i18n middleware methods', () => {
     expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
     expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test
 
-    global.server.app.updateConfig('i18n', { enabled: true });
+    appInstance.updateConfig('i18n', { enabled: true });
   });
 });

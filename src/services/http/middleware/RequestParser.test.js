@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { describe, it, expect } from 'vitest';
 import { PersistentFile } from 'formidable';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 import RequestParser from './RequestParser.ts';
 
@@ -8,7 +9,7 @@ describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    // const middleware = new RequestParser(global.server.app);
+    // const middleware = new RequestParser(appInstance);
 
     expect(RequestParser.description).toBeDefined();
   });
@@ -21,7 +22,7 @@ describe('reqest parser limiter methods', () => {
 
       const server = createServer(async (req, res) => {
         req.appInfo = {};
-        const middleware = new RequestParser(global.server.app);
+        const middleware = new RequestParser(appInstance);
         middleware.middleware(req, {}, (err) => {
           expect(err).toBeUndefined();
           expect(req.body.title).toBeDefined();
@@ -82,7 +83,7 @@ d\r
 
       const server = createServer(async (req, res) => {
         req.appInfo = {};
-        const middleware = new RequestParser(global.server.app);
+        const middleware = new RequestParser(appInstance);
         let status;
 
         const resp = {

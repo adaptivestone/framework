@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
+import { getTestServerURL } from '../tests/testHelpers.ts';
 
 describe('home', () => {
   it('can open home have', async () => {
     expect.assertions(1);
 
-    const { status } = await fetch(global.server.testingGetUrl('/')).catch(
-      () => ({ status: 500 }),
-    );
+    const { status } = await fetch(getTestServerURL('/')).catch(() => ({
+      status: 500,
+    }));
 
     expect(status).toBe(200);
   });

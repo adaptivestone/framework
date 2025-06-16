@@ -10,6 +10,6 @@ export const setServerInstance = (serverInstanceToSet: Server) => {
   serverInstance = serverInstanceToSet;
 };
 
-export const getServerBaseURL = (urlPart?: string) => {
+export const getTestServerURL = (urlPart?: string) => {
   return `http://127.0.0.1:${appInstance.getConfig('http').port}${urlPart}`;
 };

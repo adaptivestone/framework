@@ -1,8 +1,10 @@
 import { beforeAll, describe, it, expect } from 'vitest';
+import { appInstance } from '../../helpers/appInstance.ts';
+import { getTestServerURL } from '../../tests/testHelpers.ts';
 
 describe('middlewares correct works', () => {
   beforeAll(async () => {
-    const User = global.server.app.getModel('User');
+    const User = appInstance.getModel('User');
     await User.create({
       email: 'testUser1@gmail.com',
       name: {
@@ -18,7 +20,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl('/test/somecontroller/userAvatar'),
+      getTestServerURL('/test/somecontroller/userAvatar'),
       {
         method: 'PATCH',
         headers: {
@@ -37,7 +39,7 @@ describe('middlewares correct works', () => {
     expect.assertions(2);
 
     const response = await fetch(
-      global.server.testingGetUrl('/test/somecontroller/userAvatar'),
+      getTestServerURL('/test/somecontroller/userAvatar'),
       {
         method: 'PATCH',
         headers: {
@@ -60,7 +62,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const requests = Array.from({ length: 11 }, () =>
-      fetch(global.server.testingGetUrl('/test/somecontroller/')),
+      fetch(getTestServerURL('/test/somecontroller/')),
     );
 
     const responses = await Promise.all(requests);
@@ -73,7 +75,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl('/test/somecontroller/someData?flag=false'),
+      getTestServerURL('/test/somecontroller/someData?flag=false'),
       {
         headers: {
           'Content-type': 'application/json',
@@ -88,9 +90,7 @@ describe('middlewares correct works', () => {
     expect.assertions(2);
 
     const response = await fetch(
-      global.server.testingGetUrl(
-        '/test/somecontroller/grabSomeDataFromQuery?name=123',
-      ),
+      getTestServerURL('/test/somecontroller/grabSomeDataFromQuery?name=123'),
       {
         headers: {
           'Content-type': 'application/json',
@@ -109,7 +109,7 @@ describe('middlewares correct works', () => {
     expect.assertions(2);
 
     const response = await fetch(
-      global.server.testingGetUrl(
+      getTestServerURL(
         '/test/somecontroller/grabSomeDataFromQueryWithRequiredParam',
       ),
       {
@@ -130,7 +130,7 @@ describe('middlewares correct works', () => {
     expect.assertions(2);
 
     const response = await fetch(
-      global.server.testingGetUrl(
+      getTestServerURL(
         '/test/somecontroller/grabSomeDataFromQueryWithRequiredParam?name=123',
       ),
       {
@@ -151,7 +151,7 @@ describe('middlewares correct works', () => {
     expect.assertions(4);
 
     const response = await fetch(
-      global.server.testingGetUrl(
+      getTestServerURL(
         '/test/somecontroller/grabSomeDataFromQueryWithMiddlewareParams?name=123&page=3&limit=50',
       ),
       {
@@ -174,9 +174,7 @@ describe('middlewares correct works', () => {
     expect.assertions(2);
 
     const response = await fetch(
-      global.server.testingGetUrl(
-        '/test/somecontroller/postQueryParamaters?name=test',
-      ),
+      getTestServerURL('/test/somecontroller/postQueryParamaters?name=test'),
       {
         method: 'POST',
         headers: {
@@ -195,9 +193,7 @@ describe('middlewares correct works', () => {
     expect.assertions(2);
 
     const response = await fetch(
-      global.server.testingGetUrl(
-        '/test/somecontroller/postQueryParamaters?name=test',
-      ),
+      getTestServerURL('/test/somecontroller/postQueryParamaters?name=test'),
       {
         method: 'POST',
         headers: {
@@ -219,9 +215,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl(
-        '/test/somecontroller/someDataWithPermission',
-      ),
+      getTestServerURL('/test/somecontroller/someDataWithPermission'),
       {
         headers: {
           'Content-type': 'application/json',
@@ -237,7 +231,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl('/test/somecontroller/postInfo'),
+      getTestServerURL('/test/somecontroller/postInfo'),
       {
         method: 'POST',
         headers: {
@@ -257,7 +251,7 @@ describe('middlewares correct works', () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      global.server.testingGetUrl('/test/somecontroller/putInfo'),
+      getTestServerURL('/test/somecontroller/putInfo'),
       {
         method: 'PUT',
         headers: {

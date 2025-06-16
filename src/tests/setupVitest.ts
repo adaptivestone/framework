@@ -42,7 +42,7 @@ beforeAll(async () => {
   setServerInstance(server);
 
   await server.init({ isSkipModelInit: true });
-  const connectionString = process.env.TEST_MONGO_URI.replace(
+  const connectionString = (process.env.TEST_MONGO_URI as string).replace(
     '__DB_TO_REPLACE__',
     `TEST_${crypto.randomUUID()}`,
   );
@@ -84,12 +84,14 @@ beforeAll(async () => {
   }
   await server.startServer();
 
-  global.server = new Proxy(server, (target, prop, a) => {
-    console.log(target, prop, a);
-    console.error(
-      'Do not use global.server. Instead use testHelper.serverInstance',
-    );
-    return target[prop];
+  global.server = new Proxy(server, {
+    get(target, prop, receiver) {
+      console.warn(
+        'Do not use global.server. Instead use testHelper.serverInstance',
+      );
+      // 'Reflect.get' properly handles the 'this' context if a method is called.
+      return Reflect.get(target, prop, receiver);
+    },
   });
 });
 
@@ -119,14 +121,14 @@ afterEach(async () => {
 
 afterAll(async () => {
   if (serverInstance) {
-    serverInstance.app.httpServer.shutdown();
+    serverInstance.app.httpServer?.shutdown();
     serverInstance.app.events.emit('shutdown');
   }
   if (typeof global.testSetup.afterAll === 'function') {
     await global.testSetup.afterAll();
   }
   try {
-    await mongoose.connection.db.dropDatabase(); // clean database after test
+    await mongoose.connection.db?.dropDatabase(); // clean database after test
   } catch {
     // that ok. No mongoose connection
   }

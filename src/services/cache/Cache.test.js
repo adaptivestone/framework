@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { setTimeout } from 'node:timers/promises';
+import { appInstance } from '../../helpers/appInstance.ts';
 
 describe('cache', () => {
   const time = Date.now();
@@ -7,7 +8,7 @@ describe('cache', () => {
   it('can get set values', async () => {
     expect.assertions(2);
 
-    const { cache } = global.server.app;
+    const { cache } = appInstance;
 
     const res = await cache.getSetValue('TEST_TIME', () => time);
 
@@ -21,7 +22,7 @@ describe('cache', () => {
   it('can delete values', async () => {
     expect.assertions(1);
 
-    const { cache } = global.server.app;
+    const { cache } = appInstance;
 
     await cache.removeKey('TEST_TIME');
 
@@ -33,7 +34,7 @@ describe('cache', () => {
   it('can works with big int', async () => {
     expect.assertions(2);
 
-    const { cache } = global.server.app;
+    const { cache } = appInstance;
 
     const res = await cache.getSetValue('BIN_INT', () => 1n);
 
@@ -47,7 +48,7 @@ describe('cache', () => {
   it('can execute only one request per time', async () => {
     expect.assertions(3);
 
-    const { cache } = global.server.app;
+    const { cache } = appInstance;
     let counter = 0;
 
     const f = async () => {
@@ -75,7 +76,7 @@ describe('cache', () => {
     };
     let err;
 
-    const { cache } = global.server.app;
+    const { cache } = appInstance;
 
     try {
       await Promise.all([

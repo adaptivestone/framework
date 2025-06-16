@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import IpDetector from './IpDetector.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 const testVectors = [
   // IPv4 CIDR blocks
@@ -115,7 +116,7 @@ const testVectors = [
 describe('ipDetector methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
-    // const middleware = new IpDetector(global.server.app);
+    // const middleware = new IpDetector(appInstance);
     expect(IpDetector.description).toBeDefined();
   });
 
@@ -124,10 +125,10 @@ describe('ipDetector methods', () => {
 
     const nextFunction = () => {};
     for (const vector of testVectors) {
-      global.server.app.updateConfig('ipDetector', {
+      appInstance.updateConfig('ipDetector', {
         trustedProxy: [vector.cidr],
       });
-      const middleware = new IpDetector(global.server.app);
+      const middleware = new IpDetector(appInstance);
       for (const test of vector.tests) {
         const req = {
           appInfo: {},

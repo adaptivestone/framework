@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { userHelpers } from '../models/User.ts';
+import { appInstance } from '../helpers/appInstance.ts';
 
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
@@ -10,7 +11,7 @@ describe('user model', () => {
   it('can create user', async () => {
     expect.assertions(1);
 
-    globalUser = await global.server.app.getModel('User').create({
+    globalUser = await appInstance.getModel('User').create({
       email: userEmail,
       password: userPassword,
       name: {
@@ -24,7 +25,7 @@ describe('user model', () => {
   it('passwords should be hashed', async () => {
     expect.assertions(1);
 
-    const user = await global.server.app.getModel('User').findOne({
+    const user = await appInstance.getModel('User').findOne({
       email: userEmail,
     });
 
@@ -34,7 +35,7 @@ describe('user model', () => {
   it('passwords should not be changed on other fields save', async () => {
     expect.assertions(1);
 
-    const user = await global.server.app.getModel('User').findOne({
+    const user = await appInstance.getModel('User').findOne({
       email: userEmail,
     });
     const psw = user.password;
@@ -50,7 +51,7 @@ describe('user model', () => {
     it('should WORK with valid creds', async () => {
       expect.assertions(1);
 
-      const userModel = await global.server.app.getModel('User');
+      const userModel = await appInstance.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         userPassword,
@@ -62,7 +63,7 @@ describe('user model', () => {
     it('should NOT with INvalid creds', async () => {
       expect.assertions(1);
 
-      const userModel = await global.server.app.getModel('User');
+      const userModel = await appInstance.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         'wrongPassword',
@@ -74,7 +75,7 @@ describe('user model', () => {
     it('should NOT with wrong email', async () => {
       expect.assertions(1);
 
-      const userModel = await global.server.app.getModel('User');
+      const userModel = await appInstance.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         'not@exists.com',
         userPassword,
@@ -88,7 +89,7 @@ describe('user model', () => {
     it('should NOT work for non valid token', async () => {
       expect.assertions(1);
 
-      const user = await global.server.app
+      const user = await appInstance
         .getModel('User')
         .getUserByToken('fake one');
 
@@ -99,7 +100,7 @@ describe('user model', () => {
       expect.assertions(1);
 
       const token = await globalUser.generateToken();
-      const user = await global.server.app
+      const user = await appInstance
         .getModel('User')
         .getUserByToken(token.token);
 
@@ -112,9 +113,7 @@ describe('user model', () => {
       expect.assertions(1);
 
       await expect(
-        global.server.app
-          .getModel('User')
-          .getUserByVerificationToken('fake one'),
+        appInstance.getModel('User').getUserByVerificationToken('fake one'),
       ).rejects.toStrictEqual(new Error('User not exists'));
     });
 
@@ -123,7 +122,7 @@ describe('user model', () => {
 
       const token = await userHelpers.generateUserVerificationToken(globalUser);
 
-      const user = await global.server.app
+      const user = await appInstance
         .getModel('User')
         .getUserByVerificationToken(token.token);
 
@@ -136,9 +135,7 @@ describe('user model', () => {
       expect.assertions(1);
 
       await expect(
-        global.server.app
-          .getModel('User')
-          .getUserByPasswordRecoveryToken('fake one'),
+        appInstance.getModel('User').getUserByPasswordRecoveryToken('fake one'),
       ).rejects.toStrictEqual(new Error('User not exists'));
     });
 
@@ -148,7 +145,7 @@ describe('user model', () => {
       const token =
         await userHelpers.generateUserPasswordRecoveryToken(globalUser);
 
-      const user = await global.server.app
+      const user = await appInstance
         .getModel('User')
         .getUserByPasswordRecoveryToken(token.token);
 

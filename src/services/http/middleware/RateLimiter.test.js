@@ -1,6 +1,7 @@
 import { setTimeout } from 'node:timers/promises';
 import crypto from 'node:crypto';
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
+import { appInstance } from '../../../helpers/appInstance.ts';
 
 import RateLimiter from './RateLimiter.ts';
 
@@ -10,7 +11,7 @@ describe('rate limiter methods', () => {
   beforeAll(async () => {
     await setTimeout(20);
 
-    mongoRateLimiter = new RateLimiter(global.server.app, {
+    mongoRateLimiter = new RateLimiter(appInstance, {
       driver: 'mongo',
       limiterOptions: {
         keyPrefix: `mongo_${Date.now()}_${crypto.randomUUID()}}`,
@@ -26,7 +27,7 @@ describe('rate limiter methods', () => {
   it('have description fields', async () => {
     expect.assertions(1);
 
-    // const middleware = new RateLimiter(global.server.app, {
+    // const middleware = new RateLimiter(appInstance, {
     //   driver: 'redis',
     // });
 
@@ -36,7 +37,7 @@ describe('rate limiter methods', () => {
   it('can create redis rateLimiter', async () => {
     expect.assertions(1);
 
-    const redisRateLimiter = new RateLimiter(global.server.app, {
+    const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
 
@@ -46,7 +47,7 @@ describe('rate limiter methods', () => {
   it('can not create rateLimiter with unknown driver', async () => {
     expect.assertions(1);
 
-    const rateLimiter = new RateLimiter(global.server.app, {
+    const rateLimiter = new RateLimiter(appInstance, {
       driver: 'unknown',
     });
 
@@ -56,7 +57,7 @@ describe('rate limiter methods', () => {
   it('generateConsumeKey works correctly', async () => {
     expect.assertions(1);
 
-    const redisRateLimiter = new RateLimiter(global.server.app, {
+    const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
 
@@ -75,7 +76,7 @@ describe('rate limiter methods', () => {
   it('generateConsumeKey with request works correctly', async () => {
     expect.assertions(1);
 
-    const redisRateLimiter = new RateLimiter(global.server.app, {
+    const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
       consumeKeyComponents: {
         request: ['email'],
@@ -97,7 +98,7 @@ describe('rate limiter methods', () => {
   it('middleware without driver should fail', async () => {
     expect.assertions(2);
 
-    const rateLimiter = new RateLimiter(global.server.app, {
+    const rateLimiter = new RateLimiter(appInstance, {
       driver: 'unknown',
     });
     const req = {
@@ -130,7 +131,7 @@ describe('rate limiter methods', () => {
   }) => {
     let realRateLimiter = rateLimiter;
     if (!realRateLimiter) {
-      realRateLimiter = new RateLimiter(global.server.app, {
+      realRateLimiter = new RateLimiter(appInstance, {
         driver,
       });
     }
@@ -211,7 +212,7 @@ describe('rate limiter methods', () => {
   it('middleware should rate limits for us. memory driver', async () => {
     expect.assertions(2);
 
-    const rateLimiter = new RateLimiter(global.server.app, {
+    const rateLimiter = new RateLimiter(appInstance, {
       driver: 'memory',
     });
 
@@ -231,7 +232,7 @@ describe('rate limiter methods', () => {
   it('middleware should rate limits for us. redis driver', async () => {
     expect.assertions(2);
 
-    const rateLimiter = new RateLimiter(global.server.app, {
+    const rateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
 
