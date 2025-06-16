@@ -1,7 +1,7 @@
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 
 let isTeardown = false;
-let mongoMemoryServerInstance;
+let mongoMemoryServerInstance: MongoMemoryReplSet;
 
 const setup = async () => {
   console.log('GLOBAL SETUP PREPARE RUNNING...');

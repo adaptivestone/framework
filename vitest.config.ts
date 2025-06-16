@@ -3,8 +3,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    globalSetup: './src/tests/globalSetupVitest.js',
-    setupFiles: './src/tests/setupVitest.js',
+    globalSetup: './src/tests/globalSetupVitest.ts',
+    setupFiles: './src/tests/setupVitest.ts',
     testTimeout: 10000,
     outputFile: './coverage/junit.rspec.xml',
     reporters: ['default', 'junit'],

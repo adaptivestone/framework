@@ -1,11 +1,12 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
+import { setServerInstance, serverInstance } from './testHelpers.ts';
 
 import mongoose from 'mongoose'; // we do not need create indexes on tests
 
 import { createClient } from '@redis/client';
-import { clearRedisNamespace } from '../helpers/redis/clearNamespace.ts';
+import { clearNamespace } from '../helpers/redis/clearNamespace.ts';
 import Server from '../server.ts';
 
 mongoose.set('autoIndex', false);
@@ -15,7 +16,7 @@ const basePath = new URL('.', import.meta.url).pathname;
 beforeAll(async () => {
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
   process.env.AUTH_SALT = crypto.randomBytes(16).toString('hex');
-  global.server = new Server({
+  const server = new Server({
     folders: {
       config:
         process.env.TEST_FOLDER_CONFIG || path.resolve(basePath, '../config'),
@@ -38,25 +39,31 @@ beforeAll(async () => {
         path.resolve(basePath, '../migrations'),
     },
   });
-  await global.server.init({ isSkipModelInit: true });
+  setServerInstance(server);
+
+  await server.init({ isSkipModelInit: true });
   const connectionString = process.env.TEST_MONGO_URI.replace(
     '__DB_TO_REPLACE__',
     `TEST_${crypto.randomUUID()}`,
   );
-  global.server.updateConfig('mongo', {
+  server.updateConfig('mongo', {
     connectionString,
   });
-  global.server.updateConfig('http', { port: 0 }); // allow to use random
-  global.server.updateConfig('mail', { transport: 'stub' });
-  await global.server.initAllModels();
+  server.updateConfig('http', { port: 0 }); // allow to use random
+  server.updateConfig('mail', { transport: 'stub' });
+  await server.initAllModels();
 
   if (!global.testSetup) {
     global.testSetup = {};
   }
-  global.server.testingGetUrl = (urlPart) =>
-    `http://127.0.0.1:${global.server.getConfig('http').port}${urlPart}`;
+  server.testingGetUrl = (urlPart) => {
+    console.error(
+      'global.server.testingGetUrl is deprcated. Please use testHelper.getServerBaseURL()',
+    );
+    return `http://127.0.0.1:${global.server.getConfig('http').port}${urlPart}`;
+  };
   if (!global.testSetup.disableUserCreate) {
-    const User = global.server.app.getModel('User');
+    const User = server.app.getModel('User');
     global.user = await User.create({
       email: 'test@test.com',
       password: 'testPassword',
@@ -75,27 +82,35 @@ beforeAll(async () => {
   if (typeof global.testSetup.beforeAll === 'function') {
     await global.testSetup.beforeAll();
   }
-  await global.server.startServer();
+  await server.startServer();
+
+  global.server = new Proxy(server, (target, prop, a) => {
+    console.log(target, prop, a);
+    console.error(
+      'Do not use global.server. Instead use testHelper.serverInstance',
+    );
+    return target[prop];
+  });
 });
 
 beforeEach(() => {
-  if (global.server) {
+  if (serverInstance) {
     const key = `test-${Math.random().toString(36).substring(7)}`;
-    global.server.app.updateConfig('redis', {
+    serverInstance.app.updateConfig('redis', {
       namespace: key,
     });
   }
 });
 
 afterEach(async () => {
-  if (global.server) {
-    const { url, namespace } = global.server.getConfig('redis');
+  if (serverInstance) {
+    const { url, namespace } = serverInstance.getConfig('redis');
     const redisClient = createClient({ url });
 
     try {
       await redisClient.connect();
-      await clearRedisNamespace(redisClient, namespace);
-      await redisClient.disconnect();
+      await clearNamespace(redisClient, namespace);
+      await redisClient.destroy();
     } catch {
       // that ok. No redis connection
     }
@@ -103,9 +118,9 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  if (global.server) {
-    global.server.app.httpServer.shutdown();
-    global.server.app.events.emit('shutdown');
+  if (serverInstance) {
+    serverInstance.app.httpServer.shutdown();
+    serverInstance.app.events.emit('shutdown');
   }
   if (typeof global.testSetup.afterAll === 'function') {
     await global.testSetup.afterAll();
