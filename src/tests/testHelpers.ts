@@ -4,7 +4,7 @@ import type { GetModelTypeFromClass } from '../modules/BaseModel.ts';
 import type UserModel from '../models/User.ts';
 
 export let serverInstance!: Server;
-export let defaultUser: GetModelTypeFromClass<typeof UserModel>;
+export let defaultUser: InstanceType<GetModelTypeFromClass<typeof UserModel>>;
 export let defaultAuthToken: string;
 
 export const setServerInstance = (serverInstanceToSet: Server) => {
@@ -15,7 +15,7 @@ export const setServerInstance = (serverInstanceToSet: Server) => {
 };
 
 export const setDefaultUser = (
-  userToSet: GetModelTypeFromClass<typeof UserModel>,
+  userToSet: InstanceType<GetModelTypeFromClass<typeof UserModel>>,
 ) => {
   if (defaultUser) {
     throw new Error('Default user is already set');
