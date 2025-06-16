@@ -1,11 +1,7 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { beforeAll, beforeEach, afterEach, afterAll } from 'vitest';
-import {
-  setServerInstance,
-  serverInstance,
-  createDefaultTestUser,
-} from './testHelpers.ts';
+import { setServerInstance, serverInstance } from './testHelpers.ts';
 
 import mongoose from 'mongoose'; // we do not need create indexes on tests
 
@@ -57,38 +53,19 @@ beforeAll(async () => {
   server.updateConfig('mail', { transport: 'stub' });
   await server.initAllModels();
 
-  if (!global.testSetup) {
-    global.testSetup = {};
-  }
-  server.testingGetUrl = (urlPart) => {
-    console.error(
-      'global.server.testingGetUrl is deprcated. Please use testHelper.getServerBaseURL()',
-    );
-    return `http://127.0.0.1:${global.server.getConfig('http').port}${urlPart}`;
-  };
-  if (!global.testSetup.disableUserCreate) {
-    const answer = await createDefaultTestUser();
+  // if (!global.testSetup) {
+  //   global.testSetup = {};
+  // }
+  // server.testingGetUrl = (urlPart) => {
+  //   console.error(
+  //     'global.server.testingGetUrl is deprcated. Please use testHelper.getServerBaseURL()',
+  //   );
+  //   return `http://127.0.0.1:${global.server.getConfig('http').port}${urlPart}`;
+  // };
 
-    if (answer) {
-      global.User = answer.user;
-
-      global.authToken = { token: answer.token };
-    }
-  }
-
-  global.server = new Proxy(server, {
-    get(target, prop, receiver) {
-      console.warn(
-        'Do not use global.server. Instead use testHelper.serverInstance',
-      );
-      // 'Reflect.get' properly handles the 'this' context if a method is called.
-      return Reflect.get(target, prop, receiver);
-    },
-  });
-
-  if (typeof global.testSetup.beforeAll === 'function') {
-    await global.testSetup.beforeAll();
-  }
+  // if (typeof global.testSetup.beforeAll === 'function') {
+  //   await global.testSetup.beforeAll();
+  // }
   await server.startServer();
 });
 
@@ -121,9 +98,9 @@ afterAll(async () => {
     serverInstance.app.httpServer?.shutdown();
     serverInstance.app.events.emit('shutdown');
   }
-  if (typeof global.testSetup.afterAll === 'function') {
-    await global.testSetup.afterAll();
-  }
+  // if (typeof global.testSetup.afterAll === 'function') {
+  //   await global.testSetup.afterAll();
+  // }
   try {
     await mongoose.connection.db?.dropDatabase(); // clean database after test
   } catch {

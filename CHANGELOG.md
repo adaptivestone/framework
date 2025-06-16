@@ -49,6 +49,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ## [5.0.0-beta.23]
 
+- **[BREAKING]** No more global variables for testing and default user will not be created by default
 - **[NEW]** Test helpers getTestServerURL, serverInstance, setDefaultUser, setDefaultAuthToken and createDefaultTestUser.
 - **[DEPRECATION]** global usage in testing is deprecated
 

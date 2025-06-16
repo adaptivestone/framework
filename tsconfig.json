@@ -17,9 +17,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*"],
-  "exclude": [
-    "src/**/*.test.js",
-    "src/**/*.test.ts",
-    "src/tests/setupVitest.ts"
-  ]
+  "exclude": ["src/**/*.test.js", "src/**/*.test.ts"]
 }
