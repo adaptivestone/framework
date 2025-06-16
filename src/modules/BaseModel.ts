@@ -48,6 +48,10 @@ export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
   ExtractProperty<T, 'schemaOptions'> // TSchemaOptions
 >;
 
+export type VirtualType<T> = {
+  [P in keyof T]: T[P] extends { get: () => infer R } ? R : any;
+};
+
 // this came from moongose. Look at the Model and Schema types.
 export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
   InferRawDocType<
@@ -66,7 +70,7 @@ export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
           Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
         >
     >, //TRawDocType
-    ExtractProperty<T, 'modelVirtuals'> &
+    VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
       ExtractProperty<T, 'modelInstanceMethods'>, // TVirtuals & TInstanceMethods
     {}, // TQueryHelpers
     ExtractProperty<T, 'modelVirtuals'> // TVirtuals
