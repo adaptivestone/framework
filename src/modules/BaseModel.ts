@@ -98,15 +98,15 @@ export class BaseModel {
   }
 
   static get modelInstanceMethods() {
-    return {} as const;
+    return {};
   }
 
   static get modelVirtuals() {
-    return {} as const;
+    return {};
   }
 
   static get modelStatics() {
-    return {} as const;
+    return {};
   }
 
   static initHooks(schema: Schema) {
