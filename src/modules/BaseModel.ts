@@ -11,10 +11,10 @@ import type {
 export type Merge<M, N> = Omit<M, keyof N> & N;
 
 export type WithTimestamps<TOptions> = TOptions extends { timestamps: true }
-  ? { createdAt: Date; updatedAt: Date }
+  ? { createdAt: Schema.Types.Date; updatedAt: Schema.Types.Date }
   : TOptions extends { timestamps: false }
     ? {}
-    : { createdAt: Date; updatedAt: Date };
+    : { createdAt: Schema.Types.Date; updatedAt: Schema.Types.Date };
 
 export type ExtractProperty<
   T,
