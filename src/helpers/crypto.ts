@@ -5,8 +5,8 @@ import { promisify } from 'node:util';
 import { appInstance } from './appInstance.ts';
 
 export const scryptAsync = promisify<
-  string | Buffer | NodeJS.TypedArray | DataView,
-  string | Buffer | NodeJS.TypedArray | DataView,
+  string | Buffer | DataView,
+  string | Buffer | DataView,
   number,
   Buffer
 >(scrypt);

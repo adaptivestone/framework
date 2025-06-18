@@ -12,10 +12,10 @@ import prettierPlugin from 'eslint-plugin-prettier/recommended';
 // /** @type {import('eslint').Linter.Config[]} */
 export default tseslint.config([
   {
-    ignores: ['dist/'],
+    ignores: ['dist/', 'genTypes.d.ts'],
   },
-  // tseslint.configs.recommended,
   pluginJs.configs.recommended,
+  tseslint.configs.recommended,
   importPlugin.recommended,
   eslintConfigPrettier,
   prettierPlugin,

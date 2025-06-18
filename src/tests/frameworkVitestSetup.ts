@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { beforeAll, afterAll } from 'vitest';
 import { createDefaultTestUser } from './testHelpers.ts';
 
 beforeAll(async () => {

@@ -30,9 +30,8 @@ export const setDefaultAuthToken = (tokenToSet: string) => {
   defaultAuthToken = tokenToSet;
 };
 
-export const getTestServerURL = (urlPart?: string) => {
-  return `http://127.0.0.1:${appInstance.getConfig('http').port}${urlPart}`;
-};
+export const getTestServerURL = (urlPart?: string) =>
+  `http://127.0.0.1:${appInstance.getConfig('http').port}${urlPart}`;
 
 export const createDefaultTestUser = async () => {
   if (defaultUser) {
