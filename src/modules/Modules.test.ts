@@ -7,8 +7,8 @@ describe('abstract controller methods', () => {
   it('can get routes', async () => {
     expect.assertions(2);
 
-    const controller = new AbstractController(appInstance);
-    const childController = new SomeController(appInstance);
+    const controller = new AbstractController(appInstance, '');
+    const childController = new SomeController(appInstance, '');
 
     const { routes } = controller;
     const { routes: childRoutes } = childController;

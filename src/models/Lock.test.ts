@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
+import type { TLock } from './Lock.ts';
 
 describe('Lock Model', () => {
-  let Lock;
+  let Lock: TLock;
   const testLockName = 'test-lock';
   const testTtl = 30; // seconds
 
@@ -28,7 +29,7 @@ describe('Lock Model', () => {
     it('should throw non-duplicate key errors', async () => {
       // Simulate a validation error
       const invalidLockName = null;
-      await expect(Lock.acquireLock(invalidLockName)).rejects.toThrow();
+      await expect(Lock.acquireLock(invalidLockName!)).rejects.toThrow();
     });
   });
 

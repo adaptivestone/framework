@@ -1,8 +1,11 @@
 import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
+  GetModelTypeFromClass,
   ExtractProperty,
 } from '../modules/BaseModel.ts';
+
+export type TSequence = GetModelTypeFromClass<typeof Sequence>;
 
 class Sequence extends BaseModel {
   static get modelSchema() {
@@ -18,7 +21,10 @@ class Sequence extends BaseModel {
       ExtractProperty<typeof Sequence, 'schemaOptions'>
     >;
     return {
-      getSequence: async function (this: SequenceModelLite, forType: string) {
+      getSequence: async function (
+        this: SequenceModelLite,
+        forType: string,
+      ): Promise<number> {
         const sequence = await this.findByIdAndUpdate(
           { _id: forType },
           { $inc: { seq: 1 } },

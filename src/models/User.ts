@@ -14,6 +14,9 @@ type UserModelLite = GetModelTypeLiteFromSchema<
   typeof User.modelSchema,
   ExtractProperty<typeof User, 'schemaOptions'>
 >;
+
+export type TUser = GetModelTypeFromClass<typeof User>;
+
 class User extends BaseModel {
   static initHooks(schema: Schema) {
     schema.pre(
@@ -352,4 +355,3 @@ export const userHelpers = {
 };
 
 export default User;
-export type TUserModel = GetModelTypeFromClass<typeof User>;

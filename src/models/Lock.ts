@@ -1,11 +1,14 @@
 import { BaseModel } from '../modules/BaseModel.ts';
 import type {
   GetModelTypeLiteFromSchema,
+  GetModelTypeFromClass,
   ExtractProperty,
 } from '../modules/BaseModel.ts';
 
 import type { MongoError } from 'mongodb';
 import type { Schema } from 'mongoose';
+
+export type TLock = GetModelTypeFromClass<typeof Lock>;
 
 class Lock extends BaseModel {
   static initHooks(schema: Schema) {

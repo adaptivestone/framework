@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
+import type { TSequence } from './Sequence.ts';
 
 describe('sequence model', () => {
   it('should produce sequence', async () => {
     expect.assertions(1);
 
-    const SequenceModel = appInstance.getModel('Sequence');
+    const SequenceModel: TSequence = appInstance.getModel('Sequence');
 
     const number1 = await SequenceModel.getSequence('typeOne');
 
@@ -15,7 +16,7 @@ describe('sequence model', () => {
   it('should produce sequence different for different types', async () => {
     expect.assertions(3);
 
-    const SequenceModel = appInstance.getModel('Sequence');
+    const SequenceModel: TSequence = appInstance.getModel('Sequence');
 
     const number1 = await SequenceModel.getSequence('typeOneAgain');
     const number2 = await SequenceModel.getSequence('typeTwo');
@@ -29,9 +30,9 @@ describe('sequence model', () => {
   it('should works on async env', async () => {
     expect.assertions(1);
 
-    const SequenceModel = appInstance.getModel('Sequence');
+    const SequenceModel: TSequence = appInstance.getModel('Sequence');
 
-    const promises = [];
+    const promises: Promise<number>[] = [];
     const upTo = 100;
     for (let i = 0; i < upTo; i += 1) {
       promises.push(SequenceModel.getSequence('asyncTypeOne'));

@@ -10,11 +10,11 @@ describe('cache', () => {
 
     const { cache } = appInstance;
 
-    const res = await cache.getSetValue('TEST_TIME', () => time);
+    const res = await cache.getSetValue('TEST_TIME', async () => time);
 
     expect(res).toStrictEqual(time);
 
-    const res2 = await cache.getSetValue('TEST_TIME', () => '123');
+    const res2 = await cache.getSetValue('TEST_TIME', async () => '123');
 
     expect(res2).toStrictEqual(time);
   });
@@ -26,7 +26,7 @@ describe('cache', () => {
 
     await cache.removeKey('TEST_TIME');
 
-    const res2 = await cache.getSetValue('TEST_TIME', () => '123');
+    const res2 = await cache.getSetValue('TEST_TIME', async () => '123');
 
     expect(res2).toBe('123');
   });
@@ -36,11 +36,11 @@ describe('cache', () => {
 
     const { cache } = appInstance;
 
-    const res = await cache.getSetValue('BIN_INT', () => 1n);
+    const res = await cache.getSetValue('BIN_INT', async () => 1n);
 
     expect(res).toBe(1n);
 
-    const res2 = await cache.getSetValue('BIN_INT', () => '1111');
+    const res2 = await cache.getSetValue('BIN_INT', async () => '1111');
 
     expect(res2).toBe(1n);
   });

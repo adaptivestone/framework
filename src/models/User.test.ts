@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { userHelpers } from '../models/User.ts';
 import { appInstance } from '../helpers/appInstance.ts';
+import type { TUser } from './User.ts';
 
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 
-let globalUser;
+let globalUser: InstanceType<TUser>;
 
 describe('user model', () => {
   it('can create user', async () => {
@@ -25,9 +26,11 @@ describe('user model', () => {
   it('passwords should be hashed', async () => {
     expect.assertions(1);
 
-    const user = await appInstance.getModel('User').findOne({
-      email: userEmail,
-    });
+    const user: InstanceType<TUser> = await appInstance
+      .getModel('User')
+      .findOne({
+        email: userEmail,
+      });
 
     expect(user.password).not.toBe(userPassword);
   });
@@ -35,9 +38,11 @@ describe('user model', () => {
   it('passwords should not be changed on other fields save', async () => {
     expect.assertions(1);
 
-    const user = await appInstance.getModel('User').findOne({
-      email: userEmail,
-    });
+    const user: InstanceType<TUser> = await appInstance
+      .getModel('User')
+      .findOne({
+        email: userEmail,
+      });
     const psw = user.password;
     user.email = 'rrrr';
     await user.save();
@@ -51,19 +56,21 @@ describe('user model', () => {
     it('should WORK with valid creds', async () => {
       expect.assertions(1);
 
-      const userModel = await appInstance.getModel('User');
+      const userModel: TUser = await appInstance.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         userPassword,
       );
 
-      expect(user.id).toBe(globalUser.id);
+      if (user) {
+        expect(user?.id).toBe(globalUser.id);
+      }
     });
 
     it('should NOT with INvalid creds', async () => {
       expect.assertions(1);
 
-      const userModel = await appInstance.getModel('User');
+      const userModel: TUser = await appInstance.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         'wrongPassword',
@@ -75,7 +82,7 @@ describe('user model', () => {
     it('should NOT with wrong email', async () => {
       expect.assertions(1);
 
-      const userModel = await appInstance.getModel('User');
+      const userModel: TUser = await appInstance.getModel('User');
       const user = await userModel.getUserByEmailAndPassword(
         'not@exists.com',
         userPassword,
@@ -89,7 +96,7 @@ describe('user model', () => {
     it('should NOT work for non valid token', async () => {
       expect.assertions(1);
 
-      const user = await appInstance
+      const user: InstanceType<TUser> = await appInstance
         .getModel('User')
         .getUserByToken('fake one');
 
@@ -100,7 +107,7 @@ describe('user model', () => {
       expect.assertions(1);
 
       const token = await globalUser.generateToken();
-      const user = await appInstance
+      const user: InstanceType<TUser> = await appInstance
         .getModel('User')
         .getUserByToken(token.token);
 
