@@ -1,10 +1,12 @@
+import type { IRateLimiterOptions } from 'rate-limiter-flexible';
+
 export default {
   limiterOptions: {
     // https://github.com/animir/node-rate-limiter-flexible
     // https://github.com/animir/node-rate-limiter-flexible/wiki/Options
     points: 10, // 10 points
     duration: 60, // Per 60 seconds
-  },
+  } as IRateLimiterOptions,
   driver: 'memory', // can be 'mongo', 'redis'
   consumePoints: 1,
   consumeKeyComponents: {

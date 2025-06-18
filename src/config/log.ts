@@ -1,3 +1,6 @@
+import type { SentryTransportOptions } from 'winston-transport-sentry-node';
+import type { transports } from 'winston';
+
 export default {
   transports: [
     {
@@ -7,7 +10,7 @@ export default {
           dsn: process.env.LOGGER_SENTRY_DSN || process.env.SENTRY_DSN,
         },
         level: process.env.LOGGER_SENTRY_LEVEL || 'info',
-      },
+      } as SentryTransportOptions,
       enable: process.env.LOGGER_SENTRY_ENABLE || false,
     },
     {
@@ -15,7 +18,7 @@ export default {
       transportOptions: {
         level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
         timestamp: true,
-      },
+      } as transports.ConsoleTransportOptions,
       enable: process.env.LOGGER_CONSOLE_ENABLE || true,
     },
   ],
