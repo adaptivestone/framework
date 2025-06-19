@@ -4,8 +4,10 @@ import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 
 import RateLimiter from './RateLimiter.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { Response } from 'express';
 
-let mongoRateLimiter;
+let mongoRateLimiter: RateLimiter;
 
 describe('rate limiter methods', () => {
   beforeAll(async () => {
@@ -68,7 +70,7 @@ describe('rate limiter methods', () => {
           id: 'someId',
         },
       },
-    });
+    } as unknown as FrameworkRequest);
 
     expect(res).toBe('192.168.0.0__someId');
   });
@@ -90,7 +92,7 @@ describe('rate limiter methods', () => {
       body: {
         email: 'foo@example.com',
       },
-    });
+    } as FrameworkRequest);
 
     expect(res).toBe('192.168.0.0__foo@example.com');
   });
@@ -107,7 +109,7 @@ describe('rate limiter methods', () => {
     let status;
     let isSend;
     await rateLimiter.middleware(
-      req,
+      req as FrameworkRequest,
       {
         status(statusCode) {
           status = statusCode;
@@ -116,7 +118,7 @@ describe('rate limiter methods', () => {
         json() {
           isSend = true;
         },
-      },
+      } as Response,
       () => {},
     );
 
@@ -125,9 +127,13 @@ describe('rate limiter methods', () => {
   });
 
   const makeOneRequest = async ({
-    rateLimiter = null,
-    driver = null,
+    rateLimiter,
+    driver,
     request = {},
+  }: {
+    rateLimiter?: RateLimiter;
+    driver?: string;
+    request?: { ip?: string; appInfo?: object };
   }) => {
     let realRateLimiter = rateLimiter;
     if (!realRateLimiter) {
@@ -143,16 +149,16 @@ describe('rate limiter methods', () => {
     let isSend = false;
     let isNextCalled = false;
     await realRateLimiter.middleware(
-      req,
+      req as FrameworkRequest,
       {
-        status(statusCode) {
+        status(statusCode: number) {
           status = statusCode;
           return this;
         },
         json() {
           isSend = true;
         },
-      },
+      } as Response,
       () => {
         isNextCalled = true;
       },
@@ -205,8 +211,8 @@ describe('rate limiter methods', () => {
     const status = data.find((obj) => obj.status === 429);
     const isSend = data.find((obj) => obj.isSend);
 
-    expect(status.status).toBe(429);
-    expect(isSend.isSend).toBeTruthy();
+    expect(status?.status).toBe(429);
+    expect(isSend?.isSend).toBeTruthy();
   });
 
   it('middleware should rate limits for us. memory driver', async () => {
@@ -225,8 +231,8 @@ describe('rate limiter methods', () => {
     const status = data.find((obj) => obj.status === 429);
     const isSend = data.find((obj) => obj.isSend);
 
-    expect(status.status).toBe(429);
-    expect(isSend.isSend).toBeTruthy();
+    expect(status?.status).toBe(429);
+    expect(isSend?.isSend).toBeTruthy();
   });
 
   it('middleware should rate limits for us. redis driver', async () => {
@@ -245,7 +251,7 @@ describe('rate limiter methods', () => {
     const status = data.find((obj) => obj.status === 429);
     const isSend = data.find((obj) => obj.isSend);
 
-    expect(status.status).toBe(429);
-    expect(isSend.isSend).toBeTruthy();
+    expect(status?.status).toBe(429);
+    expect(isSend?.isSend).toBeTruthy();
   });
 });
