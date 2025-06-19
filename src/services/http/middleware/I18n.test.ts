@@ -17,11 +17,22 @@ describe('i18n middleware methods', () => {
   it('detectors should works correctly', async () => {
     expect.assertions(6);
 
-    const request = {
+    const request: {
+      get: () => string;
+      query?: {
+        [key: string]: string;
+      };
+      appInfo: {
+        user?: {
+          locale?: string;
+        };
+      };
+    } = {
       get: () => 'en',
       query: {
         [middleware.lookupQuerystring]: 'es',
       },
+      appInfo: {},
     };
     let lang = await middleware.detectLang(request);
 
@@ -36,12 +47,12 @@ describe('i18n middleware methods', () => {
 
     expect(lang).toBe('en');
 
-    request.get = () => null;
+    request.get = () => null as unknown as string;
     lang = await middleware.detectLang(request);
 
     expect(lang).toBe('es');
 
-    delete request.query;
+    request.query = undefined;
     lang = await middleware.detectLang(request);
 
     expect(lang).toBe('be');
@@ -65,7 +76,18 @@ describe('i18n middleware methods', () => {
     const nextFunction = () => {
       isCalled = true;
     };
-    const req = {
+    const req: {
+      get: () => string;
+      appInfo: {
+        i18n?: {
+          language: string;
+          t: (string) => string;
+        };
+      };
+      i18n?: {
+        t: (string) => string;
+      };
+    } = {
       get: () => 'en',
       appInfo: {},
     };
@@ -73,18 +95,25 @@ describe('i18n middleware methods', () => {
 
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.i18n).toBeDefined();
-    expect(req.appInfo.i18n.language).toBe('en');
-    expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
-    expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test
+    expect(req.appInfo.i18n?.language).toBe('en');
+    expect(req.appInfo.i18n?.t('aaaaa')).toBe('aaaaa');
+    expect(req.i18n?.t('aaaaa')).toBe('aaaaa'); // proxy test
 
-    const req2 = {
+    const req2: {
+      get: () => string;
+      appInfo: {
+        i18n?: {
+          language: string;
+        };
+      };
+    } = {
       get: () => 'fakeLang',
       appInfo: {},
     };
 
     await middleware.middleware(req2, {}, nextFunction);
 
-    expect(req2.appInfo.i18n.language).toBe('en');
+    expect(req2.appInfo.i18n?.language).toBe('en');
   });
 
   it('middleware disabled', async () => {
@@ -97,7 +126,19 @@ describe('i18n middleware methods', () => {
     const nextFunction = () => {
       isCalled = true;
     };
-    const req = {
+    const req: {
+      get: () => string;
+      appInfo: {
+        i18n?: {
+          language: string;
+          t: (string) => string;
+        };
+      };
+      i18n?: {
+        language: string;
+        t: (string) => string;
+      };
+    } = {
       get: () => 'en',
       appInfo: {},
     };
@@ -105,8 +146,8 @@ describe('i18n middleware methods', () => {
 
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.i18n).toBeDefined();
-    expect(req.appInfo.i18n.t('aaaaa')).toBe('aaaaa');
-    expect(req.i18n.t('aaaaa')).toBe('aaaaa'); // proxy test
+    expect(req.appInfo.i18n?.t('aaaaa')).toBe('aaaaa');
+    expect(req.i18n?.t('aaaaa')).toBe('aaaaa'); // proxy test
 
     appInstance.updateConfig('i18n', { enabled: true });
   });
