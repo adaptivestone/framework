@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0-beta.25",
+  "version": "5.0.0-beta.26",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
@@ -34,7 +34,7 @@
     "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
     "redis:docker": "docker run --rm  -p 6379:6379 redis"
   },
-  "author": "Andrey Logunov",
+  "author": "Andrei Lahunou",
   "license": "MIT",
   "dependencies": {
     "@redis/client": "^5.0.0",

@@ -48,6 +48,13 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ---
 
+## [5.0.0-beta.26]
+
+- **[UPDATE]** Update types.
+- **[UPDATE]** Update tests (more ts).
+
+---
+
 ## [5.0.0-beta.25]
 
 - **[UPDATE]** Update types.
