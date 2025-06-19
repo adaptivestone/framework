@@ -216,9 +216,9 @@ class AbstractController extends Base {
                   },
                 },
               });
-            } catch (err: any) {
+            } catch (err: unknown) {
               return res.status(400).json({
-                errors: err.message,
+                errors: err instanceof Error ? err.message : String(err),
               });
             }
             // req.body = new Proxy(req.body, {
