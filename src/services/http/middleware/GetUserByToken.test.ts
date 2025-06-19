@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import GetUserByToken from './GetUserByToken.ts';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { defaultAuthToken } from '../../../tests/testHelpers.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { Response } from 'express';
 
 describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {
@@ -35,7 +37,11 @@ describe('getUserByToken middleware methods', () => {
         user: {},
       },
     };
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
   });
@@ -54,7 +60,11 @@ describe('getUserByToken middleware methods', () => {
       get: () => {},
     };
 
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
   });
@@ -68,13 +78,19 @@ describe('getUserByToken middleware methods', () => {
       isCalled = true;
     };
     const req = {
-      appInfo: {},
+      appInfo: {
+        user: undefined,
+      },
       body: {
         token: 'fake',
       },
       get: () => {},
     };
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.user).toBeUndefined();
@@ -89,14 +105,20 @@ describe('getUserByToken middleware methods', () => {
       isCalled = true;
     };
     const req = {
-      appInfo: {},
+      appInfo: {
+        user: undefined,
+      },
       body: {
         token: defaultAuthToken,
       },
       get: () => {},
     };
 
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.user).toBeDefined();
@@ -111,12 +133,18 @@ describe('getUserByToken middleware methods', () => {
       isCalled = true;
     };
     const req = {
-      appInfo: {},
+      appInfo: {
+        user: undefined,
+      },
       body: {},
       get: () => defaultAuthToken,
     };
 
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.user).toBeDefined();

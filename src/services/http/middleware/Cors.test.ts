@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import Cors from './Cors.ts';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { Response } from 'express';
 
 describe('cors middleware methods', () => {
   it('have description fields', async () => {
@@ -13,11 +15,13 @@ describe('cors middleware methods', () => {
 
   it('should throw without origns', async () => {
     expect.assertions(1);
+    // @ts-expect-error we not pass options
     expect(() => new Cors(appInstance)).toThrow();
   });
 
   it('should throw with empty options', async () => {
     expect.assertions(1);
+    // @ts-expect-error we are passong wrong option
     expect(() => new Cors(appInstance, {})).toThrow();
   });
 
@@ -28,6 +32,7 @@ describe('cors middleware methods', () => {
 
   it('should throw with empty origins not array', async () => {
     expect.assertions(1);
+    // @ts-expect-error we passing not an Array
     expect(() => new Cors(appInstance, { origins: 'origins' })).toThrow();
   });
 
@@ -53,7 +58,11 @@ describe('cors middleware methods', () => {
       origins: ['https://localhost'],
     });
 
-    await middleware.middleware(req, res, nextFunction);
+    await middleware.middleware(
+      req as FrameworkRequest,
+      res as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
     expect(map.get('Vary')).toBe('Origin');
@@ -74,7 +83,11 @@ describe('cors middleware methods', () => {
       origins: ['https://localhost'],
     });
 
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
   });
@@ -104,7 +117,11 @@ describe('cors middleware methods', () => {
       origins: ['https://localhost'],
     });
 
-    await middleware.middleware(req, res);
+    await middleware.middleware(
+      req as FrameworkRequest,
+      res as unknown as Response,
+      () => {},
+    );
 
     expect(isEndCalled).toBeTruthy();
     expect(map.get('Vary')).toBe('Origin, Access-Control-Request-Headers');
@@ -128,6 +145,9 @@ describe('cors middleware methods', () => {
         origin: 'https://localhost',
         'access-control-request-headers': 'someAccessControlRequestHeaders',
       },
+      appInfo: {
+        app: {},
+      },
     };
     const res = {
       set: (key, val) => {
@@ -143,7 +163,11 @@ describe('cors middleware methods', () => {
       origins: [/./],
     });
 
-    await middleware.middleware(req, res);
+    await middleware.middleware(
+      req as FrameworkRequest,
+      res as unknown as Response,
+      () => {},
+    );
 
     expect(isEndCalled).toBeTruthy();
     expect(map.get('Vary')).toBe('Origin, Access-Control-Request-Headers');
