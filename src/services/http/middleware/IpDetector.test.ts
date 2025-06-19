@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import IpDetector from './IpDetector.ts';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { Response } from 'express';
 
 const testVectors = [
   // IPv4 CIDR blocks
@@ -131,12 +133,18 @@ describe('ipDetector methods', () => {
       const middleware = new IpDetector(appInstance);
       for (const test of vector.tests) {
         const req = {
-          appInfo: {},
+          appInfo: {
+            ip: undefined,
+          },
           headers: { 'x-forwarded-for': 'notAnIP' },
           socket: { remoteAddress: test.ip },
         };
         // eslint-disable-next-line no-await-in-loop
-        await middleware.middleware(req, {}, nextFunction);
+        await middleware.middleware(
+          req as unknown as FrameworkRequest,
+          {} as Response,
+          nextFunction,
+        );
         const result = req.appInfo.ip === 'notAnIP';
 
         expect(result).toBe(test.matches);
