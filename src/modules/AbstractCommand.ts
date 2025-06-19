@@ -5,12 +5,12 @@ import type { ParseArgsOptionsConfigExtended } from './BaseCli.ts';
 class AbstractCommand extends Base {
   commands: Record<string, string>;
 
-  args: Record<string, any>;
+  args: Record<string, unknown>;
 
   constructor(
     app: IApp,
     commands: Record<string, string>,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
   ) {
     super(app);
     this.args = args;
@@ -38,7 +38,7 @@ class AbstractCommand extends Base {
    */
   static getMongoConnectionName(
     commandName: string,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
   ) {
     return `CLI: ${commandName} ${JSON.stringify(args)}`;
   }

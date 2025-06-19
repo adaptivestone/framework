@@ -24,7 +24,7 @@ class RateLimiter extends AbstractMiddleware {
   finalOptions: typeof rateLimiterConfig;
   limiter!: RateLimiterAbstract;
 
-  constructor(app: IApp, params?: any) {
+  constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
     const limiterOptions = this.app.getConfig('rateLimiter');
 
@@ -60,7 +60,7 @@ class RateLimiter extends AbstractMiddleware {
   initRedisLimiter() {
     const redisConfig = this.app.getConfig('redis');
     const redisClient = createClient({
-      url: redisConfig.url,
+      url: redisConfig.url as string,
     });
 
     // TODO: change it

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 import EventEmitter from 'node:events';
 import { hrtime, loadEnvFile } from 'node:process';
 import * as url from 'node:url';
@@ -16,21 +17,26 @@ import type BaseCli from './modules/BaseCli.ts';
 import type HttpServer from './services/http/HttpServer.ts';
 import type ControllerManager from './controllers/index.ts';
 import type AbstractModel from './modules/AbstractModel.ts';
-import type { BaseModel } from './modules/BaseModel.ts';
-import type { Model } from 'mongoose';
+import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
+import type { TLogConfig } from './config/log.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
-  models: Map<string, AbstractModel['mongooseModel'] | Model<any>>;
+  models: Map<string, AbstractModel['mongooseModel'] | TBaseModel>;
   modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
 }
 
 export interface IApp {
-  getConfig(configName: string): Record<string, any>;
-  getModel(modelName: string): AbstractModel['mongooseModel'] | false | any;
+  getConfig(configName: string): Record<string, unknown>;
+  getModel(
+    modelName: string,
+  ): AbstractModel['mongooseModel'] | false | TBaseModel;
   runCliCommand(commandName: string): Promise<boolean | void>;
-  updateConfig(configName: string, config: {}): Record<string, any>;
+  updateConfig(
+    configName: string,
+    config: Record<string, unknown>,
+  ): Record<string, unknown>;
   foldersConfig: TFolderConfigFolders;
   events: EventEmitter<[never]>;
   readonly cache: Cache;
@@ -66,7 +72,7 @@ class Server {
 
   cache: AppCache = {
     configs: new Map<string, unknown>(),
-    models: new Map<string, AbstractModel['mongooseModel'] | Model<any>>(),
+    models: new Map<string, AbstractModel['mongooseModel'] | TBaseModel>(),
     modelConstructors: new Map<
       string,
       typeof AbstractModel | typeof BaseModel
@@ -205,7 +211,10 @@ class Server {
         connectionParams.appName = process.env.MONGO_APP_NAME;
       }
       mongoose
-        .connect(this.app.getConfig('mongo').connectionString, connectionParams)
+        .connect(
+          this.app.getConfig('mongo').connectionString as string,
+          connectionParams,
+        )
         .then(
           () => {
             this.app.logger?.info(
@@ -238,7 +247,7 @@ class Server {
     }
 
     if (this.app.getConfig('mongo').connectionString) {
-      const BaseModel = (await import('./modules/BaseModel.ts')).BaseModel;
+      const { BaseModel } = await import('./modules/BaseModel.ts');
       this.#mongooseConnect(); //do not wait for connection. Any time for us it ok
       for (const [modelName, ModelConstructor] of this.cache
         .modelConstructors) {
@@ -408,7 +417,7 @@ class Server {
    * @param {String} configName name on config file to load
    * @returns {Object} config object. Structure depends of config file
    */
-  getConfig(configName: string): Record<string, any> {
+  getConfig(configName: string): Record<string, unknown> {
     if (!this.cache.configs.has(configName)) {
       if (!this.#isInited) {
         throw new Error('You should call Server.init() before using getConfig');
@@ -448,7 +457,7 @@ class Server {
           }`,
       ),
     );
-    const logConfig = this.app.getConfig('log').transports;
+    const { transports } = this.app.getConfig('log') as TLogConfig;
     function IsConstructor(f: Function) {
       try {
         Reflect.construct(String, [], f);
@@ -463,7 +472,7 @@ class Server {
       level: 'silly',
     });
 
-    for (const log of logConfig) {
+    for (const log of transports) {
       if (log.enable) {
         if (log.transport === 'console') {
           logger.add(
@@ -504,7 +513,7 @@ class Server {
    * @param {String} configName
    * @param {Object} config
    */
-  updateConfig(configName: string, config: Record<string, any>) {
+  updateConfig(configName: string, config: Record<string, unknown>) {
     // const confName = configName.charAt(0).toUpperCase() + configName.slice(1);
     const conf = this.getConfig(configName);
     const newConf = Object.assign(conf, config); // TODO deep clone
@@ -519,7 +528,7 @@ class Server {
    */
   getModel(
     modelName: string,
-  ): AbstractModel['mongooseModel'] | Model<any> | false {
+  ): AbstractModel['mongooseModel'] | TBaseModel | false {
     if (modelName.endsWith('s')) {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,

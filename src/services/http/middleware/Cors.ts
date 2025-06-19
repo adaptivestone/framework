@@ -5,7 +5,12 @@ import type { FrameworkRequest } from '../HttpServer.ts';
 import type { IApp } from '../../../server.ts';
 
 class Cors extends AbstractMiddleware {
-  constructor(app: IApp, params: any) {
+  constructor(
+    app: IApp,
+    params: {
+      origins: (string | RegExp)[];
+    },
+  ) {
     super(app);
     this.params = params;
     if (!Array.isArray(params?.origins) || !params.origins.length) {
@@ -18,7 +23,7 @@ class Cors extends AbstractMiddleware {
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
-    for (const host of this.params.origins) {
+    for (const host of this.params?.origins as (string | RegExp)[]) {
       if (
         (typeof host === 'string' && req.headers.origin === host) ||
         (host instanceof RegExp && host.test(req.headers.origin ?? ''))

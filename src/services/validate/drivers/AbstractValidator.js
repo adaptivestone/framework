@@ -6,7 +6,7 @@ class AbstractValidator extends Base {
     this.body = body;
   }
 
-  // eslint-disable-next-line no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static convertFieldsToJson(fields) {
     // IMPLENT;
     return {};
@@ -18,7 +18,7 @@ class AbstractValidator extends Base {
     return {};
   }
 
-  // eslint-disable-next-line class-methods-use-this, no-unused-vars
+  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars
   async validateFields(data, { query, body, appInfo }) {
     // IMPLENT;
     return true;

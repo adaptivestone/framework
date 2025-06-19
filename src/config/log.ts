@@ -1,6 +1,16 @@
 import type { SentryTransportOptions } from 'winston-transport-sentry-node';
 import type { transports } from 'winston';
 
+export type TLogConfig = {
+  transports: {
+    transport: string;
+    transportOptions: {
+      level: string;
+    } & Record<string, unknown>;
+    enable: boolean;
+  }[];
+};
+
 export default {
   transports: [
     {
@@ -22,4 +32,4 @@ export default {
       enable: process.env.LOGGER_CONSOLE_ENABLE || true,
     },
   ],
-};
+} as TLogConfig;

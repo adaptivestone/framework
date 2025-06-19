@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 import express from 'express';
 import type { IRouter, Response, NextFunction } from 'express';
 
@@ -12,7 +13,7 @@ import type AbstractMiddleware from '../services/http/middleware/AbstractMiddlew
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 type MiddlewareWithParamsTuple = [
   typeof AbstractMiddleware,
-  Record<string, any>,
+  Record<string, unknown>,
 ];
 export type TMiddleware = Array<
   typeof AbstractMiddleware | MiddlewareWithParamsTuple
@@ -21,8 +22,8 @@ type RouteObject = {
   handler: Function;
   description?: string;
   middleware?: TMiddleware | null;
-  request?: any;
-  query?: any;
+  request?: unknown;
+  query?: unknown;
 };
 
 export type RouteParams = {
@@ -138,7 +139,7 @@ class AbstractController extends Base {
           }
         }
 
-        const handler = routeObject.handler;
+        const { handler } = routeObject;
         let fnName: string | undefined;
         if (typeof handler === 'function') {
           fnName = handler.name;
@@ -273,7 +274,9 @@ class AbstractController extends Base {
      */
     const text = ['', `Controller '${this.getConstructorName()}' registered.`];
 
-    const reports: { [key: string]: any[] } = {
+    const reports: {
+      [key: string]: typeof routesInfo | typeof middlewaresInfo;
+    } = {
       'Middlewares:': middlewaresInfo,
       'Route middlewares:': routeMiddlewaresReg,
       'Callbacks:': routesInfo,

@@ -1,4 +1,4 @@
-import i18next, { type TFunction } from 'i18next';
+import i18next, { type TFunction, type i18n } from 'i18next';
 import BackendFS from 'i18next-fs-backend';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
@@ -7,9 +7,10 @@ import type { FrameworkRequest } from '../HttpServer.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
 import type { IApp } from '../../../server.ts';
+import type i18nConfig from '../../../config/i18n.ts';
 
 class I18n extends AbstractMiddleware {
-  cache: { [key: string]: any } = {};
+  cache: { [key: string]: i18n } = {};
 
   enabled = true;
 
@@ -24,9 +25,9 @@ class I18n extends AbstractMiddleware {
     language: 'en',
   };
 
-  constructor(app: IApp, params?: any) {
+  constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
-    const I18NConfig = this.app.getConfig('i18n');
+    const I18NConfig = this.app.getConfig('i18n') as typeof i18nConfig;
 
     if (I18NConfig.enabled) {
       this.logger?.info('Enabling i18n support');
@@ -80,11 +81,11 @@ class I18n extends AbstractMiddleware {
     }
 
     req.appInfo.i18n = i18n;
-    //@ts-ignore
+    //@ts-expect-error we known thats a new one
     req.i18n = new Proxy(req.appInfo.i18n, {
       get: (target, prop) => {
         this.logger?.warn('Please not use "req.i18n" Use "req.appInfo.i18n"');
-        //@ts-ignore
+        //@ts-expect-error there are should be an erroe
         return target[prop];
       },
     });

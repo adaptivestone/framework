@@ -5,6 +5,7 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { IApp } from '../../../server.ts';
 import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import type ipDetectorConfig from '../../../config/ipDetector.ts';
 
 class IpDetector extends AbstractMiddleware {
   static get description() {
@@ -13,9 +14,11 @@ class IpDetector extends AbstractMiddleware {
 
   blockList: BlockList;
 
-  constructor(app: IApp, params?: any) {
+  constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
-    const { trustedProxy } = this.app.getConfig('ipDetector');
+    const { trustedProxy } = this.app.getConfig(
+      'ipDetector',
+    ) as typeof ipDetectorConfig;
 
     this.blockList = new BlockList();
 
@@ -41,7 +44,9 @@ class IpDetector extends AbstractMiddleware {
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
-    const { headers } = this.app.getConfig('ipDetector');
+    const { headers } = this.app.getConfig(
+      'ipDetector',
+    ) as typeof ipDetectorConfig;
     const initialIp = req.socket.remoteAddress;
     req.appInfo.ip = initialIp;
     const addressType = initialIp?.includes(':') ? 'ipv6' : 'ipv4';

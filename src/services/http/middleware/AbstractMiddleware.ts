@@ -5,9 +5,9 @@ import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
 class AbstractMiddleware extends Base {
-  params: any;
+  params?: Record<string, unknown>;
 
-  constructor(app: IApp, params?: any) {
+  constructor(app: IApp, params?: Record<string, unknown>) {
     super(app);
     this.params = params;
   }
@@ -16,6 +16,7 @@ class AbstractMiddleware extends Base {
     return 'Middleware description. Please provide own';
   }
 
+  // eslint-disable-next-line class-methods-use-this
   get usedAuthParameters(): Array<{
     name: string;
     type: string;

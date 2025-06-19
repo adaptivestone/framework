@@ -1,10 +1,11 @@
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import type { TUser } from '../../../models/User.ts';
 
 export interface GetUserByTokenAppInfo {
   appInfo: {
-    user?: any; // TODO
+    user?: InstanceType<TUser>;
   };
 }
 
@@ -47,8 +48,10 @@ class GetUserByToken extends AbstractMiddleware {
         return next();
       }
     }
-    const User = this.app.getModel('User');
-    const user = await User.getUserByToken(token);
+    const User = this.app.getModel('User') as unknown as TUser;
+    const user = (await User.getUserByToken(
+      token,
+    )) as unknown as InstanceType<TUser>;
     if (user) {
       req.appInfo.user = user;
     }

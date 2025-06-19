@@ -1,20 +1,10 @@
 import AbstractCommand from '../modules/AbstractCommand.ts';
 import { BaseModel } from '../modules/BaseModel.ts';
-import * as url from 'url';
 import fs from 'node:fs/promises';
 
 class GenerateTypes extends AbstractCommand {
   static get description(): string {
     return 'Gererates TypeScript types';
-  }
-
-  async getTypesContent(): Promise<string> {
-    const __dirname = url.fileURLToPath(new URL('.', import.meta.url));
-    const content = await fs.readFile(
-      `${__dirname}/../../../src/types/types.ts`,
-      'utf8',
-    );
-    return content;
   }
 
   static isShouldInitModels = false;
@@ -32,14 +22,15 @@ class GenerateTypes extends AbstractCommand {
   }
 
   static async getTemplate(
-    configs: Map<string, any>,
+    configs: Map<string, unknown>,
     modelPaths: { file: string; path: string }[],
   ): Promise<string> {
     const dir = process.cwd();
     const configTypes = Array.from(configs)
-      .map((config) => {
-        return `    getConfig(configName: '${config[0]}'): ${JSON.stringify(config[1], null, 6)};`;
-      })
+      .map(
+        (config) =>
+          `    getConfig(configName: '${config[0]}'): ${JSON.stringify(config[1], null, 6)};`,
+      )
       .join('\n');
 
     const modelTypes = (

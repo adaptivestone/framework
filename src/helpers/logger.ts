@@ -1,12 +1,4 @@
-const levels = [
-  'error',
-  'warn',
-  'info',
-  'http',
-  'verbose',
-  'debug',
-  'silly',
-] as const;
+const levels = ['error', 'warn', 'info', 'debug'] as const;
 
 type LogLevel = (typeof levels)[number];
 
@@ -23,8 +15,8 @@ const consoleLogger = (level: LogLevel, message: string) => {
   const shouldLog =
     configuredLevelIndex === -1 || configuredLevelIndex >= currentLevelIndex;
   if (shouldLog) {
-    if ((console as any)[level]) {
-      (console as any)[level](message);
+    if (console[level]) {
+      console[level](message);
     } else {
       console.log(message);
     }

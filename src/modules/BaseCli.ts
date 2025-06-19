@@ -186,9 +186,8 @@ class Cli extends Base {
     }
 
     const c = new Command(this.app, this.commands, parsedArgs.values);
-    let result;
 
-    result = await c.run().catch((e: { stack: any }) => {
+    const result = await c.run().catch((e: { stack: unknown }) => {
       this.logger?.error(e.stack);
     });
 

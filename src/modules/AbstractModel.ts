@@ -9,12 +9,12 @@ export interface IAbstractModelMethods<T> {
 }
 
 export interface IAbstractModel<IDocument, IMethods>
-  extends Model<IDocument, {}, IMethods> {
+  extends Model<IDocument, object, IMethods> {
   getSuper(): AbstractModel<IDocument> & this;
 }
 
 class AbstractModel<
-  IDocument = {},
+  IDocument = object,
   IMethods extends
     IAbstractModelMethods<IDocument> = IAbstractModelMethods<IDocument>,
   IModel extends IAbstractModel<IDocument, IMethods> = IAbstractModel<

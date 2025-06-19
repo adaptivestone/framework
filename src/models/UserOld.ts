@@ -81,7 +81,7 @@ class UserOld extends AbstractModel<
   initHooks() {
     this.mongooseSchema.pre('save', async function userPreSaveHook() {
       if (this.isModified('password')) {
-        // @ts-ignore
+        // @ts-expect-error badtypes
         this.password = await this.constructor.hashPassword(this.password);
       }
     });
@@ -151,7 +151,10 @@ class UserOld extends AbstractModel<
   }
 
   async generateToken(this: InstanceType<UserOld['mongooseModel']>) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+      saltSecret: string;
+      hashRounds: number;
+    };
     const timestamp = new Date();
     timestamp.setDate(timestamp.getDate() + 30);
     const data = await scryptAsync(
@@ -178,7 +181,10 @@ class UserOld extends AbstractModel<
   }
 
   static async hashPassword(this: UserOld['mongooseModel'], password: string) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+      saltSecret: string;
+      hashRounds: number;
+    };
     const data = await scryptAsync(String(password), saltSecret, hashRounds);
     return data.toString('base64url');
   }
@@ -199,7 +205,10 @@ class UserOld extends AbstractModel<
   static async generateUserPasswordRecoveryToken(
     userMongoose: InstanceType<UserOld['mongooseModel']>,
   ) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+      saltSecret: string;
+      hashRounds: number;
+    };
 
     const date = new Date();
     date.setDate(date.getDate() + 14);
@@ -253,7 +262,7 @@ class UserOld extends AbstractModel<
     let Mailer;
     // speed optimisation
     try {
-      // @ts-ignore
+      // @ts-expect-error module is optional
       // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
     } catch {
@@ -278,7 +287,10 @@ class UserOld extends AbstractModel<
   static async generateUserVerificationToken(
     userMongoose: InstanceType<UserOld['mongooseModel']>,
   ) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+      saltSecret: string;
+      hashRounds: number;
+    };
 
     const date = new Date();
     date.setDate(date.getDate() + 14);
@@ -341,7 +353,8 @@ class UserOld extends AbstractModel<
     // speed optimisation
     let Mailer;
     try {
-      // @ts-ignore
+      // @ts-expect-error module is optional
+      // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
     } catch {
       const error =

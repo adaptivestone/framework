@@ -1,6 +1,7 @@
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
 import type { RedisClientType } from '@redis/client';
+import type redisConfig from '../../config/redis.ts';
 
 class Cache extends Base {
   whenReady: Promise<void>;
@@ -22,7 +23,7 @@ class Cache extends Base {
     // memory drives should works on master process level
     // we should support multiple cashe same time
     const { createClient } = await import('@redis/client');
-    const conf = this.app.getConfig('redis');
+    const conf = this.app.getConfig('redis') as typeof redisConfig;
     this.redisClient = createClient({
       url: conf.url,
     });
@@ -57,6 +58,7 @@ class Cache extends Base {
    */
   async getSetValue(
     keyValue: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onNotFound: () => Promise<any>,
     storeTime = 60 * 5,
   ) {
@@ -66,10 +68,10 @@ class Cache extends Base {
     }
     const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
-    // eslint-disable-next-line no-unused-vars
-    let resolve = (value: any) => {};
-    // eslint-disable-next-line no-unused-vars
-    let reject = (value: any) => {};
+    // eslint-disable-next-line  @typescript-eslint/no-unused-vars
+    let resolve = (value: unknown) => {};
+    // eslint-disable-next-line  @typescript-eslint/no-unused-vars
+    let reject = (value: unknown) => {};
     if (this.promiseMapping.has(key)) {
       return this.promiseMapping.get(key);
     }

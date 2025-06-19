@@ -13,8 +13,9 @@ class YupFile extends Schema {
   constructor() {
     super({
       type: 'file',
-      // @ts-ignore
-      check: (value) => value.every((item) => item instanceof PersistentFile),
+      check: (value: unknown) =>
+        Array.isArray(value) &&
+        value.every((item) => item instanceof PersistentFile),
     });
   }
 }

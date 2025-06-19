@@ -226,7 +226,7 @@ class User extends BaseModel {
         let Mailer;
         // speed optimisation
         try {
-          // @ts-ignore
+          // @ts-expect-error module is optional
           // eslint-disable-next-line import-x/no-unresolved
           Mailer = (await import('@adaptivestone/framework-module-email'))
             .default;
@@ -264,7 +264,8 @@ class User extends BaseModel {
         // speed optimisation
         let Mailer;
         try {
-          // @ts-ignore
+          // @ts-expect-error module is optional
+          // eslint-disable-next-line import-x/no-unresolved
           Mailer = (await import('@adaptivestone/framework-module-email'))
             .default;
         } catch {
