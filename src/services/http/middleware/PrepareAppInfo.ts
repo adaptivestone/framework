@@ -10,7 +10,7 @@ class PrepareAppInfo extends AbstractMiddleware {
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     if (!req.appInfo) {
-      //@ts-ignore
+      //@ts-expect-error extending
       req.appInfo = {
         app: this.app,
       };

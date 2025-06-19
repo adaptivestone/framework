@@ -1,6 +1,5 @@
 import globals from 'globals';
 import pluginJs from '@eslint/js';
-// eslint-disable-next-line import-x/no-unresolved
 import tseslint from 'typescript-eslint';
 
 import { flatConfigs as importPlugin } from 'eslint-plugin-import-x';

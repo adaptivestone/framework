@@ -11,16 +11,23 @@ import Cors from './middleware/Cors.ts';
 import Base from '../../modules/Base.ts';
 
 import type { IApp } from '../../server.ts';
-import type { Express, Request, Response, NextFunction } from 'express';
+import type {
+  Express,
+  Request,
+  Response,
+  NextFunction,
+  Handler,
+} from 'express';
 import type { Server } from 'node:http';
 import type { TFunction } from 'i18next';
+import type ThttpConfig from '../../config/http.ts';
 
 export interface FrameworkRequest extends Request {
   appInfo: {
     app: IApp;
     ip?: string | undefined;
-    request: Record<string, any>;
-    query: Record<string, any>;
+    request: Record<string, unknown>;
+    query: Record<string, unknown>;
     // user?: any;
     i18n?: {
       t: TFunction;
@@ -48,28 +55,28 @@ class HttpServer extends Base {
     this.express.disable('x-powered-by');
 
     this.express.use(
-      new RequestLoggerMiddleware(this.app).getMiddleware() as any,
+      new RequestLoggerMiddleware(this.app).getMiddleware() as Handler,
     );
     this.express.use(
-      new PrepareAppInfoMiddleware(this.app).getMiddleware() as any,
+      new PrepareAppInfoMiddleware(this.app).getMiddleware() as Handler,
     );
-    this.express.use(new IpDetector(this.app).getMiddleware() as any);
-    this.express.use(new I18nMiddleware(this.app).getMiddleware() as any);
+    this.express.use(new IpDetector(this.app).getMiddleware() as Handler);
+    this.express.use(new I18nMiddleware(this.app).getMiddleware() as Handler);
 
-    const httpConfig = this.app.getConfig('http');
+    const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
     this.express.use(
       new Cors(this.app, {
         origins: httpConfig.corsDomains,
-      }).getMiddleware() as any,
+      }).getMiddleware() as Handler,
     );
 
     this.express.use(
-      new RequestParserMiddleware(this.app).getMiddleware() as any,
+      new RequestParserMiddleware(this.app).getMiddleware() as Handler,
     );
 
     // As exprress will check numbersof arguments
-    // eslint-disable-next-line no-unused-vars
     this.express.use(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       (err: Error, req: Request, res: Response, next: NextFunction) => {
         // error handling
         console.error(err.stack);
@@ -81,7 +88,7 @@ class HttpServer extends Base {
     this.httpServer = http.createServer(this.express);
 
     const listener = this.httpServer.listen(
-      httpConfig.port,
+      httpConfig.port as number,
       httpConfig.hostname,
       () => {
         const address = listener.address();

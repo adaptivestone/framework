@@ -44,7 +44,7 @@ export interface IApp {
   httpServer: null | HttpServer;
   controllerManager: null | ControllerManager;
   frameworkFolder: string;
-  documentation?: any[];
+  documentation?: unknown[];
   internalFilesCache: AppCache;
 }
 
@@ -98,6 +98,7 @@ class Server {
    */
   constructor(config: TFolderConfig) {
     this.config = config;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),
@@ -425,9 +426,12 @@ class Server {
       this.app.logger.warn(
         `You asked for config ${configName} that not exists. Please check you codebase `,
       );
-      return {};
+      return {} as Record<string, unknown>;
     }
-    return this.cache.configs.get(configName) || {};
+    return (
+      (this.cache.configs.get(configName) as Record<string, unknown>) ||
+      ({} as Record<string, unknown>)
+    );
   }
 
   /**
