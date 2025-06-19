@@ -5,6 +5,9 @@ import RateLimiter from '../services/http/middleware/RateLimiter.ts';
 
 import type { Response } from 'express';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import type { TUser } from '../models/User.ts';
+
+type UserInstance = InstanceType<TUser>;
 
 class Auth extends AbstractController {
   get routes() {
@@ -63,17 +66,29 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(req: FrameworkRequest, res: Response) {
-    const User = this.app.getModel('User');
-    const user = await User.getUserByEmailAndPassword(
+  async postLogin(
+    req: FrameworkRequest & {
+      appInfo: {
+        request: {
+          email: string;
+          password: string;
+        };
+      };
+    },
+    res: Response,
+  ) {
+    const User = this.app.getModel('User') as unknown as TUser;
+    const userResult = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
       req.appInfo.request.password, // we do a request casting
     );
-    if (!user) {
+    if (!userResult) {
       return res
         .status(400)
         .json({ message: req.appInfo.i18n?.t('auth.errorUPValid') });
     }
+    // TypeScript now knows userResult is not false, so it has the instance methods
+    const user = userResult;
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow && !user.isVerified) {
       return res.status(400).json({
@@ -87,15 +102,19 @@ class Auth extends AbstractController {
   }
 
   async postRegister(req: FrameworkRequest, res: Response) {
-    const User = req.appInfo.app.getModel('User');
-    let user = await User.getUserByEmail(req.appInfo.request.email);
+    const User = req.appInfo.app.getModel('User') as unknown as TUser;
+    let user = (await User.getUserByEmail(
+      req.appInfo.request.email as string,
+    )) as InstanceType<TUser>;
     if (user) {
       return res
         .status(400)
         .json({ message: req.appInfo.i18n?.t('email.registered') });
     }
     if (req.appInfo.request.nickName) {
-      user = await User.findOne({ 'name.nick': req.appInfo.request.nickName });
+      user = (await User.findOne({
+        'name.nick': req.appInfo.request.nickName,
+      })) as InstanceType<TUser>;
       if (user) {
         return res
           .status(400)
@@ -115,9 +134,11 @@ class Auth extends AbstractController {
 
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
-      await user.sendVerificationEmail(req.appInfo.i18n).catch((e: Error) => {
-        this.logger?.error(e);
-      });
+      await (user as UserInstance)
+        .sendVerificationEmail(req.appInfo.i18n!)
+        .catch((e: Error) => {
+          this.logger?.error(e);
+        });
     }
     return res.status(201).json();
   }
@@ -129,11 +150,11 @@ class Auth extends AbstractController {
   }
 
   async verifyUser(req: FrameworkRequest, res: Response) {
-    const User = req.appInfo.app.getModel('User');
+    const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user;
     try {
       user = await User.getUserByVerificationToken(
-        req.query.verification_token,
+        req.query.verification_token as string,
       );
     } catch {
       return res.status(400).json({
@@ -153,15 +174,17 @@ class Auth extends AbstractController {
   }
 
   async sendPasswordRecoveryEmail(req: FrameworkRequest, res: Response) {
-    const User = req.appInfo.app.getModel('User');
+    const User = req.appInfo.app.getModel('User') as unknown as TUser;
     try {
-      const user = await User.getUserByEmail(req.appInfo.request.email);
+      const user = await User.getUserByEmail(
+        req.appInfo.request.email as string,
+      );
       if (!user) {
         return res
           .status(400)
           .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
       }
-      await user.sendPasswordRecoveryEmail(req.appInfo.i18n);
+      await (user as UserInstance).sendPasswordRecoveryEmail(req.appInfo.i18n!);
       return res.status(200).json();
     } catch (e) {
       this.logger?.error(e);
@@ -172,9 +195,9 @@ class Auth extends AbstractController {
   }
 
   async recoverPassword(req: FrameworkRequest, res: Response) {
-    const User = this.app.getModel('User');
+    const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByPasswordRecoveryToken(
-      req.appInfo.request.passwordRecoveryToken,
+      req.appInfo.request.passwordRecoveryToken as string,
     ).catch((e: Error) => {
       this.logger?.error(e);
     });
@@ -187,21 +210,21 @@ class Auth extends AbstractController {
 
     this.logger?.debug(`Password recovery user is :${user}`);
 
-    user.password = req.appInfo.request.password;
+    user.password = req.appInfo.request.password as string;
     user.isVerified = true;
     await user.save();
     return res.status(200).json();
   }
 
   async sendVerification(req: FrameworkRequest, res: Response) {
-    const User = this.app.getModel('User');
-    const user = await User.getUserByEmail(req.appInfo.request.email);
+    const User = this.app.getModel('User') as unknown as TUser;
+    const user = await User.getUserByEmail(req.appInfo.request.email as string);
     if (!user) {
       return res
         .status(400)
         .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
-    await user.sendVerificationEmail(req.appInfo.i18n);
+    await (user as UserInstance).sendVerificationEmail(req.appInfo.i18n!);
     return res.status(200).json();
   }
 

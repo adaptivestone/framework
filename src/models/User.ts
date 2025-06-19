@@ -82,12 +82,12 @@ class User extends BaseModel {
        * @param {string} password
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
-      getUserByEmailAndPassword: async function getUserByEmailAndPassword(
-        this: UserModelLite,
-        email: string,
-        password: string,
-      ) {
-        const data = await this.findOne({ email: String(email) });
+      getUserByEmailAndPassword: async function getUserByEmailAndPassword<
+        T extends UserModelLite,
+      >(this: T, email: string, password: string) {
+        const data = await this.findOne<InstanceType<T>>({
+          email: String(email),
+        });
         if (!data) {
           return false;
         }
