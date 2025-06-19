@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
+import type { TUser } from '../models/User.ts';
 
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
@@ -131,12 +132,15 @@ describe('auth', () => {
 
     it('can login with normal creds and verified email', async () => {
       expect.assertions(3);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
 
-      const user = await appInstance
-        .getModel('User')
-        .findOne({ email: userEmail });
-      user.isVerified = true;
-      await user.save();
+      const user = await UserModel.findOne({
+        email: userEmail,
+      });
+      if (user) {
+        user.isVerified = true;
+        await user.save();
+      }
 
       const response = await fetch(getTestServerURL('/auth/login'), {
         method: 'POST',
@@ -160,8 +164,9 @@ describe('auth', () => {
   describe('isAuthWithVefificationFlow auth option', () => {
     it('can verify user', async () => {
       expect.assertions(2);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
 
-      const user = await appInstance.getModel('User').create({
+      const user = await UserModel.create({
         email: 'Test@gmail.com',
         password: 'userPassword',
         name: {
@@ -169,7 +174,7 @@ describe('auth', () => {
         },
       });
 
-      user.verificationTokens.push({
+      user.verificationTokens?.push({
         token: 'testToken',
       });
 
@@ -182,9 +187,9 @@ describe('auth', () => {
         },
       );
 
-      const { isVerified } = await appInstance.getModel('User').findOne({
+      const { isVerified } = await UserModel.findOne({
         email: 'Test@gmail.com',
-      });
+      }).orFail();
 
       expect(status).toBe(200);
       expect(isVerified).toBeTruthy();
@@ -192,8 +197,9 @@ describe('auth', () => {
 
     it('can not verify user with wrong token', async () => {
       expect.assertions(2);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
 
-      const user = await appInstance.getModel('User').create({
+      const user = await UserModel.create({
         email: 'Test423@gmail.com',
         password: 'userPassword',
         name: {
@@ -201,7 +207,7 @@ describe('auth', () => {
         },
       });
 
-      user.verificationTokens.push({
+      user.verificationTokens?.push({
         token: 'testToken',
       });
 
@@ -216,9 +222,9 @@ describe('auth', () => {
         },
       );
 
-      const { isVerified } = await appInstance.getModel('User').findOne({
+      const { isVerified } = await UserModel.findOne({
         email: 'Test423@gmail.com',
-      });
+      }).orFail();
 
       expect(status).toBe(400);
       expect(isVerified).toBeFalsy();
@@ -264,8 +270,9 @@ describe('auth', () => {
 
     it('can recover password', async () => {
       expect.assertions(1);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
 
-      const user = await appInstance.getModel('User').create({
+      const user = await UserModel.create({
         email: 'Test1@gmail.com',
         password: 'userPassword',
         name: {
@@ -273,7 +280,7 @@ describe('auth', () => {
         },
       });
 
-      user.passwordRecoveryTokens.push({
+      user.passwordRecoveryTokens?.push({
         token: 'superPassword',
       });
 
@@ -298,8 +305,9 @@ describe('auth', () => {
 
     it('can not recover password with wrong token', async () => {
       expect.assertions(1);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
 
-      const user = await appInstance.getModel('User').create({
+      const user = await UserModel.create({
         email: 'Test2@gmail.com',
         password: 'userPassword',
         name: {
@@ -307,7 +315,7 @@ describe('auth', () => {
         },
       });
 
-      user.passwordRecoveryTokens.push({
+      user.passwordRecoveryTokens?.push({
         token: 'superPassword',
       });
 
