@@ -4,7 +4,7 @@ import { PersistentFile } from 'formidable';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import type { IncomingMessage } from 'node:http';
-import type { Response } from 'express';
+import type { Response, NextFunction } from 'express';
 
 import RequestParser from './RequestParser.ts';
 
@@ -20,30 +20,35 @@ describe('reqest parser limiter methods', () => {
   it('middleware that works', async () => {
     expect.assertions(4);
 
-    await new Promise((done) => {
+    await new Promise<boolean>((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
 
       const server = createServer(async (req: IncomingMessage, res) => {
-        const frReq = {
-          ...req,
-          appInfo: {},
-          body: {},
-        } as FrameworkRequest;
+        // Add appInfo property to req
+        (req as unknown as FrameworkRequest).appInfo = {
+          app: appInstance,
+          request: {},
+          query: {},
+        };
+
         const middleware = new RequestParser(appInstance);
         middleware.middleware(
-          frReq as FrameworkRequest,
+          req as FrameworkRequest,
           {} as Response,
-          (err) => {
+          ((err?: Error) => {
             expect(err).toBeUndefined();
-            expect(frReq.body.title).toBeDefined();
-            expect(frReq.body.multipleFiles).toBeDefined();
+
+            // Get the body once to avoid linting issues
+            const reqBody = (req as unknown as FrameworkRequest).body;
+            expect(reqBody.title).toBeDefined();
+            expect(reqBody.multipleFiles).toBeDefined();
             expect(
-              frReq.body.multipleFiles[0] instanceof PersistentFile,
+              reqBody.multipleFiles[0] instanceof PersistentFile,
             ).toBeTruthy();
 
             res.writeHead(200);
             res.end('ok');
-          },
+          }) as NextFunction,
         );
       });
       server.listen(null, async () => {
@@ -89,26 +94,34 @@ d\r
   it('middleware with a problem', async () => {
     expect.assertions(1);
 
-    await new Promise((done) => {
+    await new Promise<boolean>((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
 
-      const server = createServer(async (req, res) => {
+      const server = createServer(async (req: IncomingMessage, res) => {
         const frReq = {
           ...req,
-          appInfo: {},
+          appInfo: {
+            app: appInstance,
+            request: {},
+            query: {},
+          },
           body: {},
         } as FrameworkRequest;
         const middleware = new RequestParser(appInstance);
-        let status;
+        let status = 0;
 
         const resp = {
-          status: (code) => {
+          status: (code: number) => {
             status = code;
             return resp;
           },
           json: () => resp,
         };
-        await middleware.middleware(frReq, resp as Response, () => {});
+        await middleware.middleware(
+          frReq,
+          resp as Response,
+          (() => {}) as NextFunction,
+        );
 
         expect(status).toBe(400);
         // expect(err).toBeDefined();
