@@ -2,6 +2,9 @@ import { createServer } from 'node:http';
 import { describe, it, expect } from 'vitest';
 import { PersistentFile } from 'formidable';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { IncomingMessage } from 'node:http';
+import type { Response } from 'express';
 
 import RequestParser from './RequestParser.ts';
 
@@ -20,24 +23,32 @@ describe('reqest parser limiter methods', () => {
     await new Promise((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
 
-      const server = createServer(async (req, res) => {
-        req.appInfo = {};
+      const server = createServer(async (req: IncomingMessage, res) => {
+        const frReq = {
+          ...req,
+          appInfo: {},
+          body: {},
+        } as FrameworkRequest;
         const middleware = new RequestParser(appInstance);
-        middleware.middleware(req, {}, (err) => {
-          expect(err).toBeUndefined();
-          expect(req.body.title).toBeDefined();
-          expect(req.body.multipleFiles).toBeDefined();
-          expect(
-            req.body.multipleFiles[0] instanceof PersistentFile,
-          ).toBeTruthy();
+        middleware.middleware(
+          frReq as FrameworkRequest,
+          {} as Response,
+          (err) => {
+            expect(err).toBeUndefined();
+            expect(frReq.body.title).toBeDefined();
+            expect(frReq.body.multipleFiles).toBeDefined();
+            expect(
+              frReq.body.multipleFiles[0] instanceof PersistentFile,
+            ).toBeTruthy();
 
-          res.writeHead(200);
-          res.end('ok');
-        });
+            res.writeHead(200);
+            res.end('ok');
+          },
+        );
       });
       server.listen(null, async () => {
         const address = server.address();
-        const chosenPort = typeof address === 'string' ? 0 : address.port;
+        const chosenPort = typeof address === 'string' ? 0 : address?.port;
         const body = `----13068458571765726332503797717\r
 Content-Disposition: form-data; name="title"\r
 \r
@@ -69,7 +80,7 @@ d\r
           done(err);
         });
         server.close(() => {
-          done();
+          done(true);
         });
       });
     });
@@ -82,7 +93,11 @@ d\r
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
 
       const server = createServer(async (req, res) => {
-        req.appInfo = {};
+        const frReq = {
+          ...req,
+          appInfo: {},
+          body: {},
+        } as FrameworkRequest;
         const middleware = new RequestParser(appInstance);
         let status;
 
@@ -93,7 +108,7 @@ d\r
           },
           json: () => resp,
         };
-        await middleware.middleware(req, resp, () => {});
+        await middleware.middleware(frReq, resp as Response, () => {});
 
         expect(status).toBe(400);
         // expect(err).toBeDefined();
@@ -103,7 +118,7 @@ d\r
       });
       server.listen(null, async () => {
         const address = server.address();
-        const chosenPort = typeof address === 'string' ? 0 : address.port;
+        const chosenPort = typeof address === 'string' ? 0 : address?.port;
         const body = 'someBadBody';
 
         await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
@@ -119,7 +134,7 @@ d\r
           done(err);
         });
         server.close(() => {
-          done();
+          done(true);
         });
       });
     });

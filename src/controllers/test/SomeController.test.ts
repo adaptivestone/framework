@@ -1,10 +1,11 @@
 import { beforeAll, describe, it, expect } from 'vitest';
 import { appInstance } from '../../helpers/appInstance.ts';
 import { getTestServerURL } from '../../tests/testHelpers.ts';
+import type { TUser } from '../../models/User.ts';
 
 describe('middlewares correct works', () => {
   beforeAll(async () => {
-    const User = appInstance.getModel('User');
+    const User = appInstance.getModel('User') as unknown as TUser;
     await User.create({
       email: 'testUser1@gmail.com',
       name: {

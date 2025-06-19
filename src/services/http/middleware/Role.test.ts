@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import Role from './Role.ts';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import type { Response } from 'express';
+import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+import type { TUser } from '../../../models/User.ts';
 
 describe('role middleware methods', () => {
   it('have description fields', async () => {
@@ -29,7 +33,12 @@ describe('role middleware methods', () => {
       roles: ['admin', 'role1'],
     });
 
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(
+      req as FrameworkRequest &
+        GetUserByTokenAppInfo & { user: InstanceType<TUser> },
+      {} as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
   });
@@ -48,7 +57,8 @@ describe('role middleware methods', () => {
     };
     const middleware = new Role(appInstance);
     await middleware.middleware(
-      req,
+      req as FrameworkRequest &
+        GetUserByTokenAppInfo & { user: InstanceType<TUser> },
       {
         status(statusCode) {
           status = statusCode;
@@ -57,7 +67,7 @@ describe('role middleware methods', () => {
         json() {
           isSend = true;
         },
-      },
+      } as Response,
       nextFunction,
     );
 
@@ -82,7 +92,8 @@ describe('role middleware methods', () => {
     };
     const middleware = new Role(appInstance, { roles: ['admin'] });
     await middleware.middleware(
-      req,
+      req as FrameworkRequest &
+        GetUserByTokenAppInfo & { user: InstanceType<TUser> },
       {
         status(statusCode) {
           status = statusCode;
@@ -91,7 +102,7 @@ describe('role middleware methods', () => {
         json() {
           isSend = true;
         },
-      },
+      } as Response,
       nextFunction,
     );
 
