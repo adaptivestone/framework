@@ -22,8 +22,8 @@ type RouteObject = {
   handler: Function;
   description?: string;
   middleware?: TMiddleware | null;
-  request?: unknown;
-  query?: unknown;
+  request?: (unknown & { fields: unknown }) | null; // fields part of you magic
+  query?: (unknown & { fields: unknown }) | null; // fields part of you magic
 };
 
 export type RouteParams = {

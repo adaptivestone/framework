@@ -2,6 +2,7 @@ import { appInstance } from '../helpers/appInstance.ts';
 import type Server from '../server.ts';
 import type { GetModelTypeFromClass } from '../modules/BaseModel.ts';
 import type UserModel from '../models/User.ts';
+import type { TUser } from '../models/User.ts';
 
 export let serverInstance!: Server;
 export let defaultUser: InstanceType<GetModelTypeFromClass<typeof UserModel>>;
@@ -37,7 +38,7 @@ export const createDefaultTestUser = async () => {
   if (defaultUser) {
     throw new Error('You already have created default user');
   }
-  const User = appInstance.getModel('User');
+  const User = appInstance.getModel('User') as unknown as TUser;
   const user = await User.create({
     email: 'test@test.com',
     password: 'testPassword',

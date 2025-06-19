@@ -1,8 +1,7 @@
 import { scrypt } from 'node:crypto';
-
 import { promisify } from 'node:util';
-
 import { appInstance } from './appInstance.ts';
+import type authConfig from '../config/auth.ts';
 
 export const scryptAsync = promisify<
   string | Buffer | DataView,
@@ -12,7 +11,14 @@ export const scryptAsync = promisify<
 >(scrypt);
 
 export const scryptAsyncWithSalt = async (stringToHash: string) => {
-  const { saltSecret, hashRounds } = appInstance.getConfig('auth');
+  const { saltSecret, hashRounds } = appInstance.getConfig(
+    'auth',
+  ) as typeof authConfig;
+  if (!saltSecret) {
+    throw new Error(
+      'saltSecret should be seted up. AUTH_SALT is not defined. You can "npm run cli generateRandomBytes" and use it',
+    );
+  }
   const res = await scryptAsync(stringToHash, saltSecret, hashRounds);
 
   return res;

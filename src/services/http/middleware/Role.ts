@@ -3,6 +3,7 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { Response, NextFunction } from 'express';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+import type { TUser } from '../../../models/User.ts';
 
 class RoleMiddleware extends AbstractMiddleware {
   static get description() {
@@ -10,7 +11,8 @@ class RoleMiddleware extends AbstractMiddleware {
   }
 
   async middleware(
-    req: FrameworkRequest & GetUserByTokenAppInfo,
+    req: FrameworkRequest &
+      GetUserByTokenAppInfo & { user: InstanceType<TUser> },
     res: Response,
     next: NextFunction,
   ) {
@@ -21,8 +23,8 @@ class RoleMiddleware extends AbstractMiddleware {
     }
 
     let hasRole = false;
-    user.roles.forEach((role: string) => {
-      if (this.params.roles.includes(role)) {
+    user.roles?.forEach((role: string) => {
+      if ((this.params?.roles as Array<string>).includes(role)) {
         hasRole = true;
       }
     });

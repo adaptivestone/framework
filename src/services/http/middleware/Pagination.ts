@@ -35,7 +35,10 @@ class Pagination extends AbstractMiddleware {
     res: Response,
     next: NextFunction,
   ) {
-    let { limit, maxLimit } = this.params;
+    let { limit, maxLimit } = this.params as {
+      limit: number;
+      maxLimit: number;
+    };
 
     limit = (typeof limit !== 'number' ? parseInt(limit, 10) : limit) || 10;
     maxLimit =

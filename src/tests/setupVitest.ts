@@ -8,6 +8,7 @@ import mongoose from 'mongoose'; // we do not need create indexes on tests
 import { createClient } from '@redis/client';
 import { clearNamespace } from '../helpers/redis/clearNamespace.ts';
 import Server from '../server.ts';
+import type redisConfig from '../config/redis.ts';
 
 mongoose.set('autoIndex', false);
 
@@ -80,7 +81,9 @@ beforeEach(() => {
 
 afterEach(async () => {
   if (serverInstance) {
-    const { url, namespace } = serverInstance.getConfig('redis');
+    const { url, namespace } = serverInstance.getConfig(
+      'redis',
+    ) as typeof redisConfig;
     const redisClient = createClient({ url });
 
     try {

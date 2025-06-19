@@ -14,6 +14,7 @@ import type {
   TMiddleware,
   RouteParams,
 } from '../../modules/AbstractController.ts';
+import type { TUser } from '../../models/User.ts';
 
 class SomeController extends AbstractController {
   get routes(): RouteParams {
@@ -134,7 +135,10 @@ class SomeController extends AbstractController {
 
   // eslint-disable-next-line class-methods-use-this
   async patchUserAvatar(
-    req: FrameworkRequest & GetUserByTokenAppInfo,
+    req: FrameworkRequest &
+      GetUserByTokenAppInfo & {
+        appInfo: { user: InstanceType<TUser>; request: { avatar: string } };
+      },
     res: Response,
   ) {
     const { avatar } = req.appInfo.request;
