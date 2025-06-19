@@ -2,6 +2,23 @@ import Base from './Base.ts';
 import type { IApp } from '../server.ts';
 import type { ParseArgsOptionsConfigExtended } from './BaseCli.ts';
 
+type TypeMap = {
+  string: string;
+  boolean: boolean;
+};
+
+export type CommandArgumentToTypes<
+  T extends Record<string, ParseArgsOptionsConfigExtended>,
+> = {
+  [K in keyof T as T[K] extends { required: true } | { default: never }
+    ? K
+    : never]-?: TypeMap[T[K]['type']];
+} & {
+  [K in keyof T as T[K] extends { required: true } | { default: never }
+    ? never
+    : K]?: TypeMap[T[K]['type']];
+};
+
 class AbstractCommand extends Base {
   commands: Record<string, string>;
 

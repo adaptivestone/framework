@@ -1,6 +1,7 @@
 import path from 'node:path';
 import * as url from 'node:url';
 import AbstractCommand from '../modules/AbstractCommand.ts';
+import type { Model as TModel } from 'mongoose';
 
 class SyncIndexes extends AbstractCommand {
   async run() {
@@ -18,7 +19,7 @@ class SyncIndexes extends AbstractCommand {
     this.logger?.info(`Total found ${models.length} models`);
 
     for (const modelName of models) {
-      const Model = this.app.getModel(modelName);
+      const Model = this.app.getModel(modelName) as TModel<unknown>;
       // eslint-disable-next-line no-await-in-loop
       const removedIndexes = await Model.syncIndexes(); // await in loop not a bug. Lets do one by one
       if (removedIndexes.length) {

@@ -19,7 +19,7 @@ class DropIndex extends AbstractCommand {
   }
 
   async run() {
-    const Model = this.app.getModel(this.args.model);
+    const Model = this.app.getModel(this.args.model as string);
 
     if (!Model) {
       this.logger?.error('Not able to find model');

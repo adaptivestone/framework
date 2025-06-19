@@ -21,16 +21,15 @@ class CreateMigration extends AbstractCommand {
   }
 
   async run() {
-    if (this.args.name.match(/^\d/)) {
+    const { name } = this.args as { name: string };
+    if (name.match(/^\d/)) {
       this.logger?.error('Command cant start from nubmer');
       return false;
     }
-    const fileName = `${Date.now()}_${CreateMigration.camelSentence(
-      this.args.name,
-    )}.ts`;
+    const fileName = `${Date.now()}_${CreateMigration.camelSentence(name)}.ts`;
 
     const fileContent = CreateMigration.getTemplate(
-      CreateMigration.camelSentence(this.args.name),
+      CreateMigration.camelSentence(name),
     );
 
     await fs.writeFile(

@@ -1,4 +1,7 @@
-import AbstractCommand from '../modules/AbstractCommand.ts';
+import AbstractCommand, {
+  type CommandArgumentToTypes,
+} from '../modules/AbstractCommand.ts';
+import type { TUser } from '../models/User.ts';
 
 // Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
 class CreateUser extends AbstractCommand {
@@ -12,33 +15,35 @@ class CreateUser extends AbstractCommand {
   static get commandArguments() {
     return {
       id: {
-        type: 'string' as const,
+        type: 'string',
         description: 'User id to find user',
       },
       email: {
-        type: 'string' as const,
+        type: 'string',
         description: 'User id to find/create user',
       },
       password: {
-        type: 'string' as const,
+        type: 'string',
         description: 'New password for user',
       },
       roles: {
-        type: 'string' as const,
+        type: 'string',
         description:
           'User roles comma separated string (--roles=user,admin,someOtherRoles)',
       },
       update: {
-        type: 'boolean' as const,
+        type: 'boolean',
         default: false,
         description: 'Update user if it exists',
       },
-    };
+    } as const;
   }
 
   async run() {
-    const User = this.app.getModel('User');
-    const { id, email, password, roles, update } = this.args;
+    const User = this.app.getModel('User') as unknown as TUser;
+
+    const { id, email, password, roles, update } = this
+      .args as CommandArgumentToTypes<typeof CreateUser.commandArguments>;
 
     if (!email && !id) {
       this.logger?.error('Input validation failded');
@@ -98,7 +103,7 @@ class CreateUser extends AbstractCommand {
       `User was created/updated ${JSON.stringify(user, null, 4)}`,
     );
 
-    return user;
+    return true;
   }
 }
 

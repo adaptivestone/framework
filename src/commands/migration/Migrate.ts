@@ -1,6 +1,7 @@
 import * as url from 'node:url';
 import path from 'node:path';
 import AbstractCommand from '../../modules/AbstractCommand.ts';
+import type { TMigration } from '../../models/Migration.ts';
 
 class Migrate extends AbstractCommand {
   static get description() {
@@ -17,7 +18,9 @@ class Migrate extends AbstractCommand {
     files.sort(
       (a, b) => Number(a.file.split('_')[0]) - Number(b.file.split('_')[0]),
     );
-    const MigrationModel = this.app.getModel('Migration');
+    const MigrationModel = this.app.getModel(
+      'Migration',
+    ) as unknown as TMigration;
     const lastMigration = await MigrationModel.findOne({})
       .sort({ createdAt: -1 })
       .exec();

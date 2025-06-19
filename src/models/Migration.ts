@@ -8,6 +8,7 @@ class Migration extends BaseModel {
       migrationFile: {
         type: String,
         unique: true,
+        required: true,
       },
     } as const;
   }
