@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import { getTestServerURL } from '../tests/testHelpers.ts';
+import { describe, expect, it } from "vitest";
+import { getTestServerURL } from "../tests/testHelpers.ts";
 
-describe('home', () => {
-  it('can open home have', async () => {
+describe("home", () => {
+  it("can open home have", async () => {
     expect.assertions(1);
 
-    const { status } = await fetch(getTestServerURL('/')).catch(() => ({
+    const { status } = await fetch(getTestServerURL("/")).catch(() => ({
       status: 500,
     }));
 

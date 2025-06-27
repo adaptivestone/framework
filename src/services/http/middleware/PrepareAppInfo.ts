@@ -1,7 +1,6 @@
-import AbstractMiddleware from './AbstractMiddleware.ts';
-
-import type { Response, NextFunction } from 'express';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import type { NextFunction, Response } from "express";
+import type { FrameworkRequest } from "../HttpServer.ts";
+import AbstractMiddleware from "./AbstractMiddleware.ts";
 
 class PrepareAppInfo extends AbstractMiddleware {
   static get description() {

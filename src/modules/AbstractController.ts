@@ -1,16 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
-import express from 'express';
-import type { IRouter, Response, NextFunction } from 'express';
 
-import Base from './Base.ts';
-import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
-import Auth from '../services/http/middleware/Auth.ts';
-import ValidateService from '../services/validate/ValidateService.js';
-import DocumentationGenerator from '../services/documentation/DocumentationGenerator.js';
+import type { IRouter, NextFunction, Response } from "express";
+import express from "express";
+import type { IApp } from "../server.ts";
+import DocumentationGenerator from "../services/documentation/DocumentationGenerator.js";
+import type { FrameworkRequest } from "../services/http/HttpServer.ts";
+import type AbstractMiddleware from "../services/http/middleware/AbstractMiddleware.ts";
+import Auth from "../services/http/middleware/Auth.ts";
+import GetUserByToken from "../services/http/middleware/GetUserByToken.ts";
+import ValidateService from "../services/validate/ValidateService.js";
+import Base from "./Base.ts";
 
-import type { IApp } from '../server.ts';
-import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
-import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 type MiddlewareWithParamsTuple = [
   typeof AbstractMiddleware,
   Record<string, unknown>,
@@ -40,7 +40,7 @@ export type RouteParams = {
  * In most cases you will want to have a 'home' route that not include controller name. For this case please check '  getHttpPath'
  */
 class AbstractController extends Base {
-  prefix = '';
+  prefix = "";
   router: IRouter;
 
   constructor(app: IApp, prefix: string, isExpressMergeParams = false) {
@@ -60,9 +60,9 @@ class AbstractController extends Base {
     Object.entries(routes).forEach(([method, methodRoutes]) => {
       Object.entries(methodRoutes).forEach(([route, routeParam]) => {
         if (
-          typeof routeParam === 'object' &&
+          typeof routeParam === "object" &&
           routeParam !== null &&
-          'middleware' in routeParam &&
+          "middleware" in routeParam &&
           routeParam.middleware
         ) {
           const fullRoute = method.toUpperCase() + route;
@@ -107,7 +107,7 @@ class AbstractController extends Base {
      *  Register routes itself
      */
     for (const verb in routes) {
-      if (typeof this.router[verb as keyof IRouter] !== 'function') {
+      if (typeof this.router[verb as keyof IRouter] !== "function") {
         this.logger?.error(
           `Method ${verb} not exist for router. Please check your codebase`,
         );
@@ -120,7 +120,7 @@ class AbstractController extends Base {
         );
 
         let routeObject = routes[verb][path] as RouteObject;
-        if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
+        if (Object.prototype.toString.call(routeObject) !== "[object Object]") {
           // for support firect pass function instead of object
           routeObject = {
             handler: routeObject as unknown as Function,
@@ -129,7 +129,7 @@ class AbstractController extends Base {
             middleware: null,
           };
 
-          if (typeof routeObject.handler !== 'function') {
+          if (typeof routeObject.handler !== "function") {
             this.logger?.error(
               `Can't resolve function '${
                 routeObject.handler
@@ -141,17 +141,17 @@ class AbstractController extends Base {
 
         const { handler } = routeObject;
         let fnName: string | undefined;
-        if (typeof handler === 'function') {
+        if (typeof handler === "function") {
           fnName = handler.name;
         } else {
           fnName = undefined;
         }
 
         const fullPath = `/${httpPath}/${path}`
-          .split('//')
-          .join('/')
-          .split('//')
-          .join('/');
+          .split("//")
+          .join("/")
+          .split("//")
+          .join("/");
 
         routesInfo.push({
           name: fnName,
@@ -197,7 +197,7 @@ class AbstractController extends Base {
                   options: {
                     method: verb,
                     path: fullPath,
-                    prefix: 'request',
+                    prefix: "request",
                   },
                 },
               });
@@ -212,7 +212,7 @@ class AbstractController extends Base {
                   options: {
                     method: verb,
                     path: fullPath,
-                    prefix: 'query',
+                    prefix: "query",
                   },
                 },
               });
@@ -242,17 +242,17 @@ class AbstractController extends Base {
               this.logger?.error(`Route object have no handler defined`);
               return res.status(500).json({
                 message:
-                  'Platform error 2. Please check later or contact support',
+                  "Platform error 2. Please check later or contact support",
               });
             }
 
-            if (routeObject.handler.constructor.name !== 'AsyncFunction') {
+            if (routeObject.handler.constructor.name !== "AsyncFunction") {
               const error =
                 "Handler should be AsyncFunction. Perhabs you miss 'async' of function declaration?";
               this.logger?.error(error);
               return res.status(500).json({
                 message:
-                  'Platform error. Please check later or contact support',
+                  "Platform error. Please check later or contact support",
               });
             }
             return routeObject.handler
@@ -261,7 +261,7 @@ class AbstractController extends Base {
                 this.logger?.error(e);
                 return res.status(500).json({
                   message:
-                    'Platform error. Please check later or contact support',
+                    "Platform error. Please check later or contact support",
                 });
               });
           },
@@ -272,14 +272,14 @@ class AbstractController extends Base {
     /**
      * Generate text info
      */
-    const text = ['', `Controller '${this.getConstructorName()}' registered.`];
+    const text = ["", `Controller '${this.getConstructorName()}' registered.`];
 
     const reports: {
       [key: string]: typeof routesInfo | typeof middlewaresInfo;
     } = {
-      'Middlewares:': middlewaresInfo,
-      'Route middlewares:': routeMiddlewaresReg,
-      'Callbacks:': routesInfo,
+      "Middlewares:": middlewaresInfo,
+      "Route middlewares:": routeMiddlewaresReg,
+      "Callbacks:": routesInfo,
     };
     for (const key in reports) {
       text.push(`${key}`);
@@ -294,7 +294,7 @@ class AbstractController extends Base {
 
     text.push(`Time: ${Date.now() - time} ms`);
 
-    this.logger?.verbose(text.join('\n'));
+    this.logger?.verbose(text.join("\n"));
 
     /**
      * Generate documentation
@@ -324,31 +324,31 @@ class AbstractController extends Base {
         middleware = [middleware];
       }
       for (const M of middleware) {
-        let method = 'all';
+        let method = "all";
         let realPath = path;
-        if (typeof realPath !== 'string') {
+        if (typeof realPath !== "string") {
           this.logger?.error(`Path not a string ${realPath}. Please check it`);
           continue;
         }
-        if (!realPath.startsWith('/')) {
-          method = realPath.split('/')[0]?.toLowerCase();
+        if (!realPath.startsWith("/")) {
+          method = realPath.split("/")[0]?.toLowerCase();
           if (!method) {
             this.logger?.error(`Method not found for ${realPath}`);
             continue;
           }
           realPath = realPath.substring(method.length);
         }
-        if (typeof this.router[method as keyof IRouter] !== 'function') {
+        if (typeof this.router[method as keyof IRouter] !== "function") {
           this.logger?.error(
             `Method ${method} not exist for middleware. Please check your codebase`,
           );
           continue;
         }
         const fullPath = `/${httpPath}/${realPath.toUpperCase()}`
-          .split('//')
-          .join('/')
-          .split('//')
-          .join('/');
+          .split("//")
+          .join("/")
+          .split("//")
+          .join("/");
         let MiddlewareFunction: typeof AbstractMiddleware;
         let middlewareParams = {};
         if (Array.isArray(M)) {
@@ -409,7 +409,7 @@ class AbstractController extends Base {
    * ]);
    */
   static get middleware(): Map<string, TMiddleware> {
-    return new Map([['/{*splat}', [GetUserByToken, Auth]]]);
+    return new Map([["/{*splat}", [GetUserByToken, Auth]]]);
   }
 
   /**
@@ -428,11 +428,11 @@ class AbstractController extends Base {
    * Get http path with inheritance of path
    */
   getHttpPath() {
-    return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
+    return `/${this.getConstructorName().toLowerCase()}`.replace("//", "/");
   }
 
   static get loggerGroup() {
-    return 'controller';
+    return "controller";
   }
 }
 

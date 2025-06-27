@@ -1,5 +1,5 @@
-import { beforeAll, afterAll } from 'vitest';
-import { createDefaultTestUser } from './testHelpers.ts';
+import { afterAll, beforeAll } from "vitest";
+import { createDefaultTestUser } from "./testHelpers.ts";
 
 beforeAll(async () => {
   await createDefaultTestUser();

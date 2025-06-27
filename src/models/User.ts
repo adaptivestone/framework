@@ -1,18 +1,17 @@
-import { BaseModel } from '../modules/BaseModel.ts';
+import type { TFunction } from "i18next";
+import type { Schema } from "mongoose";
+import { appInstance } from "../helpers/appInstance.ts";
+import { scryptAsyncWithSaltAsString } from "../helpers/crypto.ts";
 import type {
-  GetModelTypeLiteFromSchema,
   ExtractProperty,
   GetModelTypeFromClass,
-} from '../modules/BaseModel.ts';
-import { scryptAsyncWithSaltAsString } from '../helpers/crypto.ts';
-import { appInstance } from '../helpers/appInstance.ts';
-import type { Schema } from 'mongoose';
-
-import type { TFunction } from 'i18next';
+  GetModelTypeLiteFromSchema,
+} from "../modules/BaseModel.ts";
+import { BaseModel } from "../modules/BaseModel.ts";
 
 type UserModelLite = GetModelTypeLiteFromSchema<
   typeof User.modelSchema,
-  ExtractProperty<typeof User, 'schemaOptions'>
+  ExtractProperty<typeof User, "schemaOptions">
 >;
 
 export type TUser = GetModelTypeFromClass<typeof User>;
@@ -20,9 +19,9 @@ export type TUser = GetModelTypeFromClass<typeof User>;
 class User extends BaseModel {
   static initHooks(schema: Schema) {
     schema.pre(
-      'save',
+      "save",
       async function userPreSaveHook(this: InstanceType<UserModelLite>) {
-        if (this.isModified('password')) {
+        if (this.isModified("password")) {
           this.password = await scryptAsyncWithSaltAsString(this.password!);
         }
       },
@@ -50,7 +49,7 @@ class User extends BaseModel {
           type: String,
           index: {
             unique: true,
-            partialFilterExpression: { 'name.nick': { $type: 'string' } },
+            partialFilterExpression: { "name.nick": { $type: "string" } },
           },
         },
       },
@@ -60,7 +59,7 @@ class User extends BaseModel {
         maxlength: 255,
         index: {
           unique: true,
-          partialFilterExpression: { email: { $type: 'string' } },
+          partialFilterExpression: { email: { $type: "string" } },
         },
       },
       sessionTokens: [{ token: String, valid: Date }],
@@ -69,7 +68,7 @@ class User extends BaseModel {
       permissions: [],
       roles: [],
       isVerified: { type: Boolean, default: false },
-      locale: { type: String, default: 'en' },
+      locale: { type: String, default: "en" },
       languages: [String],
     } as const;
   }
@@ -108,7 +107,7 @@ class User extends BaseModel {
         token: string,
       ) {
         const data = await this.findOne({
-          'sessionTokens.token': String(token),
+          "sessionTokens.token": String(token),
         });
         return data || false;
       },
@@ -143,7 +142,7 @@ class User extends BaseModel {
             },
           });
           if (!data) {
-            return Promise.reject(new Error('User not exists'));
+            return Promise.reject(new Error("User not exists"));
           }
           // TODO token expiration and remove that token
 
@@ -167,7 +166,7 @@ class User extends BaseModel {
           },
         });
         if (!data) {
-          return Promise.reject(new Error('User not exists'));
+          return Promise.reject(new Error("User not exists"));
         }
         // TODO token expiration and remove that token
 
@@ -228,18 +227,18 @@ class User extends BaseModel {
         try {
           // @ts-expect-error module is optional
           // eslint-disable-next-line import-x/no-unresolved
-          Mailer = (await import('@adaptivestone/framework-module-email'))
+          Mailer = (await import("@adaptivestone/framework-module-email"))
             .default;
         } catch {
           const error =
-            'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
+            "Mailer not found. Please install @adaptivestone/framework-module-email in order to use it";
           appInstance.logger?.error(error);
           return false;
         }
 
         const mail = new Mailer(
           appInstance,
-          'recovery',
+          "recovery",
           {
             link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
             editor: this.name?.nick,
@@ -266,17 +265,17 @@ class User extends BaseModel {
         try {
           // @ts-expect-error module is optional
           // eslint-disable-next-line import-x/no-unresolved
-          Mailer = (await import('@adaptivestone/framework-module-email'))
+          Mailer = (await import("@adaptivestone/framework-module-email"))
             .default;
         } catch {
           const error =
-            'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
+            "Mailer not found. Please install @adaptivestone/framework-module-email in order to use it";
           appInstance.logger?.error(error);
           return false;
         }
         const mail = new Mailer(
           appInstance,
-          'verification',
+          "verification",
           {
             link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
             editor: this.name?.nick,

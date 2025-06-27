@@ -1,93 +1,93 @@
-import { describe, it, expect } from 'vitest';
-import { appInstance } from '../helpers/appInstance.ts';
-import { getTestServerURL } from '../tests/testHelpers.ts';
-import type { TUser } from '../models/User.ts';
+import { describe, expect, it } from "vitest";
+import { appInstance } from "../helpers/appInstance.ts";
+import type { TUser } from "../models/User.ts";
+import { getTestServerURL } from "../tests/testHelpers.ts";
 
-const userEmail = 'testing@test.com';
-const userPassword = 'SuperNiceSecret123$';
+const userEmail = "testing@test.com";
+const userPassword = "SuperNiceSecret123$";
 
-const userEmail2 = 'testing2@test.com';
+const userEmail2 = "testing2@test.com";
 
-describe('auth', () => {
-  describe('registration', () => {
-    it('code NOT able to create user with wrong email', async () => {
+describe("auth", () => {
+  describe("registration", () => {
+    it("code NOT able to create user with wrong email", async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(getTestServerURL('/auth/register'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/register"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
-          email: 'bad email',
+          email: "bad email",
           password: userPassword,
-          nickName: 'test',
+          nickName: "test",
         }),
       }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
 
-    it('can create user', async () => {
+    it("can create user", async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(getTestServerURL('/auth/register'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/register"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail,
           password: userPassword,
-          nickName: 'test',
+          nickName: "test",
         }),
       });
 
       expect(status).toBe(201);
     });
 
-    it('can  not create user with the same nickname', async () => {
+    it("can  not create user with the same nickname", async () => {
       expect.assertions(1);
 
-      await fetch(getTestServerURL('/auth/register'), {
-        method: 'POST',
+      await fetch(getTestServerURL("/auth/register"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail,
           password: userPassword,
-          nickName: 'test',
+          nickName: "test",
         }),
       });
 
-      const { status } = await fetch(getTestServerURL('/auth/register'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/register"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail2,
-          password: '123',
-          nickName: 'test',
+          password: "123",
+          nickName: "test",
         }),
       }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
 
-    it('can NOT create SAME user', async () => {
+    it("can NOT create SAME user", async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(getTestServerURL('/auth/register'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/register"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail,
           password: userPassword,
-          nickName: 'test',
+          nickName: "test",
         }),
       });
 
@@ -95,14 +95,14 @@ describe('auth', () => {
     });
   });
 
-  describe('login', () => {
-    it('can NOT login with normal creds and not verified email', async () => {
+  describe("login", () => {
+    it("can NOT login with normal creds and not verified email", async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(getTestServerURL('/auth/login'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/login"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail,
@@ -113,26 +113,26 @@ describe('auth', () => {
       expect(status).toBe(400);
     });
 
-    it('can NOT login with WRONG creds', async () => {
+    it("can NOT login with WRONG creds", async () => {
       expect.assertions(1);
 
-      const { status } = await fetch(getTestServerURL('/auth/login'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/login"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
-          email: 'test@test.by',
-          password: 'noPassword$',
+          email: "test@test.by",
+          password: "noPassword$",
         }),
       }).catch(() => ({ status: 500 }));
 
       expect(status).toBe(400);
     });
 
-    it('can login with normal creds and verified email', async () => {
+    it("can login with normal creds and verified email", async () => {
       expect.assertions(3);
-      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const UserModel = appInstance.getModel("User") as unknown as TUser;
 
       const user = await UserModel.findOne({
         email: userEmail,
@@ -142,10 +142,10 @@ describe('auth', () => {
         await user.save();
       }
 
-      const response = await fetch(getTestServerURL('/auth/login'), {
-        method: 'POST',
+      const response = await fetch(getTestServerURL("/auth/login"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail,
@@ -161,87 +161,87 @@ describe('auth', () => {
     });
   });
 
-  describe('isAuthWithVefificationFlow auth option', () => {
-    it('can verify user', async () => {
+  describe("isAuthWithVefificationFlow auth option", () => {
+    it("can verify user", async () => {
       expect.assertions(2);
-      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const UserModel = appInstance.getModel("User") as unknown as TUser;
 
       const user = await UserModel.create({
-        email: 'Test@gmail.com',
-        password: 'userPassword',
+        email: "Test@gmail.com",
+        password: "userPassword",
         name: {
-          nick: 'nickname',
+          nick: "nickname",
         },
       });
 
       user.verificationTokens?.push({
-        token: 'testToken',
+        token: "testToken",
       });
 
       await user.save();
 
       const { status } = await fetch(
-        `${getTestServerURL('/auth/verify')}?verification_token=testToken`,
+        `${getTestServerURL("/auth/verify")}?verification_token=testToken`,
         {
-          method: 'POST',
+          method: "POST",
         },
       );
 
       const { isVerified } = await UserModel.findOne({
-        email: 'Test@gmail.com',
+        email: "Test@gmail.com",
       }).orFail();
 
       expect(status).toBe(200);
       expect(isVerified).toBeTruthy();
     });
 
-    it('can not verify user with wrong token', async () => {
+    it("can not verify user with wrong token", async () => {
       expect.assertions(2);
-      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const UserModel = appInstance.getModel("User") as unknown as TUser;
 
       const user = await UserModel.create({
-        email: 'Test423@gmail.com',
-        password: 'userPassword',
+        email: "Test423@gmail.com",
+        password: "userPassword",
         name: {
-          nick: 'nicknameee',
+          nick: "nicknameee",
         },
       });
 
       user.verificationTokens?.push({
-        token: 'testToken',
+        token: "testToken",
       });
 
       await user.save();
 
       const { status } = await fetch(
         `${getTestServerURL(
-          '/auth/verify',
+          "/auth/verify",
         )}?verification_token=testToken123wrong`,
         {
-          method: 'POST',
+          method: "POST",
         },
       );
 
       const { isVerified } = await UserModel.findOne({
-        email: 'Test423@gmail.com',
+        email: "Test423@gmail.com",
       }).orFail();
 
       expect(status).toBe(400);
       expect(isVerified).toBeFalsy();
     });
 
-    it('can NOT send recovery to not exist email', async () => {
+    it("can NOT send recovery to not exist email", async () => {
       expect.assertions(1);
 
       const { status } = await fetch(
-        getTestServerURL('/auth/send-recovery-email'),
+        getTestServerURL("/auth/send-recovery-email"),
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-type': 'application/json',
+            "Content-type": "application/json",
           },
           body: JSON.stringify({
-            email: 'notExists@gmail.com',
+            email: "notExists@gmail.com",
           }),
         },
       );
@@ -249,15 +249,15 @@ describe('auth', () => {
       expect(status).toBe(400);
     });
 
-    it('can send recovery to exist email', async () => {
+    it("can send recovery to exist email", async () => {
       expect.assertions(1);
 
       const { status } = await fetch(
-        getTestServerURL('/auth/send-recovery-email'),
+        getTestServerURL("/auth/send-recovery-email"),
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-type': 'application/json',
+            "Content-type": "application/json",
           },
           body: JSON.stringify({
             email: userEmail,
@@ -268,34 +268,34 @@ describe('auth', () => {
       expect(status).toBe(200);
     });
 
-    it('can recover password', async () => {
+    it("can recover password", async () => {
       expect.assertions(1);
-      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const UserModel = appInstance.getModel("User") as unknown as TUser;
 
       const user = await UserModel.create({
-        email: 'Test1@gmail.com',
-        password: 'userPassword',
+        email: "Test1@gmail.com",
+        password: "userPassword",
         name: {
-          nick: 'nickname1',
+          nick: "nickname1",
         },
       });
 
       user.passwordRecoveryTokens?.push({
-        token: 'superPassword',
+        token: "superPassword",
       });
 
       await user.save();
 
       const { status } = await fetch(
-        getTestServerURL('/auth/recover-password'),
+        getTestServerURL("/auth/recover-password"),
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-type': 'application/json',
+            "Content-type": "application/json",
           },
           body: JSON.stringify({
-            password: 'newPass',
-            passwordRecoveryToken: 'superPassword',
+            password: "newPass",
+            passwordRecoveryToken: "superPassword",
           }),
         },
       );
@@ -303,34 +303,34 @@ describe('auth', () => {
       expect(status).toBe(200);
     });
 
-    it('can not recover password with wrong token', async () => {
+    it("can not recover password with wrong token", async () => {
       expect.assertions(1);
-      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const UserModel = appInstance.getModel("User") as unknown as TUser;
 
       const user = await UserModel.create({
-        email: 'Test2@gmail.com',
-        password: 'userPassword',
+        email: "Test2@gmail.com",
+        password: "userPassword",
         name: {
-          nick: 'nickname2',
+          nick: "nickname2",
         },
       });
 
       user.passwordRecoveryTokens?.push({
-        token: 'superPassword',
+        token: "superPassword",
       });
 
       await user.save();
 
       const { status } = await fetch(
-        getTestServerURL('/auth/recover-password'),
+        getTestServerURL("/auth/recover-password"),
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-type': 'application/json',
+            "Content-type": "application/json",
           },
           body: JSON.stringify({
-            password: 'newPass',
-            passwordRecoveryToken: '13123',
+            password: "newPass",
+            passwordRecoveryToken: "13123",
           }),
         },
       );
@@ -338,13 +338,13 @@ describe('auth', () => {
       expect(status).toBe(400);
     });
 
-    it('can login with normal creds and NOT verifyed email if option isAuthWithVefificationFlow is set', async () => {
+    it("can login with normal creds and NOT verifyed email if option isAuthWithVefificationFlow is set", async () => {
       expect.assertions(4);
 
-      const { status } = await fetch(getTestServerURL('/auth/register'), {
-        method: 'POST',
+      const { status } = await fetch(getTestServerURL("/auth/register"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail2,
@@ -352,10 +352,10 @@ describe('auth', () => {
         }),
       });
 
-      const { status: status2 } = await fetch(getTestServerURL('/auth/login'), {
-        method: 'POST',
+      const { status: status2 } = await fetch(getTestServerURL("/auth/login"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail2,
@@ -363,14 +363,14 @@ describe('auth', () => {
         }),
       });
 
-      appInstance.updateConfig('auth', {
+      appInstance.updateConfig("auth", {
         isAuthWithVefificationFlow: false,
       });
 
-      const response3 = await fetch(getTestServerURL('/auth/login'), {
-        method: 'POST',
+      const response3 = await fetch(getTestServerURL("/auth/login"), {
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail2,
@@ -387,15 +387,15 @@ describe('auth', () => {
     });
   });
 
-  it('can user send verification', async () => {
+  it("can user send verification", async () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      getTestServerURL('/auth/send-verification'),
+      getTestServerURL("/auth/send-verification"),
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
           email: userEmail2,
@@ -406,18 +406,18 @@ describe('auth', () => {
     expect(status).toBe(200);
   });
 
-  it('can not user send verification to wrong email', async () => {
+  it("can not user send verification to wrong email", async () => {
     expect.assertions(1);
 
     const { status } = await fetch(
-      getTestServerURL('/auth/send-verification'),
+      getTestServerURL("/auth/send-verification"),
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-type': 'application/json',
+          "Content-type": "application/json",
         },
         body: JSON.stringify({
-          email: 'wrong@gmail.com',
+          email: "wrong@gmail.com",
         }),
       },
     );
@@ -425,13 +425,13 @@ describe('auth', () => {
     expect(status).toBe(400);
   });
 
-  describe('rate limiter', () => {
-    it('should receive 429 on rate limit exceeded', async () => {
+  describe("rate limiter", () => {
+    it("should receive 429 on rate limit exceeded", async () => {
       expect.assertions(1);
 
       const requests = Array.from({ length: 11 }, () =>
-        fetch(getTestServerURL('/auth/logout'), {
-          method: 'POST',
+        fetch(getTestServerURL("/auth/logout"), {
+          method: "POST",
         }),
       );
 

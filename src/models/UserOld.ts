@@ -1,14 +1,12 @@
-import AbstractModel from '../modules/AbstractModel.ts';
-import { appInstance } from '../helpers/appInstance.ts';
-import type { IApp } from '../server.ts';
-import { scryptAsync } from '../helpers/crypto.ts';
-
-import type { TFunction } from 'i18next';
-
+import type { TFunction } from "i18next";
+import { appInstance } from "../helpers/appInstance.ts";
+import { scryptAsync } from "../helpers/crypto.ts";
 import type {
   IAbstractModel,
   IAbstractModelMethods,
-} from '../modules/AbstractModel.ts';
+} from "../modules/AbstractModel.ts";
+import AbstractModel from "../modules/AbstractModel.ts";
+import type { IApp } from "../server.ts";
 
 interface IUser {
   avatar: string;
@@ -42,25 +40,25 @@ interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {
   getUserByEmailAndPassword(
     email: string,
     password: string,
-  ): Promise<InstanceType<UserOld['mongooseModel']> | false>;
+  ): Promise<InstanceType<UserOld["mongooseModel"]> | false>;
   hashPassword(password: string): Promise<string>;
   getUserByToken(
     token: string,
-  ): Promise<InstanceType<UserOld['mongooseModel']> | false>;
+  ): Promise<InstanceType<UserOld["mongooseModel"]> | false>;
   getUserByEmail(
     email: string,
-  ): Promise<InstanceType<UserOld['mongooseModel']> | false>;
+  ): Promise<InstanceType<UserOld["mongooseModel"]> | false>;
   getUserByPasswordRecoveryToken(
     token: string,
-  ): Promise<InstanceType<UserOld['mongooseModel']> | false>;
+  ): Promise<InstanceType<UserOld["mongooseModel"]> | false>;
   generateUserPasswordRecoveryToken(
-    user: InstanceType<UserOld['mongooseModel']>,
+    user: InstanceType<UserOld["mongooseModel"]>,
   ): Promise<{ token: string; until: Date }>;
   getUserByVerificationToken(
     token: string,
-  ): Promise<InstanceType<UserOld['mongooseModel']> | false>;
+  ): Promise<InstanceType<UserOld["mongooseModel"]> | false>;
   generateUserVerificationToken(
-    user: InstanceType<UserOld['mongooseModel']>,
+    user: InstanceType<UserOld["mongooseModel"]>,
   ): Promise<{ token: string; until: Date }>;
 }
 
@@ -74,13 +72,13 @@ class UserOld extends AbstractModel<
 > {
   constructor(app: IApp) {
     console.warn(
-      'UserOld model is deprecated. Please use User Model instead of UserOld',
+      "UserOld model is deprecated. Please use User Model instead of UserOld",
     );
     super(app);
   }
   initHooks() {
-    this.mongooseSchema.pre('save', async function userPreSaveHook() {
-      if (this.isModified('password')) {
+    this.mongooseSchema.pre("save", async function userPreSaveHook() {
+      if (this.isModified("password")) {
         // @ts-expect-error badtypes
         this.password = await this.constructor.hashPassword(this.password);
       }
@@ -109,7 +107,7 @@ class UserOld extends AbstractModel<
           type: String,
           index: {
             unique: true,
-            partialFilterExpression: { 'name.nick': { $type: 'string' } },
+            partialFilterExpression: { "name.nick": { $type: "string" } },
           },
         },
       },
@@ -119,7 +117,7 @@ class UserOld extends AbstractModel<
         maxlength: 255,
         index: {
           unique: true,
-          partialFilterExpression: { email: { $type: 'string' } },
+          partialFilterExpression: { email: { $type: "string" } },
         },
       },
       sessionTokens: [{ token: String, valid: Date }],
@@ -128,21 +126,21 @@ class UserOld extends AbstractModel<
       permissions: [],
       roles: [],
       isVerified: { type: Boolean, default: false },
-      locale: { type: String, default: 'en' },
+      locale: { type: String, default: "en" },
       languages: [String],
     };
   }
 
   static async getUserByEmailAndPassword(
-    this: UserOld['mongooseModel'],
+    this: UserOld["mongooseModel"],
     email: string,
     password: string,
   ) {
-    const data = await this.findOne({ email: String(email) });
+    const data = await UserOld.findOne({ email: String(email) });
     if (!data) {
       return false;
     }
-    const hashedPasswords = await this.hashPassword(password);
+    const hashedPasswords = await UserOld.hashPassword(password);
 
     if (data.password !== hashedPasswords) {
       return false;
@@ -150,8 +148,8 @@ class UserOld extends AbstractModel<
     return data;
   }
 
-  async generateToken(this: InstanceType<UserOld['mongooseModel']>) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+  async generateToken(this: InstanceType<UserOld["mongooseModel"]>) {
+    const { saltSecret, hashRounds } = appInstance.getConfig("auth") as {
       saltSecret: string;
       hashRounds: number;
     };
@@ -162,13 +160,13 @@ class UserOld extends AbstractModel<
       saltSecret,
       hashRounds,
     );
-    const token = data.toString('base64url');
+    const token = data.toString("base64url");
     this.sessionTokens.push({ token, valid: timestamp });
     await this.save();
     return { token, valid: timestamp };
   }
 
-  getPublic(this: InstanceType<UserOld['mongooseModel']>) {
+  getPublic(this: InstanceType<UserOld["mongooseModel"]>) {
     return {
       avatar: this.avatar,
       name: this.name,
@@ -180,22 +178,24 @@ class UserOld extends AbstractModel<
     };
   }
 
-  static async hashPassword(this: UserOld['mongooseModel'], password: string) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+  static async hashPassword(this: UserOld["mongooseModel"], password: string) {
+    const { saltSecret, hashRounds } = appInstance.getConfig("auth") as {
       saltSecret: string;
       hashRounds: number;
     };
     const data = await scryptAsync(String(password), saltSecret, hashRounds);
-    return data.toString('base64url');
+    return data.toString("base64url");
   }
 
-  static async getUserByToken(this: UserOld['mongooseModel'], token: string) {
-    const data = await this.findOne({ 'sessionTokens.token': String(token) });
+  static async getUserByToken(this: UserOld["mongooseModel"], token: string) {
+    const data = await UserOld.findOne({
+      "sessionTokens.token": String(token),
+    });
     return data || false;
   }
 
-  static async getUserByEmail(this: UserOld['mongooseModel'], email: string) {
-    const data = await this.findOne({ email: String(email) });
+  static async getUserByEmail(this: UserOld["mongooseModel"], email: string) {
+    const data = await UserOld.findOne({ email: String(email) });
     if (!data) {
       return false;
     }
@@ -203,9 +203,9 @@ class UserOld extends AbstractModel<
   }
 
   static async generateUserPasswordRecoveryToken(
-    userMongoose: InstanceType<UserOld['mongooseModel']>,
+    userMongoose: InstanceType<UserOld["mongooseModel"]>,
   ) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+    const { saltSecret, hashRounds } = appInstance.getConfig("auth") as {
       saltSecret: string;
       hashRounds: number;
     };
@@ -218,7 +218,7 @@ class UserOld extends AbstractModel<
       hashRounds,
     );
 
-    const token = data.toString('base64url');
+    const token = data.toString("base64url");
     //       if (err) {
     //     this.logger.error("Hash 2 error ", err);
     //     reject(err);
@@ -234,16 +234,16 @@ class UserOld extends AbstractModel<
   }
 
   static async getUserByPasswordRecoveryToken(
-    this: UserOld['mongooseModel'],
+    this: UserOld["mongooseModel"],
     passwordRecoveryToken: string,
   ) {
-    const data = await this.findOne({
+    const data = await UserOld.findOne({
       passwordRecoveryTokens: {
         $elemMatch: { token: String(passwordRecoveryToken) },
       },
     });
     if (!data) {
-      return Promise.reject(new Error('User not exists'));
+      return Promise.reject(new Error("User not exists"));
     }
     // TODO token expiration and remove that token
 
@@ -254,7 +254,7 @@ class UserOld extends AbstractModel<
   }
 
   async sendPasswordRecoveryEmail(
-    this: InstanceType<UserOld['mongooseModel']>,
+    this: InstanceType<UserOld["mongooseModel"]>,
     i18n: { t: TFunction; language: string },
   ) {
     const passwordRecoveryToken =
@@ -264,17 +264,17 @@ class UserOld extends AbstractModel<
     try {
       // @ts-expect-error module is optional
       // eslint-disable-next-line import-x/no-unresolved
-      Mailer = (await import('@adaptivestone/framework-module-email')).default;
+      Mailer = (await import("@adaptivestone/framework-module-email")).default;
     } catch {
       const error =
-        'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
+        "Mailer not found. Please install @adaptivestone/framework-module-email in order to use it";
       this.getSuper().logger?.error(error);
       return false;
     }
 
     const mail = new Mailer(
       this.getSuper().app,
-      'recovery',
+      "recovery",
       {
         link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
         editor: this.name.nick,
@@ -285,9 +285,9 @@ class UserOld extends AbstractModel<
   }
 
   static async generateUserVerificationToken(
-    userMongoose: InstanceType<UserOld['mongooseModel']>,
+    userMongoose: InstanceType<UserOld["mongooseModel"]>,
   ) {
-    const { saltSecret, hashRounds } = appInstance.getConfig('auth') as {
+    const { saltSecret, hashRounds } = appInstance.getConfig("auth") as {
       saltSecret: string;
       hashRounds: number;
     };
@@ -299,7 +299,7 @@ class UserOld extends AbstractModel<
       saltSecret,
       hashRounds,
     );
-    const token = data.toString('base64url');
+    const token = data.toString("base64url");
     // if (err) {
     //     this.logger.error("Hash 2 error ", err);
     //     reject(err);
@@ -315,16 +315,16 @@ class UserOld extends AbstractModel<
   }
 
   static async getUserByVerificationToken(
-    this: UserOld['mongooseModel'],
+    this: UserOld["mongooseModel"],
     verificationToken: string,
   ) {
-    const data = await this.findOne({
+    const data = await UserOld.findOne({
       verificationTokens: {
         $elemMatch: { token: String(verificationToken) },
       },
     });
     if (!data) {
-      return Promise.reject(new Error('User not exists'));
+      return Promise.reject(new Error("User not exists"));
     }
     // TODO token expiration and remove that token
 
@@ -346,7 +346,7 @@ class UserOld extends AbstractModel<
   // }
 
   async sendVerificationEmail(
-    this: InstanceType<UserOld['mongooseModel']>,
+    this: InstanceType<UserOld["mongooseModel"]>,
     i18n: { t: TFunction; language: string },
   ) {
     const verificationToken = await UserOld.generateUserVerificationToken(this);
@@ -355,16 +355,16 @@ class UserOld extends AbstractModel<
     try {
       // @ts-expect-error module is optional
       // eslint-disable-next-line import-x/no-unresolved
-      Mailer = (await import('@adaptivestone/framework-module-email')).default;
+      Mailer = (await import("@adaptivestone/framework-module-email")).default;
     } catch {
       const error =
-        'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
+        "Mailer not found. Please install @adaptivestone/framework-module-email in order to use it";
       this.getSuper().logger?.error(error);
       return false;
     }
     const mail = new Mailer(
       this.getSuper().app,
-      'verification',
+      "verification",
       {
         link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
         editor: this.name.nick,

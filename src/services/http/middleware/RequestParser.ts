@@ -1,12 +1,11 @@
-import formidable from 'formidable';
-import AbstractMiddleware from './AbstractMiddleware.ts';
-
-import type { Response, NextFunction } from 'express';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import type { NextFunction, Response } from "express";
+import formidable from "formidable";
+import type { FrameworkRequest } from "../HttpServer.ts";
+import AbstractMiddleware from "./AbstractMiddleware.ts";
 
 class RequestParser extends AbstractMiddleware {
   static get description() {
-    return 'Parses incoming request. Based on Formidable library';
+    return "Parses incoming request. Based on Formidable library";
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {

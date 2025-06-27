@@ -1,12 +1,11 @@
-import mongoose, { Model } from 'mongoose';
-
 import type {
-  SchemaOptions,
-  Schema,
-  InferRawDocType,
   // DefaultSchemaOptions,
   HydratedDocument,
-} from 'mongoose';
+  InferRawDocType,
+  Schema,
+  SchemaOptions,
+} from "mongoose";
+import mongoose, { type Model } from "mongoose";
 
 export type Merge<M, N> = Omit<M, keyof N> & N;
 
@@ -25,27 +24,27 @@ export type ExtractProperty<
 // Type utility to get the complete Schema type for a BaseModel class
 export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
   InferRawDocType<
-    ExtractProperty<T, 'modelSchema'> &
+    ExtractProperty<T, "modelSchema"> &
       WithTimestamps<
-        Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
+        Merge<typeof defaultOptions, ExtractProperty<T, "schemaOptions">>
       >
   >, // TRawDocType
   Model<
     InferRawDocType<
-      ExtractProperty<T, 'modelSchema'> &
+      ExtractProperty<T, "modelSchema"> &
         WithTimestamps<
-          Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
+          Merge<typeof defaultOptions, ExtractProperty<T, "schemaOptions">>
         >
     >,
     object, // TQueryHelpers
-    ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
-    ExtractProperty<T, 'modelVirtuals'> // TVirtuals
+    ExtractProperty<T, "modelInstanceMethods">, // TInstanceMethods
+    ExtractProperty<T, "modelVirtuals"> // TVirtuals
   >, // TModelType
-  ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
+  ExtractProperty<T, "modelInstanceMethods">, // TInstanceMethods
   object, // TQueryHelpers
-  ExtractProperty<T, 'modelVirtuals'>, // TVirtuals
-  ExtractProperty<T, 'modelStatics'>, // TStaticMethods
-  ExtractProperty<T, 'schemaOptions'> // TSchemaOptions
+  ExtractProperty<T, "modelVirtuals">, // TVirtuals
+  ExtractProperty<T, "modelStatics">, // TStaticMethods
+  ExtractProperty<T, "schemaOptions"> // TSchemaOptions
 >;
 
 export type VirtualType<T> = {
@@ -55,29 +54,29 @@ export type VirtualType<T> = {
 // this came from moongose. Look at the Model and Schema types.
 export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
   InferRawDocType<
-    ExtractProperty<T, 'modelSchema'> &
+    ExtractProperty<T, "modelSchema"> &
       WithTimestamps<
-        Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
+        Merge<typeof defaultOptions, ExtractProperty<T, "schemaOptions">>
       >
   >, // TRawDocType
   object, // TQueryHelpers
-  ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
-  ExtractProperty<T, 'modelVirtuals'>, // TVirtuals
+  ExtractProperty<T, "modelInstanceMethods">, // TInstanceMethods
+  ExtractProperty<T, "modelVirtuals">, // TVirtuals
   HydratedDocument<
     InferRawDocType<
-      ExtractProperty<T, 'modelSchema'> &
+      ExtractProperty<T, "modelSchema"> &
         WithTimestamps<
-          Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
+          Merge<typeof defaultOptions, ExtractProperty<T, "schemaOptions">>
         >
     >, //TRawDocType
-    VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
-      ExtractProperty<T, 'modelInstanceMethods'>, // TVirtuals & TInstanceMethods
+    VirtualType<ExtractProperty<T, "modelVirtuals">> &
+      ExtractProperty<T, "modelInstanceMethods">, // TVirtuals & TInstanceMethods
     object, // TQueryHelpers
-    ExtractProperty<T, 'modelVirtuals'> // TVirtuals
+    ExtractProperty<T, "modelVirtuals"> // TVirtuals
   >,
   GetModelSchemaTypeFromClass<T> // TSchema
 > &
-  ExtractProperty<T, 'modelStatics'>; // Add intersection with static methods
+  ExtractProperty<T, "modelStatics">; // Add intersection with static methods
 
 export type GetModelTypeLiteFromSchema<
   T extends typeof BaseModel.modelSchema,
@@ -117,18 +116,18 @@ export class BaseModel {
 
   // Properly typed static method with generic constraints
   public static initialize<T extends typeof BaseModel>(this: T) {
-    const schema = new mongoose.Schema(this.modelSchema, {
+    const schema = new mongoose.Schema(BaseModel.modelSchema, {
       ...defaultOptions,
-      ...(this.schemaOptions as SchemaOptions),
-      methods: this.modelInstanceMethods,
-      statics: this.modelStatics,
-      virtuals: this.modelVirtuals,
+      ...(BaseModel.schemaOptions as SchemaOptions),
+      methods: BaseModel.modelInstanceMethods,
+      statics: BaseModel.modelStatics,
+      virtuals: BaseModel.modelVirtuals,
     }) as GetModelSchemaTypeFromClass<T>;
 
-    this.initHooks(schema);
+    BaseModel.initHooks(schema);
 
     const mongooseModel = mongoose.model(
-      this.name,
+      BaseModel.name,
       schema,
     ) as GetModelTypeFromClass<T>;
 

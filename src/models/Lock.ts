@@ -1,12 +1,11 @@
-import { BaseModel } from '../modules/BaseModel.ts';
+import type { MongoError } from "mongodb";
+import type { Schema } from "mongoose";
 import type {
-  GetModelTypeLiteFromSchema,
-  GetModelTypeFromClass,
   ExtractProperty,
-} from '../modules/BaseModel.ts';
-
-import type { MongoError } from 'mongodb';
-import type { Schema } from 'mongoose';
+  GetModelTypeFromClass,
+  GetModelTypeLiteFromSchema,
+} from "../modules/BaseModel.ts";
+import { BaseModel } from "../modules/BaseModel.ts";
 
 export type TLock = GetModelTypeFromClass<typeof Lock>;
 
@@ -27,7 +26,7 @@ class Lock extends BaseModel {
   static get modelStatics() {
     type LockModelLite = GetModelTypeLiteFromSchema<
       typeof Lock.modelSchema,
-      ExtractProperty<typeof Lock, 'schemaOptions'>
+      ExtractProperty<typeof Lock, "schemaOptions">
     >;
 
     return {
@@ -80,9 +79,9 @@ class Lock extends BaseModel {
 
         return new Promise((resolve) => {
           const stream = this.watch([
-            { $match: { operationType: 'delete', 'documentKey._id': name } },
+            { $match: { operationType: "delete", "documentKey._id": name } },
           ]);
-          stream.on('change', () => {
+          stream.on("change", () => {
             stream.close();
             resolve(true);
           });

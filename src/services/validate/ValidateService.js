@@ -1,7 +1,7 @@
-import { isSchema } from 'yup';
-import YupValidator from './drivers/YupValidator.js';
-import CustomValidator from './drivers/CustomValidator.js';
-import Base from '../../modules/Base.ts';
+import { isSchema } from "yup";
+import Base from "../../modules/Base.ts";
+import CustomValidator from "./drivers/CustomValidator.js";
+import YupValidator from "./drivers/YupValidator.js";
 
 class ValidateService extends Base {
   constructor(app, validator) {
@@ -21,13 +21,13 @@ class ValidateService extends Base {
       return false;
     }
 
-    return Object.values(this.drivers).some(
+    return Object.values(ValidateService.drivers).some(
       (driver) => validator instanceof driver,
     );
   }
 
   static getDriverByValidatorBody(app, body = {}) {
-    if (this.isValidatorExists(body)) {
+    if (ValidateService.isValidatorExists(body)) {
       return body;
     }
     if (isSchema(body)) {

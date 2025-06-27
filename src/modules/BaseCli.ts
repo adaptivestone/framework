@@ -1,11 +1,10 @@
-import path from 'node:path';
-import * as url from 'node:url';
-import { parseArgs } from 'node:util';
-import Base from './Base.ts';
-import type Server from '../server.ts';
-
-import type { ParseArgsOptionDescriptor } from 'node:util';
-import type AbstractCommand from '../modules/AbstractCommand.ts';
+import path from "node:path";
+import * as url from "node:url";
+import type { ParseArgsOptionDescriptor } from "node:util";
+import { parseArgs } from "node:util";
+import type AbstractCommand from "../modules/AbstractCommand.ts";
+import type Server from "../server.ts";
+import Base from "./Base.ts";
 
 export interface ParseArgsOptionsConfigExtended
   extends ParseArgsOptionDescriptor {
@@ -34,17 +33,17 @@ class Cli extends Base {
     if (Object.keys(this.commands).length) {
       return true;
     }
-    console.info('Loading commands...');
-    console.time('Loading commands. Time');
-    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
+    console.info("Loading commands...");
+    console.time("Loading commands. Time");
+    const dirname = url.fileURLToPath(new URL(".", import.meta.url));
     const commandsToLoad = await this.getFilesPathWithInheritance(
-      path.join(dirname, '../commands'),
+      path.join(dirname, "../commands"),
       this.server.app.foldersConfig.commands,
       true,
     );
     for (const com of commandsToLoad) {
-      if (com.file.endsWith('.js') || com.file.endsWith('.ts')) {
-        const c = com.file.replace('.js', '').replace('.ts', '');
+      if (com.file.endsWith(".js") || com.file.endsWith(".ts")) {
+        const c = com.file.replace(".js", "").replace(".ts", "");
         if (this.commands[c.toLowerCase()]) {
           this.logger?.warn(
             `Command ${c.toLowerCase()} already exists with full path ${this.commands[c.toLowerCase()]}. Possible problems - you have two commands with "ts" and "js" extensions. Skipping...`,
@@ -54,8 +53,8 @@ class Cli extends Base {
         this.commands[c.toLowerCase()] = com.path;
       }
     }
-    console.timeEnd('Loading commands. Time');
-    console.log(' ');
+    console.timeEnd("Loading commands. Time");
+    console.log(" ");
 
     return true;
   }
@@ -63,7 +62,7 @@ class Cli extends Base {
   async printCommandTable() {
     const commands = Object.keys(this.commands).sort();
     const maxLength = commands.reduce((max, c) => Math.max(max, c.length), 0);
-    console.log('Available commands:');
+    console.log("Available commands:");
     const commandsClasses = [];
     for (const c of commands) {
       commandsClasses.push(import(this.commands[c]));
@@ -72,7 +71,7 @@ class Cli extends Base {
       // );
     }
     const commandsClassesLoaded: Array<
-      Record<'default', typeof AbstractCommand>
+      Record<"default", typeof AbstractCommand>
     > = await Promise.all(commandsClasses);
     for (const [key, c] of Object.entries(commands)) {
       console.log(
@@ -80,7 +79,7 @@ class Cli extends Base {
       );
     }
     console.log(
-      '\nUsage (use one of option): \n node cli.ts <command> [options] \n npm run cli <command>  -- [options]',
+      "\nUsage (use one of option): \n node cli.ts <command> [options] \n npm run cli <command>  -- [options]",
     );
   }
 
@@ -89,24 +88,24 @@ class Cli extends Base {
     finalArguments: Record<string, ParseArgsOptionsConfigExtended>,
   ) {
     console.log(`\n\x1b[32m${Command.description}\x1b[0m`);
-    let output = '';
+    let output = "";
 
     Object.entries(finalArguments).forEach(([key, opt]) => {
       const outputLocal = [];
       outputLocal.push(`\n\x1b[36m  --${key} \x1b[0m`);
-      if (opt.type !== 'boolean') {
+      if (opt.type !== "boolean") {
         outputLocal.push(`<${opt.type}>`);
         // flag += `<${opt.type}>`;
       }
       if (opt.required) {
-        outputLocal.push('(required)');
+        outputLocal.push("(required)");
       }
       outputLocal.push(`\n      \x1b[2m${opt.description}`);
       if (opt.default !== undefined) {
         outputLocal.push(` (default: ${opt.default})`);
       }
-      outputLocal.push('\x1b[0m');
-      output += outputLocal.join(' ');
+      outputLocal.push("\x1b[0m");
+      output += outputLocal.join(" ");
     });
 
     console.log(output);
@@ -116,7 +115,7 @@ class Cli extends Base {
     await this.loadCommands();
 
     if (!command) {
-      console.log('Please provide command name');
+      console.log("Please provide command name");
       await this.printCommandTable();
       return false;
     }
@@ -134,8 +133,8 @@ class Cli extends Base {
 
     const defaultArgs: Record<string, ParseArgsOptionsConfigExtended> = {
       help: {
-        type: 'boolean',
-        description: 'Show help',
+        type: "boolean",
+        description: "Show help",
       },
     };
 
@@ -195,7 +194,7 @@ class Cli extends Base {
   }
 
   static get loggerGroup() {
-    return 'CLI_';
+    return "CLI_";
   }
 }
 

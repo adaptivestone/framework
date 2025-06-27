@@ -1,36 +1,34 @@
-import i18next, { type TFunction, type i18n } from 'i18next';
-import BackendFS from 'i18next-fs-backend';
-import AbstractMiddleware from './AbstractMiddleware.ts';
-
-import type { Response, NextFunction } from 'express';
-import type { FrameworkRequest } from '../HttpServer.ts';
-import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
-
-import type { IApp } from '../../../server.ts';
-import type i18nConfig from '../../../config/i18n.ts';
+import type { NextFunction, Response } from "express";
+import i18next, { type i18n, type TFunction } from "i18next";
+import BackendFS from "i18next-fs-backend";
+import type i18nConfig from "../../../config/i18n.ts";
+import type { IApp } from "../../../server.ts";
+import type { FrameworkRequest } from "../HttpServer.ts";
+import AbstractMiddleware from "./AbstractMiddleware.ts";
+import type { GetUserByTokenAppInfo } from "./GetUserByToken.ts";
 
 class I18n extends AbstractMiddleware {
   cache: { [key: string]: i18n } = {};
 
   enabled = true;
 
-  lookupQuerystring = '';
+  lookupQuerystring = "";
 
   supportedLngs: Array<string> = [];
 
-  fallbackLng = 'en';
+  fallbackLng = "en";
 
   i18n: { t: TFunction; language: string } = {
     t: ((text) => text) as TFunction,
-    language: 'en',
+    language: "en",
   };
 
   constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
-    const I18NConfig = this.app.getConfig('i18n') as typeof i18nConfig;
+    const I18NConfig = this.app.getConfig("i18n") as typeof i18nConfig;
 
     if (I18NConfig.enabled) {
-      this.logger?.info('Enabling i18n support');
+      this.logger?.info("Enabling i18n support");
       this.i18n = i18next;
       // eslint-disable-next-line import-x/no-named-as-default-member
       i18next.use(BackendFS).init({
@@ -52,7 +50,7 @@ class I18n extends AbstractMiddleware {
   }
 
   static get description() {
-    return 'Provide language detection and translation';
+    return "Provide language detection and translation";
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
@@ -99,17 +97,17 @@ class I18n extends AbstractMiddleware {
       req: FrameworkRequest & GetUserByTokenAppInfo,
     ) => string | undefined | false
   > = {
-    XLang: (req: FrameworkRequest) => req.get('X-Lang'), // grab from header
+    XLang: (req: FrameworkRequest) => req.get("X-Lang"), // grab from header
     query: (req: FrameworkRequest) =>
       req.query ? (req.query[this.lookupQuerystring] as string) : false, // grab from query
     user: (req: FrameworkRequest & GetUserByTokenAppInfo) =>
       req.appInfo?.user?.locale, // what if we have a user and user have a defined locale?
   };
 
-  detectorOrder = ['XLang', 'query', 'user'];
+  detectorOrder = ["XLang", "query", "user"];
 
   detectLang(req: FrameworkRequest, isUseShortCode = true): string {
-    let lang = '';
+    let lang = "";
     for (const detectorName of this.detectorOrder) {
       const lng = this.detectors[detectorName](req);
       if (!lng) {

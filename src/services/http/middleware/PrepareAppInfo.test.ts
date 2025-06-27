@@ -1,11 +1,11 @@
-import { describe, it, expect } from 'vitest';
-import PrepareAppInfo from './PrepareAppInfo.ts';
-import { appInstance } from '../../../helpers/appInstance.ts';
-import { FrameworkRequest } from '../HttpServer.ts';
-import { Response } from 'express';
+import type { Response } from "express";
+import { describe, expect, it } from "vitest";
+import { appInstance } from "../../../helpers/appInstance.ts";
+import type { FrameworkRequest } from "../HttpServer.ts";
+import PrepareAppInfo from "./PrepareAppInfo.ts";
 
-describe('prepareAppInfo methods', () => {
-  it('have description fields', async () => {
+describe("prepareAppInfo methods", () => {
+  it("have description fields", async () => {
     expect.assertions(1);
 
     // const middleware = new PrepareAppInfo(appInstance);
@@ -13,7 +13,7 @@ describe('prepareAppInfo methods', () => {
     expect(PrepareAppInfo.description).toBeDefined();
   });
 
-  it('middleware that works', async () => {
+  it("middleware that works", async () => {
     expect.assertions(3);
 
     const middleware = new PrepareAppInfo(appInstance);

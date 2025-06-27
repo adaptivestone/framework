@@ -1,5 +1,5 @@
-import { Schema } from 'yup';
-import { PersistentFile } from 'formidable';
+import { PersistentFile } from "formidable";
+import { Schema } from "yup";
 
 /**
  * Validator for file
@@ -12,7 +12,7 @@ import { PersistentFile } from 'formidable';
 class YupFile extends Schema {
   constructor() {
     super({
-      type: 'file',
+      type: "file",
       check: (value: unknown) =>
         Array.isArray(value) &&
         value.every((item) => item instanceof PersistentFile),

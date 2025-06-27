@@ -1,10 +1,10 @@
-import path from 'node:path';
-import { promises as fs } from 'node:fs';
-import AbstractCommand from '../../modules/AbstractCommand.ts';
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import AbstractCommand from "../../modules/AbstractCommand.ts";
 
 class CreateMigration extends AbstractCommand {
   static get description() {
-    return 'Create new migration';
+    return "Create new migration";
   }
 
   /**
@@ -13,8 +13,8 @@ class CreateMigration extends AbstractCommand {
   static get commandArguments() {
     return {
       name: {
-        type: 'string' as const,
-        description: 'Migration name',
+        type: "string" as const,
+        description: "Migration name",
         required: true,
       },
     };
@@ -23,7 +23,7 @@ class CreateMigration extends AbstractCommand {
   async run() {
     const { name } = this.args as { name: string };
     if (name.match(/^\d/)) {
-      this.logger?.error('Command cant start from nubmer');
+      this.logger?.error("Command cant start from nubmer");
       return false;
     }
     const fileName = `${Date.now()}_${CreateMigration.camelSentence(name)}.ts`;

@@ -1,25 +1,25 @@
-import * as url from 'node:url';
-import path from 'node:path';
-import AbstractCommand from '../../modules/AbstractCommand.ts';
-import type { TMigration } from '../../models/Migration.ts';
+import path from "node:path";
+import * as url from "node:url";
+import type { TMigration } from "../../models/Migration.ts";
+import AbstractCommand from "../../modules/AbstractCommand.ts";
 
 class Migrate extends AbstractCommand {
   static get description() {
-    return 'Run all pending migrations';
+    return "Run all pending migrations";
   }
 
   async run() {
-    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
+    const dirname = url.fileURLToPath(new URL(".", import.meta.url));
 
     const files = await this.getFilesPathWithInheritance(
-      path.join(dirname, '/../../migrations'),
+      path.join(dirname, "/../../migrations"),
       this.app.foldersConfig.migrations,
     );
     files.sort(
-      (a, b) => Number(a.file.split('_')[0]) - Number(b.file.split('_')[0]),
+      (a, b) => Number(a.file.split("_")[0]) - Number(b.file.split("_")[0]),
     );
     const MigrationModel = this.app.getModel(
-      'Migration',
+      "Migration",
     ) as unknown as TMigration;
     const lastMigration = await MigrationModel.findOne({})
       .sort({ createdAt: -1 })
@@ -29,10 +29,10 @@ class Migrate extends AbstractCommand {
 
     if (lastMigration) {
       const lastMigrationTime = Number(
-        lastMigration.migrationFile.split('_')[0],
+        lastMigration.migrationFile.split("_")[0],
       );
       migrations = files.filter(
-        (val) => Number(val.file.split('_')[0]) > lastMigrationTime,
+        (val) => Number(val.file.split("_")[0]) > lastMigrationTime,
       );
     }
 

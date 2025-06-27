@@ -1,8 +1,8 @@
-import { object } from 'yup';
-import Base from '../../../modules/Base.ts';
-import type { IApp } from '../../../server.ts';
-import type { Response, NextFunction } from 'express';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import type { NextFunction, Response } from "express";
+import { object } from "yup";
+import Base from "../../../modules/Base.ts";
+import type { IApp } from "../../../server.ts";
+import type { FrameworkRequest } from "../HttpServer.ts";
 
 class AbstractMiddleware extends Base {
   params?: Record<string, unknown>;
@@ -13,7 +13,7 @@ class AbstractMiddleware extends Base {
   }
 
   static get description() {
-    return 'Middleware description. Please provide own';
+    return "Middleware description. Please provide own";
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -50,7 +50,7 @@ class AbstractMiddleware extends Base {
     res: Response,
     next: NextFunction,
   ): Promise<void | Response> {
-    this.logger?.warn('Middleware is not implemented');
+    this.logger?.warn("Middleware is not implemented");
     return next();
   }
 
@@ -59,7 +59,7 @@ class AbstractMiddleware extends Base {
   }
 
   static get loggerGroup() {
-    return 'middleware';
+    return "middleware";
   }
 }
 

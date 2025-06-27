@@ -1,8 +1,7 @@
-import { getFilesPathWithInheritance } from '../helpers/files.ts';
-import { consoleLogger } from '../helpers/logger.ts';
-
-import type { IApp } from '../server.ts';
-import type winston from 'winston';
+import type winston from "winston";
+import { getFilesPathWithInheritance } from "../helpers/files.ts";
+import { consoleLogger } from "../helpers/logger.ts";
+import type { IApp } from "../server.ts";
 
 class Base {
   #realLogger: null | winston.Logger = null;
@@ -57,7 +56,7 @@ class Base {
     isUseSimpleLogger = false, // just to speed up to load logger in some cases
   ) {
     const logger = isUseSimpleLogger
-      ? (m: string) => consoleLogger('info', m)
+      ? (m: string) => consoleLogger("info", m)
       : (m: string) => this.logger?.verbose(m);
     return getFilesPathWithInheritance({
       internalFolder,
@@ -70,7 +69,7 @@ class Base {
    * Return logger group. Just to have all logs groupped logically
    */
   static get loggerGroup() {
-    return 'Base_please_overwrite_';
+    return "Base_please_overwrite_";
   }
 }
 

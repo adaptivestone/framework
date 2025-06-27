@@ -1,18 +1,18 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { appInstance } from '../helpers/appInstance.ts';
-import type { TLock } from './Lock.ts';
+import { beforeAll, describe, expect, it } from "vitest";
+import { appInstance } from "../helpers/appInstance.ts";
+import type { TLock } from "./Lock.ts";
 
-describe('Lock Model', () => {
+describe("Lock Model", () => {
   let Lock: TLock;
-  const testLockName = 'test-lock';
+  const testLockName = "test-lock";
   const testTtl = 30; // seconds
 
   beforeAll(async () => {
-    Lock = appInstance.getModel('Lock');
+    Lock = appInstance.getModel("Lock");
   });
 
-  describe('acquireLock()', () => {
-    it('should successfully acquire a new lock', async () => {
+  describe("acquireLock()", () => {
+    it("should successfully acquire a new lock", async () => {
       const result = await Lock.acquireLock(testLockName, testTtl);
       expect(result).toBe(true);
 
@@ -20,21 +20,21 @@ describe('Lock Model', () => {
       expect(lock).toBeTruthy();
     });
 
-    it('should fail to acquire an existing lock', async () => {
+    it("should fail to acquire an existing lock", async () => {
       await Lock.acquireLock(testLockName, testTtl);
       const result = await Lock.acquireLock(testLockName);
       expect(result).toBe(false);
     });
 
-    it('should throw non-duplicate key errors', async () => {
+    it("should throw non-duplicate key errors", async () => {
       // Simulate a validation error
       const invalidLockName = null;
       await expect(Lock.acquireLock(invalidLockName!)).rejects.toThrow();
     });
   });
 
-  describe('releaseLock()', () => {
-    it('should successfully release an existing lock', async () => {
+  describe("releaseLock()", () => {
+    it("should successfully release an existing lock", async () => {
       await Lock.acquireLock(testLockName);
       const result = await Lock.releaseLock(testLockName);
       expect(result).toBe(true);
@@ -43,19 +43,19 @@ describe('Lock Model', () => {
       expect(lock).toBeNull();
     });
 
-    it('should return false when releasing non-existent lock', async () => {
-      const result = await Lock.releaseLock('non-existent');
+    it("should return false when releasing non-existent lock", async () => {
+      const result = await Lock.releaseLock("non-existent");
       expect(result).toBe(false);
     });
   });
 
-  describe('getLockData()', () => {
-    it('should return ttl:0 for non-existent lock', async () => {
-      const data = await Lock.getLockData('non-existent');
+  describe("getLockData()", () => {
+    it("should return ttl:0 for non-existent lock", async () => {
+      const data = await Lock.getLockData("non-existent");
       expect(data.ttl).toBe(0);
     });
 
-    it('should return correct ttl for existing lock', async () => {
+    it("should return correct ttl for existing lock", async () => {
       const startTime = Date.now();
       await Lock.acquireLock(testLockName, testTtl);
 
@@ -68,9 +68,9 @@ describe('Lock Model', () => {
     });
   });
 
-  describe('getLocksData()', () => {
-    it('should return ttl for multiple locks in input order', async () => {
-      const names = ['lock1', 'lock2', 'lock3'];
+  describe("getLocksData()", () => {
+    it("should return ttl for multiple locks in input order", async () => {
+      const names = ["lock1", "lock2", "lock3"];
       await Lock.acquireLock(names[0], 10);
       await Lock.acquireLock(names[2], 20);
 
@@ -84,12 +84,12 @@ describe('Lock Model', () => {
     });
   });
 
-  describe('waitForUnlock()', () => {
-    it('should resolve immediately if lock does not exist', async () => {
-      await expect(Lock.waitForUnlock('non-existent')).resolves.toBeUndefined();
+  describe("waitForUnlock()", () => {
+    it("should resolve immediately if lock does not exist", async () => {
+      await expect(Lock.waitForUnlock("non-existent")).resolves.toBeUndefined();
     });
 
-    it('should wait until lock is released', async () => {
+    it("should wait until lock is released", async () => {
       await Lock.acquireLock(testLockName);
       let unlocked = false;
 

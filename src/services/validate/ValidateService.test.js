@@ -1,19 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { appInstance } from '../../helpers/appInstance.ts';
+import { describe, expect, it } from "vitest";
+import { object, string } from "yup";
+import { appInstance } from "../../helpers/appInstance.ts";
+import CustomValidator from "./drivers/CustomValidator.js";
+import YupValidator from "./drivers/YupValidator.js";
+import ValidateService from "./ValidateService.js";
 
-import { object, string } from 'yup';
-import ValidateService from './ValidateService.js';
-import YupValidator from './drivers/YupValidator.js';
-import CustomValidator from './drivers/CustomValidator.js';
-
-describe('validate service', () => {
-  describe('validateSchema funtion', () => {
+describe("validate service", () => {
+  describe("validateSchema funtion", () => {
     const data = {
-      name: '1213123123',
+      name: "1213123123",
     };
     const req = {};
 
-    it('returns an empty object if no validator is provided', async () => {
+    it("returns an empty object if no validator is provided", async () => {
       expect.assertions(1);
 
       const result = await new ValidateService(
@@ -24,7 +23,7 @@ describe('validate service', () => {
       expect(result).toStrictEqual({});
     });
 
-    it('calls validateFields and castFields if validator is provided', async () => {
+    it("calls validateFields and castFields if validator is provided", async () => {
       expect.assertions(1);
 
       const validator = new YupValidator(
@@ -38,22 +37,22 @@ describe('validate service', () => {
       );
 
       expect(result).toStrictEqual({
-        name: '1213123123',
+        name: "1213123123",
       });
     });
   });
 
-  describe('isValidatorExists funtion', () => {
-    it('returns false for non-object input', () => {
+  describe("isValidatorExists funtion", () => {
+    it("returns false for non-object input", () => {
       expect.assertions(1);
 
-      const validator = 'not an object';
+      const validator = "not an object";
       const result = ValidateService.isValidatorExists(validator);
 
       expect(result).toBeFalsy();
     });
 
-    it('returns true if validator is an instance of one of the drivers', () => {
+    it("returns true if validator is an instance of one of the drivers", () => {
       expect.assertions(1);
 
       const validator = new ValidateService.drivers.YupValidator();
@@ -62,7 +61,7 @@ describe('validate service', () => {
       expect(result).toBeTruthy();
     });
 
-    it('returns false if validator is not an instance of any of the drivers', () => {
+    it("returns false if validator is not an instance of any of the drivers", () => {
       expect.assertions(1);
 
       const validator = {};
@@ -72,8 +71,8 @@ describe('validate service', () => {
     });
   });
 
-  describe('getDriverByValidatorBody', () => {
-    it('should return the body if it is already a validator', () => {
+  describe("getDriverByValidatorBody", () => {
+    it("should return the body if it is already a validator", () => {
       expect.assertions(1);
 
       const body = new YupValidator(
@@ -89,7 +88,7 @@ describe('validate service', () => {
       expect(validator).toStrictEqual(body);
     });
 
-    it('should return a YupValidator instance if the body is a Yup schema', () => {
+    it("should return a YupValidator instance if the body is a Yup schema", () => {
       expect.assertions(1);
 
       const body = object().shape({
@@ -104,10 +103,10 @@ describe('validate service', () => {
       expect(validator).toBeInstanceOf(YupValidator);
     });
 
-    it('should return CustomValidator if the body is neither a validator nor a Yup schema', () => {
+    it("should return CustomValidator if the body is neither a validator nor a Yup schema", () => {
       expect.assertions(1);
 
-      const body = 'string';
+      const body = "string";
       const validator = ValidateService.getDriverByValidatorBody(
         appInstance,
         body,

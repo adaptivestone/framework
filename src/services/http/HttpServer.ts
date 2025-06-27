@@ -1,26 +1,25 @@
-import http from 'node:http';
-// import path from 'node:path';
-// import * as url from 'node:url';
-import express from 'express';
-import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
-import I18nMiddleware from './middleware/I18n.ts';
-import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
-import RequestParserMiddleware from './middleware/RequestParser.ts';
-import IpDetector from './middleware/IpDetector.ts';
-import Cors from './middleware/Cors.ts';
-import Base from '../../modules/Base.ts';
-
-import type { IApp } from '../../server.ts';
+import type { Server } from "node:http";
+import http from "node:http";
 import type {
   Express,
+  Handler,
+  NextFunction,
   Request,
   Response,
-  NextFunction,
-  Handler,
-} from 'express';
-import type { Server } from 'node:http';
-import type { TFunction } from 'i18next';
-import type ThttpConfig from '../../config/http.ts';
+} from "express";
+// import path from 'node:path';
+// import * as url from 'node:url';
+import express from "express";
+import type { TFunction } from "i18next";
+import type ThttpConfig from "../../config/http.ts";
+import Base from "../../modules/Base.ts";
+import type { IApp } from "../../server.ts";
+import Cors from "./middleware/Cors.ts";
+import I18nMiddleware from "./middleware/I18n.ts";
+import IpDetector from "./middleware/IpDetector.ts";
+import PrepareAppInfoMiddleware from "./middleware/PrepareAppInfo.ts";
+import RequestLoggerMiddleware from "./middleware/RequestLogger.ts";
+import RequestParserMiddleware from "./middleware/RequestParser.ts";
 
 export interface FrameworkRequest extends Request {
   appInfo: {
@@ -52,7 +51,7 @@ class HttpServer extends Base {
   constructor(app: IApp) {
     super(app);
     this.express = express();
-    this.express.disable('x-powered-by');
+    this.express.disable("x-powered-by");
 
     this.express.use(
       new RequestLoggerMiddleware(this.app).getMiddleware() as Handler,
@@ -63,7 +62,7 @@ class HttpServer extends Base {
     this.express.use(new IpDetector(this.app).getMiddleware() as Handler);
     this.express.use(new I18nMiddleware(this.app).getMiddleware() as Handler);
 
-    const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
+    const httpConfig = this.app.getConfig("http") as typeof ThttpConfig;
     this.express.use(
       new Cors(this.app, {
         origins: httpConfig.corsDomains,
@@ -81,7 +80,7 @@ class HttpServer extends Base {
         // error handling
         console.error(err.stack);
         // TODO
-        res.status(500).json({ message: 'Something broke!' });
+        res.status(500).json({ message: "Something broke!" });
       },
     );
 
@@ -92,11 +91,11 @@ class HttpServer extends Base {
       httpConfig.hostname,
       () => {
         const address = listener.address();
-        const port = typeof address === 'string' ? 0 : address?.port || 0;
+        const port = typeof address === "string" ? 0 : address?.port || 0;
         this.logger?.info(`App started and listening on port ${port}`);
         if (+port !== +httpConfig.port) {
           // in case we using port 0
-          this.app.updateConfig('http', { port });
+          this.app.updateConfig("http", { port });
           this.logger?.info(
             `Updating http config to use new port ${
               port
@@ -113,12 +112,12 @@ class HttpServer extends Base {
   add404Page() {
     this.express.use((req, res) => {
       // error handling
-      res.status(404).json({ message: '404' });
+      res.status(404).json({ message: "404" });
     });
   }
 
   static get loggerGroup() {
-    return 'service';
+    return "service";
   }
 
   /**

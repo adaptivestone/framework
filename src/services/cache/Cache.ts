@@ -1,14 +1,14 @@
-import Base from '../../modules/Base.ts';
-import type { IApp } from '../../server.ts';
-import type { RedisClientType } from '@redis/client';
-import type redisConfig from '../../config/redis.ts';
+import type { RedisClientType } from "@redis/client";
+import type redisConfig from "../../config/redis.ts";
+import Base from "../../modules/Base.ts";
+import type { IApp } from "../../server.ts";
 
 class Cache extends Base {
   whenReady: Promise<void>;
 
   redisClient!: RedisClientType;
 
-  redisNamespace: string = '';
+  redisNamespace: string = "";
 
   promiseMapping = new Map();
 
@@ -22,21 +22,21 @@ class Cache extends Base {
     // at least memory and redis drivers should be presented
     // memory drives should works on master process level
     // we should support multiple cashe same time
-    const { createClient } = await import('@redis/client');
-    const conf = this.app.getConfig('redis') as typeof redisConfig;
+    const { createClient } = await import("@redis/client");
+    const conf = this.app.getConfig("redis") as typeof redisConfig;
     this.redisClient = createClient({
       url: conf.url,
     });
 
     this.redisNamespace = conf.namespace;
 
-    this.redisClient.on('error', (error, b, c) => {
+    this.redisClient.on("error", (error, b, c) => {
       this.logger?.error(error, b, c);
     });
-    this.redisClient.on('connect', () => {
-      this.logger?.info('Redis connection success');
+    this.redisClient.on("connect", () => {
+      this.logger?.info("Redis connection success");
     });
-    this.app.events.on('shutdown', () => {
+    this.app.events.on("shutdown", () => {
       this.redisClient.quit();
     });
   }
@@ -99,7 +99,7 @@ class Cache extends Base {
       this.redisClient.set(
         key,
         JSON.stringify(result, (_jsonkey, value) =>
-          typeof value === 'bigint' ? `${value}n` : value,
+          typeof value === "bigint" ? `${value}n` : value,
         ),
         {
           EX: storeTime,
@@ -114,14 +114,14 @@ class Cache extends Base {
       );
       try {
         result = JSON.parse(result, (_jsonkey, value) => {
-          if (typeof value === 'string' && /^\d+n$/.test(value)) {
+          if (typeof value === "string" && /^\d+n$/.test(value)) {
             return BigInt(value.slice(0, value.length - 1));
           }
           return value;
         });
       } catch {
         this.logger?.warn(
-          'Not able to parse json from redis cache. That can be a normal in case you store string here',
+          "Not able to parse json from redis cache. That can be a normal in case you store string here",
         );
       }
     }
@@ -146,7 +146,7 @@ class Cache extends Base {
   }
 
   static get loggerGroup() {
-    return 'Cache_';
+    return "Cache_";
   }
 }
 

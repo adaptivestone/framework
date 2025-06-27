@@ -1,9 +1,9 @@
-import AbstractCommand from '../modules/AbstractCommand.ts';
-import ControllerManager from '../controllers/index.ts';
+import ControllerManager from "../controllers/index.ts";
+import AbstractCommand from "../modules/AbstractCommand.ts";
 
 class Documentation extends AbstractCommand {
   static get description() {
-    return 'Generate documentation (internal)';
+    return "Generate documentation (internal)";
   }
 
   async run() {

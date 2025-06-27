@@ -1,7 +1,7 @@
-import { scrypt } from 'node:crypto';
-import { promisify } from 'node:util';
-import { appInstance } from './appInstance.ts';
-import type authConfig from '../config/auth.ts';
+import { scrypt } from "node:crypto";
+import { promisify } from "node:util";
+import type authConfig from "../config/auth.ts";
+import { appInstance } from "./appInstance.ts";
 
 export const scryptAsync = promisify<
   string | Buffer | DataView,
@@ -12,7 +12,7 @@ export const scryptAsync = promisify<
 
 export const scryptAsyncWithSalt = async (stringToHash: string) => {
   const { saltSecret, hashRounds } = appInstance.getConfig(
-    'auth',
+    "auth",
   ) as typeof authConfig;
   if (!saltSecret) {
     throw new Error(
@@ -26,5 +26,5 @@ export const scryptAsyncWithSalt = async (stringToHash: string) => {
 
 export const scryptAsyncWithSaltAsString = async (stringToHash: string) => {
   const res = await scryptAsyncWithSalt(stringToHash);
-  return res.toString('base64url');
+  return res.toString("base64url");
 };
