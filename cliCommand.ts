@@ -1,4 +1,3 @@
-/* eslint-disable import-x/first */
 console.time('CLI');
 
 import Cli from './src/Cli.ts';

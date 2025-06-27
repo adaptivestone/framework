@@ -75,8 +75,7 @@ class HttpServer extends Base {
 
     // As exprress will check numbersof arguments
     this.express.use(
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      (err: Error, req: Request, res: Response, next: NextFunction) => {
+      (err: Error, _req: Request, res: Response, _next: NextFunction) => {
         // error handling
         console.error(err.stack);
         // TODO
@@ -110,7 +109,7 @@ class HttpServer extends Base {
    * Add handle for 404 error
    */
   add404Page() {
-    this.express.use((req, res) => {
+    this.express.use((_req, res) => {
       // error handling
       res.status(404).json({ message: '404' });
     });

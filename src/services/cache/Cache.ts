@@ -58,7 +58,6 @@ class Cache extends Base {
    */
   async getSetValue(
     keyValue: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onNotFound: () => Promise<any>,
     storeTime = 60 * 5,
   ) {
@@ -68,10 +67,8 @@ class Cache extends Base {
     }
     const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
-    // eslint-disable-next-line  @typescript-eslint/no-unused-vars
-    let resolve = (value: unknown) => {};
-    // eslint-disable-next-line  @typescript-eslint/no-unused-vars
-    let reject = (value: unknown) => {};
+    let resolve = (_value: unknown) => {};
+    let reject = (_value: unknown) => {};
     if (this.promiseMapping.has(key)) {
       return this.promiseMapping.get(key);
     }

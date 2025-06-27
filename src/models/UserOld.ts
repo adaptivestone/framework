@@ -85,7 +85,6 @@ class UserOld extends AbstractModel<
     });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   get modelSchema() {
     return {
       avatar: {
@@ -263,7 +262,6 @@ class UserOld extends AbstractModel<
     // speed optimisation
     try {
       // @ts-expect-error module is optional
-      // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
     } catch {
       const error =
@@ -354,7 +352,6 @@ class UserOld extends AbstractModel<
     let Mailer;
     try {
       // @ts-expect-error module is optional
-      // eslint-disable-next-line import-x/no-unresolved
       Mailer = (await import('@adaptivestone/framework-module-email')).default;
     } catch {
       const error =

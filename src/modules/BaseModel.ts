@@ -109,7 +109,6 @@ export class BaseModel {
     return {};
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static initHooks(schema: Schema) {
     // Add hooks here
   }

@@ -89,7 +89,6 @@ class ValidateService extends Base {
     };
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async validateSchema(req, validator, data) {
     if (!validator) {
       return {};

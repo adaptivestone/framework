@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import type { TFunction } from 'i18next';
 import { object, string } from 'yup';
 import type { TUser } from '../models/User.ts';
 import AbstractController from '../modules/AbstractController.ts';
@@ -100,7 +101,17 @@ class Auth extends AbstractController {
     return res.status(200).json({ data: { token, user: user.getPublic() } });
   }
 
-  async postRegister(req: FrameworkRequest, res: Response) {
+  async postRegister(
+    req: FrameworkRequest & {
+      appInfo: {
+        i18n: {
+          t: TFunction;
+          language: string;
+        };
+      };
+    },
+    res: Response,
+  ) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user = (await User.getUserByEmail(
       req.appInfo.request.email as string,
@@ -134,7 +145,7 @@ class Auth extends AbstractController {
     const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
       await (user as UserInstance)
-        .sendVerificationEmail(req.appInfo.i18n!)
+        .sendVerificationEmail(req.appInfo.i18n)
         .catch((e: Error) => {
           this.logger?.error(e);
         });
@@ -142,19 +153,18 @@ class Auth extends AbstractController {
     return res.status(201).json();
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async postLogout(req: FrameworkRequest, res: Response) {
+  async postLogout(_req: FrameworkRequest, res: Response) {
     // todo remove token
     return res.status(200).json();
   }
 
   async verifyUser(req: FrameworkRequest, res: Response) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
-    let user;
+    let user: UserInstance;
     try {
-      user = await User.getUserByVerificationToken(
+      user = (await User.getUserByVerificationToken(
         req.query.verification_token as string,
-      );
+      )) as unknown as UserInstance;
     } catch {
       return res.status(400).json({
         message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
@@ -172,7 +182,17 @@ class Auth extends AbstractController {
     return res.status(200).json();
   }
 
-  async sendPasswordRecoveryEmail(req: FrameworkRequest, res: Response) {
+  async sendPasswordRecoveryEmail(
+    req: FrameworkRequest & {
+      appInfo: {
+        i18n: {
+          t: TFunction;
+          language: string;
+        };
+      };
+    },
+    res: Response,
+  ) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     try {
       const user = await User.getUserByEmail(
@@ -183,7 +203,7 @@ class Auth extends AbstractController {
           .status(400)
           .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
       }
-      await (user as UserInstance).sendPasswordRecoveryEmail(req.appInfo.i18n!);
+      await (user as UserInstance).sendPasswordRecoveryEmail(req.appInfo.i18n);
       return res.status(200).json();
     } catch (e) {
       this.logger?.error(e);
@@ -215,7 +235,17 @@ class Auth extends AbstractController {
     return res.status(200).json();
   }
 
-  async sendVerification(req: FrameworkRequest, res: Response) {
+  async sendVerification(
+    req: FrameworkRequest & {
+      appInfo: {
+        i18n: {
+          t: TFunction;
+          language: string;
+        };
+      };
+    },
+    res: Response,
+  ) {
     const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByEmail(req.appInfo.request.email as string);
     if (!user) {
@@ -223,7 +253,7 @@ class Auth extends AbstractController {
         .status(400)
         .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
-    await (user as UserInstance).sendVerificationEmail(req.appInfo.i18n!);
+    await (user as UserInstance).sendVerificationEmail(req.appInfo.i18n);
     return res.status(200).json();
   }
 

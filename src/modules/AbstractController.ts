@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-function-type */
-
 import type { IRouter, NextFunction, Response } from 'express';
 import express from 'express';
 import type { IApp } from '../server.ts';
@@ -318,7 +316,6 @@ class AbstractController extends Base {
    */
   parseMiddlewares(middlewareMap: Map<string, TMiddleware>, httpPath: string) {
     const middlewaresInfo = [];
-    // eslint-disable-next-line prefer-const
     for (let [path, middleware] of middlewareMap) {
       if (!Array.isArray(middleware)) {
         middleware = [middleware];

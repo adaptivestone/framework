@@ -6,25 +6,22 @@ class AbstractValidator extends Base {
     this.body = body;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  static convertFieldsToJson(fields) {
+  static convertFieldsToJson(_fields) {
     // IMPLENT;
     return {};
   }
 
-  // eslint-disable-next-line class-methods-use-this
   get fieldsInJsonFormat() {
     // IMPLENT;
     return {};
   }
 
-  // eslint-disable-next-line class-methods-use-this, @typescript-eslint/no-unused-vars
-  async validateFields(data, { query, body, appInfo }) {
+  // biome-ignore lint/correctness/noUnusedFunctionParameters: child will use them
+  async validateFields(_data, { query, body, appInfo }) {
     // IMPLENT;
     return true;
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async castFields() {
     // IMPLENT;
     return true;

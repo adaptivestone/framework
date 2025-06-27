@@ -89,17 +89,14 @@ class SomeController extends AbstractController {
     };
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async getSomething(req: FrameworkRequest, res: Response) {
+  async getSomething(_req: FrameworkRequest, res: Response) {
     return res.status(200).json({ data: { text: 'Available text' } });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async grabSomeDataFromQuery(req: FrameworkRequest, res: Response) {
     return res.status(200).json({ data: { name: req.appInfo.query.name } });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async grabSomeDataFromQueryWithMiddlewareParams(
     req: FrameworkRequest,
     res: Response,
@@ -108,7 +105,6 @@ class SomeController extends AbstractController {
     return res.status(200).json({ data: { page, limit, name } });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async postQueryParamaters(req: FrameworkRequest, res: Response) {
     const { name } = req.appInfo.request;
     return res.status(200).json({
@@ -118,7 +114,6 @@ class SomeController extends AbstractController {
     });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async addPost(req: FrameworkRequest, res: Response) {
     const { name, discription } = req.appInfo.request;
 
@@ -132,7 +127,6 @@ class SomeController extends AbstractController {
     });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async patchUserAvatar(
     req: FrameworkRequest &
       GetUserByTokenAppInfo & {
@@ -154,7 +148,6 @@ class SomeController extends AbstractController {
     });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   async putInfo(req: FrameworkRequest, res: Response) {
     const { field } = req.appInfo.request;
 

@@ -43,12 +43,11 @@ class CreateMigration extends AbstractCommand {
   static camelSentence(str: string) {
     return ` ${str}`
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9]+(.)/g, (match, chr) => chr.toUpperCase());
+      .replace(/[^a-zA-Z0-9]+(.)/g, (_match, chr) => chr.toUpperCase());
   }
 
   static getTemplate(name: string) {
-    return `/* eslint-disable class-methods-use-this */
-
+    return `
 import Base from '@adaptivestone/framework/modules/Base.js';
 
 class ${name} extends Base {

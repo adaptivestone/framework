@@ -46,6 +46,13 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 
+
+---
+
+## [5.0.0-beta.27]
+
+- **[UPDATE]** Remove eslint, prettiver and move to biome
+
 ---
 
 ## [5.0.0-beta.26]

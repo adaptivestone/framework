@@ -7,6 +7,8 @@ import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
+export type TWithI18n = { t: TFunction; language: string };
+
 class I18n extends AbstractMiddleware {
   cache: { [key: string]: i18n } = {};
 
@@ -30,7 +32,6 @@ class I18n extends AbstractMiddleware {
     if (I18NConfig.enabled) {
       this.logger?.info('Enabling i18n support');
       this.i18n = i18next;
-      // eslint-disable-next-line import-x/no-named-as-default-member
       i18next.use(BackendFS).init({
         backend: {
           loadPath: `${this.app.foldersConfig.locales}/{{lng}}/{{ns}}.json`,

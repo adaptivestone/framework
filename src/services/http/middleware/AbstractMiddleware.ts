@@ -16,7 +16,6 @@ class AbstractMiddleware extends Base {
     return 'Middleware description. Please provide own';
   }
 
-  // eslint-disable-next-line class-methods-use-this
   get usedAuthParameters(): Array<{
     name: string;
     type: string;
@@ -26,13 +25,11 @@ class AbstractMiddleware extends Base {
     return [];
   }
 
-  // eslint-disable-next-line class-methods-use-this
   get relatedQueryParameters() {
     // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
     return object().shape({});
   }
 
-  // eslint-disable-next-line class-methods-use-this
   get relatedRequestParameters() {
     // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
     return object().shape({});

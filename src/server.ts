@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-function-type */
 import EventEmitter from 'node:events';
 import path from 'node:path';
 import { hrtime, loadEnvFile } from 'node:process';
@@ -96,7 +95,6 @@ class Server {
    */
   constructor(config: TFolderConfig) {
     this.config = config;
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),

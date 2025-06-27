@@ -38,12 +38,9 @@ class Migrate extends AbstractCommand {
 
     for (const migration of migrations) {
       this.logger?.info(`=== Start migration ${migration.file} ===`);
-      // eslint-disable-next-line no-await-in-loop
       const { default: MigrationCommand } = await import(migration.path);
       const migrationCommand = new MigrationCommand(this.app);
-      // eslint-disable-next-line no-await-in-loop
       await migrationCommand.up();
-      // eslint-disable-next-line no-await-in-loop
       await MigrationModel.create({
         migrationFile: migration.file,
       });

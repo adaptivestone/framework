@@ -14,7 +14,6 @@ class GetUserByToken extends AbstractMiddleware {
     return 'Grab a token and try to parse the user from it. It user exist will add req.appInfo.user variable';
   }
 
-  // eslint-disable-next-line class-methods-use-this
   get usedAuthParameters() {
     return [
       {

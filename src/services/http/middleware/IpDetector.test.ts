@@ -139,7 +139,6 @@ describe('ipDetector methods', () => {
           headers: { 'x-forwarded-for': 'notAnIP' },
           socket: { remoteAddress: test.ip },
         };
-        // eslint-disable-next-line no-await-in-loop
         await middleware.middleware(
           req as unknown as FrameworkRequest,
           {} as Response,

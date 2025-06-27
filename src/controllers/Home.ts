@@ -12,12 +12,10 @@ class Home extends AbstractController {
     };
   }
 
-  // eslint-disable-next-line class-methods-use-this
-  async home(req: FrameworkRequest, res: Response) {
+  async home(_req: FrameworkRequest, res: Response) {
     return res.json({ message: 'Home' });
   }
 
-  // eslint-disable-next-line class-methods-use-this
   getHttpPath() {
     return '/';
   }

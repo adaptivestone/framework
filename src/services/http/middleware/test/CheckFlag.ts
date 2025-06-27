@@ -3,7 +3,6 @@ import type { FrameworkRequest } from '../../HttpServer.ts';
 import AbstractMiddleware from '../AbstractMiddleware.ts';
 
 class CheckFlag extends AbstractMiddleware {
-  // eslint-disable-next-line class-methods-use-this
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     const { flag } = req.body || {};
 

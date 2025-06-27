@@ -2,7 +2,6 @@ import Base from '../../modules/Base.ts';
 import ValidateService from '../validate/ValidateService.js';
 
 class DocumentationGenerator extends Base {
-  // eslint-disable-next-line class-methods-use-this
   processingFields(fieldsByRoute) {
     const fields = [];
     if (!fieldsByRoute) {
@@ -22,9 +21,7 @@ class DocumentationGenerator extends Base {
 
       if (value.fields) {
         field.fields = [];
-        // eslint-disable-next-line no-shadow
         const entries = Object.entries(value.fields);
-        // eslint-disable-next-line no-shadow
         entries.forEach(([key, value]) => {
           field.fields.push({
             name: key,
@@ -37,7 +34,6 @@ class DocumentationGenerator extends Base {
     return fields;
   }
 
-  // eslint-disable-next-line class-methods-use-this
   selectUniqueFields(fields) {
     return Array.from(
       new Map(fields.map((item) => [item.name, item])).values(),
