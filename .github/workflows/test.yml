@@ -4,7 +4,7 @@ name: Test
 
 on:
   push:
-    branches: ['*']
+  pull_request:
 
 jobs:
   test:
@@ -19,7 +19,7 @@ jobs:
           - 6379:6379
 
     env:
-      LOGGER_CONSOLE_LEVEL: 'error'
+      LOGGER_CONSOLE_LEVEL: "error"
       REDIS_URI: redis://localhost
 
     steps:
@@ -29,8 +29,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 'latest'
-          cache: 'npm'
+          node-version: "latest"
+          cache: "npm"
 
       - name: npm clean install
         run: npm ci
