@@ -16,3 +16,4 @@ tsconfig.json
 vitest.config.ts
 genTypes.d.ts
 biome.json
+lefthook.yml

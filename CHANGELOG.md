@@ -52,6 +52,9 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [5.0.0-beta.27]
 
 - **[UPDATE]** Remove eslint, prettiver and move to biome
+- **[UPDATE]** Update types.
+- **[UPDATE]** Update deps.
+
 
 ---
 
