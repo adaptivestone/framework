@@ -43,8 +43,8 @@ class AbstractMiddleware extends Base {
   }
 
   async middleware(
-    req: FrameworkRequest,
-    res: Response,
+    _req: FrameworkRequest,
+    _res: Response,
     next: NextFunction,
   ): Promise<void | Response> {
     this.logger?.warn('Middleware is not implemented');

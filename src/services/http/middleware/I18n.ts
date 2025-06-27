@@ -7,7 +7,7 @@ import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
-export type TWithI18n = { t: TFunction; language: string };
+export type TI18n = { t: TFunction; language: string };
 
 class I18n extends AbstractMiddleware {
   cache: { [key: string]: i18n } = {};
@@ -54,8 +54,8 @@ class I18n extends AbstractMiddleware {
     return 'Provide language detection and translation';
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
-    let i18n;
+  async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
+    let i18n: i18n | TI18n | null = null;
 
     if (this.enabled) {
       let lang = this.detectLang(req);

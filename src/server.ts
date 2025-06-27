@@ -322,7 +322,7 @@ class Server {
       return {
         name: configName,
         finalValue: merge(result[0].default, result[1]?.default || {}, {
-          arrayMerge: (destinationArray, sourceArray) => sourceArray,
+          arrayMerge: (_destinationArray, sourceArray) => sourceArray,
         }),
       };
     };

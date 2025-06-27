@@ -14,8 +14,8 @@ class RequestParser extends AbstractMiddleware {
     // TODO update this to https://github.com/node-formidable/formidable/issues/412#issuecomment-1367914268 in node v20 (in 2023?)
 
     const form = formidable(this.params); // not in construstor as reuse formidable affects performance
-    let fields;
-    let files;
+    let fields: formidable.Fields<string>;
+    let files: formidable.Files<string>;
     try {
       [fields, files] = await form.parse(req);
     } catch (err) {

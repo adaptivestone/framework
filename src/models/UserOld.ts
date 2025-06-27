@@ -258,28 +258,27 @@ class UserOld extends AbstractModel<
   ) {
     const passwordRecoveryToken =
       await UserOld.generateUserPasswordRecoveryToken(this);
-    let Mailer;
     // speed optimisation
     try {
       // @ts-expect-error module is optional
-      Mailer = (await import('@adaptivestone/framework-module-email')).default;
+      const Mailer = (await import('@adaptivestone/framework-module-email'))
+        .default;
+      const mail = new Mailer(
+        this.getSuper().app,
+        'recovery',
+        {
+          link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
+          editor: this.name.nick,
+        },
+        i18n,
+      );
+      return mail.send(this.email);
     } catch {
       const error =
         'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
       this.getSuper().logger?.error(error);
       return false;
     }
-
-    const mail = new Mailer(
-      this.getSuper().app,
-      'recovery',
-      {
-        link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
-        editor: this.name.nick,
-      },
-      i18n,
-    );
-    return mail.send(this.email);
   }
 
   static async generateUserVerificationToken(
@@ -349,26 +348,26 @@ class UserOld extends AbstractModel<
   ) {
     const verificationToken = await UserOld.generateUserVerificationToken(this);
     // speed optimisation
-    let Mailer;
     try {
       // @ts-expect-error module is optional
-      Mailer = (await import('@adaptivestone/framework-module-email')).default;
+      const Mailer = (await import('@adaptivestone/framework-module-email'))
+        .default;
+      const mail = new Mailer(
+        this.getSuper().app,
+        'verification',
+        {
+          link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
+          editor: this.name.nick,
+        },
+        i18n,
+      );
+      return mail.send(this.email);
     } catch {
       const error =
         'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
       this.getSuper().logger?.error(error);
       return false;
     }
-    const mail = new Mailer(
-      this.getSuper().app,
-      'verification',
-      {
-        link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
-        editor: this.name.nick,
-      },
-      i18n,
-    );
-    return mail.send(this.email);
   }
 }
 

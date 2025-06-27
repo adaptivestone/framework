@@ -112,10 +112,7 @@ class Lock extends BaseModel {
           const lock = lockMap.get(name);
           return {
             name,
-            ttl:
-              lock && lock.expiredAt
-                ? lock.expiredAt.getTime() - Date.now()
-                : 0,
+            ttl: lock?.expiredAt ? lock.expiredAt.getTime() - Date.now() : 0,
           };
         });
       },

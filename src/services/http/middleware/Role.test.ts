@@ -47,8 +47,8 @@ describe('role middleware methods', () => {
     expect.assertions(3);
 
     let isCalled = false;
-    let status;
-    let isSend;
+    let status = 0;
+    let isSend = false;
     const nextFunction = () => {
       isCalled = true;
     };
@@ -80,8 +80,8 @@ describe('role middleware methods', () => {
     expect.assertions(3);
 
     let isCalled = false;
-    let status;
-    let isSend;
+    let status = 0;
+    let isSend = false;
     const nextFunction = () => {
       isCalled = true;
     };

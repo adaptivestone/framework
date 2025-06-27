@@ -3,7 +3,7 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import Auth from './Auth.ts';
 
 describe('atuh middleware methods', () => {
-  let middleware;
+  let middleware: Auth;
 
   beforeAll(() => {
     middleware = new Auth(appInstance);
@@ -11,7 +11,7 @@ describe('atuh middleware methods', () => {
 
   it('have description fields', async () => {
     expect.assertions(1);
-    expect(middleware.constructor.description).toBeDefined();
+    expect(Auth.description).toBeDefined();
   });
 
   it('middleware pass when user presented', async () => {
@@ -26,7 +26,7 @@ describe('atuh middleware methods', () => {
         user: true,
       },
     };
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(req as any, {} as any, nextFunction);
 
     expect(isCalled).toBeTruthy();
   });
@@ -35,8 +35,8 @@ describe('atuh middleware methods', () => {
     expect.assertions(3);
 
     let isCalled = false;
-    let status;
-    let isSend;
+    let status = 0;
+    let isSend = false;
     const nextFunction = () => {
       isCalled = true;
     };
@@ -44,16 +44,17 @@ describe('atuh middleware methods', () => {
       appInfo: {}, // no user
     };
     await middleware.middleware(
-      req,
+      req as any,
       {
-        status(statusCode) {
+        status(statusCode: number) {
           status = statusCode;
           return this;
         },
         json() {
           isSend = true;
+          return this;
         },
-      },
+      } as any,
       nextFunction,
     );
 

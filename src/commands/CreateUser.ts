@@ -51,13 +51,14 @@ class CreateUser extends AbstractCommand {
       return false;
     }
 
-    let user;
+    const query: { _id?: string; email?: string } = {};
 
     if (id) {
-      user = await User.findOne({ _id: id });
+      query._id = id;
     } else if (email) {
-      user = await User.findOne({ email });
+      query.email = email;
     }
+    let user = await User.findOne(query);
 
     if (user && !update) {
       this.logger?.error(

@@ -8,7 +8,7 @@ describe('Lock Model', () => {
   const testTtl = 30; // seconds
 
   beforeAll(async () => {
-    Lock = appInstance.getModel('Lock');
+    Lock = appInstance.getModel('Lock') as unknown as TLock;
   });
 
   describe('acquireLock()', () => {
@@ -29,6 +29,7 @@ describe('Lock Model', () => {
     it('should throw non-duplicate key errors', async () => {
       // Simulate a validation error
       const invalidLockName = null;
+      // biome-ignore lint/style/noNonNullAssertion: we speciall send wrong type
       await expect(Lock.acquireLock(invalidLockName!)).rejects.toThrow();
     });
   });

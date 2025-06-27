@@ -23,7 +23,7 @@ class Base {
    * Optimzation to lazy load logger. It will be inited only on request
    */
   get logger(): winston.Logger | null {
-    let l;
+    let l: winston.Logger | null;
     try {
       l = this.#realLogger;
     } catch {

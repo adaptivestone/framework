@@ -105,8 +105,8 @@ describe('rate limiter methods', () => {
     const req = {
       appInfo: {},
     };
-    let status;
-    let isSend;
+    let status = 0;
+    let isSend = false;
     await rateLimiter.middleware(
       req as FrameworkRequest,
       {
@@ -144,7 +144,7 @@ describe('rate limiter methods', () => {
       appInfo: {},
       ...request,
     };
-    let status;
+    let status = 0;
     let isSend = false;
     let isNextCalled = false;
     await realRateLimiter.middleware(

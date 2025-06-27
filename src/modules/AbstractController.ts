@@ -164,7 +164,7 @@ class AbstractController extends Base {
         //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
         // );
 
-        let additionalMiddlewares;
+        let additionalMiddlewares: any;
 
         if (routeAdditionalMiddlewares.length > 0) {
           additionalMiddlewares = Array.from(

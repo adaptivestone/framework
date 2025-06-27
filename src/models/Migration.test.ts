@@ -6,8 +6,15 @@ describe('migration model', () => {
   it('migrationFile should be uniqe', async () => {
     expect.assertions(1);
 
-    let errorCode;
-    const MigrationModel: TMigration = appInstance.getModel('Migration');
+    let errorCode: number | undefined;
+    const MigrationModel = appInstance.getModel(
+      'Migration',
+    ) as unknown as TMigration;
+
+    if (!MigrationModel) {
+      throw new Error('Migration model not found');
+    }
+
     await MigrationModel.syncIndexes();
     await MigrationModel.create({
       migrationFile: 'a',

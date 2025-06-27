@@ -74,7 +74,7 @@ describe('cache', () => {
     const getAsyncThrow = async () => {
       throw new Error('err');
     };
-    let err;
+    let err: Error | null = null;
 
     const { cache } = appInstance;
 
@@ -83,10 +83,10 @@ describe('cache', () => {
         cache.getSetValue('THROW', getAsyncThrow),
         cache.getSetValue('THROW', getAsyncThrow),
       ]);
-    } catch (e) {
-      err = e;
+    } catch (e: unknown) {
+      err = e as Error;
     }
 
-    expect(err.message).toBe('err');
+    expect(err?.message).toBe('err');
   });
 });

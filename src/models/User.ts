@@ -9,7 +9,7 @@ import type {
 } from '../modules/BaseModel.ts';
 import { BaseModel } from '../modules/BaseModel.ts';
 
-type UserModelLite = GetModelTypeLiteFromSchema<
+export type UserModelLite = GetModelTypeLiteFromSchema<
   typeof User.modelSchema,
   ExtractProperty<typeof User, 'schemaOptions'>
 >;
@@ -22,7 +22,9 @@ class User extends BaseModel {
       'save',
       async function userPreSaveHook(this: InstanceType<UserModelLite>) {
         if (this.isModified('password')) {
-          this.password = await scryptAsyncWithSaltAsString(this.password!);
+          this.password = await scryptAsyncWithSaltAsString(
+            this.password as string,
+          );
         }
       },
     );
@@ -202,10 +204,16 @@ class User extends BaseModel {
       generateToken: async function (this: UserInstanceType) {
         const timestamp = new Date();
         timestamp.setDate(timestamp.getDate() + 30);
+        if (!this.email) {
+          throw new Error('Email is requiried');
+        }
         const token = await scryptAsyncWithSaltAsString(
-          this.email! + Date.now(),
+          this.email + Date.now(),
         );
-        this.sessionTokens?.push({ token, valid: timestamp });
+        if (!this.sessionTokens) {
+          this.sessionTokens = [];
+        }
+        this.sessionTokens.push({ token, valid: timestamp });
         await this.save();
         return { token, valid: timestamp };
       },
@@ -222,29 +230,27 @@ class User extends BaseModel {
       ) {
         const passwordRecoveryToken =
           await userHelpers.generateUserPasswordRecoveryToken(this);
-        let Mailer;
         // speed optimisation
         try {
           // @ts-expect-error module is optional
-          Mailer = (await import('@adaptivestone/framework-module-email'))
+          const Mailer = (await import('@adaptivestone/framework-module-email'))
             .default;
+          const mail = new Mailer(
+            appInstance,
+            'recovery',
+            {
+              link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
+              editor: this.name?.nick,
+            },
+            i18n,
+          );
+          return mail.send(this.email);
         } catch {
           const error =
             'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
           appInstance.logger?.error(error);
           return false;
         }
-
-        const mail = new Mailer(
-          appInstance,
-          'recovery',
-          {
-            link: `${i18n.language}/auth/recovery?password_recovery_token=${passwordRecoveryToken.token}`,
-            editor: this.name?.nick,
-          },
-          i18n,
-        );
-        return mail.send(this.email);
       },
       /**
        * Send verification email
@@ -260,27 +266,26 @@ class User extends BaseModel {
         const verificationToken =
           await userHelpers.generateUserVerificationToken(this);
         // speed optimisation
-        let Mailer;
         try {
           // @ts-expect-error module is optional
-          Mailer = (await import('@adaptivestone/framework-module-email'))
+          const Mailer = (await import('@adaptivestone/framework-module-email'))
             .default;
+          const mail = new Mailer(
+            appInstance,
+            'verification',
+            {
+              link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
+              editor: this.name?.nick,
+            },
+            i18n,
+          );
+          return mail.send(this.email);
         } catch {
           const error =
             'Mailer not found. Please install @adaptivestone/framework-module-email in order to use it';
           appInstance.logger?.error(error);
           return false;
         }
-        const mail = new Mailer(
-          appInstance,
-          'verification',
-          {
-            link: `${i18n.language}/auth/login?verification_token=${verificationToken.token}`,
-            editor: this.name?.nick,
-          },
-          i18n,
-        );
-        return mail.send(this.email);
       } /**
        * Get public user data
        * @returns {Object}
@@ -311,8 +316,11 @@ export const userHelpers = {
   ) {
     const date = new Date();
     date.setDate(date.getDate() + 14);
+    if (!userMongoose.email) {
+      throw new Error('Email is required');
+    }
     const token = await scryptAsyncWithSaltAsString(
-      userMongoose.email! + Date.now(),
+      userMongoose.email + Date.now(),
     );
     // if (err) {
     //     this.logger.error("Hash 2 error ", err);
@@ -338,8 +346,11 @@ export const userHelpers = {
     ) {
       const date = new Date();
       date.setDate(date.getDate() + 14);
+      if (!userMongoose.email) {
+        throw new Error('Email is requiried');
+      }
       const token = await scryptAsyncWithSaltAsString(
-        userMongoose.email! + Date.now(),
+        userMongoose.email + Date.now(),
       );
 
       userMongoose.passwordRecoveryTokens = [];
