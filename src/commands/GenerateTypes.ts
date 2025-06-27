@@ -1,10 +1,10 @@
-import fs from "node:fs/promises";
-import AbstractCommand from "../modules/AbstractCommand.ts";
-import { BaseModel } from "../modules/BaseModel.ts";
+import fs from 'node:fs/promises';
+import AbstractCommand from '../modules/AbstractCommand.ts';
+import { BaseModel } from '../modules/BaseModel.ts';
 
 class GenerateTypes extends AbstractCommand {
   static get description(): string {
-    return "Gererates TypeScript types";
+    return 'Gererates TypeScript types';
   }
 
   static isShouldInitModels = false;
@@ -16,7 +16,7 @@ class GenerateTypes extends AbstractCommand {
     );
     await fs.writeFile(`${process.cwd()}/genTypes.d.ts`, template);
 
-    console.log("TypeScript types generated successfully at genTypes.d.ts");
+    console.log('TypeScript types generated successfully at genTypes.d.ts');
 
     return Promise.resolve(true);
   }
@@ -31,13 +31,13 @@ class GenerateTypes extends AbstractCommand {
         (config) =>
           `    getConfig(configName: '${config[0]}'): ${JSON.stringify(config[1], null, 6)};`,
       )
-      .join("\n");
+      .join('\n');
 
     const modelTypes = (
       await Promise.all(
         modelPaths.map(async (modelPath) => {
           const modelModule = await import(modelPath.path);
-          const path = modelPath.path.replace(dir, ".");
+          const path = modelPath.path.replace(dir, '.');
           if (modelModule.default.prototype instanceof BaseModel) {
             return `    getModel(modelName: '${modelPath.file}'): GetModelTypeFromClass<typeof import('${path}').default>`;
           } else {
@@ -45,7 +45,7 @@ class GenerateTypes extends AbstractCommand {
           }
         }),
       )
-    ).join("\n");
+    ).join('\n');
 
     return `
 import type {} from '@adaptivestone/framework/server.js';

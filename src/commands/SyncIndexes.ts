@@ -1,13 +1,13 @@
-import path from "node:path";
-import * as url from "node:url";
-import type { Model as TModel } from "mongoose";
-import AbstractCommand from "../modules/AbstractCommand.ts";
+import path from 'node:path';
+import * as url from 'node:url';
+import type { Model as TModel } from 'mongoose';
+import AbstractCommand from '../modules/AbstractCommand.ts';
 
 class SyncIndexes extends AbstractCommand {
   async run() {
-    const dirname = url.fileURLToPath(new URL(".", import.meta.url));
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const files = await this.getFilesPathWithInheritance(
-      path.join(dirname, "/../models"),
+      path.join(dirname, '/../models'),
       this.app.foldersConfig.models,
     );
     let models = [];
@@ -34,7 +34,7 @@ class SyncIndexes extends AbstractCommand {
   }
 
   static get description() {
-    return "Synchronize indexes defined in models with a real one indexed on the database.  Command will remove all indexes from the database that do not exist on model OR have different parameters. Then it will create a new indexes   ";
+    return 'Synchronize indexes defined in models with a real one indexed on the database.  Command will remove all indexes from the database that do not exist on model OR have different parameters. Then it will create a new indexes   ';
   }
 }
 

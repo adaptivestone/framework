@@ -1,26 +1,26 @@
 /* eslint-disable @typescript-eslint/no-unsafe-function-type */
-import EventEmitter from "node:events";
-import path from "node:path";
-import { hrtime, loadEnvFile } from "node:process";
-import * as url from "node:url";
+import EventEmitter from 'node:events';
+import path from 'node:path';
+import { hrtime, loadEnvFile } from 'node:process';
+import * as url from 'node:url';
 
-import merge from "deepmerge";
-import winston from "winston";
-import type { TLogConfig } from "./config/log.ts";
-import type ControllerManager from "./controllers/index.ts";
-import type { TFolderConfig, TFolderConfigFolders } from "./folderConfig.ts";
-import { setAppInstance } from "./helpers/appInstance.ts";
-import { getFilesPathWithInheritance } from "./helpers/files.ts";
-import { consoleLogger } from "./helpers/logger.ts";
-import type AbstractModel from "./modules/AbstractModel.ts";
-import type BaseCli from "./modules/BaseCli.ts";
-import type { BaseModel, TBaseModel } from "./modules/BaseModel.ts";
-import Cache from "./services/cache/Cache.ts";
-import type HttpServer from "./services/http/HttpServer.ts";
+import merge from 'deepmerge';
+import winston from 'winston';
+import type { TLogConfig } from './config/log.ts';
+import type ControllerManager from './controllers/index.ts';
+import type { TFolderConfig, TFolderConfigFolders } from './folderConfig.ts';
+import { setAppInstance } from './helpers/appInstance.ts';
+import { getFilesPathWithInheritance } from './helpers/files.ts';
+import { consoleLogger } from './helpers/logger.ts';
+import type AbstractModel from './modules/AbstractModel.ts';
+import type BaseCli from './modules/BaseCli.ts';
+import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
+import Cache from './services/cache/Cache.ts';
+import type HttpServer from './services/http/HttpServer.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
-  models: Map<string, AbstractModel["mongooseModel"] | TBaseModel>;
+  models: Map<string, AbstractModel['mongooseModel'] | TBaseModel>;
   modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
 }
@@ -29,7 +29,7 @@ export interface IApp {
   getConfig(configName: string): Record<string, unknown>;
   getModel(
     modelName: string,
-  ): AbstractModel["mongooseModel"] | false | TBaseModel;
+  ): AbstractModel['mongooseModel'] | false | TBaseModel;
   runCliCommand(commandName: string): Promise<boolean | void>;
   updateConfig(
     configName: string,
@@ -49,7 +49,7 @@ export interface IApp {
 try {
   loadEnvFile();
 } catch {
-  console.warn("No env file found. This is ok. But please check youself.");
+  console.warn('No env file found. This is ok. But please check youself.');
 }
 
 /**
@@ -70,7 +70,7 @@ class Server {
 
   cache: AppCache = {
     configs: new Map<string, unknown>(),
-    models: new Map<string, AbstractModel["mongooseModel"] | TBaseModel>(),
+    models: new Map<string, AbstractModel['mongooseModel'] | TBaseModel>(),
     modelConstructors: new Map<
       string,
       typeof AbstractModel | typeof BaseModel
@@ -113,13 +113,13 @@ class Server {
       },
       httpServer: null,
       controllerManager: null,
-      frameworkFolder: new URL(".", import.meta.url).pathname,
+      frameworkFolder: new URL('.', import.meta.url).pathname,
       internalFilesCache: that.cache,
     };
 
-    this.app.events.on("shutdown", () => {
+    this.app.events.on('shutdown', () => {
       const forceShutdownTimer = setTimeout(() => {
-        console.error("Shutdown timed out, forcing exit");
+        console.error('Shutdown timed out, forcing exit');
         process.exit(1);
       }, 5_000);
       // Unref the timer so it doesn't keep the process alive
@@ -137,8 +137,8 @@ class Server {
   ): Promise<void> {
     const [{ default: HttpServer }, { default: ControllerManager }] =
       await Promise.all([
-        import("./services/http/HttpServer.ts"), // Speed optimisation
-        import("./controllers/index.ts"), // Speed optimisation
+        import('./services/http/HttpServer.ts'), // Speed optimisation
+        import('./controllers/index.ts'), // Speed optimisation
         this.init(),
       ]);
 
@@ -164,15 +164,15 @@ class Server {
     if (this.#isInited) {
       return true;
     }
-    console.log("Server init...");
-    console.time("Server init. Done");
-    console.time("Loading config and model files. Time");
+    console.log('Server init...');
+    console.time('Server init. Done');
+    console.time('Loading config and model files. Time');
     const prom = [this.#initConfigFiles()];
     if (!isSkipModelLoading) {
       prom.push(this.#loadModelFiles());
     }
     await Promise.all(prom);
-    console.timeEnd("Loading config and model files. Time");
+    console.timeEnd('Loading config and model files. Time');
 
     if (!isSkipModelInit) {
       await this.initAllModels();
@@ -180,8 +180,8 @@ class Server {
 
     this.#isInited = true;
 
-    console.timeEnd("Server init. Done");
-    console.log(" ");
+    console.timeEnd('Server init. Done');
+    console.log(' ');
 
     return true;
   }
@@ -190,13 +190,13 @@ class Server {
    * Connect to mongoose if needed
    */
   async #mongooseConnect(): Promise<void> {
-    const mongoose = (await import("mongoose")).default;
-    mongoose.set("strictQuery", true);
+    const mongoose = (await import('mongoose')).default;
+    mongoose.set('strictQuery', true);
 
     if (!mongoose.connection.readyState) {
-      this.app.events.on("shutdown", async () => {
+      this.app.events.on('shutdown', async () => {
         this.app.logger?.verbose(
-          "Shutdown was called. Closing all mongoose connections",
+          'Shutdown was called. Closing all mongoose connections',
         );
         for (const c of mongoose.connections) {
           c.close(true);
@@ -211,7 +211,7 @@ class Server {
       }
       mongoose
         .connect(
-          this.app.getConfig("mongo").connectionString as string,
+          this.app.getConfig('mongo').connectionString as string,
           connectionParams,
         )
         .then(
@@ -219,8 +219,8 @@ class Server {
             this.app.logger?.info(
               `Mongo connection success ${connectionParams.appName}`,
             );
-            mongoose.connection.on("error", (err) => {
-              this.app.logger?.error("Mongo connection error", err);
+            mongoose.connection.on('error', (err) => {
+              this.app.logger?.error('Mongo connection error', err);
               console.error(err);
             });
           },
@@ -245,8 +245,8 @@ class Server {
       await this.#loadModelFiles();
     }
 
-    if (this.app.getConfig("mongo").connectionString) {
-      const { BaseModel } = await import("./modules/BaseModel.ts");
+    if (this.app.getConfig('mongo').connectionString) {
+      const { BaseModel } = await import('./modules/BaseModel.ts');
       this.#mongooseConnect(); //do not wait for connection. Any time for us it ok
       for (const [modelName, ModelConstructor] of this.cache
         .modelConstructors) {
@@ -276,7 +276,7 @@ class Server {
       }
     } else {
       this.app.logger.warn(
-        "Skipping inited models as we have no mongo connection string",
+        'Skipping inited models as we have no mongo connection string',
       );
     }
 
@@ -287,12 +287,12 @@ class Server {
   }
 
   async #initConfigFiles(): Promise<boolean> {
-    const dirname = url.fileURLToPath(new URL(".", import.meta.url));
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const files = await getFilesPathWithInheritance({
-      internalFolder: path.join(dirname, "/config"),
+      internalFolder: path.join(dirname, '/config'),
       externalFolder: this.app.foldersConfig.config,
-      loggerFileType: "CONFIG",
-      logger: (m) => consoleLogger("info", m),
+      loggerFileType: 'CONFIG',
+      logger: (m) => consoleLogger('info', m),
       filter: {
         startWithCapital: false,
       },
@@ -301,7 +301,7 @@ class Server {
     const configFiles: Record<string, Record<string, string>> = {};
 
     for (const file of files) {
-      const config = file.file.split(".");
+      const config = file.file.split('.');
       if (!configFiles[config[0]]) {
         configFiles[config[0]] = {};
       }
@@ -347,16 +347,16 @@ class Server {
     { path: string; file: string }[]
   > {
     if (this.cache.modelPaths.length === 0) {
-      const dirname = url.fileURLToPath(new URL(".", import.meta.url));
+      const dirname = url.fileURLToPath(new URL('.', import.meta.url));
       const files = await getFilesPathWithInheritance({
-        internalFolder: path.join(dirname, "/models"),
+        internalFolder: path.join(dirname, '/models'),
         externalFolder: this.app.foldersConfig.models,
-        loggerFileType: "MODEL",
-        logger: (m) => consoleLogger("info", m),
+        loggerFileType: 'MODEL',
+        logger: (m) => consoleLogger('info', m),
       });
       for (const file of files) {
         this.cache.modelPaths.push({
-          file: file.file.split(".")[0],
+          file: file.file.split('.')[0],
           path: file.path,
         });
       }
@@ -398,11 +398,11 @@ class Server {
    * Add error logging on promise reject
    */
   addErrorHandling(): void {
-    process.on("uncaughtException", (e) =>
-      this.app.logger.error("uncaughtException", e),
+    process.on('uncaughtException', (e) =>
+      this.app.logger.error('uncaughtException', e),
     );
-    process.on("unhandledRejection", (e) => {
-      this.app.logger.error("unhandledRejection", e);
+    process.on('unhandledRejection', (e) => {
+      this.app.logger.error('unhandledRejection', e);
     });
   }
 
@@ -419,7 +419,7 @@ class Server {
   getConfig(configName: string): Record<string, unknown> {
     if (!this.cache.configs.has(configName)) {
       if (!this.#isInited) {
-        throw new Error("You should call Server.init() before using getConfig");
+        throw new Error('You should call Server.init() before using getConfig');
       }
       this.app.logger.warn(
         `You asked for config ${configName} that not exists. Please check you codebase `,
@@ -437,9 +437,9 @@ class Server {
    */
   getLogger(): winston.Logger {
     if (!this.#realLogger) {
-      console.time("Creating real logger for server. Time");
+      console.time('Creating real logger for server. Time');
       this.#realLogger = this.#createLogger();
-      console.timeEnd("Creating real logger for server. Time");
+      console.timeEnd('Creating real logger for server. Time');
     }
     return this.#realLogger;
   }
@@ -452,14 +452,14 @@ class Server {
       winston.format.timestamp(),
       winston.format.printf(
         (info) =>
-          `(${process.pid}) \x1B[32m[${info.label ?? "SERVER"}]\x1B[39m ${
+          `(${process.pid}) \x1B[32m[${info.label ?? 'SERVER'}]\x1B[39m ${
             info.timestamp
-          }  ${info.level} : ${info.message} ${info?.stack ?? ""} ${
-            info.durationMs ? `Duration: ${info.durationMs}ms` : ""
+          }  ${info.level} : ${info.message} ${info?.stack ?? ''} ${
+            info.durationMs ? `Duration: ${info.durationMs}ms` : ''
           }`,
       ),
     );
-    const { transports } = this.app.getConfig("log") as TLogConfig;
+    const { transports } = this.app.getConfig('log') as TLogConfig;
     function IsConstructor(f: Function) {
       try {
         Reflect.construct(String, [], f);
@@ -471,12 +471,12 @@ class Server {
 
     const logger = winston.createLogger({
       format: winston.format.errors({ stack: true }),
-      level: "silly",
+      level: 'silly',
     });
 
     for (const log of transports) {
       if (log.enable) {
-        if (log.transport === "console") {
+        if (log.transport === 'console') {
           logger.add(
             new winston.transports.Console({
               level: log.transportOptions.level,
@@ -530,15 +530,15 @@ class Server {
    */
   getModel(
     modelName: string,
-  ): AbstractModel["mongooseModel"] | TBaseModel | false {
-    if (modelName.endsWith("s")) {
+  ): AbstractModel['mongooseModel'] | TBaseModel | false {
+    if (modelName.endsWith('s')) {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
       );
     }
     if (!this.#isInited) {
       this.app.logger.error(
-        new Error("You should call Server.init() before using getModel"),
+        new Error('You should call Server.init() before using getModel'),
       );
       return false;
     }
@@ -558,7 +558,7 @@ class Server {
    */
   async runCliCommand(commandName: string) {
     if (!this.cli) {
-      const { default: BaseCli } = await import("./modules/BaseCli.ts"); // Speed optimisation
+      const { default: BaseCli } = await import('./modules/BaseCli.ts'); // Speed optimisation
       this.cli = new BaseCli(this);
     }
     return this.cli.run(commandName);

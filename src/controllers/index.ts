@@ -1,8 +1,8 @@
-import path from "node:path";
-import * as url from "node:url";
-import type AbstractController from "../modules/AbstractController.ts";
-import Base from "../modules/Base.ts";
-import type { IApp } from "../server.ts";
+import path from 'node:path';
+import * as url from 'node:url';
+import type AbstractController from '../modules/AbstractController.ts';
+import Base from '../modules/Base.ts';
+import type { IApp } from '../server.ts';
 
 /**
  * Class do autoloading a http controllers
@@ -18,7 +18,7 @@ class ControllerManager extends Base {
    * Load controllers
    */
   async initControllers() {
-    const dirname = url.fileURLToPath(new URL(".", import.meta.url));
+    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const controllersToLoad = await this.getFilesPathWithInheritance(
       dirname,
       this.app.foldersConfig.controllers,
@@ -26,12 +26,12 @@ class ControllerManager extends Base {
 
     controllersToLoad.sort((a, b) => {
       if (
-        a.file.toLowerCase().endsWith("index.js") ||
-        a.file.toLowerCase().endsWith("index.ts")
+        a.file.toLowerCase().endsWith('index.js') ||
+        a.file.toLowerCase().endsWith('index.ts')
       ) {
         if (
-          b.file.toLowerCase().endsWith("index.js") ||
-          b.file.toLowerCase().endsWith("index.ts")
+          b.file.toLowerCase().endsWith('index.js') ||
+          b.file.toLowerCase().endsWith('index.ts')
         ) {
           return 0;
         }
@@ -45,8 +45,8 @@ class ControllerManager extends Base {
         import(controller.path).then(({ default: ControllerModule }) => {
           const contollerName = ControllerModule.name.toLowerCase();
           let prefix = path.dirname(controller.file);
-          if (prefix === ".") {
-            prefix = "";
+          if (prefix === '.') {
+            prefix = '';
           }
           const controllePath = prefix
             ? `${prefix}/${contollerName}`
@@ -62,7 +62,7 @@ class ControllerManager extends Base {
   }
 
   static get loggerGroup() {
-    return "controller";
+    return 'controller';
   }
 }
 

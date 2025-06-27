@@ -1,12 +1,12 @@
-import type { Response } from "express";
-import { describe, expect, it } from "vitest";
-import { appInstance } from "../../../helpers/appInstance.ts";
-import { defaultAuthToken } from "../../../tests/testHelpers.ts";
-import type { FrameworkRequest } from "../HttpServer.ts";
-import GetUserByToken from "./GetUserByToken.ts";
+import type { Response } from 'express';
+import { describe, expect, it } from 'vitest';
+import { appInstance } from '../../../helpers/appInstance.ts';
+import { defaultAuthToken } from '../../../tests/testHelpers.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import GetUserByToken from './GetUserByToken.ts';
 
-describe("getUserByToken middleware methods", () => {
-  it("have description fields", async () => {
+describe('getUserByToken middleware methods', () => {
+  it('have description fields', async () => {
     expect.assertions(1);
 
     // const middleware = new GetUserByToken(appInstance);
@@ -14,17 +14,17 @@ describe("getUserByToken middleware methods", () => {
     expect(GetUserByToken.description).toBeDefined();
   });
 
-  it("have description usedAuthParameters", async () => {
+  it('have description usedAuthParameters', async () => {
     expect.assertions(2);
 
     const middleware = new GetUserByToken(appInstance);
     const params = middleware.usedAuthParameters;
 
     expect(params).toHaveLength(1);
-    expect(params[0].name).toBe("Authorization");
+    expect(params[0].name).toBe('Authorization');
   });
 
-  it("should not called twice", async () => {
+  it('should not called twice', async () => {
     expect.assertions(1);
 
     const middleware = new GetUserByToken(appInstance);
@@ -46,7 +46,7 @@ describe("getUserByToken middleware methods", () => {
     expect(isCalled).toBeTruthy();
   });
 
-  it("should not getuser without token", async () => {
+  it('should not getuser without token', async () => {
     expect.assertions(1);
 
     const middleware = new GetUserByToken(appInstance);
@@ -69,7 +69,7 @@ describe("getUserByToken middleware methods", () => {
     expect(isCalled).toBeTruthy();
   });
 
-  it("should not getuser with a wrong token", async () => {
+  it('should not getuser with a wrong token', async () => {
     expect.assertions(2);
 
     const middleware = new GetUserByToken(appInstance);
@@ -82,7 +82,7 @@ describe("getUserByToken middleware methods", () => {
         user: undefined,
       },
       body: {
-        token: "fake",
+        token: 'fake',
       },
       get: () => {},
     };
@@ -96,7 +96,7 @@ describe("getUserByToken middleware methods", () => {
     expect(req.appInfo.user).toBeUndefined();
   });
 
-  it("should not getuser with a good token in body", async () => {
+  it('should not getuser with a good token in body', async () => {
     expect.assertions(2);
 
     const middleware = new GetUserByToken(appInstance);
@@ -124,7 +124,7 @@ describe("getUserByToken middleware methods", () => {
     expect(req.appInfo.user).toBeDefined();
   });
 
-  it("should not getuser with a good token in header", async () => {
+  it('should not getuser with a good token in header', async () => {
     expect.assertions(2);
 
     const middleware = new GetUserByToken(appInstance);

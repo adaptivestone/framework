@@ -1,7 +1,7 @@
-import { isSchema } from "yup";
-import Base from "../../modules/Base.ts";
-import CustomValidator from "./drivers/CustomValidator.js";
-import YupValidator from "./drivers/YupValidator.js";
+import { isSchema } from 'yup';
+import Base from '../../modules/Base.ts';
+import CustomValidator from './drivers/CustomValidator.js';
+import YupValidator from './drivers/YupValidator.js';
 
 class ValidateService extends Base {
   constructor(app, validator) {

@@ -1,10 +1,10 @@
-import type { Response } from "express";
-import { object, string } from "yup";
-import type { TUser } from "../models/User.ts";
-import AbstractController from "../modules/AbstractController.ts";
-import type { FrameworkRequest } from "../services/http/HttpServer.ts";
-import GetUserByToken from "../services/http/middleware/GetUserByToken.ts";
-import RateLimiter from "../services/http/middleware/RateLimiter.ts";
+import type { Response } from 'express';
+import { object, string } from 'yup';
+import type { TUser } from '../models/User.ts';
+import AbstractController from '../modules/AbstractController.ts';
+import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
+import RateLimiter from '../services/http/middleware/RateLimiter.ts';
 
 type UserInstance = InstanceType<TUser>;
 
@@ -12,52 +12,52 @@ class Auth extends AbstractController {
   get routes() {
     return {
       post: {
-        "/login": {
+        '/login': {
           handler: this.postLogin,
           request: object().shape({
-            email: string().email().required("auth.emailProvided"), // if not provided then error will be generated
-            password: string().required("auth.passwordProvided"), // possible to provide values from translation
+            email: string().email().required('auth.emailProvided'), // if not provided then error will be generated
+            password: string().required('auth.passwordProvided'), // possible to provide values from translation
           }),
         },
-        "/register": {
+        '/register': {
           handler: this.postRegister,
           request: object().shape({
             email: string()
-              .email("auth.emailValid")
-              .required("auth.emailProvided"),
+              .email('auth.emailValid')
+              .required('auth.emailProvided'),
             password: string()
               .matches(
                 /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
-                "auth.passwordValid",
+                'auth.passwordValid',
               )
-              .required("auth.passwordProvided"),
+              .required('auth.passwordProvided'),
             nickName: string().matches(
               /^[a-zA-Z0-9_\-.]+$/,
-              "auth.nickNameValid",
+              'auth.nickNameValid',
             ),
             firstName: string(),
             lastName: string(),
           }),
         },
-        "/logout": this.postLogout,
-        "/verify": this.verifyUser,
-        "/send-recovery-email": {
+        '/logout': this.postLogout,
+        '/verify': this.verifyUser,
+        '/send-recovery-email': {
           handler: this.sendPasswordRecoveryEmail,
           request: object().shape({ email: string().email().required() }),
         },
-        "/recover-password": {
+        '/recover-password': {
           handler: this.recoverPassword,
           request: object().shape({
             password: string()
               .matches(
                 /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
-                "auth.passwordValid",
+                'auth.passwordValid',
               )
               .required(),
             passwordRecoveryToken: string().required(),
           }),
         },
-        "/send-verification": {
+        '/send-verification': {
           handler: this.sendVerification,
           request: object().shape({ email: string().email().required() }),
         },
@@ -76,7 +76,7 @@ class Auth extends AbstractController {
     },
     res: Response,
   ) {
-    const User = this.app.getModel("User") as unknown as TUser;
+    const User = this.app.getModel('User') as unknown as TUser;
     const userResult = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
       req.appInfo.request.password, // we do a request casting
@@ -84,14 +84,14 @@ class Auth extends AbstractController {
     if (!userResult) {
       return res
         .status(400)
-        .json({ message: req.appInfo.i18n?.t("auth.errorUPValid") });
+        .json({ message: req.appInfo.i18n?.t('auth.errorUPValid') });
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
     const user = userResult;
-    const { isAuthWithVefificationFlow } = this.app.getConfig("auth");
+    const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow && !user.isVerified) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t("email.notVerified"),
+        message: req.appInfo.i18n?.t('email.notVerified'),
         notVerified: true,
       });
     }
@@ -101,23 +101,23 @@ class Auth extends AbstractController {
   }
 
   async postRegister(req: FrameworkRequest, res: Response) {
-    const User = req.appInfo.app.getModel("User") as unknown as TUser;
+    const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user = (await User.getUserByEmail(
       req.appInfo.request.email as string,
     )) as InstanceType<TUser>;
     if (user) {
       return res
         .status(400)
-        .json({ message: req.appInfo.i18n?.t("email.registered") });
+        .json({ message: req.appInfo.i18n?.t('email.registered') });
     }
     if (req.appInfo.request.nickName) {
       user = (await User.findOne({
-        "name.nick": req.appInfo.request.nickName,
+        'name.nick': req.appInfo.request.nickName,
       })) as InstanceType<TUser>;
       if (user) {
         return res
           .status(400)
-          .json({ message: req.appInfo.i18n?.t("auth.nicknameExists") });
+          .json({ message: req.appInfo.i18n?.t('auth.nicknameExists') });
       }
     }
 
@@ -131,7 +131,7 @@ class Auth extends AbstractController {
       },
     });
 
-    const { isAuthWithVefificationFlow } = this.app.getConfig("auth");
+    const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
     if (isAuthWithVefificationFlow) {
       await (user as UserInstance)
         .sendVerificationEmail(req.appInfo.i18n!)
@@ -149,7 +149,7 @@ class Auth extends AbstractController {
   }
 
   async verifyUser(req: FrameworkRequest, res: Response) {
-    const User = req.appInfo.app.getModel("User") as unknown as TUser;
+    const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user;
     try {
       user = await User.getUserByVerificationToken(
@@ -157,13 +157,13 @@ class Auth extends AbstractController {
       );
     } catch {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t("email.alreadyVerifiedOrWrongToken"),
+        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
       });
     }
     this.logger?.debug(`Verify user user is :${user}`);
     if (!user) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t("email.alreadyVerifiedOrWrongToken"),
+        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
       });
     }
 
@@ -173,7 +173,7 @@ class Auth extends AbstractController {
   }
 
   async sendPasswordRecoveryEmail(req: FrameworkRequest, res: Response) {
-    const User = req.appInfo.app.getModel("User") as unknown as TUser;
+    const User = req.appInfo.app.getModel('User') as unknown as TUser;
     try {
       const user = await User.getUserByEmail(
         req.appInfo.request.email as string,
@@ -181,7 +181,7 @@ class Auth extends AbstractController {
       if (!user) {
         return res
           .status(400)
-          .json({ message: req.appInfo.i18n?.t("auth.errorUExist") });
+          .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
       }
       await (user as UserInstance).sendPasswordRecoveryEmail(req.appInfo.i18n!);
       return res.status(200).json();
@@ -189,12 +189,12 @@ class Auth extends AbstractController {
       this.logger?.error(e);
       return res
         .status(400)
-        .json({ message: req.appInfo.i18n?.t("auth.errorUExist") });
+        .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
   }
 
   async recoverPassword(req: FrameworkRequest, res: Response) {
-    const User = this.app.getModel("User") as unknown as TUser;
+    const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByPasswordRecoveryToken(
       req.appInfo.request.passwordRecoveryToken as string,
     ).catch((e: Error) => {
@@ -204,7 +204,7 @@ class Auth extends AbstractController {
     if (!user) {
       return res
         .status(400)
-        .json({ message: req.appInfo.i18n?.t("password.wrongToken") });
+        .json({ message: req.appInfo.i18n?.t('password.wrongToken') });
     }
 
     this.logger?.debug(`Password recovery user is :${user}`);
@@ -216,19 +216,19 @@ class Auth extends AbstractController {
   }
 
   async sendVerification(req: FrameworkRequest, res: Response) {
-    const User = this.app.getModel("User") as unknown as TUser;
+    const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByEmail(req.appInfo.request.email as string);
     if (!user) {
       return res
         .status(400)
-        .json({ message: req.appInfo.i18n?.t("auth.errorUExist") });
+        .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
     await (user as UserInstance).sendVerificationEmail(req.appInfo.i18n!);
     return res.status(200).json();
   }
 
   static get middleware() {
-    return new Map([["/{*splat}", [GetUserByToken, RateLimiter]]]);
+    return new Map([['/{*splat}', [GetUserByToken, RateLimiter]]]);
   }
 }
 

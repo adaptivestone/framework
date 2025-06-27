@@ -2,8 +2,8 @@ import type {
   ExtractProperty,
   GetModelTypeFromClass,
   GetModelTypeLiteFromSchema,
-} from "../modules/BaseModel.ts";
-import { BaseModel } from "../modules/BaseModel.ts";
+} from '../modules/BaseModel.ts';
+import { BaseModel } from '../modules/BaseModel.ts';
 
 export type TSequence = GetModelTypeFromClass<typeof Sequence>;
 
@@ -18,7 +18,7 @@ class Sequence extends BaseModel {
   static get modelStatics() {
     type SequenceModelLite = GetModelTypeLiteFromSchema<
       typeof Sequence.modelSchema,
-      ExtractProperty<typeof Sequence, "schemaOptions">
+      ExtractProperty<typeof Sequence, 'schemaOptions'>
     >;
     return {
       getSequence: async function (

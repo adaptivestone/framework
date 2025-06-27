@@ -1,5 +1,5 @@
-import folderConfig from "./folderConfig.ts";
-import Server from "./server.ts";
+import folderConfig from './folderConfig.ts';
+import Server from './server.ts';
 
 const server = new Server(folderConfig);
 

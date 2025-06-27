@@ -1,8 +1,8 @@
-import type { Model, Schema } from "mongoose";
-import mongoose from "mongoose";
+import type { Model, Schema } from 'mongoose';
+import mongoose from 'mongoose';
 
-import type { IApp } from "../server.ts";
-import Base from "./Base.ts";
+import type { IApp } from '../server.ts';
+import Base from './Base.ts';
 
 export interface IAbstractModelMethods<T> {
   getSuper(): AbstractModel<T> & this;
@@ -36,11 +36,11 @@ class AbstractModel<
       this.modelSchema,
       this.modelSchemaOptions,
     );
-    this.mongooseSchema.set("timestamps", true);
-    this.mongooseSchema.set("minimize", false);
+    this.mongooseSchema.set('timestamps', true);
+    this.mongooseSchema.set('minimize', false);
     this.mongooseSchema.loadClass(this.constructor);
-    this.mongooseSchema.static("getSuper", () => this);
-    this.mongooseSchema.method("getSuper", () => this);
+    this.mongooseSchema.static('getSuper', () => this);
+    this.mongooseSchema.method('getSuper', () => this);
     this.initHooks();
     this.mongooseModel = mongoose.model<IDocument, IModel>(
       this.constructor.name,
@@ -52,7 +52,7 @@ class AbstractModel<
    * Mongoose schema
    */
   get modelSchema() {
-    this.logger?.warn("You should provide modelSchema");
+    this.logger?.warn('You should provide modelSchema');
     return {};
   }
 
@@ -65,7 +65,7 @@ class AbstractModel<
   }
 
   static get loggerGroup() {
-    return "model";
+    return 'model';
   }
 
   initHooks() {

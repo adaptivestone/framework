@@ -1,51 +1,51 @@
-import { setTimeout } from "node:timers/promises";
-import { describe, expect, it } from "vitest";
-import { appInstance } from "../../helpers/appInstance.ts";
+import { setTimeout } from 'node:timers/promises';
+import { describe, expect, it } from 'vitest';
+import { appInstance } from '../../helpers/appInstance.ts';
 
-describe("cache", () => {
+describe('cache', () => {
   const time = Date.now();
 
-  it("can get set values", async () => {
+  it('can get set values', async () => {
     expect.assertions(2);
 
     const { cache } = appInstance;
 
-    const res = await cache.getSetValue("TEST_TIME", async () => time);
+    const res = await cache.getSetValue('TEST_TIME', async () => time);
 
     expect(res).toStrictEqual(time);
 
-    const res2 = await cache.getSetValue("TEST_TIME", async () => "123");
+    const res2 = await cache.getSetValue('TEST_TIME', async () => '123');
 
     expect(res2).toStrictEqual(time);
   });
 
-  it("can delete values", async () => {
+  it('can delete values', async () => {
     expect.assertions(1);
 
     const { cache } = appInstance;
 
-    await cache.removeKey("TEST_TIME");
+    await cache.removeKey('TEST_TIME');
 
-    const res2 = await cache.getSetValue("TEST_TIME", async () => "123");
+    const res2 = await cache.getSetValue('TEST_TIME', async () => '123');
 
-    expect(res2).toBe("123");
+    expect(res2).toBe('123');
   });
 
-  it("can works with big int", async () => {
+  it('can works with big int', async () => {
     expect.assertions(2);
 
     const { cache } = appInstance;
 
-    const res = await cache.getSetValue("BIN_INT", async () => 1n);
+    const res = await cache.getSetValue('BIN_INT', async () => 1n);
 
     expect(res).toBe(1n);
 
-    const res2 = await cache.getSetValue("BIN_INT", async () => "1111");
+    const res2 = await cache.getSetValue('BIN_INT', async () => '1111');
 
     expect(res2).toBe(1n);
   });
 
-  it("can execute only one request per time", async () => {
+  it('can execute only one request per time', async () => {
     expect.assertions(3);
 
     const { cache } = appInstance;
@@ -58,8 +58,8 @@ describe("cache", () => {
     };
 
     const [res, res1] = await Promise.all([
-      cache.getSetValue("T", f),
-      cache.getSetValue("T", f),
+      cache.getSetValue('T', f),
+      cache.getSetValue('T', f),
     ]);
 
     expect(counter).toBe(1);
@@ -68,11 +68,11 @@ describe("cache", () => {
     expect(res1).toBe(1);
   });
 
-  it("can handle problems on onNotFound", async () => {
+  it('can handle problems on onNotFound', async () => {
     expect.assertions(1);
 
     const getAsyncThrow = async () => {
-      throw new Error("err");
+      throw new Error('err');
     };
     let err;
 
@@ -80,13 +80,13 @@ describe("cache", () => {
 
     try {
       await Promise.all([
-        cache.getSetValue("THROW", getAsyncThrow),
-        cache.getSetValue("THROW", getAsyncThrow),
+        cache.getSetValue('THROW', getAsyncThrow),
+        cache.getSetValue('THROW', getAsyncThrow),
       ]);
     } catch (e) {
       err = e;
     }
 
-    expect(err.message).toBe("err");
+    expect(err.message).toBe('err');
   });
 });

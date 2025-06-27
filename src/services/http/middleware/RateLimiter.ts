@@ -1,22 +1,22 @@
-import { createClient } from "@redis/client";
-import merge from "deepmerge";
-import type { NextFunction, Response } from "express";
-import mongoose from "mongoose";
-import type { RateLimiterAbstract } from "rate-limiter-flexible";
+import { createClient } from '@redis/client';
+import merge from 'deepmerge';
+import type { NextFunction, Response } from 'express';
+import mongoose from 'mongoose';
+import type { RateLimiterAbstract } from 'rate-limiter-flexible';
 import {
   RateLimiterMemory,
   RateLimiterMongo,
   RateLimiterRedis,
-} from "rate-limiter-flexible";
-import type rateLimiterConfig from "../../../config/rateLimiter.js";
-import type { IApp } from "../../../server.ts";
-import type { FrameworkRequest } from "../HttpServer.ts";
-import AbstractMiddleware from "./AbstractMiddleware.ts";
-import type { GetUserByTokenAppInfo } from "./GetUserByToken.ts";
+} from 'rate-limiter-flexible';
+import type rateLimiterConfig from '../../../config/rateLimiter.js';
+import type { IApp } from '../../../server.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import AbstractMiddleware from './AbstractMiddleware.ts';
+import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
 class RateLimiter extends AbstractMiddleware {
   static get description() {
-    return "Rate limiter middleware. Limit amount of request. Please refer to documentation";
+    return 'Rate limiter middleware. Limit amount of request. Please refer to documentation';
   }
 
   finalOptions: typeof rateLimiterConfig;
@@ -24,7 +24,7 @@ class RateLimiter extends AbstractMiddleware {
 
   constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
-    const limiterOptions = this.app.getConfig("rateLimiter");
+    const limiterOptions = this.app.getConfig('rateLimiter');
 
     this.finalOptions = merge(
       limiterOptions,
@@ -32,15 +32,15 @@ class RateLimiter extends AbstractMiddleware {
     ) as typeof rateLimiterConfig;
 
     switch (this.finalOptions.driver) {
-      case "memory":
+      case 'memory':
         this.limiter = new RateLimiterMemory(this.finalOptions.limiterOptions);
         break;
 
-      case "redis":
+      case 'redis':
         this.limiter = this.initRedisLimiter();
         break;
 
-      case "mongo":
+      case 'mongo':
         this.limiter = new RateLimiterMongo({
           storeClient: mongoose.connection,
           ...this.finalOptions.limiterOptions,
@@ -56,7 +56,7 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   initRedisLimiter() {
-    const redisConfig = this.app.getConfig("redis");
+    const redisConfig = this.app.getConfig('redis');
     const redisClient = createClient({
       url: redisConfig.url as string,
     });
@@ -66,14 +66,14 @@ class RateLimiter extends AbstractMiddleware {
       await redisClient.connect();
     })();
 
-    redisClient.on("error", (error, b, c) => {
+    redisClient.on('error', (error, b, c) => {
       this.logger?.error(error, b, c);
     });
-    redisClient.on("connect", () => {
-      this.logger?.info("Redis connection success");
+    redisClient.on('connect', () => {
+      this.logger?.info('Redis connection success');
     });
 
-    this.app.events.on("shutdown", async () => {
+    this.app.events.on('shutdown', async () => {
       await redisClient.disconnect();
     });
 
@@ -98,7 +98,7 @@ class RateLimiter extends AbstractMiddleware {
       }
     }
     if (route) {
-      key.push(`${req.baseUrl ?? ""}${req.path ?? ""}`); // to avoid quesry params
+      key.push(`${req.baseUrl ?? ''}${req.path ?? ''}`); // to avoid quesry params
     }
     if (user && req.appInfo?.user) {
       key.push(req.appInfo?.user.id);
@@ -115,7 +115,7 @@ class RateLimiter extends AbstractMiddleware {
       });
     }
 
-    return key.join("_");
+    return key.join('_');
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
@@ -123,10 +123,10 @@ class RateLimiter extends AbstractMiddleware {
       this.logger?.info(
         `RateLimiter not inited correclty! Please check init logs `,
       );
-      return res.status(500).json({ message: "RateLimiter error" });
+      return res.status(500).json({ message: 'RateLimiter error' });
     }
 
-    const { namespace } = this.app.getConfig("redis");
+    const { namespace } = this.app.getConfig('redis');
 
     const consumeKey = `${namespace}-${this.gerenateConsumeKey(req)}`;
 
@@ -138,7 +138,7 @@ class RateLimiter extends AbstractMiddleware {
     if (consumeResult) {
       return next();
     }
-    return res.status(429).json({ message: "Too Many Requests" });
+    return res.status(429).json({ message: 'Too Many Requests' });
   }
 }
 

@@ -1,19 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { appInstance } from "../helpers/appInstance.ts";
-import type { TMigration } from "./Migration.ts";
+import { describe, expect, it } from 'vitest';
+import { appInstance } from '../helpers/appInstance.ts';
+import type { TMigration } from './Migration.ts';
 
-describe("migration model", () => {
-  it("migrationFile should be uniqe", async () => {
+describe('migration model', () => {
+  it('migrationFile should be uniqe', async () => {
     expect.assertions(1);
 
     let errorCode;
-    const MigrationModel: TMigration = appInstance.getModel("Migration");
+    const MigrationModel: TMigration = appInstance.getModel('Migration');
     await MigrationModel.syncIndexes();
     await MigrationModel.create({
-      migrationFile: "a",
+      migrationFile: 'a',
     });
     await MigrationModel.create({
-      migrationFile: "a",
+      migrationFile: 'a',
     }).catch((e) => {
       errorCode = e.code;
     });

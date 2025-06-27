@@ -1,52 +1,52 @@
-import type { Response } from "express";
-import { boolean, number, object, string } from "yup";
-import type { TUser } from "../../models/User.ts";
+import type { Response } from 'express';
+import { boolean, number, object, string } from 'yup';
+import type { TUser } from '../../models/User.ts';
 import type {
   RouteParams,
   TMiddleware,
-} from "../../modules/AbstractController.ts";
-import AbstractController from "../../modules/AbstractController.ts";
-import type { FrameworkRequest } from "../../services/http/HttpServer.ts";
-import AuthMiddleware from "../../services/http/middleware/Auth.ts";
-import type { GetUserByTokenAppInfo } from "../../services/http/middleware/GetUserByToken.ts";
-import GetUserByToken from "../../services/http/middleware/GetUserByToken.ts";
-import Pagination from "../../services/http/middleware/Pagination.ts";
-import RateLimiter from "../../services/http/middleware/RateLimiter.ts";
-import RoleMiddleware from "../../services/http/middleware/Role.ts";
-import CheckFlag from "../../services/http/middleware/test/CheckFlag.ts";
+} from '../../modules/AbstractController.ts';
+import AbstractController from '../../modules/AbstractController.ts';
+import type { FrameworkRequest } from '../../services/http/HttpServer.ts';
+import AuthMiddleware from '../../services/http/middleware/Auth.ts';
+import type { GetUserByTokenAppInfo } from '../../services/http/middleware/GetUserByToken.ts';
+import GetUserByToken from '../../services/http/middleware/GetUserByToken.ts';
+import Pagination from '../../services/http/middleware/Pagination.ts';
+import RateLimiter from '../../services/http/middleware/RateLimiter.ts';
+import RoleMiddleware from '../../services/http/middleware/Role.ts';
+import CheckFlag from '../../services/http/middleware/test/CheckFlag.ts';
 
 class SomeController extends AbstractController {
   get routes(): RouteParams {
     return {
       get: {
-        "/": {
+        '/': {
           handler: this.getSomething,
           middleware: [RateLimiter],
         },
-        "/someData": {
+        '/someData': {
           handler: this.getSomething,
           query: object().shape({
             flag: boolean().required(),
           }),
           middleware: [RateLimiter, CheckFlag],
         },
-        "/someDataWithPermission": {
+        '/someDataWithPermission': {
           handler: this.getSomething,
-          middleware: [RateLimiter, [RoleMiddleware, { roles: ["admin"] }]],
+          middleware: [RateLimiter, [RoleMiddleware, { roles: ['admin'] }]],
         },
-        "/grabSomeDataFromQuery": {
+        '/grabSomeDataFromQuery': {
           handler: this.grabSomeDataFromQuery,
           query: object().shape({
             name: string(),
           }),
         },
-        "/grabSomeDataFromQueryWithRequiredParam": {
+        '/grabSomeDataFromQueryWithRequiredParam': {
           handler: this.grabSomeDataFromQuery,
           query: object().shape({
             name: number().required(),
           }),
         },
-        "/grabSomeDataFromQueryWithMiddlewareParams": {
+        '/grabSomeDataFromQueryWithMiddlewareParams': {
           handler: this.grabSomeDataFromQueryWithMiddlewareParams,
           query: object().shape({
             name: string(),
@@ -55,14 +55,14 @@ class SomeController extends AbstractController {
         },
       },
       post: {
-        "/postInfo": {
+        '/postInfo': {
           handler: this.addPost,
           request: object().shape({
             name: string(),
             discription: string(),
           }),
         },
-        "/postQueryParamaters": {
+        '/postQueryParamaters': {
           handler: this.postQueryParamaters,
           request: object().shape({
             name: string(),
@@ -70,7 +70,7 @@ class SomeController extends AbstractController {
         },
       },
       patch: {
-        "/userAvatar": {
+        '/userAvatar': {
           handler: this.patchUserAvatar,
           request: object().shape({
             avatar: string(),
@@ -91,7 +91,7 @@ class SomeController extends AbstractController {
 
   // eslint-disable-next-line class-methods-use-this
   async getSomething(req: FrameworkRequest, res: Response) {
-    return res.status(200).json({ data: { text: "Available text" } });
+    return res.status(200).json({ data: { text: 'Available text' } });
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -169,9 +169,9 @@ class SomeController extends AbstractController {
 
   static get middleware(): Map<string, TMiddleware> {
     return new Map([
-      ["/{*splat}", [GetUserByToken]],
-      ["PATCH/userAvatar", [GetUserByToken, AuthMiddleware]],
-      ["PUT/{*splat}", [[RoleMiddleware, { roles: ["client"] }]]],
+      ['/{*splat}', [GetUserByToken]],
+      ['PATCH/userAvatar', [GetUserByToken, AuthMiddleware]],
+      ['PUT/{*splat}', [[RoleMiddleware, { roles: ['client'] }]]],
     ]);
   }
 }

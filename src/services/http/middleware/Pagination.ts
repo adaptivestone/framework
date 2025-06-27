@@ -1,7 +1,7 @@
-import type { NextFunction, Response } from "express";
-import { number, object } from "yup";
-import type { FrameworkRequest } from "../HttpServer.ts";
-import AbstractMiddleware from "./AbstractMiddleware.ts";
+import type { NextFunction, Response } from 'express';
+import { number, object } from 'yup';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import AbstractMiddleware from './AbstractMiddleware.ts';
 
 export interface PaginationMiddlewareAppInfo {
   appInfo: {
@@ -18,7 +18,7 @@ export interface PaginationMiddlewareAppInfo {
  */
 class Pagination extends AbstractMiddleware {
   static get description() {
-    return "Pagination middleware. You can use limit=10 and maxLimit=100 parameters";
+    return 'Pagination middleware. You can use limit=10 and maxLimit=100 parameters';
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -39,18 +39,18 @@ class Pagination extends AbstractMiddleware {
       maxLimit: number;
     };
 
-    limit = (typeof limit !== "number" ? parseInt(limit, 10) : limit) || 10;
+    limit = (typeof limit !== 'number' ? parseInt(limit, 10) : limit) || 10;
     maxLimit =
-      (typeof maxLimit !== "number" ? parseInt(maxLimit, 10) : maxLimit) || 100;
+      (typeof maxLimit !== 'number' ? parseInt(maxLimit, 10) : maxLimit) || 100;
 
     req.appInfo.pagination = {
       page:
-        typeof req?.query?.page === "string"
+        typeof req?.query?.page === 'string'
           ? parseInt(req?.query?.page, 10) || 1
           : 1,
 
       limit:
-        typeof req?.query?.limit === "string"
+        typeof req?.query?.limit === 'string'
           ? parseInt(req?.query?.limit, 10) || 0
           : limit,
       skip: 0,

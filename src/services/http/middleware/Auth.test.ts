@@ -1,20 +1,20 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { appInstance } from "../../../helpers/appInstance.ts";
-import Auth from "./Auth.ts";
+import { beforeAll, describe, expect, it } from 'vitest';
+import { appInstance } from '../../../helpers/appInstance.ts';
+import Auth from './Auth.ts';
 
-describe("atuh middleware methods", () => {
+describe('atuh middleware methods', () => {
   let middleware;
 
   beforeAll(() => {
     middleware = new Auth(appInstance);
   });
 
-  it("have description fields", async () => {
+  it('have description fields', async () => {
     expect.assertions(1);
     expect(middleware.constructor.description).toBeDefined();
   });
 
-  it("middleware pass when user presented", async () => {
+  it('middleware pass when user presented', async () => {
     expect.assertions(1);
 
     let isCalled = false;
@@ -31,7 +31,7 @@ describe("atuh middleware methods", () => {
     expect(isCalled).toBeTruthy();
   });
 
-  it("middleware NOT pass when user NOT presented", async () => {
+  it('middleware NOT pass when user NOT presented', async () => {
     expect.assertions(3);
 
     let isCalled = false;

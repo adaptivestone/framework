@@ -1,6 +1,6 @@
-import type { Dirent } from "node:fs";
-import { promises as fs } from "node:fs";
-import { format, join, parse } from "node:path";
+import type { Dirent } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import { format, join, parse } from 'node:path';
 
 interface getFilesPathWithInheritanceProps {
   internalFolder: string;
@@ -18,7 +18,7 @@ const getFilesPathWithInheritance = async ({
   internalFolder,
   externalFolder,
   logger,
-  loggerFileType = "",
+  loggerFileType = '',
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
 }: getFilesPathWithInheritanceProps) => {
   const [internalFiles, externalFiles] = await Promise.all([
@@ -30,7 +30,7 @@ const getFilesPathWithInheritance = async ({
     if (!fileDirent.isFile()) {
       return false;
     }
-    const fileArray = fileDirent.name.split("/");
+    const fileArray = fileDirent.name.split('/');
     const file = fileArray[fileArray.length - 1];
     if (startWithCapital && file[0] !== file[0].toUpperCase()) {
       // not start with capital
@@ -38,17 +38,17 @@ const getFilesPathWithInheritance = async ({
     }
     if (
       notTests &&
-      (file.endsWith(".test.js") ||
-        file.endsWith(".test.ts") ||
-        file.endsWith(".d.ts"))
+      (file.endsWith('.test.js') ||
+        file.endsWith('.test.ts') ||
+        file.endsWith('.d.ts'))
     ) {
       return false;
     }
 
-    if (!file.endsWith(".js") && !file.endsWith(".ts")) {
+    if (!file.endsWith('.js') && !file.endsWith('.ts')) {
       return false;
     }
-    if (notHidden && file[0] === ".") {
+    if (notHidden && file[0] === '.') {
       // not start with dot
       return false;
     }
@@ -59,15 +59,15 @@ const getFilesPathWithInheritance = async ({
     .filter(filterIndexFile)
     .map((fileDirent) =>
       join(fileDirent.parentPath, fileDirent.name)
-        .replace(`${internalFolder}/`, "")
-        .replace(`${internalFolder}`, ""),
+        .replace(`${internalFolder}/`, '')
+        .replace(`${internalFolder}`, ''),
     );
   const externalFilesString = externalFiles
     .filter(filterIndexFile)
     .map((fileDirent) =>
       join(fileDirent.parentPath, fileDirent.name)
-        .replace(`${externalFolder}/`, "")
-        .replace(`${externalFolder}`, ""),
+        .replace(`${externalFolder}/`, '')
+        .replace(`${externalFolder}`, ''),
     );
 
   const filesToLoad = [];
@@ -76,13 +76,13 @@ const getFilesPathWithInheritance = async ({
     const jsFile = format({
       dir: fileDetails.dir,
       name: fileDetails.name,
-      ext: ".js",
+      ext: '.js',
     });
 
     const tsFile = format({
       dir: fileDetails.dir,
       name: fileDetails.name,
-      ext: ".ts",
+      ext: '.ts',
     });
 
     if (
@@ -91,7 +91,7 @@ const getFilesPathWithInheritance = async ({
     ) {
       logger(
         `Skipping register INTERNAL file '${file}' ${
-          loggerFileType ? `of type ${loggerFileType}` : ""
+          loggerFileType ? `of type ${loggerFileType}` : ''
         } as it override by EXTERNAL ONE`,
       );
     } else {

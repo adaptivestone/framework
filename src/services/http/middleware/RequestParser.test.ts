@@ -1,15 +1,15 @@
-import type { IncomingMessage } from "node:http";
-import { createServer } from "node:http";
-import type { NextFunction, Response } from "express";
-import { PersistentFile } from "formidable";
-import { describe, expect, it } from "vitest";
-import { appInstance } from "../../../helpers/appInstance.ts";
-import type { FrameworkRequest } from "../HttpServer.ts";
+import type { IncomingMessage } from 'node:http';
+import { createServer } from 'node:http';
+import type { NextFunction, Response } from 'express';
+import { PersistentFile } from 'formidable';
+import { describe, expect, it } from 'vitest';
+import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
 
-import RequestParser from "./RequestParser.ts";
+import RequestParser from './RequestParser.ts';
 
-describe("reqest parser limiter methods", () => {
-  it("have description fields", async () => {
+describe('reqest parser limiter methods', () => {
+  it('have description fields', async () => {
     expect.assertions(1);
 
     // const middleware = new RequestParser(appInstance);
@@ -17,7 +17,7 @@ describe("reqest parser limiter methods", () => {
     expect(RequestParser.description).toBeDefined();
   });
 
-  it("middleware that works", async () => {
+  it('middleware that works', async () => {
     expect.assertions(4);
 
     await new Promise<boolean>((done) => {
@@ -47,13 +47,13 @@ describe("reqest parser limiter methods", () => {
             ).toBeTruthy();
 
             res.writeHead(200);
-            res.end("ok");
+            res.end('ok');
           }) as NextFunction,
         );
       });
       server.listen(null, async () => {
         const address = server.address();
-        const chosenPort = typeof address === "string" ? 0 : address?.port;
+        const chosenPort = typeof address === 'string' ? 0 : address?.port;
         const body = `----13068458571765726332503797717\r
 Content-Disposition: form-data; name="title"\r
 \r
@@ -72,12 +72,12 @@ d\r
 ----13068458571765726332503797717--\r
 `;
         await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Length": body.length.toString(),
+            'Content-Length': body.length.toString(),
             Host: `localhost:${chosenPort}`,
-            "Content-Type":
-              "multipart/form-data; boundary=--13068458571765726332503797717",
+            'Content-Type':
+              'multipart/form-data; boundary=--13068458571765726332503797717',
           },
           body,
         }).catch((err) => {
@@ -91,7 +91,7 @@ d\r
     });
   });
 
-  it("middleware with a problem", async () => {
+  it('middleware with a problem', async () => {
     expect.assertions(1);
 
     await new Promise<boolean>((done) => {
@@ -127,19 +127,19 @@ d\r
         // expect(err).toBeDefined();
 
         res.writeHead(200);
-        res.end("ok");
+        res.end('ok');
       });
       server.listen(null, async () => {
         const address = server.address();
-        const chosenPort = typeof address === "string" ? 0 : address?.port;
-        const body = "someBadBody";
+        const chosenPort = typeof address === 'string' ? 0 : address?.port;
+        const body = 'someBadBody';
 
         await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Length": body.length.toString(),
+            'Content-Length': body.length.toString(),
             Host: `localhost:${chosenPort}`,
-            "Content-Type": "badContentType",
+            'Content-Type': 'badContentType',
           },
           body,
         }).catch((err) => {

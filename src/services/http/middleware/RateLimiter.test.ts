@@ -1,19 +1,19 @@
-import crypto from "node:crypto";
-import { setTimeout } from "node:timers/promises";
-import type { Response } from "express";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { appInstance } from "../../../helpers/appInstance.ts";
-import type { FrameworkRequest } from "../HttpServer.ts";
-import RateLimiter from "./RateLimiter.ts";
+import crypto from 'node:crypto';
+import { setTimeout } from 'node:timers/promises';
+import type { Response } from 'express';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
+import RateLimiter from './RateLimiter.ts';
 
 let mongoRateLimiter: RateLimiter;
 
-describe("rate limiter methods", () => {
+describe('rate limiter methods', () => {
   beforeAll(async () => {
     await setTimeout(20);
 
     mongoRateLimiter = new RateLimiter(appInstance, {
-      driver: "mongo",
+      driver: 'mongo',
       limiterOptions: {
         keyPrefix: `mongo_${Date.now()}_${crypto.randomUUID()}}`,
       },
@@ -25,7 +25,7 @@ describe("rate limiter methods", () => {
     await setTimeout(200);
   });
 
-  it("have description fields", async () => {
+  it('have description fields', async () => {
     expect.assertions(1);
 
     // const middleware = new RateLimiter(appInstance, {
@@ -35,72 +35,72 @@ describe("rate limiter methods", () => {
     expect(RateLimiter.description).toBeDefined();
   });
 
-  it("can create redis rateLimiter", async () => {
+  it('can create redis rateLimiter', async () => {
     expect.assertions(1);
 
     const redisRateLimiter = new RateLimiter(appInstance, {
-      driver: "redis",
+      driver: 'redis',
     });
 
     expect(redisRateLimiter.limiter).toBeDefined();
   });
 
-  it("can not create rateLimiter with unknown driver", async () => {
+  it('can not create rateLimiter with unknown driver', async () => {
     expect.assertions(1);
 
     const rateLimiter = new RateLimiter(appInstance, {
-      driver: "unknown",
+      driver: 'unknown',
     });
 
     expect(rateLimiter.limiter).toBeUndefined();
   });
 
-  it("generateConsumeKey works correctly", async () => {
+  it('generateConsumeKey works correctly', async () => {
     expect.assertions(1);
 
     const redisRateLimiter = new RateLimiter(appInstance, {
-      driver: "redis",
+      driver: 'redis',
     });
 
     const res = await redisRateLimiter.gerenateConsumeKey({
       appInfo: {
-        ip: "192.168.0.0",
+        ip: '192.168.0.0',
         user: {
-          id: "someId",
+          id: 'someId',
         },
       },
     } as unknown as FrameworkRequest);
 
-    expect(res).toBe("192.168.0.0__someId");
+    expect(res).toBe('192.168.0.0__someId');
   });
 
-  it("generateConsumeKey with request works correctly", async () => {
+  it('generateConsumeKey with request works correctly', async () => {
     expect.assertions(1);
 
     const redisRateLimiter = new RateLimiter(appInstance, {
-      driver: "redis",
+      driver: 'redis',
       consumeKeyComponents: {
-        request: ["email"],
+        request: ['email'],
       },
     });
 
     const res = await redisRateLimiter.gerenateConsumeKey({
       appInfo: {
-        ip: "192.168.0.0",
+        ip: '192.168.0.0',
       },
       body: {
-        email: "foo@example.com",
+        email: 'foo@example.com',
       },
     } as FrameworkRequest);
 
-    expect(res).toBe("192.168.0.0__foo@example.com");
+    expect(res).toBe('192.168.0.0__foo@example.com');
   });
 
-  it("middleware without driver should fail", async () => {
+  it('middleware without driver should fail', async () => {
     expect.assertions(2);
 
     const rateLimiter = new RateLimiter(appInstance, {
-      driver: "unknown",
+      driver: 'unknown',
     });
     const req = {
       appInfo: {},
@@ -165,40 +165,40 @@ describe("rate limiter methods", () => {
     return { status, isSend, isNextCalled };
   };
 
-  it("middleware should works with a mongo drivers", async () => {
+  it('middleware should works with a mongo drivers', async () => {
     expect.assertions(1);
 
     const { isNextCalled } = await makeOneRequest({
       rateLimiter: mongoRateLimiter,
-      request: { ip: "10.10.0.1" },
+      request: { ip: '10.10.0.1' },
     });
 
     expect(isNextCalled).toBeTruthy();
   });
 
-  it("middleware should works with a memory drivers", async () => {
+  it('middleware should works with a memory drivers', async () => {
     expect.assertions(1);
 
     const { isNextCalled } = await makeOneRequest({
-      driver: "memory",
-      request: { ip: "10.10.0.1" },
+      driver: 'memory',
+      request: { ip: '10.10.0.1' },
     });
 
     expect(isNextCalled).toBeTruthy();
   });
 
-  it("middleware should works with a redis drivers", async () => {
+  it('middleware should works with a redis drivers', async () => {
     expect.assertions(1);
 
     const { isNextCalled } = await makeOneRequest({
-      driver: "redis",
-      request: { ip: "10.10.0.1" },
+      driver: 'redis',
+      request: { ip: '10.10.0.1' },
     });
 
     expect(isNextCalled).toBeTruthy();
   });
 
-  it("middleware should rate limits for us. mongo driver", async () => {
+  it('middleware should rate limits for us. mongo driver', async () => {
     expect.assertions(2);
 
     const middlewares = Array.from({ length: 20 }, () =>
@@ -214,11 +214,11 @@ describe("rate limiter methods", () => {
     expect(isSend?.isSend).toBeTruthy();
   });
 
-  it("middleware should rate limits for us. memory driver", async () => {
+  it('middleware should rate limits for us. memory driver', async () => {
     expect.assertions(2);
 
     const rateLimiter = new RateLimiter(appInstance, {
-      driver: "memory",
+      driver: 'memory',
     });
 
     const middlewares = Array.from({ length: 20 }, () =>
@@ -234,11 +234,11 @@ describe("rate limiter methods", () => {
     expect(isSend?.isSend).toBeTruthy();
   });
 
-  it("middleware should rate limits for us. redis driver", async () => {
+  it('middleware should rate limits for us. redis driver', async () => {
     expect.assertions(2);
 
     const rateLimiter = new RateLimiter(appInstance, {
-      driver: "redis",
+      driver: 'redis',
     });
 
     const middlewares = Array.from({ length: 20 }, () =>

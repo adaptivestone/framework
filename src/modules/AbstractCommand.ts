@@ -1,6 +1,6 @@
-import type { IApp } from "../server.ts";
-import Base from "./Base.ts";
-import type { ParseArgsOptionsConfigExtended } from "./BaseCli.ts";
+import type { IApp } from '../server.ts';
+import Base from './Base.ts';
+import type { ParseArgsOptionsConfigExtended } from './BaseCli.ts';
 
 type TypeMap = {
   string: string;
@@ -12,11 +12,11 @@ export type CommandArgumentToTypes<
 > = {
   [K in keyof T as T[K] extends { required: true } | { default: never }
     ? K
-    : never]-?: TypeMap[T[K]["type"]];
+    : never]-?: TypeMap[T[K]['type']];
 } & {
   [K in keyof T as T[K] extends { required: true } | { default: never }
     ? never
-    : K]?: TypeMap[T[K]["type"]];
+    : K]?: TypeMap[T[K]['type']];
 };
 
 class AbstractCommand extends Base {
@@ -35,7 +35,7 @@ class AbstractCommand extends Base {
   }
 
   static get description() {
-    return "Command description. PLEASE PROVIDE IT";
+    return 'Command description. PLEASE PROVIDE IT';
   }
 
   /**
@@ -75,12 +75,12 @@ class AbstractCommand extends Base {
    * Entry point to every command. This method should be overridden
    */
   async run(): Promise<boolean> {
-    this.logger?.error("You should implement run method");
+    this.logger?.error('You should implement run method');
     return false;
   }
 
   static get loggerGroup() {
-    return "command";
+    return 'command';
   }
 }
 
