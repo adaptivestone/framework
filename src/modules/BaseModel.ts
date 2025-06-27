@@ -88,6 +88,7 @@ export type GetModelTypeLiteFromSchema<
 export const defaultOptions = { timestamps: true, minimize: false } as const;
 
 export type TBaseModel = GetModelTypeFromClass<typeof BaseModel>;
+// biome-ignore lint/complexity/noStaticOnlyClass: TODO think about it in future
 export class BaseModel {
   static get modelSchema() {
     return {} as const;
@@ -109,24 +110,24 @@ export class BaseModel {
     return {};
   }
 
-  static initHooks(schema: Schema) {
+  static initHooks(_schema: Schema) {
     // Add hooks here
   }
 
   // Properly typed static method with generic constraints
   public static initialize<T extends typeof BaseModel>(this: T) {
-    const schema = new mongoose.Schema(BaseModel.modelSchema, {
+    const schema = new mongoose.Schema(this.modelSchema, {
       ...defaultOptions,
-      ...(BaseModel.schemaOptions as SchemaOptions),
-      methods: BaseModel.modelInstanceMethods,
-      statics: BaseModel.modelStatics,
-      virtuals: BaseModel.modelVirtuals,
+      ...(this.schemaOptions as SchemaOptions),
+      methods: this.modelInstanceMethods,
+      statics: this.modelStatics,
+      virtuals: this.modelVirtuals,
     }) as GetModelSchemaTypeFromClass<T>;
 
-    BaseModel.initHooks(schema);
+    this.initHooks(schema);
 
     const mongooseModel = mongoose.model(
-      BaseModel.name,
+      this.name,
       schema,
     ) as GetModelTypeFromClass<T>;
 
