@@ -27,7 +27,7 @@ class GetUserByToken extends AbstractMiddleware {
 
   async middleware(
     req: FrameworkRequest & GetUserByTokenAppInfo,
-    res: Response,
+    _res: Response,
     next: NextFunction,
   ) {
     if (req.appInfo.user) {

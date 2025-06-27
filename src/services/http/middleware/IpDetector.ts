@@ -41,7 +41,7 @@ class IpDetector extends AbstractMiddleware {
     }
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
     const { headers } = this.app.getConfig(
       'ipDetector',
     ) as typeof ipDetectorConfig;

@@ -135,11 +135,11 @@ class UserOld extends AbstractModel<
     email: string,
     password: string,
   ) {
-    const data = await UserOld.findOne({ email: String(email) });
+    const data = await this.findOne({ email: String(email) });
     if (!data) {
       return false;
     }
-    const hashedPasswords = await UserOld.hashPassword(password);
+    const hashedPasswords = await this.hashPassword(password);
 
     if (data.password !== hashedPasswords) {
       return false;
@@ -187,14 +187,14 @@ class UserOld extends AbstractModel<
   }
 
   static async getUserByToken(this: UserOld['mongooseModel'], token: string) {
-    const data = await UserOld.findOne({
+    const data = await this.findOne({
       'sessionTokens.token': String(token),
     });
     return data || false;
   }
 
   static async getUserByEmail(this: UserOld['mongooseModel'], email: string) {
-    const data = await UserOld.findOne({ email: String(email) });
+    const data = await this.findOne({ email: String(email) });
     if (!data) {
       return false;
     }
@@ -236,7 +236,7 @@ class UserOld extends AbstractModel<
     this: UserOld['mongooseModel'],
     passwordRecoveryToken: string,
   ) {
-    const data = await UserOld.findOne({
+    const data = await this.findOne({
       passwordRecoveryTokens: {
         $elemMatch: { token: String(passwordRecoveryToken) },
       },
@@ -315,7 +315,7 @@ class UserOld extends AbstractModel<
     this: UserOld['mongooseModel'],
     verificationToken: string,
   ) {
-    const data = await UserOld.findOne({
+    const data = await this.findOne({
       verificationTokens: {
         $elemMatch: { token: String(verificationToken) },
       },

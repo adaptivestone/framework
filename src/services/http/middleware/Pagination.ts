@@ -30,7 +30,7 @@ class Pagination extends AbstractMiddleware {
 
   async middleware(
     req: FrameworkRequest & PaginationMiddlewareAppInfo,
-    res: Response,
+    _res: Response,
     next: NextFunction,
   ) {
     let { limit, maxLimit } = this.params as {
