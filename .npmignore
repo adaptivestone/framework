@@ -1,9 +1,7 @@
 .gitlab-ci.yml
 .gitignore
 .getkeep
-.prettierrc
 .editorconfig
-.husky
 .env
 /cliCommand.ts
 /dist/controllers/test/*
@@ -17,3 +15,4 @@
 tsconfig.json
 vitest.config.ts
 genTypes.d.ts
+biome.json

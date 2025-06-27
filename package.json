@@ -30,7 +30,6 @@
     "lint:fix": "biome lint --write",
     "check": "biome check",
     "check:fix": "biome check --write",
-    "prepare": "husky",
     "prepublishOnly": "npm run build",
     "cli": "node cliCommand.ts",
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
@@ -58,8 +57,6 @@
     "@types/formidable": "^3.4.5",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^3.0.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^16.0.0",
     "mongodb-memory-server": "^10.0.0",
     "typescript": "^5.8.3",
     "vitest": "^3.0.0"
@@ -71,10 +68,5 @@
     "@adaptivestone/framework-module-email": {
       "optional": true
     }
-  },
-  "lint-staged": {
-    "**/*.{js,jsx,ts,tsx,json,css,scss,md}": [
-      "npm run check:fix"
-    ]
   }
 }
