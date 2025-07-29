@@ -147,6 +147,7 @@ class Cli extends Base {
       args: process.argv.slice(3), // remove command name
       options: finalArguments,
       tokens: true,
+      allowNegative: true,
     });
 
     if (parsedArgs.values.help) {
@@ -173,7 +174,7 @@ class Cli extends Base {
 
     if (Command.isShouldInitModels) {
       console.info(
-        `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in tyou command`,
+        `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in your command`,
       );
       process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
         command,

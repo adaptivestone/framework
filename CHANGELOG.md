@@ -49,6 +49,13 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ---
 
+## [5.0.0-beta.28]
+
+- **[UPDATE]** Inside CLI allow to have a negative values 
+- **[UPDATE]** Update deps.
+
+---
+
 ## [5.0.0-beta.27]
 
 - **[UPDATE]** Remove eslint, prettiver and move to biome
