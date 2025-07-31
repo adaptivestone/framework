@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { IApp } from '../server.ts';
 import Base from './Base.ts';
 import type { ParseArgsOptionsConfigExtended } from './BaseCli.ts';
@@ -57,7 +58,18 @@ class AbstractCommand extends Base {
     commandName: string,
     args: Record<string, unknown>,
   ) {
-    return `CLI: ${commandName} ${JSON.stringify(args)}`;
+    let name = `CLI: ${commandName} ${JSON.stringify(args)}`;
+    if (name.length >= 128) {
+      // this is a limit of connection name
+      console.warn(
+        `CLI: ${commandName} mongo connection string more then 128 symbols. Switching to hash`,
+      );
+      const hash = createHash('sha256')
+        .update(JSON.stringify(args))
+        .digest('hex');
+      name = `CLI: ${commandName} ${hash}`;
+    }
+    return name;
   }
 
   /**

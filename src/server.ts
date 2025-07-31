@@ -205,7 +205,13 @@ class Server {
         appName?: string;
       } = {};
       if (process.env.MONGO_APP_NAME) {
-        connectionParams.appName = process.env.MONGO_APP_NAME;
+        if (process.env.MONGO_APP_NAME.length >= 128) {
+          this.app.logger?.error(
+            `Mongo connection MONGO_APP_NAME mare then 128 symbols. This is a limitation of mogno driver. Ignoring it  ${process.env.MONGO_APP_NAME}`,
+          );
+        } else {
+          connectionParams.appName = process.env.MONGO_APP_NAME;
+        }
       }
       mongoose
         .connect(
