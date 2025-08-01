@@ -59,14 +59,16 @@ class AbstractCommand extends Base {
     args: Record<string, unknown>,
   ) {
     let name = `CLI: ${commandName} ${JSON.stringify(args)}`;
-    if (name.length >= 128) {
+    // https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md?plain=1#L460
+    if (name.length >= 64) {
       // this is a limit of connection name
       console.warn(
         `CLI: ${commandName} mongo connection string more then 128 symbols. Switching to hash`,
       );
       const hash = createHash('sha256')
         .update(JSON.stringify(args))
-        .digest('hex');
+        .digest('hex')
+        .substring(0, 32);
       name = `CLI: ${commandName} ${hash}`;
     }
     return name;

@@ -205,9 +205,11 @@ class Server {
         appName?: string;
       } = {};
       if (process.env.MONGO_APP_NAME) {
-        if (process.env.MONGO_APP_NAME.length >= 128) {
+        if (process.env.MONGO_APP_NAME.length >= 64) {
+          // https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md?plain=1#L460
+          // all metadata 512 and app name 128, better to keep as low as possible
           this.app.logger?.error(
-            `Mongo connection MONGO_APP_NAME mare then 128 symbols. This is a limitation of mogno driver. Ignoring it  ${process.env.MONGO_APP_NAME}`,
+            `Mongo connection MONGO_APP_NAME mare then 64 symbols. This is a limitation of mogno driver. Ignoring it  ${process.env.MONGO_APP_NAME}`,
           );
         } else {
           connectionParams.appName = process.env.MONGO_APP_NAME;

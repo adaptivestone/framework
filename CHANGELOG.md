@@ -49,7 +49,14 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ---
 
-## [5.0.0-beta.20]
+## [5.0.0-beta.30]
+
+- **[FIX]** Fix CLI mongo app name generation (64 symbols limit)
+
+
+---
+
+## [5.0.0-beta.29]
 
 - **[FIX]** Fix CLI mongo app name generation (128 symbols limit)
 
