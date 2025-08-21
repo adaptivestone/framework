@@ -118,6 +118,14 @@ class RateLimiter extends AbstractMiddleware {
     return key.join('_');
   }
 
+  async consumeResult(consumeKey: string) {
+    return this.limiter
+      .consume(consumeKey, this.finalOptions.consumePoints)
+      .catch(() => {
+        this.logger?.warn(`Too many requests. Consume key: ${consumeKey}`);
+      });
+  }
+
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     if (!this.limiter) {
       this.logger?.info(
@@ -130,11 +138,7 @@ class RateLimiter extends AbstractMiddleware {
 
     const consumeKey = `${namespace}-${this.gerenateConsumeKey(req)}`;
 
-    const consumeResult = await this.limiter
-      .consume(consumeKey, this.finalOptions.consumePoints)
-      .catch(() => {
-        this.logger?.warn(`Too many requests. Consume key: ${consumeKey}`);
-      });
+    const consumeResult = await this.consumeResult(consumeKey);
     if (consumeResult) {
       return next();
     }

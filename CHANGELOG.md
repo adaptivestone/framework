@@ -24,6 +24,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** `GenerateRandomBytes` command added.
 - **[NEW]** `IpDetector` middleware for detecting proxies and `X-Forwarded-For` headers.
 - **[NEW]** Test helpers getTestServerURL and serverInstance.
+- **[NEW]** Rate limiter middleware - add consumeResult function to allow user middleware as a regular rate limiter
 
 ### Breaking changes (please read carefully)
 
@@ -46,6 +47,15 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 
+
+---
+
+## [5.0.0-beta.31]
+
+- **[NEW]** Rate limiter middleware - add consumeResult function to allow user middleware as a regular rate limiter
+
+
+---
 
 ---
 
