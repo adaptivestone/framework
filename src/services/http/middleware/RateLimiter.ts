@@ -2,7 +2,10 @@ import { createClient } from '@redis/client';
 import merge from 'deepmerge';
 import type { NextFunction, Response } from 'express';
 import mongoose from 'mongoose';
-import type { RateLimiterAbstract } from 'rate-limiter-flexible';
+import type {
+  RateLimiterAbstract,
+  RateLimiterRes,
+} from 'rate-limiter-flexible';
 import {
   RateLimiterMemory,
   RateLimiterMongo,
@@ -118,12 +121,20 @@ class RateLimiter extends AbstractMiddleware {
     return key.join('_');
   }
 
-  async consumeResult(consumeKey: string) {
-    return this.limiter
-      .consume(consumeKey, this.finalOptions.consumePoints)
-      .catch(() => {
-        this.logger?.warn(`Too many requests. Consume key: ${consumeKey}`);
-      });
+  async consumeResult(consumeKey: string, consumePoints = 0) {
+    try {
+      const result = await this.limiter.consume(
+        consumeKey,
+        consumePoints || this.finalOptions.consumePoints,
+      );
+      return { isAllowed: true, retryAfter: 0, ...result };
+    } catch (e: unknown) {
+      this.logger?.warn(`Too many requests. Consume key: ${consumeKey}`);
+      const result = e as RateLimiterRes;
+      const retryAfter = Math.round(result.msBeforeNext / 1000) || 1;
+
+      return { isAllowed: false, retryAfter, ...result };
+    }
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
@@ -139,10 +150,14 @@ class RateLimiter extends AbstractMiddleware {
     const consumeKey = `${namespace}-${this.gerenateConsumeKey(req)}`;
 
     const consumeResult = await this.consumeResult(consumeKey);
-    if (consumeResult) {
+    if (consumeResult.isAllowed) {
       return next();
     }
-    return res.status(429).json({ message: 'Too Many Requests' });
+
+    return res
+      .status(429)
+      .header('Retry-After', String(consumeResult.retryAfter))
+      .json({ message: 'Too Many Requests' });
   }
 }
 
