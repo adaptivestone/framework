@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import { BlockList } from 'node:net';
 import type { NextFunction, Response } from 'express';
 import type ipDetectorConfig from '../../../config/ipDetector.ts';
@@ -41,12 +42,12 @@ class IpDetector extends AbstractMiddleware {
     }
   }
 
-  async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
+  getIpAdressFromIncomingMessage(req: IncomingMessage) {
     const { headers } = this.app.getConfig(
       'ipDetector',
     ) as typeof ipDetectorConfig;
     const initialIp = req.socket.remoteAddress;
-    req.appInfo.ip = initialIp;
+    let ip = initialIp;
     const addressType = initialIp?.includes(':') ? 'ipv6' : 'ipv4';
 
     if (this.blockList.check(initialIp ?? '', addressType)) {
@@ -56,11 +57,16 @@ class IpDetector extends AbstractMiddleware {
         const ipHeader = req.headers[header.toLowerCase()] as string;
         if (ipHeader) {
           const [firstIp] = ipHeader.split(',').map((ip) => ip.trim());
-          req.appInfo.ip = firstIp;
+          ip = firstIp;
           break;
         }
       }
     }
+    return ip;
+  }
+
+  async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
+    req.appInfo.ip = this.getIpAdressFromIncomingMessage(req);
     next();
   }
 }
