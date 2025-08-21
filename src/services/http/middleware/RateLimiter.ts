@@ -156,7 +156,7 @@ class RateLimiter extends AbstractMiddleware {
 
     return res
       .status(429)
-      .header('Retry-After', String(consumeResult.retryAfter))
+      .setHeader('Retry-After', String(consumeResult.retryAfter))
       .json({ message: 'Too Many Requests' });
   }
 }
