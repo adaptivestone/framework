@@ -48,12 +48,19 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 
+
+
+---
+
+## [5.0.0-beta.33]
+
+- **[NEW]** consumeResult changed to be more flexible
+
 ---
 
 ## [5.0.0-beta.32]
 
 - **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware 
-
 
 ---
 
