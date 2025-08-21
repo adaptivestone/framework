@@ -117,6 +117,9 @@ describe('rate limiter methods', () => {
         json() {
           isSend = true;
         },
+        setHeader(_name, _value) {
+          return this;
+        },
       } as Response,
       () => {},
     );
@@ -156,6 +159,9 @@ describe('rate limiter methods', () => {
         },
         json() {
           isSend = true;
+        },
+        setHeader(_name, _value) {
+          return this;
         },
       } as Response,
       () => {
