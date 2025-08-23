@@ -9,6 +9,15 @@ import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
 export type TI18n = { t: TFunction; language: string };
 
+export interface I18nMiddlewareAppInfo {
+  appInfo: {
+    i18n: {
+      t: TFunction;
+      language: string;
+    };
+  };
+}
+
 class I18n extends AbstractMiddleware {
   cache: { [key: string]: i18n } = {};
 

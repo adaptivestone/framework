@@ -52,6 +52,12 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ---
 
+## [5.0.0-beta.34]
+
+- **[NEW]** I18nMiddlewareAppInfo type
+
+---
+
 ## [5.0.0-beta.33]
 
 - **[NEW]** consumeResult changed to be more flexible
