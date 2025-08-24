@@ -26,6 +26,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** Test helpers getTestServerURL and serverInstance.
 - **[NEW]** Rate limiter middleware - add consumeResult function to allow user middleware as a regular rate limiter
 - **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware 
+- **[NEW]**  Introduce i18nService (ability to user i18n not only inside middleware)
 
 ### Breaking changes (please read carefully)
 
@@ -49,6 +50,12 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 
 
+
+---
+
+## [5.0.0-beta.35]
+
+- **[NEW]** Introduce i18nService (ability to user i18n not only inside middleware)
 
 ---
 

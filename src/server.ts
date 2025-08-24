@@ -16,6 +16,7 @@ import type BaseCli from './modules/BaseCli.ts';
 import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
 import Cache from './services/cache/Cache.ts';
 import type HttpServer from './services/http/HttpServer.ts';
+import type { I18n, TI18n } from './services/i18n/I18n.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
@@ -34,6 +35,7 @@ export interface IApp {
     configName: string,
     config: Record<string, unknown>,
   ): Record<string, unknown>;
+  getI18nService(): Promise<I18n>;
   foldersConfig: TFolderConfigFolders;
   events: EventEmitter<[never]>;
   readonly cache: Cache;
@@ -62,6 +64,8 @@ class Server {
   #isModelsInited = false;
 
   #isModelsLoaded = false;
+
+  #i18nService?: I18n;
 
   cli: null | BaseCli = null;
 
@@ -101,6 +105,7 @@ class Server {
       getModel: this.getModel.bind(this),
       runCliCommand: this.runCliCommand.bind(this),
       updateConfig: this.updateConfig.bind(this),
+      getI18nService: this.getI18nService.bind(this),
       foldersConfig: this.config.folders,
       events: new EventEmitter(),
       get cache() {
@@ -527,6 +532,14 @@ class Server {
     const newConf = Object.assign(conf, config); // TODO deep clone
     this.cache.configs.set(configName, newConf);
     return newConf;
+  }
+
+  async getI18nService() {
+    if (!this.#i18nService) {
+      const I18nService = (await import('./services/i18n/I18n.ts')).I18n; // speed optimisation
+      this.#i18nService = new I18nService(this.app);
+    }
+    return this.#i18nService;
   }
 
   /**
