@@ -67,6 +67,8 @@ class Server {
 
   #i18nService?: I18n;
 
+  #i18nServicePromise?: Promise<I18n>;
+
   cli: null | BaseCli = null;
 
   config: TFolderConfig;
@@ -535,11 +537,17 @@ class Server {
   }
 
   async getI18nService() {
-    if (!this.#i18nService) {
-      const I18nService = (await import('./services/i18n/I18n.ts')).I18n; // speed optimisation
-      this.#i18nService = new I18nService(this.app);
+    if (this.#i18nService) {
+      return this.#i18nService;
     }
-    return this.#i18nService;
+    if (!this.#i18nServicePromise) {
+      this.#i18nServicePromise = (async () => {
+        const I18nService = (await import('./services/i18n/I18n.ts')).I18n; // speed optimisation
+        this.#i18nService = new I18nService(this.app);
+        return this.#i18nService;
+      })();
+    }
+    return this.#i18nServicePromise;
   }
 
   /**
