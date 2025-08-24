@@ -38,7 +38,7 @@ class I18n extends AbstractMiddleware {
     }
     const i18nService = await this.app.getI18nService();
 
-    req.appInfo.i18n = await i18nService.getI18n(lang);
+    req.appInfo.i18n = await i18nService.getI18nForLang(lang);
     //@ts-expect-error we known thats a new one
     req.i18n = new Proxy(req.appInfo.i18n, {
       get: (target, prop) => {
@@ -77,7 +77,7 @@ class I18n extends AbstractMiddleware {
         continue;
       }
       const i18nService = await this.app.getI18nService();
-      const i18nInstance = await i18nService.getI18nInstance();
+      const i18nInstance = await i18nService.getI18nBaseInstance();
       if (i18nInstance.services.languageUtils.isSupportedCode(lng)) {
         if (isUseShortCode) {
           lang =

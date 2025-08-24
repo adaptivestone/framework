@@ -14,7 +14,7 @@ export class I18n extends Base {
     language: 'en',
   };
 
-  async getI18n(lang?: string) {
+  async getI18nForLang(lang?: string) {
     const i18NConfig = this.app.getConfig('i18n') as typeof i18nConfig;
     if (!i18NConfig.enabled) {
       return this.#i18nFallback;
@@ -27,7 +27,7 @@ export class I18n extends Base {
       lang = i18NConfig.fallbackLng;
     }
     if (!this.#cache[lang]) {
-      this.#cache[lang] = (await this.getI18nInstance()).cloneInstance({
+      this.#cache[lang] = (await this.getI18nBaseInstance()).cloneInstance({
         initAsync: false,
         lng: lang,
       });
@@ -35,7 +35,7 @@ export class I18n extends Base {
     return this.#cache[lang];
   }
 
-  async getI18nInstance() {
+  async getI18nBaseInstance() {
     if (!this.#i18nBase) {
       const [{ default: i18next }, { default: BackendFS }] = await Promise.all([
         import('i18next'), // Speed optimisation

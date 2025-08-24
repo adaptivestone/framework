@@ -53,6 +53,12 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ---
 
+## [5.0.0-beta.36]
+
+- **[UPDATE]**  i18nService  update method names
+
+---
+
 ## [5.0.0-beta.35]
 
 - **[NEW]** Introduce i18nService (ability to user i18n not only inside middleware)
