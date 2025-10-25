@@ -28,7 +28,6 @@ class RateLimiter extends AbstractMiddleware {
   constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
     const limiterOptions = this.app.getConfig('rateLimiter');
-
     this.finalOptions = merge(
       limiterOptions,
       params || {},
@@ -46,6 +45,7 @@ class RateLimiter extends AbstractMiddleware {
       case 'mongo':
         this.limiter = new RateLimiterMongo({
           storeClient: mongoose.connection,
+          disableIndexesCreation: process.env.NODE_ENV === 'test', // disable in test env, but we can still overrite it later
           ...this.finalOptions.limiterOptions,
         });
         break;

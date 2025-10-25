@@ -7,7 +7,7 @@ export default {
     points: 10, // 10 points
     duration: 60, // Per 60 seconds
   } as IRateLimiterOptions,
-  driver: 'memory', // can be 'mongo', 'redis'
+  driver: 'mongo', // can be 'mongo', 'redis'
   consumePoints: 1,
   consumeKeyComponents: {
     ip: true, // include ip to key generation
