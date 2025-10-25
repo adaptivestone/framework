@@ -50,7 +50,11 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
 
+---
 
+## [5.0.0-beta.39]
+
+- **[UPDATE]**  rete limiter. Do not create index on mongo if we have "proceee.env.test === 'true'"
 
 ---
 

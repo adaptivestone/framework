@@ -45,7 +45,7 @@ class RateLimiter extends AbstractMiddleware {
       case 'mongo':
         this.limiter = new RateLimiterMongo({
           storeClient: mongoose.connection,
-          disableIndexesCreation: process.env.NODE_ENV === 'test', // disable in test env, but we can still overrite it later
+          disableIndexesCreation: process.env.TEST === 'true', // disable in test env, but we can still overrite it later
           ...this.finalOptions.limiterOptions,
         });
         break;
