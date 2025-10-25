@@ -56,11 +56,11 @@
     "@types/express": "^5.0.1",
     "@types/formidable": "^3.4.5",
     "@types/node": "^24.0.0",
-    "@vitest/coverage-v8": "^3.0.0",
+    "@vitest/coverage-v8": "^4.0.0",
     "lefthook": "^2.0.0",
     "mongodb-memory-server": "^10.0.0",
     "typescript": "^5.8.3",
-    "vitest": "^3.0.0"
+    "vitest": "^4.0.0"
   },
   "peerDependencies": {
     "@adaptivestone/framework-module-email": "^1.0.0"
