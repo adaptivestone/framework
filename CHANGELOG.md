@@ -54,7 +54,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ## [5.0.0-beta.39]
 
-- **[UPDATE]**  rete limiter. Do not create index on mongo if we have "proceee.env.test === 'true'"
+- **[UPDATE]**  rete limiter. Do not create index on mongo if we have "process.env.test === 'true'"
 
 ---
 
