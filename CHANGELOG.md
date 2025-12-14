@@ -51,6 +51,10 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
 
 ---
+## [5.0.0-beta.40]
+
+- **[UPDATE]** Update `rate-limiter-flexible` to v9.
+
 
 ## [5.0.0-beta.39]
 
