@@ -1,5 +1,4 @@
 import type { transports } from 'winston';
-import type { SentryTransportOptions } from 'winston-transport-sentry-node';
 
 export type TLogConfig = {
   transports: {
@@ -14,13 +13,10 @@ export type TLogConfig = {
 export default {
   transports: [
     {
-      transport: 'winston-transport-sentry-node',
+      transport: 'sentry',
       transportOptions: {
-        sentry: {
-          dsn: process.env.LOGGER_SENTRY_DSN || process.env.SENTRY_DSN,
-        },
         level: process.env.LOGGER_SENTRY_LEVEL || 'info',
-      } as SentryTransportOptions,
+      } as transports.StreamTransportOptions,
       enable: process.env.LOGGER_SENTRY_ENABLE || false,
     },
     {

@@ -16,7 +16,7 @@ import type BaseCli from './modules/BaseCli.ts';
 import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
 import Cache from './services/cache/Cache.ts';
 import type HttpServer from './services/http/HttpServer.ts';
-import type { I18n, TI18n } from './services/i18n/I18n.ts';
+import type { I18n } from './services/i18n/I18n.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
@@ -37,7 +37,7 @@ export interface IApp {
   ): Record<string, unknown>;
   getI18nService(): Promise<I18n>;
   foldersConfig: TFolderConfigFolders;
-  events: EventEmitter<[never]>;
+  events: EventEmitter;
   readonly cache: Cache;
   readonly logger: winston.Logger;
   httpServer: null | HttpServer;
@@ -499,6 +499,17 @@ class Server {
               ),
             }),
           );
+        } else if (log.transport === 'sentry') {
+          // Special handling for Sentry - load our wrapper
+          import('./services/logging/SentryTransport.js')
+            .then((Tr) => {
+              const Transport = Tr.default;
+              logger.add(new Transport(log.transportOptions));
+            })
+            .catch(() => {
+              // Silently ignore if wrapper not found (shouldn't happen in production)
+              console.warn('[Framework] Sentry transport not available');
+            });
         } else {
           import(log.transport).then((Tr) => {
             let Transport = Tr.default;

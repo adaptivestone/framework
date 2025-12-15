@@ -48,7 +48,7 @@
     "mongoose": "^8.19.0",
     "rate-limiter-flexible": "^9.0.0",
     "winston": "^3.3.3",
-    "winston-transport-sentry-node": "^3.0.0",
+    "winston-transport": "^4.9.0",
     "yup": "^1.0.0"
   },
   "devDependencies": {
@@ -67,6 +67,9 @@
   },
   "peerDependenciesMeta": {
     "@adaptivestone/framework-module-email": {
+      "optional": true
+    },
+    "@sentry/node": {
       "optional": true
     }
   }
