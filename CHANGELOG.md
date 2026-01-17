@@ -54,7 +54,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [5.0.0-beta.40]
 
 - **[UPDATE]** Update `rate-limiter-flexible` to v9.
-- **[UPDATE]** Remove 'winston-transport-sentry' and implementcustom logic based on 'sentry' itself (from v9.14 sentry have natove winston support)
+- **[UPDATE]** Remove 'winston-transport-sentry' and implementcustom logic based on 'sentry' itself (from v9.14 sentry have native winston support)
 
 
 ## [5.0.0-beta.39]
