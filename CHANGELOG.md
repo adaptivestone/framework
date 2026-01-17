@@ -52,10 +52,11 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 
 ---
-## [5.0.0-beta.41] NEXT
+## [5.0.0-beta.41] 
 
 - **[UPDATE]** Update deps
 - **[NEW]** Bearer scheme support
+- **[NEW]** redisConnection helper
 
 
 
