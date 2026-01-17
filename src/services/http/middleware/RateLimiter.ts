@@ -1,4 +1,3 @@
-import { createClient } from '@redis/client';
 import merge from 'deepmerge';
 import type { NextFunction, Response } from 'express';
 import mongoose from 'mongoose';
@@ -12,6 +11,7 @@ import {
   RateLimiterRedis,
 } from 'rate-limiter-flexible';
 import type rateLimiterConfig from '../../../config/rateLimiter.js';
+import { getRedisClientSync } from '../../../helpers/redis/redisConnection.ts';
 import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
@@ -59,26 +59,7 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   initRedisLimiter() {
-    const redisConfig = this.app.getConfig('redis');
-    const redisClient = createClient({
-      url: redisConfig.url as string,
-    });
-
-    // TODO: change it
-    (async () => {
-      await redisClient.connect();
-    })();
-
-    redisClient.on('error', (error, b, c) => {
-      this.logger?.error(error, b, c);
-    });
-    redisClient.on('connect', () => {
-      this.logger?.info('Redis connection success');
-    });
-
-    this.app.events.on('shutdown', async () => {
-      await redisClient.close();
-    });
+    const redisClient = getRedisClientSync();
 
     return new RateLimiterRedis({
       storeClient: redisClient,

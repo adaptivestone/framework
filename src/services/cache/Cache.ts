@@ -1,5 +1,6 @@
 import type { RedisClientType } from '@redis/client';
 import type redisConfig from '../../config/redis.ts';
+import { getRedisClient } from '../../helpers/redis/redisConnection.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
 
@@ -22,23 +23,10 @@ class Cache extends Base {
     // at least memory and redis drivers should be presented
     // memory drives should works on master process level
     // we should support multiple cashe same time
-    const { createClient } = await import('@redis/client');
-    const conf = this.app.getConfig('redis') as typeof redisConfig;
-    this.redisClient = createClient({
-      url: conf.url,
-    });
+    const { namespace } = this.app.getConfig('redis') as typeof redisConfig;
+    this.redisClient = await getRedisClient();
 
-    this.redisNamespace = conf.namespace;
-
-    this.redisClient.on('error', (error, b, c) => {
-      this.logger?.error(error, b, c);
-    });
-    this.redisClient.on('connect', () => {
-      this.logger?.info('Redis connection success');
-    });
-    this.app.events.on('shutdown', () => {
-      this.redisClient.close();
-    });
+    this.redisNamespace = namespace;
   }
 
   /**
