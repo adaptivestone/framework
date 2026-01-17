@@ -1,7 +1,5 @@
-// this is an optional packages. If @sentry/node is not installed, this transport will be a no-op.
-
-import type { LogSeverityLevel } from '@sentry/core';
-import type Sentry from '@sentry/node';
+import type { LogSeverityLevel, SeverityLevel } from '@sentry/core';
+import type * as Sentry from '@sentry/node';
 import Transport from 'winston-transport';
 
 // See: https://github.com/winstonjs/triple-beam
@@ -31,7 +29,7 @@ function isObject(
  * Only loads the Winston transport if @sentry/node is installed
  */
 class SentryTransport extends Transport {
-  #sentry: Sentry | null = null;
+  #sentry: typeof Sentry | null = null;
   #initializationAttempted = false;
 
   constructor(opts: Transport.TransportStreamOptions = {}) {
@@ -65,15 +63,12 @@ class SentryTransport extends Transport {
   }
 
   log(info: unknown, callback: () => void) {
-    if (!this.#sentry) {
-      setImmediate(callback);
-    }
     setImmediate(() => {
       this.emit('logged', info);
     });
 
-    if (!isObject(info)) {
-      return;
+    if (!this.#sentry || !isObject(info)) {
+      return callback();
     }
 
     const levelFromSymbol = info[LEVEL_SYMBOL];
@@ -110,10 +105,12 @@ class SentryTransport extends Transport {
     const error =
       Object.values(info).find((value) => value instanceof Error) ??
       new ExtendedError(info as Record<string, unknown>);
+
     this.#sentry.captureException(error, {
       tags: tags as Record<string, string>,
-      level: logSeverityLevel as Sentry.SeverityLevel,
+      level: logSeverityLevel as SeverityLevel,
     });
+
     return callback();
   }
 }

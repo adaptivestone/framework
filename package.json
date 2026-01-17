@@ -53,6 +53,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",
+    "@sentry/core": "^10.34.0",
+    "@sentry/node": "^10.34.0",
     "@types/express": "^5.0.1",
     "@types/formidable": "^3.4.5",
     "@types/node": "^25.0.0",
@@ -63,10 +65,15 @@
     "vitest": "^4.0.0"
   },
   "peerDependencies": {
-    "@adaptivestone/framework-module-email": "^1.0.0"
+    "@adaptivestone/framework-module-email": "^1.0.0",
+    "@sentry/core": "^10.34..0",
+    "@sentry/node": "^10.34.0"
   },
   "peerDependenciesMeta": {
     "@adaptivestone/framework-module-email": {
+      "optional": true
+    },
+    "@sentry/core": {
       "optional": true
     },
     "@sentry/node": {
