@@ -77,7 +77,7 @@ class RateLimiter extends AbstractMiddleware {
     });
 
     this.app.events.on('shutdown', async () => {
-      await redisClient.disconnect();
+      await redisClient.close();
     });
 
     return new RateLimiterRedis({

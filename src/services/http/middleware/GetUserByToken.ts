@@ -22,6 +22,12 @@ class GetUserByToken extends AbstractMiddleware {
         in: 'header',
         description: GetUserByToken.description,
       },
+      {
+        name: 'bearerAuth',
+        type: 'http',
+        scheme: 'bearer',
+        description: GetUserByToken.description,
+      },
     ];
   }
 
@@ -47,6 +53,8 @@ class GetUserByToken extends AbstractMiddleware {
         return next();
       }
     }
+    // token cleanup
+    token = token.replace(/^Bearer\s+/i, '').trim();
     const User = this.app.getModel('User') as unknown as TUser;
     const user = (await User.getUserByToken(
       token,

@@ -37,7 +37,7 @@ class Cache extends Base {
       this.logger?.info('Redis connection success');
     });
     this.app.events.on('shutdown', () => {
-      this.redisClient.quit();
+      this.redisClient.close();
     });
   }
 

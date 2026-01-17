@@ -19,7 +19,8 @@ class AbstractMiddleware extends Base {
   get usedAuthParameters(): Array<{
     name: string;
     type: string;
-    in: string;
+    in?: string;
+    scheme?: string;
     description: string;
   }> {
     return [];

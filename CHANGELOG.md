@@ -50,6 +50,15 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
 
+
+---
+## [5.0.0-beta.41] NEXT
+
+- **[UPDATE]** Update deps
+- **[NEW]** Bearer scheme support
+
+
+
 ---
 ## [5.0.0-beta.40]
 
@@ -533,7 +542,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ## [4.9.0]
 
-- **[BREAKING]** We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memoery server is spinned up. If you are using `vitest` please add `"globalSetup": "node_modules/@adaptivestone/framework/tests/globalSetupVitest"` to your vitest config.
+- **[BREAKING]** We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memory server is spinned up. If you are using `vitest` please add `"globalSetup": "node_modules/@adaptivestone/framework/tests/globalSetupVitest"` to your vitest config.
 
 ---
 

@@ -20,7 +20,7 @@ describe('getUserByToken middleware methods', () => {
     const middleware = new GetUserByToken(appInstance);
     const params = middleware.usedAuthParameters;
 
-    expect(params).toHaveLength(1);
+    expect(params).toHaveLength(2);
     expect(params[0].name).toBe('Authorization');
   });
 
@@ -138,6 +138,33 @@ describe('getUserByToken middleware methods', () => {
       },
       body: {},
       get: () => defaultAuthToken,
+    };
+
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
+
+    expect(isCalled).toBeTruthy();
+    expect(req.appInfo.user).toBeDefined();
+  });
+
+  it('should getuser with a Bearer token in header', async () => {
+    expect.assertions(2);
+
+    const middleware = new GetUserByToken(appInstance);
+    let isCalled = false;
+    const nextFunction = () => {
+      isCalled = true;
+    };
+    const req = {
+      appInfo: {
+        user: undefined,
+      },
+      body: {},
+      get: (name: string) =>
+        name === 'Authorization' ? `Bearer ${defaultAuthToken}` : undefined,
     };
 
     await middleware.middleware(
