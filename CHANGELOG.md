@@ -53,6 +53,12 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 
 ---
+## [5.0.0-beta.44]  NEXT
+
+- **[NEW]** Logout method
+
+
+---
 ## [5.0.0-beta.43] 
 
 - **[FIX]** Fix typo in peerDeps
