@@ -48,8 +48,14 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Minimum node version is 20.12 as for now (`process.loadEnvFile`).
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
+- **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
 
+
+---
+## [5.0.0-beta.42] 
+
+- **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 
 ---
 ## [5.0.0-beta.41] 

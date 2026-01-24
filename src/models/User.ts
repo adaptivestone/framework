@@ -213,7 +213,10 @@ class User extends BaseModel {
         if (!this.sessionTokens) {
           this.sessionTokens = [];
         }
-        this.sessionTokens.push({ token, valid: timestamp });
+        this.sessionTokens.push({
+          token,
+          valid: timestamp,
+        } as (typeof this.sessionTokens)[number]);
         await this.save();
         return { token, valid: timestamp };
       },
@@ -331,7 +334,7 @@ export const userHelpers = {
     userMongoose.verificationTokens.push({
       until: date,
       token,
-    });
+    } as (typeof userMongoose.verificationTokens)[number]);
     await userMongoose.save();
     return { token, until: date.getTime() };
   },
@@ -357,7 +360,7 @@ export const userHelpers = {
       userMongoose.passwordRecoveryTokens.push({
         until: date,
         token,
-      });
+      } as (typeof userMongoose.passwordRecoveryTokens)[number]);
       await userMongoose.save();
       return { token, until: date.getTime() };
     },

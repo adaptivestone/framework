@@ -70,7 +70,7 @@ export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
         >
     >, //TRawDocType
     VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
-      ExtractProperty<T, 'modelInstanceMethods'>, // TVirtuals & TInstanceMethods
+      ExtractProperty<T, 'modelInstanceMethods'> & { id: string }, // TVirtuals & TInstanceMethods
     object, // TQueryHelpers
     ExtractProperty<T, 'modelVirtuals'> // TVirtuals
   >,

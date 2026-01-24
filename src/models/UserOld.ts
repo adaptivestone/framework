@@ -34,6 +34,7 @@ interface IUser {
   isVerified: boolean;
   locale: string;
   languages: string[];
+  id?: string;
 }
 
 interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {

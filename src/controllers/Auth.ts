@@ -104,6 +104,13 @@ class Auth extends AbstractController {
   async postRegister(
     req: FrameworkRequest & {
       appInfo: {
+        request: {
+          email: string;
+          password: string;
+          firstName?: string;
+          lastName?: string;
+          nickName?: string;
+        };
         i18n: {
           t: TFunction;
           language: string;
@@ -185,6 +192,9 @@ class Auth extends AbstractController {
   async sendPasswordRecoveryEmail(
     req: FrameworkRequest & {
       appInfo: {
+        request: {
+          email: string;
+        };
         i18n: {
           t: TFunction;
           language: string;
@@ -213,10 +223,20 @@ class Auth extends AbstractController {
     }
   }
 
-  async recoverPassword(req: FrameworkRequest, res: Response) {
+  async recoverPassword(
+    req: FrameworkRequest & {
+      appInfo: {
+        request: {
+          passwordRecoveryToken: string;
+          password: string;
+        };
+      };
+    },
+    res: Response,
+  ) {
     const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByPasswordRecoveryToken(
-      req.appInfo.request.passwordRecoveryToken as string,
+      req.appInfo.request.passwordRecoveryToken,
     ).catch((e: Error) => {
       this.logger?.error(e);
     });
@@ -229,7 +249,7 @@ class Auth extends AbstractController {
 
     this.logger?.debug(`Password recovery user is :${user}`);
 
-    user.password = req.appInfo.request.password as string;
+    user.password = req.appInfo.request.password;
     user.isVerified = true;
     await user.save();
     return res.status(200).json();
@@ -238,6 +258,9 @@ class Auth extends AbstractController {
   async sendVerification(
     req: FrameworkRequest & {
       appInfo: {
+        request: {
+          email: string;
+        };
         i18n: {
           t: TFunction;
           language: string;
@@ -247,7 +270,7 @@ class Auth extends AbstractController {
     res: Response,
   ) {
     const User = this.app.getModel('User') as unknown as TUser;
-    const user = await User.getUserByEmail(req.appInfo.request.email as string);
+    const user = await User.getUserByEmail(req.appInfo.request.email);
     if (!user) {
       return res
         .status(400)
