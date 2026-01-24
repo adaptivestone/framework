@@ -160,9 +160,20 @@ class Auth extends AbstractController {
     return res.status(201).json();
   }
 
-  async postLogout(_req: FrameworkRequest, res: Response) {
-    // todo remove token
-    return res.status(200).json();
+  async postLogout(
+    req: FrameworkRequest & { appInfo: { user: { _id: string } } },
+    res: Response,
+  ) {
+    const user = req.appInfo.user;
+    if (user) {
+      const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      const UserModel = this.app.getModel('User') as unknown as TUser;
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $pull: { sessionTokens: { token } } },
+      );
+    }
+    return res.status(200).json({ message: 'Ok' });
   }
 
   async verifyUser(req: FrameworkRequest, res: Response) {
