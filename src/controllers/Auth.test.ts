@@ -425,6 +425,62 @@ describe('auth', () => {
     expect(status).toBe(400);
   });
 
+  describe('logout', () => {
+    it('can logout', async () => {
+      expect.assertions(3);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+
+      // 1. Create and verify user
+      await UserModel.create({
+        email: 'logout@test.com',
+        password: 'password123',
+        name: { nick: 'logoutNick' },
+        isVerified: true,
+      });
+
+      // 2. Login to get token
+      const loginResponse = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({
+          email: 'logout@test.com',
+          password: 'password123',
+        }),
+      });
+      const loginData = await loginResponse.json();
+      const token = loginData.data.token.token;
+
+      // 3. Verify token in DB
+      let userInDb = await UserModel.findOne({ email: 'logout@test.com' });
+      const hasToken = userInDb?.sessionTokens?.some((t) => t.token === token);
+      expect(hasToken).toBeTruthy();
+
+      // 4. Logout
+      const logoutResponse = await fetch(getTestServerURL('/auth/logout'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      expect(logoutResponse.status).toBe(200);
+
+      // 5. Verify token removed
+      userInDb = await UserModel.findOne({ email: 'logout@test.com' });
+      const hasTokenAfter = userInDb?.sessionTokens?.some(
+        (t) => t.token === token,
+      );
+      expect(hasTokenAfter).toBeFalsy();
+    });
+
+    it('can logout without token', async () => {
+      expect.assertions(1);
+      const response = await fetch(getTestServerURL('/auth/logout'), {
+        method: 'POST',
+      });
+      expect(response.status).toBe(200);
+    });
+  });
+
   describe('rate limiter', () => {
     it('should receive 429 on rate limit exceeded', async () => {
       expect.assertions(1);
