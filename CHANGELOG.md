@@ -53,6 +53,12 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 
 ---
+## [5.0.0-beta.43] 
+
+- **[FIX]** Fix typo in peerDeps
+
+
+---
 ## [5.0.0-beta.42] 
 
 - **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
