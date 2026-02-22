@@ -196,12 +196,17 @@ class User extends BaseModel {
 
   static get modelInstanceMethods() {
     type UserInstanceType = InstanceType<UserModelLite>;
+
     return {
       /**
        * Generate token for user
        * @returns {Object}
        */
-      generateToken: async function (this: UserInstanceType) {
+      generateToken: async function (this: {
+        email?: string | null;
+        sessionTokens?: { token?: string | null; valid?: Date | null }[] | null;
+        save: () => Promise<unknown>;
+      }) {
         const timestamp = new Date();
         timestamp.setDate(timestamp.getDate() + 30);
         if (!this.email) {
