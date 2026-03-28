@@ -94,7 +94,7 @@ class Lock extends BaseModel {
        */
       getLockData: async function (this: LockModelLite, name: string) {
         const res = await this.findOne({ _id: name });
-        if (!res || !res.expiredAt) {
+        if (!res?.expiredAt) {
           return { ttl: 0 };
         }
         return { ttl: res.expiredAt.getTime() - Date.now() };

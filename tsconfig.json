@@ -14,7 +14,8 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": ["src/**/*.test.js", "src/**/*.test.ts"]
