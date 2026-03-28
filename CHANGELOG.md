@@ -56,7 +56,8 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [5.0.0-beta.44]  NEXT
 
 - **[NEW]** Logout method
-- **[Update]** ser model typing
+- **[Update]** set model typing
+- **[BREAKING]** rate-limiter-flexible v9->v10
 
 ---
 ## [5.0.0-beta.43] 

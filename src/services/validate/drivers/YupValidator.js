@@ -63,7 +63,7 @@ class YupValidator extends AbstractValidator {
       );
 
       const errorAnswer = {};
-      if (!e.inner || !e.inner.length) {
+      if (!e.inner?.length) {
         errorAnswer[e.path] = errors;
       } else {
         e.inner.forEach((err) => {

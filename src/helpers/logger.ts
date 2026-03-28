@@ -23,4 +23,4 @@ const consoleLogger = (level: LogLevel, message: string) => {
   }
 };
 
-export { levels, consoleLogger };
+export { consoleLogger, levels };
