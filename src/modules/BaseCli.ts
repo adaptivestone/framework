@@ -189,6 +189,7 @@ class Cli extends Base {
 
     const result = await c.run().catch((e: { stack: unknown }) => {
       this.logger?.error(e.stack);
+      return undefined;
     });
 
     return result;

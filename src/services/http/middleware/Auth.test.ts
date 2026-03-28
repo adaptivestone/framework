@@ -1,6 +1,11 @@
+import type { Response } from 'express';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
 import Auth from './Auth.ts';
+import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+
+type AuthRequest = FrameworkRequest & GetUserByTokenAppInfo;
 
 describe('atuh middleware methods', () => {
   let middleware: Auth;
@@ -26,7 +31,11 @@ describe('atuh middleware methods', () => {
         user: true,
       },
     };
-    await middleware.middleware(req as any, {} as any, nextFunction);
+    await middleware.middleware(
+      req as unknown as AuthRequest,
+      {} as unknown as Response,
+      nextFunction,
+    );
 
     expect(isCalled).toBeTruthy();
   });
@@ -44,7 +53,7 @@ describe('atuh middleware methods', () => {
       appInfo: {}, // no user
     };
     await middleware.middleware(
-      req as any,
+      req as unknown as AuthRequest,
       {
         status(statusCode: number) {
           status = statusCode;
@@ -54,7 +63,7 @@ describe('atuh middleware methods', () => {
           isSend = true;
           return this;
         },
-      } as any,
+      } as unknown as Response,
       nextFunction,
     );
 

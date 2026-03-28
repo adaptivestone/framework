@@ -44,9 +44,9 @@ class Cache extends Base {
    * @param onNotFound callback that will be executed if value not found on cahce
    * @param storeTime how long we should store value on cache
    */
-  async getSetValue(
+  async getSetValue<T = unknown>(
     keyValue: string,
-    onNotFound: () => Promise<any>,
+    onNotFound: () => Promise<T>,
     storeTime = 60 * 5,
   ) {
     await this.whenReady;
@@ -69,11 +69,12 @@ class Cache extends Base {
       }),
     );
 
-    let result = await this.redisClient.get(key);
-    if (!result) {
+    let parsedResult: T | undefined;
+    const cached = await this.redisClient.get(key);
+    if (!cached) {
       this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
       try {
-        result = await onNotFound();
+        parsedResult = await onNotFound();
       } catch (e) {
         this.logger?.error(`Cache onNotFound for key '${key}' error: ${e}`);
         this.promiseMapping.delete(key);
@@ -83,7 +84,7 @@ class Cache extends Base {
 
       this.redisClient.set(
         key,
-        JSON.stringify(result, (_jsonkey, value) =>
+        JSON.stringify(parsedResult, (_jsonkey, value) =>
           typeof value === 'bigint' ? `${value}n` : value,
         ),
         {
@@ -92,13 +93,13 @@ class Cache extends Base {
       );
     } else {
       this.logger?.verbose(
-        `getSetValueFromCache FROM CACHE key ${key}, value ${result.substring(
+        `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
           0,
           100,
         )}`,
       );
       try {
-        result = JSON.parse(result, (_jsonkey, value) => {
+        parsedResult = JSON.parse(cached, (_jsonkey, value) => {
           if (typeof value === 'string' && /^\d+n$/.test(value)) {
             return BigInt(value.slice(0, value.length - 1));
           }
@@ -111,9 +112,9 @@ class Cache extends Base {
       }
     }
 
-    resolve(result);
+    resolve(parsedResult);
     this.promiseMapping.delete(key);
-    return result;
+    return parsedResult;
   }
 
   /**

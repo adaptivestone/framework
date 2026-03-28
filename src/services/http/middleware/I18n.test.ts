@@ -3,7 +3,7 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import I18n from './I18n.ts';
 
 describe('i18n middleware methods', () => {
-  let middleware: any;
+  let middleware: I18n;
 
   beforeAll(() => {
     middleware = new I18n(appInstance);

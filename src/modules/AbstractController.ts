@@ -16,8 +16,10 @@ type MiddlewareWithParamsTuple = [
 export type TMiddleware = Array<
   typeof AbstractMiddleware | MiddlewareWithParamsTuple
 >;
+// biome-ignore lint/complexity/noBannedTypes: Route handlers are generic callable values from user controllers
+type RouteHandler = Function;
 type RouteObject = {
-  handler: Function;
+  handler: RouteHandler;
   description?: string;
   middleware?: TMiddleware | null;
   request?: (unknown & { fields: unknown }) | null; // fields part of you magic
@@ -26,7 +28,7 @@ type RouteObject = {
 
 export type RouteParams = {
   [method: string]: {
-    [path: string]: RouteObject | Function;
+    [path: string]: RouteObject | RouteHandler;
   };
 };
 
@@ -92,7 +94,7 @@ class AbstractController extends Base {
      *  Register controller middleware
      */
     for (const middleware of middlewaresInfo) {
-      (this.router[middleware.method as keyof IRouter] as Function)(
+      (this.router[middleware.method as keyof IRouter] as RouteHandler)(
         middleware.path,
         new middleware.MiddlewareFunction(
           this.app,
@@ -121,7 +123,7 @@ class AbstractController extends Base {
         if (Object.prototype.toString.call(routeObject) !== '[object Object]') {
           // for support firect pass function instead of object
           routeObject = {
-            handler: routeObject as unknown as Function,
+            handler: routeObject as unknown as RouteHandler,
             request: null,
             query: null,
             middleware: null,
@@ -164,7 +166,9 @@ class AbstractController extends Base {
         //   `Controller '${this.getConstructorName()}' register function '${fnName}'  for method '${verb}' and path '${path}' Full path '${fullPath}'`,
         // );
 
-        let additionalMiddlewares: any;
+        let additionalMiddlewares:
+          | ReturnType<AbstractMiddleware['getMiddleware']>[]
+          | undefined;
 
         if (routeAdditionalMiddlewares.length > 0) {
           additionalMiddlewares = Array.from(
@@ -174,7 +178,7 @@ class AbstractController extends Base {
           );
         }
 
-        (this.router[verb as keyof IRouter] as Function)(
+        (this.router[verb as keyof IRouter] as RouteHandler)(
           path,
           additionalMiddlewares || [],
           async (req: FrameworkRequest, res: Response, next: NextFunction) => {

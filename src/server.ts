@@ -30,7 +30,7 @@ export interface IApp {
   getModel(
     modelName: string,
   ): AbstractModel['mongooseModel'] | false | TBaseModel;
-  runCliCommand(commandName: string): Promise<boolean | void>;
+  runCliCommand(commandName: string): Promise<boolean | undefined>;
   updateConfig(
     configName: string,
     config: Record<string, unknown>,
@@ -473,7 +473,7 @@ class Server {
       ),
     );
     const { transports } = this.app.getConfig('log') as TLogConfig;
-    function IsConstructor(f: Function) {
+    function IsConstructor(f: (...args: never) => unknown) {
       try {
         Reflect.construct(String, [], f);
       } catch {

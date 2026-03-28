@@ -47,7 +47,8 @@ class AbstractMiddleware extends Base {
     _req: FrameworkRequest,
     _res: Response,
     next: NextFunction,
-  ): Promise<void | Response> {
+  ): // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
+  Promise<void | Response> {
     this.logger?.warn('Middleware is not implemented');
     return next();
   }

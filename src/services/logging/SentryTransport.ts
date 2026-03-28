@@ -39,7 +39,7 @@ class SentryTransport extends Transport {
     this.loadSentryTransport(opts);
   }
 
-  private async loadSentryTransport(opts: Transport.TransportStreamOptions) {
+  private async loadSentryTransport(_opts: Transport.TransportStreamOptions) {
     if (this.#initializationAttempted) {
       return;
     }
@@ -54,7 +54,7 @@ class SentryTransport extends Transport {
       this.#sentry = sentry;
 
       console.log('[Framework] Sentry Winston transport loaded successfully');
-    } catch (error) {
+    } catch (_error) {
       // Sentry is not installed - this is fine for a framework
       console.log(
         '[Framework] Sentry Winston transport not available (package not installed)',

@@ -51,14 +51,17 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
 
+---
+## [5.0.0-beta.45]
+- **[BREAKING]** rate-limiter-flexible v9->v10
+- **[BREAKING]** typecript v5->v6
 
 ---
 ## [5.0.0-beta.44]
 
 - **[NEW]** Logout method
 - **[Update]** set model typing
-- **[BREAKING]** rate-limiter-flexible v9->v10
-- **[BREAKING]** typecript v5->v6
+
 
 
 ---
