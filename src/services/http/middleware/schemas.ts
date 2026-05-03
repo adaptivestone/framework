@@ -41,10 +41,14 @@ export function collectMiddlewareSchemas(
 
   const schemas: unknown[] = [];
   for (const mw of [...controllerMiddlewares, ...routeMiddlewares]) {
-    if (lower(mw.method) !== m || lower(mw.fullPath) !== p) continue;
+    if (lower(mw.method) !== m || lower(mw.fullPath) !== p) {
+      continue;
+    }
     const instance = new mw.MiddlewareFunction(app, mw.params);
     const schema = instance.relatedReqParameters?.[prefix];
-    if (schema) schemas.push(schema);
+    if (schema) {
+      schemas.push(schema);
+    }
   }
   return schemas;
 }

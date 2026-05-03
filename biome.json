@@ -18,6 +18,9 @@
       "recommended": true,
       "complexity": {
         "noThisInStatic": "off"
+      },
+      "style": {
+        "useBlockStatements": "error"
       }
     }
   },

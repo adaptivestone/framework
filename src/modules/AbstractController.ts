@@ -335,7 +335,9 @@ class AbstractController extends Base {
       fullPath,
       prefix,
     );
-    if (middlewareSchemas.length === 0) return main;
+    if (middlewareSchemas.length === 0) {
+      return main;
+    }
 
     const middlewareResults = await Promise.all(
       middlewareSchemas.map(

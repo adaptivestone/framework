@@ -138,7 +138,9 @@ describe('ValidateService', () => {
       } finally {
         // Cleanup: remove the driver we just registered
         const idx = ValidateService.drivers.indexOf(customDriver);
-        if (idx >= 0) ValidateService.drivers.splice(idx, 1);
+        if (idx >= 0) {
+          ValidateService.drivers.splice(idx, 1);
+        }
       }
     });
 
@@ -159,7 +161,9 @@ describe('ValidateService', () => {
         ).toBe(lastDriver);
       } finally {
         const idx = ValidateService.drivers.indexOf(lastDriver);
-        if (idx >= 0) ValidateService.drivers.splice(idx, 1);
+        if (idx >= 0) {
+          ValidateService.drivers.splice(idx, 1);
+        }
       }
     });
   });
@@ -177,7 +181,9 @@ describe('ValidateService', () => {
       try {
         await svc.validate({}, i18n);
       } catch (err) {
-        if (err instanceof ValidationError) caught = err;
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
       }
       expect(caught).not.toBeNull();
       expect(caught?.message).toEqual({
@@ -196,7 +202,9 @@ describe('ValidateService', () => {
       try {
         await svc.validate({});
       } catch (err) {
-        if (err instanceof ValidationError) caught = err;
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
       }
       expect(caught?.message).toEqual({
         email: ['auth.emailProvided'],
@@ -218,7 +226,9 @@ describe('ValidateService', () => {
       try {
         await svc.validate({ password: 'short' }, i18n);
       } catch (err) {
-        if (err instanceof ValidationError) caught = err;
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
       }
       expect(caught?.message).toEqual({
         password: ['Password must be at least 8 characters'],
@@ -239,7 +249,9 @@ describe('ValidateService', () => {
       try {
         await svc.validate({ tags: ['ok', 'a', 'longer'] });
       } catch (err) {
-        if (err instanceof ValidationError) caught = err;
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
       }
       // yup serializes the offending element as `tags[1]` in path
       expect(caught?.message).toEqual({
@@ -265,7 +277,9 @@ describe('ValidateService', () => {
       try {
         await svc.validate({ password: 'a' });
       } catch (err) {
-        if (err instanceof ValidationError) caught = err;
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
       }
       // YupDriver runs with abortEarly:false → both errors land on `password`
       expect(caught?.message).toEqual({
@@ -285,7 +299,9 @@ describe('ValidateService', () => {
       try {
         await svc.validate({ age: 12 });
       } catch (err) {
-        if (err instanceof ValidationError) caught = err;
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
       }
       expect(caught?.message).toEqual({
         email: ['emailReq'],

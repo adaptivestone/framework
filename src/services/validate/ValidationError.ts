@@ -85,7 +85,9 @@ export function issuesToPayload(
   const out: Record<string, string[]> = {};
   for (const issue of issues) {
     const path = pathToString(issue.path);
-    if (!out[path]) out[path] = [];
+    if (!out[path]) {
+      out[path] = [];
+    }
     out[path].push(issue.message);
   }
   return out;
