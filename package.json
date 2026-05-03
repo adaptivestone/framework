@@ -46,7 +46,7 @@
     "i18next": "^26.0.1",
     "i18next-fs-backend": "^2.0.0",
     "mongoose": "^9.0.0",
-    "rate-limiter-flexible": "^10.0.1",
+    "rate-limiter-flexible": "^11.0.0",
     "winston": "^3.3.3",
     "winston-transport": "^4.9.0",
     "yup": "^1.0.0"
