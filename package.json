@@ -52,7 +52,7 @@
     "rate-limiter-flexible": "^11.0.0",
     "winston": "^3.3.3",
     "winston-transport": "^4.9.0",
-    "yup": "^1.0.0"
+    "yup": "^1.7.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",
@@ -65,12 +65,14 @@
     "lefthook": "^2.0.0",
     "mongodb-memory-server": "^11.0.0",
     "typescript": "^6.0.0",
-    "vitest": "^4.0.0"
+    "vitest": "^4.0.0",
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
     "@adaptivestone/framework-module-email": "^1.0.0",
     "@sentry/core": "^10.34.0",
-    "@sentry/node": "^10.34.0"
+    "@sentry/node": "^10.34.0",
+    "zod": "^3.24.0 || ^4.0.0"
   },
   "peerDependenciesMeta": {
     "@adaptivestone/framework-module-email": {
@@ -80,6 +82,9 @@
       "optional": true
     },
     "@sentry/node": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   }

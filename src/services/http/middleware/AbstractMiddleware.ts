@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from 'express';
-import { object } from 'yup';
 import Base from '../../../modules/Base.ts';
 import type { IApp } from '../../../server.ts';
+import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
 class AbstractMiddleware extends Base {
@@ -26,14 +26,26 @@ class AbstractMiddleware extends Base {
     return [];
   }
 
-  get relatedQueryParameters() {
-    // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
-    return object().shape({});
+  /**
+   * Optional schema describing query parameters consumed by this middleware.
+   * Override with any Standard Schema-conformant schema (Yup, Zod, Valibot,
+   * ArkType, custom). Default `null` — no schema declared.
+   *
+   * Example:
+   *   get relatedQueryParameters() {
+   *     return yup.object().shape({ page: yup.number(), limit: yup.number() });
+   *   }
+   */
+  get relatedQueryParameters(): StandardSchemaV1 | null {
+    return null;
   }
 
-  get relatedRequestParameters() {
-    // For example  yup.object().shape({page: yup.number().required(),limit: yup.number()})
-    return object().shape({});
+  /**
+   * Optional schema describing request-body parameters consumed by this
+   * middleware. Same shape rules as `relatedQueryParameters`.
+   */
+  get relatedRequestParameters(): StandardSchemaV1 | null {
+    return null;
   }
 
   get relatedReqParameters() {
