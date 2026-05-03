@@ -28,7 +28,7 @@ class Sequence extends BaseModel {
         const sequence = await this.findByIdAndUpdate(
           { _id: forType },
           { $inc: { seq: 1 } },
-          { new: true, upsert: true },
+          { returnDocument: 'after', upsert: true },
         );
         return sequence.seq;
       },
