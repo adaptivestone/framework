@@ -72,13 +72,20 @@ export declare namespace StandardSchemaV1 {
 export interface ValidationIssue {
   readonly message: string;
   readonly path?: ReadonlyArray<PropertyKey | { readonly key: PropertyKey }>;
+  /**
+   * Extra context for message interpolation (e.g., yup populates `min`,
+   * `max`, `length` for those validators). Passed to `t(message, fallback,
+   * params)` when the framework auto-translates so i18n placeholders
+   * like `{{min}}` resolve to actual values.
+   */
+  readonly params?: Record<string, unknown>;
 }
 
 /**
- * Framework-owned validation error contract. The runtime class lands in
- * P1a-runtime — this interface is what handler catch-blocks (and the
- * top-level error boundary) read to surface field-keyed messages back
- * to the client.
+ * Framework-owned validation error contract. The runtime class is in
+ * `./ValidationError.ts`. This interface is what handler catch-blocks
+ * (and the top-level error boundary) read to surface field-keyed
+ * messages back to the client.
  */
 export interface ValidationError extends Error {
   readonly name: 'ValidationError';
@@ -86,22 +93,33 @@ export interface ValidationError extends Error {
 }
 
 /**
- * Legacy custom-validator escape hatch. Mirrors today's
- * `src/services/validate/drivers/CustomValidator.js` shape: a plain
- * object with `validate` (throws on failure) and `cast` (transforms
- * to typed output).
- *
- * Preserved during P1a-runtime so users with `request: { validate, cast }`
- * plain objects don't break on day one. Deprecation timeline TBD.
+ * JSON Schema document. Loose typing; downstream consumers (e.g., an
+ * OpenAPI generator) refine to a stricter shape.
  */
-export interface LegacyCustomValidator<Input = unknown, Output = Input> {
-  readonly validate: (data: Input, ctx: unknown) => unknown | Promise<unknown>;
-  readonly cast: (data: Input, ctx: unknown) => Output | Promise<Output>;
-}
+export type JsonSchema = Record<string, unknown>;
 
 /**
- * The shape accepted as a route's `request` or `query` schema.
- * Standard Schema is canonical; `LegacyCustomValidator` is the
- * temporary escape hatch for existing custom validators.
+ * A pluggable validator driver. The framework dispatches one driver
+ * per route schema; drivers handle vendor-specific quirks (yup's
+ * `stripUnknown` post-process, native JSON Schema export, etc.).
+ *
+ * Built-in drivers live in `./drivers/`. Users register their own via
+ * `ValidateService.register(driver)` to support non-Standard-Schema
+ * validators (raw Joi, custom shapes, ...).
+ *
+ * Concerns:
+ * - Runtime validation + cast    →  `validate`
+ * - JSON Schema for OpenAPI      →  `toJsonSchema?` (optional)
+ * - Compile-time TS types        →  schema-side, not driver — see `StandardSchemaV1.InferOutput`
  */
-export type ValidatorBody = StandardSchemaV1 | LegacyCustomValidator;
+export interface ValidatorDriver {
+  /** Sync dispatch; should be a fast property check. */
+  canHandle(body: unknown): boolean;
+  /** Validate + cast. Returns the cast value on success; throws `ValidationError` on failure. */
+  validate(body: unknown, data: unknown): Promise<unknown>;
+  /** Optional: emit JSON Schema. Returns null when introspection isn't supported. */
+  toJsonSchema?(
+    body: unknown,
+    opts?: { target?: 'openapi-3.0' | 'draft-07' | 'draft-2020-12' },
+  ): JsonSchema | null;
+}

@@ -6,7 +6,8 @@ import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import Auth from '../services/http/middleware/Auth.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
-import ValidateService from '../services/validate/ValidateService.js';
+import { collectMiddlewareSchemas } from '../services/http/middleware/schemas.ts';
+import ValidateService from '../services/validate/ValidateService.ts';
 import Base from './Base.ts';
 
 type MiddlewareWithParamsTuple = [
@@ -182,42 +183,27 @@ class AbstractController extends Base {
           path,
           additionalMiddlewares || [],
           async (req: FrameworkRequest, res: Response, next: NextFunction) => {
-            const requestObj = {
-              query: req.query,
-              body: req.body,
-              appInfo: req.appInfo,
-            };
             try {
-              req.appInfo.request = await new ValidateService(
-                this.app,
+              req.appInfo.request = await this.#validateRouteSlot(
                 routeObject?.request,
-              ).validateReqData(requestObj, {
-                selectedReqData: req.body,
-                additionalMiddlewareFieldsData: {
-                  middlewaresInfo,
-                  routeMiddlewaresReg,
-                  options: {
-                    method: verb,
-                    path: fullPath,
-                    prefix: 'request',
-                  },
-                },
-              });
-              req.appInfo.query = await new ValidateService(
-                this.app,
+                req.body,
+                middlewaresInfo,
+                routeMiddlewaresReg,
+                verb,
+                fullPath,
+                'request',
+                req.appInfo.i18n,
+              );
+              req.appInfo.query = await this.#validateRouteSlot(
                 routeObject?.query,
-              ).validateReqData(requestObj, {
-                selectedReqData: req.query,
-                additionalMiddlewareFieldsData: {
-                  middlewaresInfo,
-                  routeMiddlewaresReg,
-                  options: {
-                    method: verb,
-                    path: fullPath,
-                    prefix: 'query',
-                  },
-                },
-              });
+                req.query,
+                middlewaresInfo,
+                routeMiddlewaresReg,
+                verb,
+                fullPath,
+                'query',
+                req.appInfo.i18n,
+              );
             } catch (err: unknown) {
               return res.status(400).json({
                 errors: err instanceof Error ? err.message : String(err),
@@ -313,6 +299,53 @@ class AbstractController extends Base {
     } else {
       this.app.httpServer.express.use(httpPath, this.router);
     }
+  }
+
+  /**
+   * Validate one slot (`request` from `req.body`, or `query` from `req.query`)
+   * against the route's schema and any schemas declared by attached middlewares.
+   * Per-middleware results are merged into the route's result.
+   *
+   * If `i18n` is provided, validation errors are translated automatically by
+   * `ValidateService.validate` before they propagate back to the controller's
+   * top-level catch.
+   */
+  async #validateRouteSlot(
+    routeSchema: unknown,
+    data: unknown,
+    middlewaresInfo: ReturnType<AbstractController['parseMiddlewares']>,
+    routeMiddlewaresReg: ReturnType<AbstractController['parseMiddlewares']>,
+    method: string,
+    fullPath: string,
+    prefix: 'request' | 'query',
+    i18n?: FrameworkRequest['appInfo']['i18n'],
+  ): Promise<Record<string, unknown>> {
+    const main = routeSchema
+      ? ((await new ValidateService(this.app, routeSchema).validate(
+          data,
+          i18n,
+        )) as Record<string, unknown>)
+      : {};
+
+    const middlewareSchemas = collectMiddlewareSchemas(
+      this.app,
+      middlewaresInfo,
+      routeMiddlewaresReg,
+      method,
+      fullPath,
+      prefix,
+    );
+    if (middlewareSchemas.length === 0) return main;
+
+    const middlewareResults = await Promise.all(
+      middlewareSchemas.map(
+        (schema) =>
+          new ValidateService(this.app, schema).validate(data, i18n) as Promise<
+            Record<string, unknown>
+          >,
+      ),
+    );
+    return Object.assign({}, main, ...middlewareResults);
   }
 
   /**

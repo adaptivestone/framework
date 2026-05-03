@@ -27,6 +27,10 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** Rate limiter middleware - add consumeResult function to allow user middleware as a regular rate limiter
 - **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware 
 - **[NEW]**  Introduce i18nService (ability to user i18n not only inside middleware)
+- **[NEW]** [Standard Schema](https://standardschema.dev/) validation. Yup ≥1.7, Zod, Valibot, ArkType supported.
+- **[NEW]** Pluggable `ValidatorDriver` + `ValidateService.register(driver)` for custom validators.
+- **[NEW]** `StandardSchemaV1.InferOutput<typeof schema>` for compile-time handler types.
+- **[NEW]** Framework-owned `ValidationError` with structured `.issues`. Wire-compatible.
 
 ### Breaking changes (please read carefully)
 
@@ -50,6 +54,11 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 - **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
+- **[BREAKING]** Yup → optional peer dep (was direct dep). Schemas must implement Standard Schema (`~standard`).
+- **[BREAKING]** Legacy `{validate, cast}` plain-object validators removed. Wrap as Standard Schema (~10 lines).
+- **[BREAKING]** Yup `req:` context inside `.test()` / `.when()` removed. Use `this.parent` or move logic to handler.
+- **[BREAKING]** Internal driver classes (`AbstractValidator`, `YupValidator`, `CustomValidator`) removed.
+- **[BREAKING]** `ValidateService` surface trimmed to `{constructor, validate, resolve, register}`. Helpers like `validateReqData` removed.
 
 ---
 ## [5.0.0-beta.45]

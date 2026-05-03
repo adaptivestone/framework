@@ -5,6 +5,7 @@
     "emailProvided": "Email must be provided",
     "nickNameValid": "Nick name is not valid,only a-z,A-Z,0-9",
     "passwordValid": "Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>",
+    "passwordTooShort": "Password must be at least {{min}} characters",
     "emailValid": "Email is not valid",
     "errorUPValid": "User/password not valid",
     "messageSome": "Some server problem. Please try later",

@@ -28,6 +28,26 @@ describe('auth', () => {
       expect(status).toBe(400);
     });
 
+    it('translates i18n keys in validation error response', async () => {
+      expect.assertions(3);
+
+      const response = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(response.status).toBe(400);
+
+      const body = (await response.json()) as {
+        errors: Record<string, string | string[]>;
+      };
+      // Schema declares messages as i18n keys (`auth.emailProvided`,
+      // `auth.passwordProvided`); framework auto-translates via the
+      // request's i18n.t before sending the response.
+      expect(body.errors.email).toEqual(['Email must be provided']);
+      expect(body.errors.password).toEqual(['Password must be provided']);
+    });
+
     it('can create user', async () => {
       expect.assertions(1);
 

@@ -1,5 +1,5 @@
 import Base from '../../modules/Base.ts';
-import ValidateService from '../validate/ValidateService.js';
+import { collectMiddlewareSchemas } from '../http/middleware/schemas.ts';
 
 class DocumentationGenerator extends Base {
   processingFields(fieldsByRoute) {
@@ -50,23 +50,15 @@ class DocumentationGenerator extends Base {
     }, []);
   }
 
-  groupFieldsFromSchemas(schemas) {
-    const result = [];
-    schemas.forEach((schema) => {
-      const convertedSchema = new ValidateService(this.app, schema).validator;
-
-      for (const [key, value] of Object.entries(
-        convertedSchema?.fieldsInJsonFormat,
-      )) {
-        result.push({
-          name: key,
-          type: value.type,
-          required: value.required,
-        });
-      }
-    });
-
-    return result;
+  /**
+   * Map middleware-declared schemas to document field entries.
+   *
+   * TODO: lib-agnostic schema introspection requires `driver.toJsonSchema`
+   * (per-vendor exporters: yup `describe()`, zod `z.toJSONSchema()`,
+   * valibot/arktype native). Stubbed empty until that ships.
+   */
+  groupFieldsFromSchemas(_schemas) {
+    return [];
   }
 
   convertDataToDocumentationElement(
@@ -78,19 +70,23 @@ class DocumentationGenerator extends Base {
     return {
       contollerName: controllerName,
       routesInfo: routesInfo.map((route) => {
-        const middlewareQueryParams = new ValidateService(
+        const middlewareQueryParams = collectMiddlewareSchemas(
           this.app,
-        ).getMiddlewareParams(middlewaresInfo, routeMiddlewaresReg, {
-          method: route.method.toLowerCase(),
-          path: route.fullPath,
-        }).query;
+          middlewaresInfo,
+          routeMiddlewaresReg,
+          route.method.toLowerCase(),
+          route.fullPath,
+          'query',
+        );
 
-        const middlewareRequestParams = new ValidateService(
+        const middlewareRequestParams = collectMiddlewareSchemas(
           this.app,
-        ).getMiddlewareParams(middlewaresInfo, routeMiddlewaresReg, {
-          method: route.method.toLowerCase(),
-          path: route.fullPath,
-        }).request;
+          middlewaresInfo,
+          routeMiddlewaresReg,
+          route.method.toLowerCase(),
+          route.fullPath,
+          'request',
+        );
 
         const queryParams = this.groupFieldsFromSchemas(middlewareQueryParams);
 
