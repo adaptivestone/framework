@@ -1,19 +1,19 @@
 import type { Response } from 'express';
 import { boolean, number, object, string } from 'yup';
-import type { TUser } from '../../models/User.ts';
+import type { TUser } from '../../../models/User.ts';
 import type {
   RouteParams,
   TMiddleware,
-} from '../../modules/AbstractController.ts';
-import AbstractController from '../../modules/AbstractController.ts';
-import type { FrameworkRequest } from '../../services/http/HttpServer.ts';
-import AuthMiddleware from '../../services/http/middleware/Auth.ts';
-import type { GetUserByTokenAppInfo } from '../../services/http/middleware/GetUserByToken.ts';
-import GetUserByToken from '../../services/http/middleware/GetUserByToken.ts';
-import Pagination from '../../services/http/middleware/Pagination.ts';
-import RateLimiter from '../../services/http/middleware/RateLimiter.ts';
-import RoleMiddleware from '../../services/http/middleware/Role.ts';
-import CheckFlag from '../../services/http/middleware/test/CheckFlag.ts';
+} from '../../../modules/AbstractController.ts';
+import AbstractController from '../../../modules/AbstractController.ts';
+import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
+import AuthMiddleware from '../../../services/http/middleware/Auth.ts';
+import type { GetUserByTokenAppInfo } from '../../../services/http/middleware/GetUserByToken.ts';
+import GetUserByToken from '../../../services/http/middleware/GetUserByToken.ts';
+import Pagination from '../../../services/http/middleware/Pagination.ts';
+import RateLimiter from '../../../services/http/middleware/RateLimiter.ts';
+import RoleMiddleware from '../../../services/http/middleware/Role.ts';
+import CheckFlag from '../middleware/CheckFlag.ts';
 
 class SomeController extends AbstractController {
   get routes(): RouteParams {

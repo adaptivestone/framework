@@ -1,6 +1,6 @@
 import type { NextFunction, Response } from 'express';
-import type { FrameworkRequest } from '../../HttpServer.ts';
-import AbstractMiddleware from '../AbstractMiddleware.ts';
+import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
+import AbstractMiddleware from '../../../services/http/middleware/AbstractMiddleware.ts';
 
 class CheckFlag extends AbstractMiddleware {
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {

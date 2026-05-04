@@ -15,7 +15,26 @@ class ControllerManager extends Base {
   }
 
   /**
-   * Load controllers
+   * Register a controller explicitly. Returns the constructed instance.
+   * Routes mount on `app.httpServer.express` immediately via the controller's
+   * constructor; for late registration (after `startServer` finishes) use
+   * `Server.startServer`'s `callbackBefore404` hook.
+   */
+  registerController<T extends typeof AbstractController>(
+    ControllerClass: T,
+    prefix = '',
+  ): InstanceType<T> {
+    const name = ControllerClass.name.toLowerCase();
+    const key = prefix ? `${prefix}/${name}` : name;
+    const instance = new ControllerClass(this.app, prefix) as InstanceType<T>;
+    this.controllers[key] = instance;
+    return instance;
+  }
+
+  /**
+   * Auto-load controllers from the framework's internal folder and the user's
+   * external folder, then register each one. User overrides win when filenames
+   * collide (handled by `getFilesPathWithInheritance`).
    */
   async initControllers() {
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
@@ -43,18 +62,11 @@ class ControllerManager extends Base {
     for (const controller of controllersToLoad) {
       controllers.push(
         import(controller.path).then(({ default: ControllerModule }) => {
-          const contollerName = ControllerModule.name.toLowerCase();
           let prefix = path.dirname(controller.file);
           if (prefix === '.') {
             prefix = '';
           }
-          const controllePath = prefix
-            ? `${prefix}/${contollerName}`
-            : contollerName;
-          this.controllers[controllePath] = new ControllerModule(
-            this.app,
-            prefix,
-          );
+          this.registerController(ControllerModule, prefix);
         }),
       );
     }

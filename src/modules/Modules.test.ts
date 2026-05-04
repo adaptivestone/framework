@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import SomeController from '../controllers/test/SomeController.ts';
 import { appInstance } from '../helpers/appInstance.ts';
+import SomeController from '../tests/fixtures/controllers/SomeController.ts';
 import AbstractController from './AbstractController.ts';
 
 describe('abstract controller methods', () => {

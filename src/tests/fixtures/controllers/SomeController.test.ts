@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { appInstance } from '../../helpers/appInstance.ts';
-import type { TUser } from '../../models/User.ts';
-import { getTestServerURL } from '../../tests/testHelpers.ts';
+import { appInstance } from '../../../helpers/appInstance.ts';
+import type { TUser } from '../../../models/User.ts';
+import { getTestServerURL } from '../../../tests/testHelpers.ts';
 
 describe('middlewares correct works', () => {
   beforeAll(async () => {

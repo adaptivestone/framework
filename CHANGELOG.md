@@ -31,6 +31,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** Pluggable `ValidatorDriver` + `ValidateService.register(driver)` for custom validators.
 - **[NEW]** `StandardSchemaV1.InferOutput<typeof schema>` for compile-time handler types.
 - **[NEW]** Framework-owned `ValidationError` with structured `.issues`. Wire-compatible.
+- **[NEW]** `app.controllerManager.registerController(ControllerClass, prefix?)` for explicit/programmatic controller registration. Auto-loading uses the same entry point internally. Register late via `Server.startServer`'s `callbackBefore404` hook so routes mount before the 404 handler.
 
 ### Breaking changes (please read carefully)
 

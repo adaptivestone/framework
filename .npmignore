@@ -4,8 +4,7 @@
 .editorconfig
 .env
 /cliCommand.ts
-/dist/controllers/test/*
-/dist/services/http/middleware/test/*
+/dist/tests/fixtures/*
 /benchmark/*
 /coverage/*
 /.github/*
