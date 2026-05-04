@@ -60,6 +60,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Internal driver classes (`AbstractValidator`, `YupValidator`, `CustomValidator`) removed.
 - **[BREAKING]** `ValidateService` surface trimmed to `{constructor, validate, resolve, register}`. Helpers like `validateReqData` removed.
 - **[BREAKING]** `AbstractMiddleware.relatedQueryParameters` / `relatedRequestParameters` defaults changed from `yup.object().shape({})` to `null`. Override with any Standard Schema-conformant schema.
+- **[BREAKING]** OpenAPI / documentation generation removed: `framework documentation` and `framework getOpenApiJson` CLI commands, `DocumentationGenerator`, and `app.documentation` field deleted. Output was already partial after Standard Schema migration. Will return in later with per-vendor `toJsonSchema` support.
 
 ---
 ## [5.0.0-beta.45]

@@ -43,7 +43,6 @@ export interface IApp {
   httpServer: null | HttpServer;
   controllerManager: null | ControllerManager;
   frameworkFolder: string;
-  documentation?: unknown[];
   internalFilesCache: AppCache;
 }
 

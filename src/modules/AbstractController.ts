@@ -1,7 +1,6 @@
 import type { IRouter, NextFunction, Response } from 'express';
 import express from 'express';
 import type { IApp } from '../server.ts';
-import DocumentationGenerator from '../services/documentation/DocumentationGenerator.js';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import Auth from '../services/http/middleware/Auth.ts';
@@ -284,21 +283,7 @@ class AbstractController extends Base {
 
     this.logger?.verbose(text.join('\n'));
 
-    /**
-     * Generate documentation
-     */
-    if (!this.app.httpServer) {
-      this.app.documentation?.push(
-        new DocumentationGenerator(this.app).convertDataToDocumentationElement(
-          this.getConstructorName(),
-          routesInfo,
-          middlewaresInfo,
-          routeMiddlewaresReg,
-        ),
-      );
-    } else {
-      this.app.httpServer.express.use(httpPath, this.router);
-    }
+    this.app.httpServer?.express.use(httpPath, this.router);
   }
 
   /**
