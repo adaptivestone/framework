@@ -1,11 +1,18 @@
 import type { Response } from 'express';
-import type { TFunction } from 'i18next';
 import { object, string } from 'yup';
 import type { TUser } from '../models/User.ts';
 import AbstractController from '../modules/AbstractController.ts';
-import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.ts';
+import type {
+  PostLoginRequest,
+  PostLogoutRequest,
+  PostRegisterRequest,
+  RecoverPasswordRequest,
+  SendPasswordRecoveryEmailRequest,
+  SendVerificationRequest,
+  VerifyUserRequest,
+} from './Auth.routes.gen.ts';
 
 type UserInstance = InstanceType<TUser>;
 
@@ -66,17 +73,7 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(
-    req: FrameworkRequest & {
-      appInfo: {
-        request: {
-          email: string;
-          password: string;
-        };
-      };
-    },
-    res: Response,
-  ) {
+  async postLogin(req: PostLoginRequest, res: Response) {
     const User = this.app.getModel('User') as unknown as TUser;
     const userResult = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
@@ -101,27 +98,10 @@ class Auth extends AbstractController {
     return res.status(200).json({ data: { token, user: user.getPublic() } });
   }
 
-  async postRegister(
-    req: FrameworkRequest & {
-      appInfo: {
-        request: {
-          email: string;
-          password: string;
-          firstName?: string;
-          lastName?: string;
-          nickName?: string;
-        };
-        i18n: {
-          t: TFunction;
-          language: string;
-        };
-      };
-    },
-    res: Response,
-  ) {
+  async postRegister(req: PostRegisterRequest, res: Response) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user = (await User.getUserByEmail(
-      req.appInfo.request.email as string,
+      req.appInfo.request.email,
     )) as InstanceType<TUser>;
     if (user) {
       return res
@@ -160,10 +140,7 @@ class Auth extends AbstractController {
     return res.status(201).json();
   }
 
-  async postLogout(
-    req: FrameworkRequest & { appInfo: { user: { _id: string } } },
-    res: Response,
-  ) {
+  async postLogout(req: PostLogoutRequest, res: Response) {
     const user = req.appInfo.user;
     if (user) {
       const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
@@ -176,7 +153,7 @@ class Auth extends AbstractController {
     return res.status(200).json({ message: 'Ok' });
   }
 
-  async verifyUser(req: FrameworkRequest, res: Response) {
+  async verifyUser(req: VerifyUserRequest, res: Response) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user: UserInstance;
     try {
@@ -201,24 +178,12 @@ class Auth extends AbstractController {
   }
 
   async sendPasswordRecoveryEmail(
-    req: FrameworkRequest & {
-      appInfo: {
-        request: {
-          email: string;
-        };
-        i18n: {
-          t: TFunction;
-          language: string;
-        };
-      };
-    },
+    req: SendPasswordRecoveryEmailRequest,
     res: Response,
   ) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     try {
-      const user = await User.getUserByEmail(
-        req.appInfo.request.email as string,
-      );
+      const user = await User.getUserByEmail(req.appInfo.request.email);
       if (!user) {
         return res
           .status(400)
@@ -234,17 +199,7 @@ class Auth extends AbstractController {
     }
   }
 
-  async recoverPassword(
-    req: FrameworkRequest & {
-      appInfo: {
-        request: {
-          passwordRecoveryToken: string;
-          password: string;
-        };
-      };
-    },
-    res: Response,
-  ) {
+  async recoverPassword(req: RecoverPasswordRequest, res: Response) {
     const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByPasswordRecoveryToken(
       req.appInfo.request.passwordRecoveryToken,
@@ -266,20 +221,7 @@ class Auth extends AbstractController {
     return res.status(200).json();
   }
 
-  async sendVerification(
-    req: FrameworkRequest & {
-      appInfo: {
-        request: {
-          email: string;
-        };
-        i18n: {
-          t: TFunction;
-          language: string;
-        };
-      };
-    },
-    res: Response,
-  ) {
+  async sendVerification(req: SendVerificationRequest, res: Response) {
     const User = this.app.getModel('User') as unknown as TUser;
     const user = await User.getUserByEmail(req.appInfo.request.email);
     if (!user) {

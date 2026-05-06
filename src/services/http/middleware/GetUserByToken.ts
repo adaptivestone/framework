@@ -14,6 +14,16 @@ class GetUserByToken extends AbstractMiddleware {
     return 'Grab a token and try to parse the user from it. It user exist will add req.appInfo.user variable';
   }
 
+  /**
+   * Type-only phantom: declares what this middleware contributes to
+   * `req.appInfo`. Codegen reads this to type per-route `Request<M, P>`;
+   * runtime ignores it. The returned object is always `{}` — only the cast
+   * type matters.
+   */
+  static get provides() {
+    return {} as { user?: InstanceType<TUser> };
+  }
+
   get usedAuthParameters() {
     return [
       {

@@ -40,6 +40,8 @@ const getFilesPathWithInheritance = async ({
       notTests &&
       (file.endsWith('.test.js') ||
         file.endsWith('.test.ts') ||
+        file.endsWith('.gen.js') ||
+        file.endsWith('.gen.ts') ||
         file.endsWith('.d.ts'))
     ) {
       return false;
