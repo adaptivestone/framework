@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MalformedPathError, match } from './match.ts';
 import type { HandlerEntry, MiddlewareEntry } from './RouteNode.ts';
-import { createNode } from './RouteNode.ts';
+import { createNode } from './RouteRegistry.ts';
 
 const noop: HandlerEntry['handler'] = async () => {};
 
