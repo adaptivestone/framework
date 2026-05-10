@@ -100,6 +100,19 @@ describe('match — splat segments', () => {
     expect(m?.params).toEqual({ rest: 'v1/users/42' });
   });
 
+  it('captures deeply nested paths under a splat', () => {
+    const root = createNode('');
+    const api = createNode('api');
+    const splat = createNode('*rest');
+    splat.methods = { GET: { handler: noop } };
+    api.splatChild = splat;
+    root.children.set('api', api);
+
+    const deep = '/api/a/b/c/d/e/f/g/h/i/j';
+    const m = match(root, 'GET', deep);
+    expect(m?.params).toEqual({ rest: 'a/b/c/d/e/f/g/h/i/j' });
+  });
+
   it('static and param beat splat', () => {
     const root = createNode('');
     const api = createNode('api');
@@ -251,6 +264,17 @@ describe('match — 405 Method Not Allowed', () => {
     expect(m?.allowedMethods).toEqual(
       expect.arrayContaining(['GET', 'POST', 'HEAD']),
     );
+  });
+
+  it('HEAD on a POST-only route → 405 without HEAD in Allow', () => {
+    const root = createNode('');
+    const users = createNode('users');
+    users.methods = { POST: { handler: noop } };
+    root.children.set('users', users);
+
+    const m = match(root, 'HEAD', '/users');
+    expect(m?.entry).toBeNull();
+    expect(m?.allowedMethods).toEqual(['POST']);
   });
 });
 

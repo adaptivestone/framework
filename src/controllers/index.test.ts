@@ -435,3 +435,45 @@ describe('ControllerManager — combined production-style example', () => {
     ]);
   });
 });
+
+// ─── cross-controller middleware bleed ───────────────────────────────
+
+describe('ControllerManager — cross-controller middleware', () => {
+  // A controller mounted at `/` has its `'/{*splat}'` middleware attached
+  // to the registry root, which means it propagates to every other
+  // controller's routes via tree-walk accumulation. This is consistent
+  // with the prior Express-router behavior and is documented; this test
+  // captures the semantic so future changes don't break it silently.
+  it("a `/`-mounted controller's `/{*splat}` mw propagates to other controllers", () => {
+    class Home extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map([['/{*splat}', [FakeMw as unknown as MiddlewareSpec]]]);
+      }
+      getHttpPath() {
+        return '/';
+      }
+    }
+    class Auth extends AbstractController {
+      get routes() {
+        return { post: { '/login': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map([['/{*splat}', [OtherMw as unknown as MiddlewareSpec]]]);
+      }
+    }
+
+    const { registry, cm } = setup();
+    cm.registerController(Home);
+    cm.registerController(Auth);
+
+    // POST /auth/login walks: root (Home's FakeMw) → /auth (Auth's OtherMw) → /login
+    const m = registry.match('POST', '/auth/login');
+    expect(m?.middlewares.map((mw) => mw.Class.name)).toEqual([
+      'FakeMw',
+      'OtherMw',
+    ]);
+  });
+});

@@ -305,4 +305,58 @@ describe('createExpressAdapter — middleware instance caching', () => {
 
     expect(constructCount).toBe(1);
   });
+
+  it('shares one instance across concurrent requests (no double-construct)', async () => {
+    let constructCount = 0;
+    class CountedMw {
+      readonly _kind = 'mw';
+      constructor() {
+        constructCount += 1;
+      }
+      // biome-ignore lint/suspicious/noExplicitAny: minimal mw shape for test
+      async middleware(_req: any, _res: any, next: any) {
+        // Simulate small async work so several requests overlap.
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        next();
+      }
+    }
+
+    const r = new RouteRegistry();
+    r.root.middlewares.push({
+      // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
+      Class: CountedMw as any,
+      source: { kind: 'package', spec: 't' },
+    });
+    r.registerRoute('GET', '/x', {
+      handler: async (_req, res) => {
+        res.end();
+      },
+    });
+
+    const adapter = createExpressAdapter(r, fakeApp);
+    await Promise.all(
+      Array.from({ length: 10 }, () =>
+        adapter(makeReq('GET', '/x'), makeRes(), vi.fn()),
+      ),
+    );
+
+    expect(constructCount).toBe(1);
+  });
+});
+
+describe('createExpressAdapter — match throws non-MalformedPathError', () => {
+  it('forwards unknown errors to next(err)', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/users', { handler: async () => {} });
+    const explosion = new Error('registry exploded');
+    // biome-ignore lint/suspicious/noExplicitAny: stub for test
+    (r as any).match = () => {
+      throw explosion;
+    };
+
+    const adapter = createExpressAdapter(r, fakeApp);
+    const next = vi.fn();
+    await adapter(makeReq('GET', '/users'), makeRes(), next);
+    expect(next).toHaveBeenCalledWith(explosion);
+  });
 });

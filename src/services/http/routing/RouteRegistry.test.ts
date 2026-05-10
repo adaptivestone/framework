@@ -121,6 +121,25 @@ describe('RouteRegistry — registerSubtree', () => {
     ).toEqual(['AdminAuth']);
   });
 
+  it('ad-hoc registerRoute then registerSubtree on overlapping prefix — subtree mw applies to the prior route', () => {
+    const r = new RouteRegistry();
+    // Ad-hoc registration first — bare route, no middleware.
+    r.registerRoute('GET', '/admin/users', { handler: noop });
+
+    // Subtree mounted at the same prefix later — its middlewares should
+    // apply to the prior ad-hoc route too (mergeNode appends).
+    const adminSub: RouteNode = {
+      segment: '',
+      middlewares: [mw('AdminAuth')],
+      children: new Map(),
+    };
+    r.registerSubtree('/admin', adminSub);
+
+    expect(
+      r.match('GET', '/admin/users')?.middlewares.map((m) => m.Class.name),
+    ).toEqual(['AdminAuth']);
+  });
+
   it('throws on conflicting handler on the same node', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users', { handler: noop });
@@ -234,6 +253,20 @@ describe('RouteRegistry — walk', () => {
     });
     expect(visited).toEqual(
       expect.arrayContaining(['/', '/admin', '/admin/users', '/admin/posts']),
+    );
+  });
+
+  it('descends into paramChild and splatChild', () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/users/:id', { handler: noop });
+    r.registerRoute('GET', '/api/*rest', { handler: noop });
+
+    const visited: string[] = [];
+    r.walk((_node, fullPath) => {
+      visited.push(fullPath);
+    });
+    expect(visited).toEqual(
+      expect.arrayContaining(['/users', '/users/:id', '/api', '/api/*rest']),
     );
   });
 });
