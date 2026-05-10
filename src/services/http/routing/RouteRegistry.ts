@@ -1,20 +1,14 @@
 /**
  * Global route tree. One instance per app, lives on `app.routeRegistry`.
  *
- * Producers (controllers, ad-hoc routes, the project boot hook) register
- * subtrees and global middleware here. Consumers (the runtime adapter,
- * codegen, OpenAPI / MCP emitters) walk it.
+ * Producers (controllers, ad-hoc routes) register subtrees here. Consumers
+ * (the runtime adapter, codegen, OpenAPI / MCP emitters) walk it.
  */
 
-import { type MatchOptions, match } from './match.ts';
-import {
-  type MiddlewareSpec,
-  normalizeMiddleware,
-} from './middlewareNormalization.ts';
+import { match } from './match.ts';
 import type {
   BodyParsingMode,
   FlatRoute,
-  GlobalMiddlewarePosition,
   HandlerEntry,
   HttpMethod,
   MatchResult,
@@ -33,12 +27,6 @@ export function createNode(segment: string): RouteNode {
 
 export class RouteRegistry {
   readonly root: RouteNode = createNode('');
-  private matchOptions: MatchOptions = {};
-
-  /** Update default match behavior (case sensitivity, trailing-slash policy). */
-  setMatchOptions(options: MatchOptions): void {
-    this.matchOptions = { ...this.matchOptions, ...options };
-  }
 
   /**
    * Mount a subtree at a path prefix. Intermediate nodes are created;
@@ -78,29 +66,6 @@ export class RouteRegistry {
     target.methods[method] = entry;
   }
 
-  /**
-   * Append middleware to `root.middlewares`. Accepts shorthand
-   * (`Class` or `[Class, params]`) or canonical `MiddlewareEntry`;
-   * short forms without `source` get a placeholder (globals aren't
-   * codegen targets). `position` takes named anchors, `{ before/after:
-   * 'Name' }`, or `'first'` / `'last'`.
-   */
-  registerGlobalMiddleware(
-    middleware: MiddlewareSpec | MiddlewareEntry,
-    options: {
-      position?: GlobalMiddlewarePosition;
-      source?: MiddlewareEntry['source'];
-    } = {},
-  ): void {
-    const entry = isMiddlewareEntry(middleware)
-      ? middleware
-      : normalizeMiddleware(
-          middleware,
-          options.source ?? { kind: 'package', spec: '<unknown>' },
-        );
-    insertWithPosition(this.root.middlewares, entry, options.position);
-  }
-
   /** Walk depth-first; `fullPath` is the slash-joined path to the node. */
   walk(visitor: (node: RouteNode, fullPath: string) => void): void {
     walkRecursive(this.root, '', visitor);
@@ -118,7 +83,7 @@ export class RouteRegistry {
 
   /** Match a request. See `MatchResult` for return cases (404 / 405 / hit). */
   match(method: string, path: string): MatchResult | null {
-    return match(this.root, method, path, this.matchOptions);
+    return match(this.root, method, path);
   }
 }
 
@@ -292,55 +257,4 @@ function flattenRecursive(
   if (node.splatChild) {
     flattenRecursive(node.splatChild, fullPath, bodyParsing, middlewares, out);
   }
-}
-
-// ─── middleware ──────────────────────────────────────────────────────
-
-/** Type guard: full `MiddlewareEntry` vs shorthand (class or tuple). */
-function isMiddlewareEntry(
-  spec: MiddlewareSpec | MiddlewareEntry,
-): spec is MiddlewareEntry {
-  return (
-    typeof spec === 'object' &&
-    spec !== null &&
-    !Array.isArray(spec) &&
-    'Class' in spec &&
-    'source' in spec
-  );
-}
-
-function insertWithPosition(
-  list: MiddlewareEntry[],
-  middleware: MiddlewareEntry,
-  position: GlobalMiddlewarePosition | undefined,
-): void {
-  if (
-    position === undefined ||
-    position === 'last' ||
-    position === 'after-builtins' ||
-    position === 'before-controllers'
-  ) {
-    list.push(middleware);
-    return;
-  }
-  if (position === 'first' || position === 'before-builtins') {
-    list.unshift(middleware);
-    return;
-  }
-  if (typeof position === 'object') {
-    const targetName = 'before' in position ? position.before : position.after;
-    const idx = list.findIndex((m) => m.Class.name === targetName);
-    if (idx === -1) {
-      throw new Error(
-        `RouteRegistry: useGlobal position references "${targetName}" but no middleware with that class name is registered`,
-      );
-    }
-    if ('before' in position) {
-      list.splice(idx, 0, middleware);
-    } else {
-      list.splice(idx + 1, 0, middleware);
-    }
-    return;
-  }
-  list.push(middleware);
 }

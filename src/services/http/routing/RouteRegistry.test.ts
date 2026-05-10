@@ -63,7 +63,7 @@ describe('RouteRegistry — registerSubtree', () => {
 
   it('accumulates middlewares from root → subtree → leaf', () => {
     const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('Global'));
+    r.root.middlewares.push(mw('Global'));
 
     const subtree: RouteNode = {
       segment: '',
@@ -152,112 +152,6 @@ describe('RouteRegistry — registerSubtree', () => {
   });
 });
 
-describe('RouteRegistry — registerGlobalMiddleware (position)', () => {
-  it('appends by default', () => {
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('A'));
-    r.registerGlobalMiddleware(mw('B'));
-    expect(r.root.middlewares.map((m) => m.Class.name)).toEqual(['A', 'B']);
-  });
-
-  it('"first" prepends', () => {
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('A'));
-    r.registerGlobalMiddleware(mw('B'), { position: 'first' });
-    expect(r.root.middlewares.map((m) => m.Class.name)).toEqual(['B', 'A']);
-  });
-
-  it('"before-builtins" is treated as first', () => {
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('A'));
-    r.registerGlobalMiddleware(mw('Sentry'), { position: 'before-builtins' });
-    expect(r.root.middlewares.map((m) => m.Class.name)).toEqual([
-      'Sentry',
-      'A',
-    ]);
-  });
-
-  it('{ before } inserts before named middleware', () => {
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('A'));
-    r.registerGlobalMiddleware(mw('B'));
-    r.registerGlobalMiddleware(mw('X'), { position: { before: 'B' } });
-    expect(r.root.middlewares.map((m) => m.Class.name)).toEqual([
-      'A',
-      'X',
-      'B',
-    ]);
-  });
-
-  it('{ after } inserts after named middleware', () => {
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('A'));
-    r.registerGlobalMiddleware(mw('B'));
-    r.registerGlobalMiddleware(mw('X'), { position: { after: 'A' } });
-    expect(r.root.middlewares.map((m) => m.Class.name)).toEqual([
-      'A',
-      'X',
-      'B',
-    ]);
-  });
-
-  it('{ before } throws if name not found', () => {
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('A'));
-    expect(() =>
-      r.registerGlobalMiddleware(mw('X'), { position: { before: 'NotThere' } }),
-    ).toThrow(/no middleware with that class name/);
-  });
-
-  it('accepts a class shorthand (no params)', () => {
-    class ShortMw {
-      readonly _kind = 'mw';
-    }
-    const r = new RouteRegistry();
-    // biome-ignore lint/suspicious/noExplicitAny: synthetic class for test
-    r.registerGlobalMiddleware(ShortMw as any, {
-      source: { kind: 'package', spec: 'test' },
-    });
-    expect(r.root.middlewares).toHaveLength(1);
-    expect(r.root.middlewares[0]?.Class).toBe(ShortMw);
-    expect(r.root.middlewares[0]?.params).toBeUndefined();
-  });
-
-  it('accepts a [Class, params] tuple shorthand', () => {
-    class ParamsMw {
-      readonly _kind = 'mw';
-    }
-    const r = new RouteRegistry();
-    r.registerGlobalMiddleware(
-      // biome-ignore lint/suspicious/noExplicitAny: synthetic class for test
-      [ParamsMw as any, { max: 5 }] as const,
-      { source: { kind: 'package', spec: 'test' } },
-    );
-    expect(r.root.middlewares[0]?.Class).toBe(ParamsMw);
-    expect(r.root.middlewares[0]?.params).toEqual({ max: 5 });
-  });
-
-  it('uses placeholder source when short form is registered without source', () => {
-    class NoSourceMw {
-      readonly _kind = 'mw';
-    }
-    const r = new RouteRegistry();
-    // biome-ignore lint/suspicious/noExplicitAny: synthetic class for test
-    r.registerGlobalMiddleware(NoSourceMw as any);
-    expect(r.root.middlewares[0]?.source).toEqual({
-      kind: 'package',
-      spec: '<unknown>',
-    });
-  });
-
-  it('passes through a pre-built MiddlewareEntry unchanged', () => {
-    const r = new RouteRegistry();
-    const entry = mw('PreBuilt');
-    r.registerGlobalMiddleware(entry);
-    expect(r.root.middlewares[0]).toBe(entry);
-  });
-});
-
 describe('RouteRegistry — flatten', () => {
   it('produces one entry per (method, path) leaf', () => {
     const r = new RouteRegistry();
@@ -276,7 +170,7 @@ describe('RouteRegistry — flatten', () => {
 
   it('includes accumulated middlewares per leaf', () => {
     const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('Global'));
+    r.root.middlewares.push(mw('Global'));
 
     const subtree: RouteNode = {
       segment: '',
@@ -344,30 +238,6 @@ describe('RouteRegistry — walk', () => {
   });
 });
 
-describe('RouteRegistry — match options', () => {
-  it('setMatchOptions affects subsequent matches (case sensitivity)', () => {
-    const r = new RouteRegistry();
-    r.registerRoute('GET', '/users', { handler: noop });
-
-    expect(r.match('GET', '/Users')?.entry?.handler).toBe(noop); // insensitive default
-
-    r.setMatchOptions({ caseSensitive: true });
-    expect(r.match('GET', '/Users')).toBeNull();
-    expect(r.match('GET', '/users')?.entry?.handler).toBe(noop);
-  });
-
-  it('setMatchOptions affects subsequent matches (trailing slash)', () => {
-    const r = new RouteRegistry();
-    r.registerRoute('GET', '/users', { handler: noop });
-
-    expect(r.match('GET', '/users/')?.entry?.handler).toBe(noop); // lenient default
-
-    r.setMatchOptions({ strictTrailingSlash: true });
-    expect(r.match('GET', '/users/')).toBeNull();
-    expect(r.match('GET', '/users')?.entry?.handler).toBe(noop);
-  });
-});
-
 describe('RouteRegistry — registerRoute with splat / param syntax', () => {
   it('registers a splat route via registerRoute', () => {
     const r = new RouteRegistry();
@@ -401,8 +271,8 @@ describe('RouteRegistry — registerRoute with splat / param syntax', () => {
 describe('RouteRegistry — subtree composition (the P1b test plan check)', () => {
   it('multi-level walk + middleware accumulation matches the documented order', () => {
     const r = new RouteRegistry();
-    r.registerGlobalMiddleware(mw('GlobalA'));
-    r.registerGlobalMiddleware(mw('GlobalB'));
+    r.root.middlewares.push(mw('GlobalA'));
+    r.root.middlewares.push(mw('GlobalB'));
 
     const adminSubtree: RouteNode = createNode('');
     adminSubtree.middlewares.push(mw('AdminAuth'));

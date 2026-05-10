@@ -78,13 +78,13 @@ class SomeController extends AbstractController {
         },
       },
       put: {
-        // '/putInfo': {
-        //   handler: this.putInfo,
-        //   request: object().shape({
-        //     field: string(),
-        //   }),
-        //   middleware: [[RoleMiddleware, { roles: ['admin'] }]],
-        // },
+        '/putInfo': {
+          handler: this.putInfo,
+          request: object().shape({
+            field: string(),
+          }),
+          middleware: [[RoleMiddleware, { roles: ['admin'] }]],
+        },
       },
     };
   }

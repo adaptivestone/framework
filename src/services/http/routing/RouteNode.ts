@@ -106,13 +106,3 @@ export interface FlatRoute {
   middlewares: MiddlewareEntry[];
   bodyParsing: BodyParsingMode;
 }
-
-/** Position hint for `registerGlobalMiddleware`. */
-export type GlobalMiddlewarePosition =
-  | 'before-builtins'
-  | 'after-builtins'
-  | 'before-controllers'
-  | { before: string }
-  | { after: string }
-  | 'first'
-  | 'last';

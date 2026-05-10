@@ -32,6 +32,9 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** `StandardSchemaV1.InferOutput<typeof schema>` for compile-time handler types.
 - **[NEW]** Framework-owned `ValidationError` with structured `.issues`. Wire-compatible.
 - **[NEW]** `app.controllerManager.registerController(ControllerClass, prefix?)` for explicit/programmatic controller registration. Auto-loading uses the same entry point internally. Register late via `Server.startServer`'s `callbackBefore404` hook so routes mount before the 404 handler.
+- **[NEW]** Per-controller route type generation: `npm run cli generatetypes` now emits `<File>.routes.gen.ts` next to each controller (in addition to `genTypes.d.ts`). Handler signatures use `import type { PostLoginRequest } from './Auth.routes.gen.ts'` instead of hand-written `req: FrameworkRequest & { appInfo: { request: { ... } } }` intersections. Gen files are gitignored — recommend `**/*.routes.gen.ts` in `.gitignore` and `npm run cli generatetypes && tsc --noEmit` in your `check:types` script.
+- **[NEW]** Type contracts in `services/http/types`: `BaseRequestContext`, `BaseAppInfo`, `AppInfoExtensions` (module-augmentation point for app-wide globals), `ProvidesOf<T>`, `UnionAppInfoProvides<MWs>`. Codegen output composes these into per-handler `<MethodName>Request` aliases.
+- **[NEW]** `static get provides()` convention on middlewares — declares what the middleware adds to `req.appInfo` (e.g., `GetUserByToken.provides` returns `{ user?: InstanceType<TUser> }`). Codegen reads this; runtime ignores it. Type-only phantom.
 
 ### Breaking changes (please read carefully)
 
@@ -61,6 +64,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Internal driver classes (`AbstractValidator`, `YupValidator`, `CustomValidator`) removed.
 - **[BREAKING]** `ValidateService` surface trimmed to `{constructor, validate, resolve, register}`. Helpers like `validateReqData` removed.
 - **[BREAKING]** `AbstractMiddleware.relatedQueryParameters` / `relatedRequestParameters` defaults changed from `yup.object().shape({})` to `null`. Override with any Standard Schema-conformant schema.
+- **[BREAKING]** `BaseAppInfo.i18n` is now required (was optional in `FrameworkRequest`). Reflects runtime reality: `I18nMiddleware` is part of `HttpServer`'s default chain. If you removed I18n from your global chain, augment `BaseAppInfo` to relax the field.
 - **[BREAKING]** OpenAPI / documentation generation removed: `framework documentation` and `framework getOpenApiJson` CLI commands, `DocumentationGenerator`, and `app.documentation` field deleted. Output was already partial after Standard Schema migration. Will return in later with per-vendor `toJsonSchema` support.
 
 ---

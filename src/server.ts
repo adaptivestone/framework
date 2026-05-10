@@ -154,8 +154,10 @@ class Server {
     this.app.controllerManager = new ControllerManager(this.app);
 
     await this.app.controllerManager.initControllers();
+    this.app.httpServer.mountAdapter();
     await callbackBefore404();
     this.app.httpServer.add404Page();
+    this.app.httpServer.addErrorHandler();
   }
 
   /**

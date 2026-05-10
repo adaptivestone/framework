@@ -7,8 +7,6 @@ import type {
   Request,
   Response,
 } from 'express';
-// import path from 'node:path';
-// import * as url from 'node:url';
 import express from 'express';
 import type { TFunction } from 'i18next';
 import type ThttpConfig from '../../config/http.ts';
@@ -20,6 +18,8 @@ import IpDetector from './middleware/IpDetector.ts';
 import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
 import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import RequestParserMiddleware from './middleware/RequestParser.ts';
+import { createExpressAdapter } from './routing/ExpressAdapter.ts';
+import { RouteRegistry } from './routing/RouteRegistry.ts';
 
 export interface FrameworkRequest extends Request {
   appInfo: {
@@ -27,16 +27,10 @@ export interface FrameworkRequest extends Request {
     ip?: string | undefined;
     request: Record<string, unknown>;
     query: Record<string, unknown>;
-    // user?: any;
     i18n?: {
       t: TFunction;
       language: string;
     };
-    // pagination?: {
-    //   page: number;
-    //   limit: number;
-    //   skip: number;
-    // };
   };
 }
 
@@ -48,10 +42,13 @@ class HttpServer extends Base {
 
   httpServer: Server;
 
+  routeRegistry: RouteRegistry;
+
   constructor(app: IApp) {
     super(app);
     this.express = express();
     this.express.disable('x-powered-by');
+    this.routeRegistry = new RouteRegistry();
 
     this.express.use(
       new RequestLoggerMiddleware(this.app).getMiddleware() as Handler,
@@ -71,16 +68,6 @@ class HttpServer extends Base {
 
     this.express.use(
       new RequestParserMiddleware(this.app).getMiddleware() as Handler,
-    );
-
-    // As exprress will check numbersof arguments
-    this.express.use(
-      (err: Error, _req: Request, res: Response, _next: NextFunction) => {
-        // error handling
-        console.error(err.stack);
-        // TODO
-        res.status(500).json({ message: 'Something broke!' });
-      },
     );
 
     this.httpServer = http.createServer(this.express);
@@ -105,6 +92,11 @@ class HttpServer extends Base {
     );
   }
 
+  /** Mount the route adapter — single entry to the registry. */
+  mountAdapter() {
+    this.express.use(createExpressAdapter(this.routeRegistry, this.app));
+  }
+
   /**
    * Add handle for 404 error
    */
@@ -113,6 +105,21 @@ class HttpServer extends Base {
       // error handling
       res.status(404).json({ message: '404' });
     });
+  }
+
+  /**
+   * Add the 500 error handler. Express recognises 4-arg middleware as the
+   * error sink, so it must be registered last.
+   */
+  addErrorHandler() {
+    this.express.use(
+      (err: Error, _req: Request, res: Response, _next: NextFunction) => {
+        // error handling
+        console.error(err.stack);
+        // TODO
+        res.status(500).json({ message: 'Something broke!' });
+      },
+    );
   }
 
   static get loggerGroup() {
