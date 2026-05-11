@@ -6,7 +6,6 @@ import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 import type redisConfig from '../config/redis.ts';
 import { clearNamespace } from '../helpers/redis/clearNamespace.ts';
 import Server from '../server.ts';
-import SomeController from './fixtures/controllers/SomeController.ts';
 import { serverInstance, setServerInstance } from './testHelpers.ts';
 
 mongoose.set('autoIndex', false);
@@ -66,9 +65,7 @@ beforeAll(async () => {
   // if (typeof global.testSetup.beforeAll === 'function') {
   //   await global.testSetup.beforeAll();
   // }
-  await server.startServer(async () => {
-    server.app.controllerManager?.registerController(SomeController, 'test');
-  });
+  await server.startServer();
 });
 
 beforeEach(() => {

@@ -2,9 +2,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { TUser } from '../../../models/User.ts';
 import { getTestServerURL } from '../../../tests/testHelpers.ts';
+import SomeController from './SomeController.ts';
 
 describe('middlewares correct works', () => {
   beforeAll(async () => {
+    // Late registration — the adapter reads the registry live on each
+    // request, so adding a controller after `startServer` works as long
+    // as it lands before the test fires its first HTTP request.
+    appInstance.controllerManager?.registerController(SomeController, 'test');
     const User = appInstance.getModel('User') as unknown as TUser;
     await User.create({
       email: 'testUser1@gmail.com',
