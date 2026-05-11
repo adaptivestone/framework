@@ -26,7 +26,6 @@
     "t": "vitest --coverage=false --reporter=default",
     "format": "biome format",
     "format:fix": "biome format --write",
-    "knip": "knip",
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
     "check": "biome check",
