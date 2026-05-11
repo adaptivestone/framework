@@ -15,20 +15,16 @@ import type {
   MiddlewareEntry,
   RouteNode,
 } from '../services/http/routing/RouteNode.ts';
+import { HTTP_METHODS } from '../services/http/routing/RouteNode.ts';
 import { createNode } from '../services/http/routing/RouteRegistry.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import ValidateService from '../services/validate/ValidateService.ts';
 
-const HTTP_METHODS: ReadonlySet<string> = new Set([
-  'GET',
-  'POST',
-  'PUT',
-  'PATCH',
-  'DELETE',
-  'HEAD',
-  'OPTIONS',
-  'ALL',
-]);
+/** HTTP methods valid in a controller's `routes` getter (no `'ALL'`). */
+const ROUTE_HTTP_METHODS: ReadonlySet<string> = new Set(HTTP_METHODS);
+
+/** HTTP methods plus the `'ALL'` pseudo-verb for middleware-Map scope keys. */
+const MAP_KEY_METHODS: ReadonlySet<string> = new Set([...HTTP_METHODS, 'ALL']);
 
 /**
  * Class does autoloading a http controllers
@@ -50,6 +46,7 @@ class ControllerManager extends Base {
   registerController<T extends typeof AbstractController>(
     ControllerClass: T,
     prefix = '',
+    options: { skipWrap?: boolean } = {},
   ): InstanceType<T> {
     const name = ControllerClass.name.toLowerCase();
     const key = prefix ? `${prefix}/${name}` : name;
@@ -69,7 +66,14 @@ class ControllerManager extends Base {
       spec: `<${ControllerClass.name}>`,
     };
     const subtree = this.#buildSubtree(instance, source);
-    this.#wrapHandlersInSubtree(subtree, []);
+    // `skipWrap` is the codegen escape hatch — we only need the tree
+    // structure to emit types, not the runtime validation wrappers.
+    // Wrapping instantiates every middleware in every handler's chain
+    // to read schemas, which side-effects (Redis clients, timers, etc.)
+    // and keeps the event loop open for codegen-only runs.
+    if (!options.skipWrap) {
+      this.#wrapHandlersInSubtree(subtree, []);
+    }
     registry.registerSubtree(instance.getHttpPath(), subtree);
     return instance;
   }
@@ -78,8 +82,13 @@ class ControllerManager extends Base {
    * Auto-load controllers from the framework's internal folder and the user's
    * external folder, then register each one. User overrides win when filenames
    * collide (handled by `getFilesPathWithInheritance`).
+   *
+   * `options.skipWrap` (codegen-only): build the registry tree without
+   * wrapping handlers with validation. Skips middleware instantiation —
+   * which avoids side effects (Redis clients, timers) in introspection
+   * commands like `generatetypes`.
    */
-  async initControllers() {
+  async initControllers(options: { skipWrap?: boolean } = {}) {
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const controllersToLoad = await this.getFilesPathWithInheritance(
       dirname,
@@ -109,7 +118,7 @@ class ControllerManager extends Base {
           if (prefix === '.') {
             prefix = '';
           }
-          this.registerController(ControllerModule, prefix);
+          this.registerController(ControllerModule, prefix, options);
         }),
       );
     }
@@ -128,6 +137,7 @@ class ControllerManager extends Base {
     source: MiddlewareEntry['source'],
   ): RouteNode {
     const subtree = createNode('');
+    const ctrlName = controller.constructor.name;
 
     // 1. Routes first — handlers placed in the tree before middleware
     //    attachments look for them.
@@ -139,14 +149,34 @@ class ControllerManager extends Base {
         if (!routeMap || typeof routeMap !== 'object') {
           continue;
         }
+        const upperVerb = verb.toUpperCase();
+        if (!ROUTE_HTTP_METHODS.has(upperVerb)) {
+          this.logger?.warn(
+            `Controller ${ctrlName}: unknown verb '${verb}' in routes getter (expected one of: ${[...ROUTE_HTTP_METHODS].join(', ').toLowerCase()}). Routes under this verb will never match.`,
+          );
+          continue;
+        }
         for (const [pathKey, routeSpec] of Object.entries(routeMap)) {
           const entry = buildHandlerEntry(routeSpec, controller, source);
           if (!entry) {
+            // Object spec but no callable `handler` field — a common
+            // misconfiguration (e.g., `{ request: schema }` without a
+            // handler). Warn and skip; the old framework also rejected
+            // these with a 500 at request time.
+            if (
+              routeSpec !== null &&
+              typeof routeSpec === 'object' &&
+              typeof (routeSpec as { handler?: unknown }).handler !== 'function'
+            ) {
+              this.logger?.warn(
+                `Controller ${ctrlName}: route ${upperVerb} ${pathKey} has no \`handler\` function. Skipping.`,
+              );
+            }
             continue;
           }
           attachHandler(
             subtree,
-            verb.toUpperCase() as HttpMethod,
+            upperVerb as HttpMethod,
             convertPathSyntax(pathKey),
             entry,
           );
@@ -163,15 +193,26 @@ class ControllerManager extends Base {
     const mwMap = ControllerClass.middleware;
     if (mwMap instanceof Map) {
       for (const [scopeKey, mwList] of mwMap) {
+        if (typeof scopeKey !== 'string') {
+          this.logger?.warn(
+            `Controller ${ctrlName}: middleware Map key is not a string (got ${typeof scopeKey}). Skipping.`,
+          );
+          continue;
+        }
         if (!Array.isArray(mwList) || mwList.length === 0) {
           continue;
         }
-        const { method, path: scopePath } = parseScopeKey(scopeKey);
+        const parsed = parseScopeKey(scopeKey);
+        if (parsed.unknownMethod) {
+          this.logger?.warn(
+            `Controller ${ctrlName}: middleware Map key '${scopeKey}' has unknown method prefix '${parsed.unknownMethod}'. Treating the whole key as a path. Expected method prefix is one of: ${[...MAP_KEY_METHODS].join(', ')}.`,
+          );
+        }
         const entries = normalizeMiddlewares(mwList, source);
         attachMiddlewares(
           subtree,
-          method,
-          convertPathSyntax(scopePath),
+          parsed.method,
+          convertPathSyntax(parsed.path),
           entries,
         );
       }
@@ -299,10 +340,17 @@ class ControllerManager extends Base {
 
 // ─── translation helpers (file-local) ────────────────────────────────
 
-/** `'POST/login'` → method=POST,path=/login · `'/login'` → method=ALL,path=/login */
+/**
+ * `'POST/login'` → method=POST,path=/login · `'/login'` → method=ALL,path=/login
+ *
+ * When the key looks like `METHOD/path` but the method isn't recognized
+ * (likely a typo, e.g., `'PATC/login'`), returns `unknownMethod` so the
+ * caller can warn instead of silently treating the whole key as a path.
+ */
 function parseScopeKey(key: string): {
   method: HttpMethod | 'ALL';
   path: string;
+  unknownMethod?: string;
 } {
   if (key.startsWith('/')) {
     return { method: 'ALL', path: key };
@@ -312,13 +360,13 @@ function parseScopeKey(key: string): {
     return { method: 'ALL', path: `/${key}` };
   }
   const candidate = key.slice(0, slashIdx).toUpperCase();
-  if (HTTP_METHODS.has(candidate)) {
+  if (MAP_KEY_METHODS.has(candidate)) {
     return {
       method: candidate as HttpMethod | 'ALL',
       path: key.slice(slashIdx),
     };
   }
-  return { method: 'ALL', path: `/${key}` };
+  return { method: 'ALL', path: `/${key}`, unknownMethod: candidate };
 }
 
 /** `{*splat}` → `*splat`. Other syntax stays as-is. */

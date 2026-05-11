@@ -9,15 +9,21 @@
 import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 
-/** HTTP methods, upper-case. */
-export type HttpMethod =
-  | 'GET'
-  | 'POST'
-  | 'PUT'
-  | 'PATCH'
-  | 'DELETE'
-  | 'HEAD'
-  | 'OPTIONS';
+/**
+ * HTTP methods, upper-case. Single source of truth for the framework;
+ * the runtime const + the `HttpMethod` type derive from this one array.
+ */
+export const HTTP_METHODS = [
+  'GET',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'HEAD',
+  'OPTIONS',
+] as const;
+
+export type HttpMethod = (typeof HTTP_METHODS)[number];
 
 /**
  * Body parsing mode per route.

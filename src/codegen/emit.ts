@@ -41,40 +41,74 @@ export async function emitGenFile(input: EmitInput): Promise<string> {
   const source = await fs.readFile(srcPath, 'utf8');
   const importMap = parseImports(source);
 
-  const uniqueMiddlewares = collectUniqueMiddlewares(chains);
+  // Drop chain entries whose middleware isn't imported by the controller
+  // file. Cross-controller propagation (e.g., a `/`-mounted controller
+  // pushing its `'/{*splat}'` middleware onto every other controller's
+  // chain) is the common case — the receiving controller doesn't import
+  // the propagating middleware. The runtime still runs them; the gen
+  // file just can't type them. v5.1 will thread `MiddlewareEntry.source`
+  // through so codegen can synthesize the import path itself.
+  const filteredChains = chains.map((chain) =>
+    chain.filter((mw) => importMap.has(mw.className)),
+  );
+  const uniqueMiddlewares = collectUniqueMiddlewares(filteredChains);
 
   const frameworkRoot = findFrameworkSrcRoot(srcPath);
   const ctrlDir = path.dirname(srcPath);
+  const isFrameworkOwnController = srcPath.startsWith(
+    `${frameworkRoot}${path.sep}`,
+  );
   const relFromCtrl = (target: string) => relativeImport(ctrlDir, target);
 
-  const typesPath = relFromCtrl(
-    path.join(frameworkRoot, 'services/http/types.ts'),
-  );
-  const validateTypesPath = relFromCtrl(
-    path.join(frameworkRoot, 'services/validate/types.ts'),
-  );
+  // Framework's own controllers (during framework dev / build) use
+  // relative imports because the framework references itself by relative
+  // path. External consumers' controllers use bare package specifiers
+  // so the gen file resolves through node_modules (or npm-linked
+  // framework) regardless of where in the consumer's tree it lives.
+  const typesPath = isFrameworkOwnController
+    ? relFromCtrl(path.join(frameworkRoot, 'services/http/types.ts'))
+    : '@adaptivestone/framework/services/http/types.js';
+  const validateTypesPath = isFrameworkOwnController
+    ? relFromCtrl(path.join(frameworkRoot, 'services/validate/types.ts'))
+    : '@adaptivestone/framework/services/validate/types.js';
   const ctrlBaseName = path.basename(srcPath, '.ts');
   const ctrlImportPath = `./${ctrlBaseName}.ts`;
 
   const middlewareImports = uniqueMiddlewares
-    .map((mw) => {
-      const importPath = importMap.get(mw);
-      if (!importPath) {
-        throw new Error(
-          `emit: middleware '${mw}' not found in imports of ${srcPath}. ` +
-            `Add an import for it in the controller, or codegen will not be able to type the chain.`,
-        );
-      }
-      return `import type ${mw} from '${importPath}';`;
-    })
+    .map((mw) => `import type ${mw} from '${importMap.get(mw)}';`)
     .sort();
 
   const routesAlias = `${controller.className}Routes`;
   const anyRouteHasSchema = controller.routes.some((r) => r.hasSchema);
 
-  const handlerBlocks = controller.routes
-    .map((route, i) => renderHandlerType(route, chains[i] ?? [], routesAlias))
-    .filter((block) => block !== null);
+  // Group routes by handler name so a method serving multiple routes
+  // (e.g., both POST and GET wired to the same `getContainers`) emits
+  // a single union alias instead of duplicate identifiers.
+  const groupedByHandler = new Map<
+    string,
+    { route: RouteMeta; chain: MiddlewareRef[] }[]
+  >();
+  for (let i = 0; i < controller.routes.length; i++) {
+    const route = controller.routes[i];
+    if (!route?.handlerName) {
+      continue;
+    }
+    const existing = groupedByHandler.get(route.handlerName);
+    const entry = { route, chain: filteredChains[i] ?? [] };
+    if (existing) {
+      existing.push(entry);
+    } else {
+      groupedByHandler.set(route.handlerName, [entry]);
+    }
+  }
+
+  const handlerBlocks: string[] = [];
+  for (const [, group] of groupedByHandler) {
+    const block = renderHandlerGroup(group, routesAlias);
+    if (block !== null) {
+      handlerBlocks.push(block);
+    }
+  }
 
   const importLines: string[] = [];
   importLines.push(...middlewareImports);
@@ -112,22 +146,47 @@ export async function emitGenFile(input: EmitInput): Promise<string> {
 }
 
 /**
- * Build the per-handler `<MethodName>Request` type for one route.
+ * Build the `<MethodName>Request` alias for a group of routes sharing
+ * the same handler method. When the group has one route, emits a single
+ * shape. When the group has 2+ routes (one method, multiple verbs/paths),
+ * emits a union — narrow with `req.method` inside the handler.
  *
  * Output is intentionally single-line for the union/schema generics —
  * gen files are gitignored, so biome skips them (`vcs.useIgnoreFile`),
  * and TS doesn't care about line length. No formatter post-step needed.
  */
-function renderHandlerType(
+function renderHandlerGroup(
+  group: { route: RouteMeta; chain: MiddlewareRef[] }[],
+  routesAlias: string,
+): string | null {
+  if (group.length === 0 || !group[0]?.route.handlerName) {
+    return null;
+  }
+  const handlerName = group[0].route.handlerName;
+  const typeName = `${pascalCase(handlerName)}Request`;
+
+  const docComment = group
+    .map(({ route }) => `\`${route.method.toUpperCase()} ${route.path}\``)
+    .join(', ');
+  const shapes = group.map(({ route, chain }) =>
+    renderShape(route, chain, routesAlias),
+  );
+
+  if (shapes.length === 1) {
+    return `/** Request type for ${docComment} (handler: \`${handlerName}\`). */
+export type ${typeName} = ${shapes[0]};`;
+  }
+  return `/** Request type for ${docComment} (handler: \`${handlerName}\`). */
+export type ${typeName} =
+  | ${shapes.join('\n  | ')};`;
+}
+
+/** Render the BaseRequestContext intersection for one route. */
+function renderShape(
   route: RouteMeta,
   chain: MiddlewareRef[],
   routesAlias: string,
-): string | null {
-  if (!route.handlerName) {
-    return null;
-  }
-  const typeName = `${pascalCase(route.handlerName)}Request`;
-
+): string {
   const tupleInner =
     chain.length === 0
       ? 'readonly []'
@@ -137,10 +196,7 @@ function renderHandlerType(
     ? ` & { request: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['request']> }`
     : '';
 
-  return `/** Request type for \`${route.method.toUpperCase()} ${route.path}\` (handler: \`${route.handlerName}\`). */
-export type ${typeName} = BaseRequestContext & {
-  appInfo: UnionAppInfoProvides<${tupleInner}>${requestOverride};
-};`;
+  return `BaseRequestContext & { appInfo: UnionAppInfoProvides<${tupleInner}>${requestOverride} }`;
 }
 
 function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {

@@ -37,8 +37,7 @@ export async function generateRouteTypes(
   } as any;
 
   const cm = new ControllerManager(app);
-  await cm.initControllers();
-
+  await cm.initControllers({ skipWrap: true });
   const flatByKey = indexFlatRoutes(registry.flatten());
 
   const controllers = Object.values(cm.controllers);
@@ -49,8 +48,8 @@ export async function generateRouteTypes(
     const meta = extractControllerMeta(controller);
     const srcPath = await resolveControllerSourcePath(app, meta);
     if (!srcPath) {
-      logger?.warn?.(
-        `Could not locate source file for ${meta.className} (prefix='${meta.prefix}'); skipping`,
+      logger?.info?.(
+        `Skipping ${meta.className}: no .ts source found in controllers folder.`,
       );
       continue;
     }
@@ -132,7 +131,12 @@ function joinPath(prefix: string, sub: string): string {
 }
 
 /**
- * Find a controller's source file by convention: `<controllers>/<prefix>/<ClassName>.ts`.
+ * Find a controller's source file by convention:
+ * `<controllers>/<prefix>/<ClassName>.ts`. Tries class-name-case and
+ * lowercase variants. Returns `null` when no `.ts` source exists in the
+ * project's controllers folder — covers both legacy `.js` controllers
+ * and controllers loaded from external packages (e.g. the framework's
+ * own `Home.ts` shipped via `node_modules`).
  */
 async function resolveControllerSourcePath(
   app: IApp,

@@ -139,12 +139,16 @@ class Server {
   async startServer(
     callbackBefore404 = async () => Promise.resolve(),
   ): Promise<void> {
-    const [{ default: HttpServer }, { default: ControllerManager }] =
-      await Promise.all([
-        import('./services/http/HttpServer.ts'), // Speed optimisation
-        import('./controllers/index.ts'), // Speed optimisation
-        this.init(),
-      ]);
+    const [
+      { default: HttpServer },
+      { default: ControllerManager },
+      { formatRouteTree },
+    ] = await Promise.all([
+      import('./services/http/HttpServer.ts'), // Speed optimisation
+      import('./controllers/index.ts'), // Speed optimisation
+      import('./services/http/routing/formatTree.ts'),
+      this.init(),
+    ]);
 
     this.addErrorHandling();
 
@@ -158,6 +162,11 @@ class Server {
     await callbackBefore404();
     this.app.httpServer.add404Page();
     this.app.httpServer.addErrorHandler();
+
+    // Boot-time route tree log — walked from the unified registry, so
+    // cross-controller middleware accumulation is visible. Verbose-only:
+    // production filters this out by default via the logger level.
+    this.app.logger.verbose(formatRouteTree(this.app.httpServer.routeRegistry));
   }
 
   /**
@@ -453,6 +462,9 @@ class Server {
     if (!this.#realLogger) {
       console.time('Creating real logger for server. Time');
       this.#realLogger = this.#createLogger();
+      this.app.events.on('shutdown', () => {
+        this.#realLogger?.close();
+      });
       console.timeEnd('Creating real logger for server. Time');
     }
     return this.#realLogger;
