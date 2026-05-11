@@ -16,3 +16,5 @@ vitest.config.ts
 genTypes.d.ts
 biome.json
 lefthook.yml
+.claude/*
+.plans/*
