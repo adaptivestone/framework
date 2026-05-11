@@ -79,7 +79,9 @@ export async function emitGenFile(input: EmitInput): Promise<string> {
     .sort();
 
   const routesAlias = `${controller.className}Routes`;
-  const anyRouteHasSchema = controller.routes.some((r) => r.hasSchema);
+  const anyRouteHasSchema = controller.routes.some(
+    (r) => r.hasSchema || r.hasQuerySchema,
+  );
 
   // Group routes by handler name so a method serving multiple routes
   // (e.g., both POST and GET wired to the same `getContainers`) emits
@@ -168,9 +170,13 @@ function renderHandlerGroup(
   const docComment = group
     .map(({ route }) => `\`${route.method.toUpperCase()} ${route.path}\``)
     .join(', ');
-  const shapes = group.map(({ route, chain }) =>
+  // Dedup identical shapes (same chain + same schemas + same path params)
+  // so multi-route handlers with structurally-equivalent contexts emit one
+  // shape instead of an N-way union of identical branches.
+  const allShapes = group.map(({ route, chain }) =>
     renderShape(route, chain, routesAlias),
   );
+  const shapes = Array.from(new Set(allShapes));
 
   if (shapes.length === 1) {
     return `/** Request type for ${docComment} (handler: \`${handlerName}\`). */
@@ -192,11 +198,48 @@ function renderShape(
       ? 'readonly []'
       : `readonly [${chain.map((m) => `typeof ${m.className}`).join(', ')}]`;
 
-  const requestOverride = route.hasSchema
-    ? ` & { request: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['request']> }`
-    : '';
+  // Path params: `:name` → `name: string`. Splats (`{*name}` user-facing,
+  // `*name` internal) capture multiple segments joined with `/` — still a
+  // string, not an array (see `match.ts`).
+  const pathParams = parsePathParams(route.path);
+  const paramsOverride =
+    pathParams.length > 0
+      ? ` & { params: { ${pathParams.map((p) => `${p}: string`).join('; ')} } }`
+      : '';
 
-  return `BaseRequestContext & { appInfo: UnionAppInfoProvides<${tupleInner}>${requestOverride} }`;
+  // appInfo overrides for body/query when their schema is declared inline
+  // on the route entry.
+  const appInfoOverrides: string[] = [];
+  if (route.hasSchema) {
+    appInfoOverrides.push(
+      `request: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['request']>`,
+    );
+  }
+  if (route.hasQuerySchema) {
+    appInfoOverrides.push(
+      `query: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['query']>`,
+    );
+  }
+  const appInfoOverride =
+    appInfoOverrides.length > 0 ? ` & { ${appInfoOverrides.join('; ')} }` : '';
+
+  return `BaseRequestContext & { appInfo: UnionAppInfoProvides<${tupleInner}>${appInfoOverride} }${paramsOverride}`;
+}
+
+/**
+ * Pull path-param names out of a route path string. Handles `:name` (single
+ * segment) and `{*name}` (splat — author-facing syntax that the registry
+ * normalizes to internal `*name` for matching).
+ */
+function parsePathParams(routePath: string): string[] {
+  const names: string[] = [];
+  for (const match of routePath.matchAll(/:([a-zA-Z_][a-zA-Z0-9_]*)/g)) {
+    names.push(match[1] as string);
+  }
+  for (const match of routePath.matchAll(/\{\*([a-zA-Z_][a-zA-Z0-9_]*)\}/g)) {
+    names.push(match[1] as string);
+  }
+  return names;
 }
 
 function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {

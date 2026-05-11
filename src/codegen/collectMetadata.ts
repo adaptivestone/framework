@@ -25,6 +25,8 @@ export interface RouteMeta {
   handlerName: string | null;
   /** True when the route entry is `{ handler, request }` and `request` is set. */
   hasSchema: boolean;
+  /** True when the route entry is `{ handler, query }` and `query` is set. */
+  hasQuerySchema: boolean;
 }
 
 /** Aggregate metadata for one controller. */
@@ -70,19 +72,31 @@ function extractRouteMeta(
       path,
       handlerName: nameOf(entry),
       hasSchema: false,
+      hasQuerySchema: false,
     };
   }
   if (entry && typeof entry === 'object') {
-    const obj = entry as { handler?: unknown; request?: unknown };
+    const obj = entry as {
+      handler?: unknown;
+      request?: unknown;
+      query?: unknown;
+    };
     return {
       method: verb,
       path,
       handlerName:
         typeof obj.handler === 'function' ? nameOf(obj.handler) : null,
       hasSchema: obj.request != null,
+      hasQuerySchema: obj.query != null,
     };
   }
-  return { method: verb, path, handlerName: null, hasSchema: false };
+  return {
+    method: verb,
+    path,
+    handlerName: null,
+    hasSchema: false,
+    hasQuerySchema: false,
+  };
 }
 
 function nameOf(value: unknown): string | null {
