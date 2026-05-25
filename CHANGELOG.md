@@ -80,6 +80,49 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** `AbstractController` constructor third argument `isExpressMergeParams` removed. The old default Express-router behavior of stripping parent params is gone — all matched params (across the full path, including the controller prefix) are available on `req.params`. If you relied on the merge-params toggle, no action needed in most cases; if you specifically depended on the strip behavior, restructure your handler to filter `req.params` keys.
 
 ---
+## [5.0.0-beta.50]
+
+- **[FIX]** Tree-based router: different HTTP methods at the same param position can now use different `:name` segments. Previously, `PUT /:slug` and `POST /:event` on the same controller would either throw at boot ("conflicting param children") or silently use the first-registered name for all methods (`req.params.event` → `undefined`). Each `HandlerEntry` now carries its own `paramNames` array — the tree is structural only, param naming is per-handler.
+
+---
+## [5.0.0-beta.49]
+
+- **[FIX]** Codegen: fix router name resolution in generated route types.
+- **[UPDATE]** Codegen output improvements.
+
+---
+## [5.0.0-beta.48]
+
+- **[NEW]** Codegen emits route metadata (`methodName`, `controllerClass`, `sourceFile`) on `HandlerEntry.meta`.
+- **[NEW]** `Pagination` middleware declares `static get provides()` — routes with `Pagination` in their chain get `req.appInfo.pagination` typed automatically.
+- **[NEW]** Codegen emits `appInfo.query` from route-level `query:` schemas.
+- **[NEW]** Codegen deduplicates identical union branches.
+
+---
+## [5.0.0-beta.47]
+
+- **[UPDATE]** Tree-based route type generation improvements.
+- **[UPDATE]** Dependencies update.
+
+---
+## [5.0.0-beta.46]
+
+- **[NEW]** Tree-based `RouteRegistry` replaces Express's hidden router internally. One global tree, walkable by codegen / OpenAPI / MCP emitters.
+- **[NEW]** Per-controller route type generation (`npm run gen` emits `<File>.routes.gen.ts`).
+- **[NEW]** Standard Schema validation (Yup ≥1.7, Zod, Valibot, ArkType supported).
+- **[NEW]** Boot-time route tree log at `verbose` level.
+- **[NEW]** Boot-time warnings on misconfigured routes / middleware Maps.
+- **[NEW]** `app.controllerManager.registerController(ControllerClass, prefix?)` for explicit registration.
+- **[FIX]** `setupVitest.ts` no longer imports framework-internal fixtures.
+- **[FIX]** Codegen walks the `extends` chain when resolving middleware import paths.
+- **[BREAKING]** Path-pattern syntax narrowed (no Express 5 optional-param `{:name}` or inline regex).
+- **[BREAKING]** `AbstractController` constructor third argument `isExpressMergeParams` removed.
+- **[BREAKING]** Legacy `{validate, cast}` plain-object validators removed.
+- **[BREAKING]** Yup ≥1.7 required. Schemas must implement Standard Schema.
+- **[BREAKING]** `ValidateService` surface trimmed. Helpers like `validateReqData` removed.
+- **[BREAKING]** OpenAPI / documentation generation removed (will return later).
+
+---
 ## [5.0.0-beta.45]
 - **[BREAKING]** rate-limiter-flexible v9->v10
 - **[BREAKING]** typecript v5->v6

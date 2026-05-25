@@ -72,7 +72,8 @@ export interface HandlerEntry {
  *
  * Specificity is structural: static `children` first, then `paramChild`,
  * then `splatChild`. At most one `paramChild` and one `splatChild` per
- * node — registering a second of either throws.
+ * node. Different HTTP methods may use different param names at the same
+ * position — each handler carries its own `paramNames` array.
  */
 export interface RouteNode {
   segment: string;
