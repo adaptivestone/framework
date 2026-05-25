@@ -162,12 +162,43 @@ describe('RouteRegistry — registerSubtree', () => {
     expect(() => r.registerSubtree('/', conflict)).toThrow();
   });
 
-  it('throws on conflicting param segment names', () => {
+  it('throws on conflicting param segment names (same method)', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users/:id', { handler: noop });
     expect(() =>
       r.registerRoute('GET', '/users/:userId', { handler: noop }),
-    ).toThrow(/conflicting param/);
+    ).toThrow();
+  });
+
+  it('different param names for different methods at the same position', () => {
+    const r = new RouteRegistry();
+    const putHandler: HandlerEntry['handler'] = async () => 'put';
+    const postHandler: HandlerEntry['handler'] = async () => 'post';
+
+    r.registerRoute('PUT', '/:slug', { handler: putHandler });
+    r.registerRoute('POST', '/:event', { handler: postHandler });
+
+    const putMatch = r.match('PUT', '/my-value');
+    expect(putMatch?.params).toEqual({ slug: 'my-value' });
+
+    const postMatch = r.match('POST', '/my-value');
+    expect(postMatch?.params).toEqual({ event: 'my-value' });
+  });
+
+  it('different param names at multiple depths', () => {
+    const r = new RouteRegistry();
+    r.registerRoute('PUT', '/:model/:slug', {
+      handler: async () => 'put',
+    });
+    r.registerRoute('POST', '/:type/:event', {
+      handler: async () => 'post',
+    });
+
+    const putMatch = r.match('PUT', '/foo/bar');
+    expect(putMatch?.params).toEqual({ model: 'foo', slug: 'bar' });
+
+    const postMatch = r.match('POST', '/foo/bar');
+    expect(postMatch?.params).toEqual({ type: 'foo', event: 'bar' });
   });
 });
 
@@ -329,5 +360,110 @@ describe('RouteRegistry — subtree composition (the P1b test plan check)', () =
       'UsersScope',
       'PerHandler',
     ]);
+  });
+});
+
+describe('RouteRegistry — per-method paramNames via registerSubtree + mergeNode', () => {
+  it('two subtrees merged at the same prefix with different param names per method', () => {
+    // Simulates two controllers mounted at /api:
+    //   Controller A: GET /:id
+    //   Controller B: POST /:slug
+    const r = new RouteRegistry();
+
+    const getHandler: HandlerEntry['handler'] = async () => 'get';
+    const postHandler: HandlerEntry['handler'] = async () => 'post';
+
+    // Subtree A — GET /:id
+    const subtreeA: RouteNode = createNode('');
+    const paramNodeA = createNode(':id');
+    paramNodeA.methods = { GET: { handler: getHandler, paramNames: ['id'] } };
+    subtreeA.paramChild = paramNodeA;
+
+    // Subtree B — POST /:slug
+    const subtreeB: RouteNode = createNode('');
+    const paramNodeB = createNode(':slug');
+    paramNodeB.methods = {
+      POST: { handler: postHandler, paramNames: ['slug'] },
+    };
+    subtreeB.paramChild = paramNodeB;
+
+    r.registerSubtree('/api', subtreeA);
+    r.registerSubtree('/api', subtreeB);
+
+    const getMatch = r.match('GET', '/api/hello');
+    expect(getMatch?.entry?.handler).toBe(getHandler);
+    expect(getMatch?.params).toEqual({ id: 'hello' });
+
+    const postMatch = r.match('POST', '/api/hello');
+    expect(postMatch?.entry?.handler).toBe(postHandler);
+    expect(postMatch?.params).toEqual({ slug: 'hello' });
+  });
+
+  it('two subtrees with different param names at depth 1, different static children at depth 2', () => {
+    // Simulates one controller with:
+    //   PUT  /:slug/details
+    //   POST /:event/info
+    const r = new RouteRegistry();
+
+    const putHandler: HandlerEntry['handler'] = async () => 'put';
+    const postHandler: HandlerEntry['handler'] = async () => 'post';
+
+    // Subtree with PUT /:slug/details
+    const subtreeA: RouteNode = createNode('');
+    const paramA = createNode(':slug');
+    const detailsNode = createNode('details');
+    detailsNode.methods = {
+      PUT: { handler: putHandler, paramNames: ['slug'] },
+    };
+    paramA.children.set('details', detailsNode);
+    subtreeA.paramChild = paramA;
+
+    // Subtree with POST /:event/info
+    const subtreeB: RouteNode = createNode('');
+    const paramB = createNode(':event');
+    const infoNode = createNode('info');
+    infoNode.methods = {
+      POST: { handler: postHandler, paramNames: ['event'] },
+    };
+    paramB.children.set('info', infoNode);
+    subtreeB.paramChild = paramB;
+
+    r.registerSubtree('/api', subtreeA);
+    r.registerSubtree('/api', subtreeB);
+
+    const putMatch = r.match('PUT', '/api/my-article/details');
+    expect(putMatch?.entry?.handler).toBe(putHandler);
+    expect(putMatch?.params).toEqual({ slug: 'my-article' });
+
+    const postMatch = r.match('POST', '/api/my-event/info');
+    expect(postMatch?.entry?.handler).toBe(postHandler);
+    expect(postMatch?.params).toEqual({ event: 'my-event' });
+  });
+
+  it('merged param nodes: 405 still lists all methods from both controllers', () => {
+    const r = new RouteRegistry();
+
+    const getHandler: HandlerEntry['handler'] = async () => 'get';
+    const postHandler: HandlerEntry['handler'] = async () => 'post';
+
+    const subtreeA: RouteNode = createNode('');
+    const pA = createNode(':id');
+    pA.methods = { GET: { handler: getHandler, paramNames: ['id'] } };
+    subtreeA.paramChild = pA;
+
+    const subtreeB: RouteNode = createNode('');
+    const pB = createNode(':slug');
+    pB.methods = { POST: { handler: postHandler, paramNames: ['slug'] } };
+    subtreeB.paramChild = pB;
+
+    r.registerSubtree('/api', subtreeA);
+    r.registerSubtree('/api', subtreeB);
+
+    // DELETE should 405 with allowed methods listing both GET and POST
+    const deleteMatch = r.match('DELETE', '/api/hello');
+    expect(deleteMatch?.entry).toBeNull();
+    expect(deleteMatch?.allowedMethods).toEqual(
+      expect.arrayContaining(['GET', 'POST']),
+    );
   });
 });

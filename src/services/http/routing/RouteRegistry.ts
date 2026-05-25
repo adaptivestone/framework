@@ -52,7 +52,11 @@ export class RouteRegistry {
    */
   registerRoute(method: HttpMethod, path: string, entry: HandlerEntry): void {
     let target = this.root;
+    const paramNames: string[] = [];
     for (const seg of pathSegments(path)) {
+      if (seg.startsWith(':') || seg.startsWith('*')) {
+        paramNames.push(seg.slice(1));
+      }
       target = ensureChildBySegment(target, seg);
     }
     if (!target.methods) {
@@ -62,6 +66,9 @@ export class RouteRegistry {
       throw new Error(
         `RouteRegistry: route ${method} ${path} already registered`,
       );
+    }
+    if (paramNames.length > 0) {
+      entry.paramNames = paramNames;
     }
     target.methods[method] = entry;
   }
@@ -104,29 +111,18 @@ function joinPath(prefix: string, segment: string): string {
 // ─── tree mutation ───────────────────────────────────────────────────
 
 function ensureChildBySegment(node: RouteNode, segment: string): RouteNode {
-  // Splat consumes the rest of the path; nothing under it is reachable.
   if (node.segment.startsWith('*')) {
     throw new Error(
       `RouteRegistry: cannot register a child segment "${segment}" under a splat segment "${node.segment}" — splat consumes the rest of the path, so this child would be unreachable`,
     );
   }
   if (segment.startsWith(':')) {
-    if (node.paramChild && node.paramChild.segment !== segment) {
-      throw new Error(
-        `RouteRegistry: conflicting param children at "${node.segment}" — ${node.paramChild.segment} vs ${segment}`,
-      );
-    }
     if (!node.paramChild) {
       node.paramChild = createNode(segment);
     }
     return node.paramChild;
   }
   if (segment.startsWith('*')) {
-    if (node.splatChild && node.splatChild.segment !== segment) {
-      throw new Error(
-        `RouteRegistry: conflicting splat children at "${node.segment}" — ${node.splatChild.segment} vs ${segment}`,
-      );
-    }
     if (!node.splatChild) {
       node.splatChild = createNode(segment);
     }
@@ -172,11 +168,6 @@ function mergeNode(target: RouteNode, source: RouteNode): void {
 
   if (source.paramChild) {
     if (target.paramChild) {
-      if (target.paramChild.segment !== source.paramChild.segment) {
-        throw new Error(
-          `RouteRegistry: conflicting param children — ${target.paramChild.segment} vs ${source.paramChild.segment}`,
-        );
-      }
       mergeNode(target.paramChild, source.paramChild);
     } else {
       target.paramChild = source.paramChild;
@@ -185,11 +176,6 @@ function mergeNode(target: RouteNode, source: RouteNode): void {
 
   if (source.splatChild) {
     if (target.splatChild) {
-      if (target.splatChild.segment !== source.splatChild.segment) {
-        throw new Error(
-          `RouteRegistry: conflicting splat children — ${target.splatChild.segment} vs ${source.splatChild.segment}`,
-        );
-      }
       mergeNode(target.splatChild, source.splatChild);
     } else {
       target.splatChild = source.splatChild;

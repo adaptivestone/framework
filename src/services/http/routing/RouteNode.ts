@@ -59,6 +59,7 @@ export interface HandlerEntry {
   query?: StandardSchemaV1;
   middlewares?: MiddlewareEntry[];
   bodyParsing?: BodyParsingMode;
+  paramNames?: string[];
   meta?: {
     methodName?: string;
     controllerClass?: string;

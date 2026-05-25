@@ -69,6 +69,34 @@ describe('match — param segments', () => {
     expect(m?.params).toEqual({ id: '42' });
   });
 
+  it('uses handler paramNames to derive param keys', () => {
+    const root = createNode('');
+    const paramNode = createNode(':slug');
+    const putHandler: HandlerEntry['handler'] = async () => 'put';
+    const postHandler: HandlerEntry['handler'] = async () => 'post';
+    paramNode.methods = {
+      PUT: { handler: putHandler, paramNames: ['slug'] },
+      POST: { handler: postHandler, paramNames: ['event'] },
+    };
+    root.paramChild = paramNode;
+
+    const putMatch = match(root, 'PUT', '/my-value');
+    expect(putMatch?.params).toEqual({ slug: 'my-value' });
+
+    const postMatch = match(root, 'POST', '/my-value');
+    expect(postMatch?.params).toEqual({ event: 'my-value' });
+  });
+
+  it('falls back to tree segment name when paramNames is not set', () => {
+    const root = createNode('');
+    const paramNode = createNode(':id');
+    paramNode.methods = { GET: { handler: noop } };
+    root.paramChild = paramNode;
+
+    const m = match(root, 'GET', '/42');
+    expect(m?.params).toEqual({ id: '42' });
+  });
+
   it('static beats param when both could match', () => {
     const root = createNode('');
     const users = createNode('users');
@@ -351,5 +379,141 @@ describe('match — empty / edge cases', () => {
     root.children.set('users', users);
 
     expect(match(root, 'GET', '/users')).toBeNull();
+  });
+});
+
+describe('match — HEAD fallback uses GET paramNames', () => {
+  it('HEAD inherits paramNames from the GET handler', () => {
+    const root = createNode('');
+    const users = createNode('users');
+    const paramNode = createNode(':slug');
+    paramNode.methods = {
+      GET: { handler: noop, paramNames: ['userId'] },
+    };
+    users.paramChild = paramNode;
+    root.children.set('users', users);
+
+    const m = match(root, 'HEAD', '/users/42');
+    expect(m?.entry?.handler).toBe(noop);
+    expect(m?.params).toEqual({ userId: '42' });
+  });
+
+  it('explicit HEAD handler uses its own paramNames, not GET', () => {
+    const headHandler: HandlerEntry['handler'] = async () => 'head';
+    const root = createNode('');
+    const users = createNode('users');
+    const paramNode = createNode(':slug');
+    paramNode.methods = {
+      GET: { handler: noop, paramNames: ['userId'] },
+      HEAD: { handler: headHandler, paramNames: ['headId'] },
+    };
+    users.paramChild = paramNode;
+    root.children.set('users', users);
+
+    const m = match(root, 'HEAD', '/users/42');
+    expect(m?.entry?.handler).toBe(headHandler);
+    expect(m?.params).toEqual({ headId: '42' });
+  });
+});
+
+describe('match — 405 with params', () => {
+  it('405 response still returns tree-derived params', () => {
+    const root = createNode('');
+    const users = createNode('users');
+    const paramNode = createNode(':id');
+    paramNode.methods = {
+      GET: { handler: noop, paramNames: ['userId'] },
+    };
+    users.paramChild = paramNode;
+    root.children.set('users', users);
+
+    const m = match(root, 'DELETE', '/users/42');
+    expect(m?.entry).toBeNull();
+    // handler is null so paramNames cannot be used; falls back to tree name
+    expect(m?.params).toEqual({ id: '42' });
+  });
+});
+
+describe('match — mixed param + splat with paramNames', () => {
+  it('zips paramNames with paramValues in correct order (param then splat)', () => {
+    const root = createNode('');
+    const files = createNode('files');
+    const paramNode = createNode(':owner');
+    const splatNode = createNode('*path');
+    splatNode.methods = {
+      GET: { handler: noop, paramNames: ['id', 'rest'] },
+    };
+    paramNode.splatChild = splatNode;
+    files.paramChild = paramNode;
+    root.children.set('files', files);
+
+    const m = match(root, 'GET', '/files/alice/docs/report.pdf');
+    expect(m?.entry?.handler).toBe(noop);
+    expect(m?.params).toEqual({ id: 'alice', rest: 'docs/report.pdf' });
+  });
+
+  it('without paramNames, uses tree segment names for param + splat', () => {
+    const root = createNode('');
+    const files = createNode('files');
+    const paramNode = createNode(':owner');
+    const splatNode = createNode('*path');
+    splatNode.methods = { GET: { handler: noop } };
+    paramNode.splatChild = splatNode;
+    files.paramChild = paramNode;
+    root.children.set('files', files);
+
+    const m = match(root, 'GET', '/files/alice/docs/report.pdf');
+    expect(m?.params).toEqual({ owner: 'alice', path: 'docs/report.pdf' });
+  });
+
+  it('paramNames length mismatch — extra paramValues are silently dropped', () => {
+    const root = createNode('');
+    const files = createNode('files');
+    const p1 = createNode(':a');
+    const p2 = createNode(':b');
+    p2.methods = {
+      GET: { handler: noop, paramNames: ['only'] },
+    };
+    p1.paramChild = p2;
+    files.paramChild = p1;
+    root.children.set('files', files);
+
+    const m = match(root, 'GET', '/files/x/y');
+    // paramValues = ['x', 'y'], paramNames = ['only'] — only first zips
+    expect(m?.params).toEqual({ only: 'x' });
+    // 'y' is silently lost — the handler declared fewer names than segments
+  });
+});
+
+describe('match — duplicate tree param names (mergeNode edge case)', () => {
+  it('without paramNames, last param value wins (object spread)', () => {
+    // Contrived: two param levels with the same tree segment name.
+    // This can happen if mergeNode merges subtrees from different controllers
+    // where both used `:id` at different depths.
+    const root = createNode('');
+    const p1 = createNode(':id');
+    const p2 = createNode(':id');
+    p2.methods = { GET: { handler: noop } };
+    p1.paramChild = p2;
+    root.paramChild = p1;
+
+    const m = match(root, 'GET', '/first/second');
+    // walk does { ...parentParams, [paramName]: seg } so the second ':id'
+    // overwrites the first — only 'second' survives.
+    expect(m?.params).toEqual({ id: 'second' });
+  });
+
+  it('with paramNames, both values are preserved under distinct keys', () => {
+    const root = createNode('');
+    const p1 = createNode(':id');
+    const p2 = createNode(':id');
+    p2.methods = {
+      GET: { handler: noop, paramNames: ['parentId', 'childId'] },
+    };
+    p1.paramChild = p2;
+    root.paramChild = p1;
+
+    const m = match(root, 'GET', '/first/second');
+    expect(m?.params).toEqual({ parentId: 'first', childId: 'second' });
   });
 });

@@ -439,6 +439,16 @@ function attachHandler(
       `ControllerManager: duplicate handler for ${method} ${pathStr}`,
     );
   }
+  const segments = pathStr.split('/').filter((s) => s.length > 0);
+  const paramNames: string[] = [];
+  for (const seg of segments) {
+    if (seg.startsWith(':') || seg.startsWith('*')) {
+      paramNames.push(seg.slice(1));
+    }
+  }
+  if (paramNames.length > 0) {
+    entry.paramNames = paramNames;
+  }
   target.methods[method] = entry;
 }
 

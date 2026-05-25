@@ -40,6 +40,7 @@ interface WalkResult {
   node: RouteNode;
   middlewares: MiddlewareEntry[];
   params: Record<string, string>;
+  paramValues: string[];
   bodyParsing: BodyParsingMode | undefined;
 }
 
@@ -63,6 +64,7 @@ export function match(
     0,
     [],
     {},
+    [],
     undefined,
     options.caseSensitive ?? false,
   );
@@ -72,15 +74,21 @@ export function match(
 
   const methods = result.node.methods;
   if (!methods || Object.keys(methods).length === 0) {
-    // Structural node, no handlers → 404 (not 405).
     return null;
   }
 
   const handler = resolveHandler(methods, upMethod);
   const allowedMethods = Object.keys(methods) as HttpMethod[];
-  // HEAD implicitly allowed when GET is registered.
   if (methods.GET && !methods.HEAD) {
     allowedMethods.push('HEAD');
+  }
+
+  let params = result.params;
+  if (handler?.paramNames && result.paramValues.length > 0) {
+    params = {};
+    for (let i = 0; i < handler.paramNames.length; i++) {
+      params[handler.paramNames[i] as string] = result.paramValues[i] as string;
+    }
   }
 
   return {
@@ -89,7 +97,7 @@ export function match(
     middlewares: handler
       ? [...result.middlewares, ...(handler.middlewares ?? [])]
       : result.middlewares,
-    params: result.params,
+    params,
     bodyParsing: handler?.bodyParsing ?? result.bodyParsing ?? 'parsed',
   };
 }
@@ -114,6 +122,7 @@ function walk(
   index: number,
   parentMw: MiddlewareEntry[],
   parentParams: Record<string, string>,
+  parentParamValues: string[],
   parentBodyParsing: BodyParsingMode | undefined,
   caseSensitive: boolean,
 ): WalkResult | null {
@@ -121,12 +130,17 @@ function walk(
   const bodyParsing = node.bodyParsing ?? parentBodyParsing;
 
   if (index === segments.length) {
-    return { node, middlewares, params: parentParams, bodyParsing };
+    return {
+      node,
+      middlewares,
+      params: parentParams,
+      paramValues: parentParamValues,
+      bodyParsing,
+    };
   }
 
   const seg = segments[index] as string;
 
-  // Static (most specific).
   const staticChild = lookupStaticChild(node.children, seg, caseSensitive);
   if (staticChild) {
     const result = walk(
@@ -135,6 +149,7 @@ function walk(
       index + 1,
       middlewares,
       parentParams,
+      parentParamValues,
       bodyParsing,
       caseSensitive,
     );
@@ -143,7 +158,6 @@ function walk(
     }
   }
 
-  // Param (`:name`).
   if (node.paramChild) {
     const paramName = node.paramChild.segment.slice(1);
     const result = walk(
@@ -152,6 +166,7 @@ function walk(
       index + 1,
       middlewares,
       { ...parentParams, [paramName]: seg },
+      [...parentParamValues, seg],
       bodyParsing,
       caseSensitive,
     );
@@ -160,7 +175,6 @@ function walk(
     }
   }
 
-  // Splat (`*name`) — consumes remaining segments.
   if (node.splatChild) {
     const splatName = node.splatChild.segment.slice(1);
     const splatValue = segments.slice(index).join('/');
@@ -170,6 +184,7 @@ function walk(
       segments.length,
       middlewares,
       { ...parentParams, [splatName]: splatValue },
+      [...parentParamValues, splatValue],
       bodyParsing,
       caseSensitive,
     );
