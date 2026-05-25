@@ -39,15 +39,18 @@ export interface EmitInput {
 export async function emitGenFile(input: EmitInput): Promise<string> {
   const { controller, srcPath, chains } = input;
   const source = await fs.readFile(srcPath, 'utf8');
-  const importMap = parseImports(source);
+  // Walk the `extends` chain — child controllers inheriting `static get
+  // middleware()` from a parent don't import those middleware classes
+  // themselves, but their parent does. We need the parent's import paths
+  // to emit `import type` lines in the child's gen file. Child imports
+  // win on collisions.
+  const importMap = await buildExtendsImportMap(srcPath, source);
 
-  // Drop chain entries whose middleware isn't imported by the controller
-  // file. Cross-controller propagation (e.g., a `/`-mounted controller
-  // pushing its `'/{*splat}'` middleware onto every other controller's
-  // chain) is the common case — the receiving controller doesn't import
-  // the propagating middleware. The runtime still runs them; the gen
-  // file just can't type them. v5.1 will thread `MiddlewareEntry.source`
-  // through so codegen can synthesize the import path itself.
+  // Drop chain entries whose middleware isn't in any ancestor's imports.
+  // Cross-controller propagation (a `/`-mounted controller pushing its
+  // `'/{*splat}'` middleware onto every other controller's chain) still
+  // gets filtered correctly — the receiving controller and its ancestors
+  // don't import the propagating middleware.
   const filteredChains = chains.map((chain) =>
     chain.filter((mw) => importMap.has(mw.className)),
   );
@@ -257,6 +260,92 @@ function pascalCase(name: string): string {
     return name;
   }
   return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
+ * Build an import map covering the controller and its `extends` ancestors.
+ *
+ * Inherited `static get middleware()` from a parent class references
+ * middleware classes the parent imports — the child file doesn't import
+ * them. To emit `import type` lines for them, we walk the extends chain,
+ * scan each ancestor's source file for its imports, and merge.
+ *
+ * Resolution rules:
+ *  - Child's imports win on name collisions (matches JS class-override
+ *    semantics).
+ *  - Only ancestors with a *resolvable local source path* are walked.
+ *    Bare-package ancestors (e.g. extending a class from `node_modules`)
+ *    are skipped because their `.ts` source isn't accessible at codegen
+ *    time. The child either re-imports inherited middlewares explicitly
+ *    or those middlewares get filtered out as today.
+ */
+async function buildExtendsImportMap(
+  srcPath: string,
+  source: string,
+): Promise<Map<string, string>> {
+  const merged = new Map<string, string>();
+  const visited = new Set<string>();
+
+  async function visit(filePath: string, fileSource: string): Promise<void> {
+    if (visited.has(filePath)) {
+      return;
+    }
+    visited.add(filePath);
+
+    const localImports = parseImports(fileSource);
+    // Merge with "deepest ancestor first" → child wins by being applied last.
+    // We descend first, then set our own imports after, so we always overwrite
+    // ancestor entries with our own. Achieved by visiting parent before
+    // setting our imports.
+    const parentName = parseExtendsParent(fileSource);
+    if (parentName) {
+      const parentImportPath = localImports.get(parentName);
+      if (parentImportPath) {
+        const parentSrcPath = resolveSiblingSource(filePath, parentImportPath);
+        if (parentSrcPath !== null) {
+          try {
+            const parentSource = await fs.readFile(parentSrcPath, 'utf8');
+            await visit(parentSrcPath, parentSource);
+          } catch {
+            // Parent source unreachable — skip silently. The child's own
+            // imports still apply.
+          }
+        }
+      }
+    }
+    // Apply this level's imports AFTER ancestors so we overwrite collisions.
+    for (const [name, importPath] of localImports) {
+      merged.set(name, importPath);
+    }
+  }
+
+  await visit(srcPath, source);
+  return merged;
+}
+
+/** `class X extends Y {` → `'Y'`. Returns `null` if no extends clause. */
+function parseExtendsParent(source: string): string | null {
+  const m = source.match(/\bclass\s+\w+\s+extends\s+(\w+)/);
+  return m ? (m[1] ?? null) : null;
+}
+
+/**
+ * Given an import path used by `fromFile`, resolve it to an absolute
+ * source path if it points at a local `.ts` sibling. Returns `null` for
+ * bare-package specifiers and for paths whose target isn't a readable
+ * `.ts` file.
+ */
+function resolveSiblingSource(
+  fromFile: string,
+  importPath: string,
+): string | null {
+  if (!importPath.startsWith('.')) {
+    return null; // bare package, can't resolve locally
+  }
+  const fromDir = path.dirname(fromFile);
+  // Strip the trailing `.js` / `.ts` (we want the `.ts` file)
+  const stripped = importPath.replace(/\.(js|ts)$/, '');
+  return path.resolve(fromDir, `${stripped}.ts`);
 }
 
 /**

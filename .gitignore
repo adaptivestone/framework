@@ -7,6 +7,6 @@ coverage/
 dist/*
 genTypes.d.ts
 **/*.routes.gen.ts
-.plans
+
 .claude
 benchmark/*.json
