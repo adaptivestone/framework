@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [5.0.0-next]
 
 This is a big release that contains a lot of new features and breaking changes.
-Main feature of that release is full TypeScript support insluding mongoose models.
+Main feature of that release is full TypeScript support including mongoose models.
 
 ### New Features
 
@@ -49,7 +49,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ### Breaking changes (please read carefully)
 
 - **[BREAKING]** No more global variables for testing and default user will not be created by default
-- **[BREAKING]** All models now should be extended from `BaseModel`. This is a potencial breaking change specially for `User` model.
+- **[BREAKING]** All models now should be extended from `BaseModel`. This is a potential breaking change specially for `User` model.
 - **[BREAKING]** Remove jest support for testing.
 - **[BREAKING]** Move email module to separate package `@adaptivestone/framework-module-email`. Please use it if you want to send emails.
 - **[BREAKING]** Remove `VIEWS` folders at all. Should not affect any user as this was not used internally.
@@ -59,7 +59,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** `i18next` v24 <https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0>.
 - **[BREAKING]** Possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too <https://expressjs.com/en/guide/migrating-5.html>.
 - **[BREAKING]** As part of express 5 migration `_` in rotes (middlewares) should have perameter. please replace `_` to `*splat`.
-- **[BREAKING]** Default auth responce changed to be unified. `{token, user}` => `{data:{token, user}}`.
+- **[BREAKING]** Default auth response changed to be unified. `{token, user}` => `{data:{token, user}}`.
 - **[BREAKING]** `RateLimiter` now need to have `IpDetector` middleware before.
 - **[BREAKING]** Removing `staticFiles` middleware as it not used in projects anymore. Docs with nginx config will be provided.
 - **[BREAKING]** Remove default `AUTH_SALT`. It should be provided on a app level now.
@@ -309,14 +309,14 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [5.0.0-beta.19]
 
 - **[NEW]** Introducing new model type. `BaseModel`. Features - simplifie works with typescript. And based on statics.
-- **[BREAKING]** All models now should be extended from `BaseModel`. This is a potencial breaking change specially for `User` model.
+- **[BREAKING]** All models now should be extended from `BaseModel`. This is a potential breaking change specially for `User` model.
 
 ---
 
 ## [5.0.0-beta.18]
 
 - **[UPDATE]** Move away connection from `mongooseModels` to server itself (preparation for different model types).
-- **[BREAKING]** Potencial. We are removed callback from `mongooseModels` contrctuctor. It was not used in code.
+- **[BREAKING]** potential. We are removed callback from `mongooseModels` contrctuctor. It was not used in code.
 - **[NEW]** Add `appInstance` helper to access app instance from anywhere without passing it.
 
 ---
@@ -356,7 +356,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [5.0.0-beta.12]
 
 - **[BREAKING]** Remove jest support for testing.
-- **[NEW]** Initial move to typescript. Potencially breaking.
+- **[NEW]** Initial move to typescript. potentially breaking.
 - **[NEW]** Introduce `src` and `dist` folders.
 
 ---
@@ -474,7 +474,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ## [5.0.0-alpha.18]
 
-- **[BREAKING]** Default auth responce changed to be unified. `{token, user}` => `{data:{token, user}}`.
+- **[BREAKING]** Default auth response changed to be unified. `{token, user}` => `{data:{token, user}}`.
 - **[UPDATE]** `RateLimiter` updae key generation.
 
 ---
@@ -625,7 +625,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [4.11.0]
 
 - **[NEW]** `Cors` middleware.
-- **[BREAKING]** This is a potencial breaking change as we switched from `cors` external package to internal middleware. From API nothing was changed. This is a potencial breaking changes, but it should keep working as it.
+- **[BREAKING]** This is a potential breaking change as we switched from `cors` external package to internal middleware. From API nothing was changed. This is a potential breaking changes, but it should keep working as it.
 
 ---
 
@@ -633,7 +633,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 - **[UPDATE]** Deps update.
 - **[NEW]** Static file middleware.
-- **[BREAKING]** This is a potencial breaking change as we switched from `express.static` to internal middleware that provide less features but faster. From API nothing was changed.
+- **[BREAKING]** This is a potential breaking change as we switched from `express.static` to internal middleware that provide less features but faster. From API nothing was changed.
 
 ---
 
@@ -645,7 +645,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 
 ## [4.9.1]
 
-- **[UPDATE]** All responces from framework now happens in JSON. Previouls sometime aswers was in plan text.
+- **[UPDATE]** All responses from framework now happens in JSON. Previouls sometime aswers was in plan text.
 
 ---
 
@@ -1010,7 +1010,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[REMOVED]** Removed deprecated `isUseControllerNameForRouting()` on abstract controller. Use `getExpressPath()` instead.
 - **[REMOVED]** Removed deprecated `Base.loadFilesWithInheritance` please use `getFilesPathWithInheritance` that produce almost the same output.
 - **[BREAKING]** Removed "success" field on Auth contreoller. Please use http status instead.
-- **[BREAKING]** Auth controller - "error" error responce renamed to "message".
+- **[BREAKING]** Auth controller - "error" error response renamed to "message".
   ```js
   // Before
   {
