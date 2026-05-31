@@ -80,6 +80,11 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** `AbstractController` constructor third argument `isExpressMergeParams` removed. The old default Express-router behavior of stripping parent params is gone — all matched params (across the full path, including the controller prefix) are available on `req.params`. If you relied on the merge-params toggle, no action needed in most cases; if you specifically depended on the strip behavior, restructure your handler to filter `req.params` keys.
 
 ---
+## [5.0.0-beta.51]
+
+- **[NEW]** `KeyValue` model: a minimal persistent key/value store backed by MongoDB for lightweight caching, runtime config, and feature flags.
+
+---
 ## [5.0.0-beta.50]
 
 - **[FIX]** Tree-based router: different HTTP methods at the same param position can now use different `:name` segments. Previously, `PUT /:slug` and `POST /:event` on the same controller would either throw at boot ("conflicting param children") or silently use the first-registered name for all methods (`req.params.event` → `undefined`). Each `HandlerEntry` now carries its own `paramNames` array — the tree is structural only, param naming is per-handler.
