@@ -43,7 +43,7 @@
   "author": "Andrei Lahunou",
   "license": "MIT",
   "dependencies": {
-    "@redis/client": "^5.0.0",
+    "@redis/client": "^6.0.0",
     "deepmerge": "^4.2.2",
     "express": "^5.0.1",
     "formidable": "^3.5.1",

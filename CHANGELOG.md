@@ -68,6 +68,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 - **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
+- **[BREAKING]** `@redis/client` v6. Now defaults to the RESP3 protocol (was RESP2) and requires a Redis ≥6 server; pass `createClient({ RESP: 2 })` to keep v5 wire behavior. Also adds a default 5s command timeout. <https://github.com/redis/node-redis/blob/master/docs/v5-to-v6.md>
 - **[BREAKING]** Yup ≥1.7 required (was ≥1.0). Stays as a direct dep — used by built-in `Auth` controller. Schemas must implement Standard Schema (`~standard`); yup ≥1.7 does this natively.
 - **[BREAKING]** Legacy `{validate, cast}` plain-object validators removed. Wrap as Standard Schema (~10 lines).
 - **[BREAKING]** Yup `req:` context inside `.test()` / `.when()` removed. Use `this.parent` or move logic to handler.
@@ -88,6 +89,7 @@ Main feature of that release is full TypeScript support insluding mongoose model
 - **[NEW]** Content-type-keyed request schemas: a route's `request` can be a map (`{ 'application/json': schemaA, 'multipart/form-data': schemaB }`, mirrors OpenAPI `requestBody.content`). The framework validates with the schema matching the request's `Content-Type` (415 on no match) and `req.appInfo.request` becomes a `contentType`-discriminated union; codegen emits the union automatically. Media-type matching is case-insensitive and ignores parameters (`; charset=...`); `contentType` is a reserved field on the validated request object.
 - **[CHANGE]** Built-in `Auth` controller and `Pagination` middleware now validate with `defineSchema` instead of yup. The framework runtime and built-ins are yup-free.
 - **[BREAKING]** `yup` moved from `dependencies` to an optional `peerDependency`. It is no longer bundled. Apps that use yup schemas (including `YupFile`) must add `yup` to their own `dependencies`. Zod/Valibot/ArkType users are unaffected.
+- **[BREAKING]** `@redis/client` v6. Now defaults to the RESP3 protocol (was RESP2) and requires a Redis ≥6 server; pass `createClient({ RESP: 2 })` to keep v5 wire behavior. Also adds a default 5s command timeout. <https://github.com/redis/node-redis/blob/master/docs/v5-to-v6.md>
 - **[DEPRECATED]** `YupFile` (`@adaptivestone/framework/helpers/yup.js`) — removed in v6. Validate files via the new `File` export + your validator's `instanceof` idiom instead.
 
 ---
