@@ -214,9 +214,25 @@ function renderShape(
   // on the route entry.
   const appInfoOverrides: string[] = [];
   if (route.hasSchema) {
-    appInfoOverrides.push(
-      `request: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['request']>`,
-    );
+    if (route.requestContentTypes?.length) {
+      // Content-type map → discriminated union keyed by `contentType`. Each
+      // branch reads InferOutput of that media type's schema.
+      const base = `${routesAlias}['${route.method}']['${route.path}']['request']`;
+      // Discriminant literal is lower-cased to match the runtime-injected
+      // value (the parser normalizes `Content-Type` to lower case); the type
+      // navigation keeps the author's original key so the schema resolves.
+      const union = route.requestContentTypes
+        .map(
+          (ct) =>
+            `({ contentType: '${ct.toLowerCase()}' } & StandardSchemaV1.InferOutput<${base}['${ct}']>)`,
+        )
+        .join(' | ');
+      appInfoOverrides.push(`request: ${union}`);
+    } else {
+      appInfoOverrides.push(
+        `request: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['request']>`,
+      );
+    }
   }
   if (route.hasQuerySchema) {
     appInfoOverrides.push(

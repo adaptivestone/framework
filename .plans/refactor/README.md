@@ -41,6 +41,7 @@ Blocking: docs-sweep blocks llm-skills
 | [rate-limiter-lazy](queued/rate-limiter-lazy.md) | P1b+ | Lazy-import RateLimiter. Small. |
 | [cache-drivers](queued/cache-drivers.md) | P1c | Cache driver abstraction. Small. |
 | [test-helpers](queued/test-helpers.md) | P1i | Framework test helpers usable from `node:test` + vitest. ~½ d. |
+| [yup-optional](queued/yup-optional.md) | P1k | Un-bundle yup: built-in schemas → `defineSchema` (zero-dep Standard Schema). yup leaves `dependencies`. Codegen unchanged. ~½ d. |
 | [codegen-incremental](queued/codegen-incremental.md) | P2a | File-based codegen cache + OpenAPI surface. TBD. |
 
 ### later/
@@ -71,7 +72,8 @@ Blocking: docs-sweep blocks llm-skills
 ## v5.1 extras (no phase doc — tracked as bullets)
 
 - `bodyParsing: 'parsed' | 'raw' | 'none'` modes + parser registry (`app.parsers`)
-- `multipartScalar` helper, `File` type export
+- `File` type export — ✅ shipped (beta.51)
+- **Route-level multipart single-element extraction** — let a route declare which multipart fields are scalar; the router unwraps their single-element arrays **before** validation, so the schema stays the clean logical shape (`avatar: z.instanceof(File)`) and codegen reads that output type directly. Chosen over a schema-side `multipartScalar` helper (that wrapper was prototyped and dropped — it pushed a parser concern into the schema/types). Interim: validator-native `.array().length(1).transform(...)`. Revisits the parser-side `getFieldShape` idea from `decisions.md` → "Multipart parser is always-array" as an opt-in route convenience. Not scheduled.
 - Project-side boot hook (`bootHttp(app)` for ad-hoc routes / globals)
 - `npm run cli routes` (registry walker for "what's mounted in my app")
 

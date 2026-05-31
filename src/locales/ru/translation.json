@@ -4,6 +4,8 @@
     "passwordProvided": "Нужно ввести пароль",
     "emailProvided": "Нужно указать Email",
     "nickNameValid": "Неверный формат ника,только a-z,A-Z,0-9",
+    "nameValid": "Неверное имя",
+    "passwordRecoveryTokenProvided": "Нужно указать токен восстановления пароля",
     "passwordValid": "Неверный формат пароля,только a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>",
     "passwordTooShort": "Пароль должен быть не менее {{min}} символов",
     "emailValid": "Неверный формат Email-а",

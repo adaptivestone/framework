@@ -17,6 +17,10 @@ import type {
 } from '../services/http/routing/RouteNode.ts';
 import { HTTP_METHODS } from '../services/http/routing/RouteNode.ts';
 import { createNode } from '../services/http/routing/RouteRegistry.ts';
+import {
+  isContentTypeRequestMap,
+  normalizeContentType,
+} from '../services/validate/contentType.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import ValidateService from '../services/validate/ValidateService.ts';
 
@@ -272,11 +276,31 @@ class ControllerManager extends Base {
       }
     }
 
-    const requestSchemas: StandardSchemaV1[] = [];
-    if (entry.request) {
-      requestSchemas.push(entry.request);
+    // Route-entry request schema: a single Standard Schema, or a content-type
+    // map resolved per-request by `Content-Type`. The map is resolved inside
+    // the request handler (it depends on the incoming header); middleware
+    // schemas are content-type-agnostic and resolved once here.
+    //
+    // The lookup table is a null-prototype object with lower-cased keys: this
+    // makes matching case-insensitive AND prevents a header like `__proto__`
+    // or `constructor` from resolving to an inherited `Object.prototype`
+    // member (which would otherwise be truthy and bypass the 415).
+    const entryRequest = entry.request as
+      | StandardSchemaV1
+      | Record<string, StandardSchemaV1>
+      | undefined;
+    let entryRequestMapLookup: Record<string, StandardSchemaV1> | null = null;
+    let entryRequestMapKeys: string[] = [];
+    if (isContentTypeRequestMap(entryRequest)) {
+      entryRequestMapLookup = Object.create(null) as Record<
+        string,
+        StandardSchemaV1
+      >;
+      entryRequestMapKeys = Object.keys(entryRequest);
+      for (const key of entryRequestMapKeys) {
+        entryRequestMapLookup[key.toLowerCase()] = entryRequest[key];
+      }
     }
-    requestSchemas.push(...middlewareRequestSchemas);
 
     const querySchemas: StandardSchemaV1[] = [];
     if (entry.query) {
@@ -290,6 +314,28 @@ class ControllerManager extends Base {
       next: NextFunction,
     ): Promise<unknown> => {
       try {
+        const requestSchemas: StandardSchemaV1[] = [];
+        let resolvedContentType: string | null = null;
+        if (entryRequestMapLookup) {
+          const contentType = normalizeContentType(req.headers['content-type']);
+          const matched =
+            contentType && Object.hasOwn(entryRequestMapLookup, contentType)
+              ? entryRequestMapLookup[contentType]
+              : undefined;
+          if (!matched) {
+            return res.status(415).json({
+              message: `Unsupported Content-Type. Expected one of: ${entryRequestMapKeys.join(
+                ', ',
+              )}`,
+            });
+          }
+          requestSchemas.push(matched);
+          resolvedContentType = contentType;
+        } else if (entryRequest) {
+          requestSchemas.push(entryRequest as StandardSchemaV1);
+        }
+        requestSchemas.push(...middlewareRequestSchemas);
+
         if (requestSchemas.length > 0) {
           const parts = await Promise.all(
             requestSchemas.map(
@@ -301,6 +347,10 @@ class ControllerManager extends Base {
             ),
           );
           req.appInfo.request = Object.assign({}, ...parts);
+          if (resolvedContentType) {
+            (req.appInfo.request as Record<string, unknown>).contentType =
+              resolvedContentType;
+          }
         }
         if (querySchemas.length > 0) {
           const parts = await Promise.all(

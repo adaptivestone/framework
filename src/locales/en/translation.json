@@ -4,6 +4,8 @@
     "passwordProvided": "Password must be provided",
     "emailProvided": "Email must be provided",
     "nickNameValid": "Nick name is not valid,only a-z,A-Z,0-9",
+    "nameValid": "Name is not valid",
+    "passwordRecoveryTokenProvided": "Password recovery token must be provided",
     "passwordValid": "Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>",
     "passwordTooShort": "Password must be at least {{min}} characters",
     "emailValid": "Email is not valid",

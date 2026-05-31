@@ -272,4 +272,80 @@ describe('middlewares correct works', () => {
 
     expect(status).toBe(403);
   });
+
+  describe('content-type request map', () => {
+    const path = '/test/somecontroller/contentTypeBody';
+
+    it('dispatches to the application/json schema', async () => {
+      expect.assertions(2);
+      const res = await fetch(getTestServerURL(path), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ anything: true }),
+      });
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.data).toEqual({
+        via: 'json',
+        contentType: 'application/json',
+      });
+    });
+
+    it('dispatches to the urlencoded schema', async () => {
+      expect.assertions(2);
+      const res = await fetch(getTestServerURL(path), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/x-www-form-urlencoded' },
+        body: 'anything=1',
+      });
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.data).toEqual({
+        via: 'form',
+        contentType: 'application/x-www-form-urlencoded',
+      });
+    });
+
+    it('returns 415 for an unsupported Content-Type', async () => {
+      expect.assertions(1);
+      const res = await fetch(getTestServerURL(path), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/octet-stream' },
+        body: 'rawbytes',
+      });
+      expect(res.status).toBe(415);
+    });
+
+    it('matches the Content-Type case-insensitively', async () => {
+      expect.assertions(2);
+      const res = await fetch(getTestServerURL(path), {
+        method: 'POST',
+        headers: { 'Content-type': 'APPLICATION/JSON' },
+        body: JSON.stringify({ anything: true }),
+      });
+      const body = await res.json();
+      expect(res.status).toBe(200);
+      expect(body.data).toEqual({
+        via: 'json',
+        contentType: 'application/json',
+      });
+    });
+
+    it('does not accept or leak internals for prototype-chain Content-Types', async () => {
+      expect.assertions(4);
+      // `constructor` / `__proto__` resolve to truthy `Object.prototype`
+      // members on a plain-object map; the null-prototype lookup must reject
+      // them (never 200) and never leak the internal "no driver" message.
+      for (const ct of ['constructor', '__proto__']) {
+        const res = await fetch(getTestServerURL(path), {
+          method: 'POST',
+          headers: { 'Content-type': ct },
+          body: 'x',
+        });
+        const text = await res.text();
+        expect(res.status).not.toBe(200);
+        expect(text).not.toContain('Standard Schema');
+      }
+    });
+  });
 });

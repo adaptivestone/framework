@@ -150,6 +150,18 @@ describe('auth', () => {
       expect(status).toBe(400);
     });
 
+    it('rejects a non-string password with 400 (not 500)', async () => {
+      expect.assertions(1);
+
+      const { status } = await fetch(getTestServerURL('/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ email: 'a@b.com', password: ['x'] }),
+      }).catch(() => ({ status: 500 }));
+
+      expect(status).toBe(400);
+    });
+
     it('can login with normal creds and verified email', async () => {
       expect.assertions(3);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
