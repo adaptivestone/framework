@@ -210,7 +210,7 @@ class Server {
 
     if (!mongoose.connection.readyState) {
       this.app.events.on('shutdown', async () => {
-        this.app.logger?.verbose(
+        this.app.logger.verbose(
           'Shutdown was called. Closing all mongoose connections',
         );
         for (const c of mongoose.connections) {
@@ -225,7 +225,7 @@ class Server {
         if (process.env.MONGO_APP_NAME.length >= 64) {
           // https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md?plain=1#L460
           // all metadata 512 and app name 128, better to keep as low as possible
-          this.app.logger?.error(
+          this.app.logger.error(
             `Mongo connection MONGO_APP_NAME mare then 64 symbols. This is a limitation of mogno driver. Ignoring it  ${process.env.MONGO_APP_NAME}`,
           );
         } else {
@@ -239,16 +239,16 @@ class Server {
         )
         .then(
           () => {
-            this.app.logger?.info(
+            this.app.logger.info(
               `Mongo connection success ${connectionParams.appName}`,
             );
             mongoose.connection.on('error', (err) => {
-              this.app.logger?.error('Mongo connection error', err);
+              this.app.logger.error('Mongo connection error', err);
               console.error(err);
             });
           },
           (error) => {
-            this.app.logger?.error("Can't install mongodb connection", error);
+            this.app.logger.error("Can't install mongodb connection", error);
           },
         );
     }
@@ -278,7 +278,7 @@ class Server {
             const model = (ModelConstructor as typeof BaseModel).initialize();
             this.cache.models.set(modelName, model);
           } else {
-            this.app.logger?.warn(
+            this.app.logger.warn(
               `Model ${modelName} is old type model. Please update it to BaseModel`,
             );
             const model = new ModelConstructor(this.app) as AbstractModel;

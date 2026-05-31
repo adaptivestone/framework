@@ -1,6 +1,6 @@
 import type winston from 'winston';
 import { getFilesPathWithInheritance } from '../helpers/files.ts';
-import { consoleLogger } from '../helpers/logger.ts';
+import { consoleLogger, noopLogger } from '../helpers/logger.ts';
 import type { IApp } from '../server.ts';
 
 class Base {
@@ -22,24 +22,26 @@ class Base {
   /**
    * Optimzation to lazy load logger. It will be inited only on request
    */
-  get logger(): winston.Logger | null {
-    let l: winston.Logger | null;
+  get logger(): winston.Logger {
+    let current: winston.Logger | null;
     try {
-      l = this.#realLogger;
+      current = this.#realLogger;
     } catch {
+      // `this` is not a real `Base` instance (private field read threw) — e.g.
+      // accessed through a model proxy. Warn (every access, as before) and
+      // return the no-op logger so callers never get null.
       console.warn(
-        `You try to accees logger not from class. that can be ok in case of models.`,
+        'logger accessed outside a Base instance (e.g. a model proxy); using a no-op logger — logs from this context are dropped. This can be ok for models.',
       );
-      return null;
+      return noopLogger;
     }
 
-    if (!l) {
+    if (!current) {
       const { loggerGroup } = this.constructor as typeof Base;
-      this.#realLogger = this.getLogger(
-        loggerGroup + this.getConstructorName(),
-      );
+      current = this.getLogger(loggerGroup + this.getConstructorName());
+      this.#realLogger = current;
     }
-    return this.#realLogger;
+    return current;
   }
 
   /**
