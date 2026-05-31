@@ -9,6 +9,7 @@
  */
 
 import type AbstractController from '../modules/AbstractController.ts';
+import { isContentTypeRequestMap } from '../services/validate/contentType.ts';
 
 /** One middleware reference, with its parameters if it was declared as a tuple. */
 export interface MiddlewareRef {
@@ -25,6 +26,12 @@ export interface RouteMeta {
   handlerName: string | null;
   /** True when the route entry is `{ handler, request }` and `request` is set. */
   hasSchema: boolean;
+  /**
+   * Media-type keys when `request` is a content-type map (`{ 'application/json':
+   * schema, ... }`). Drives the discriminated-union request type. Absent for a
+   * single-schema `request`.
+   */
+  requestContentTypes?: string[];
   /** True when the route entry is `{ handler, query }` and `query` is set. */
   hasQuerySchema: boolean;
 }
@@ -87,6 +94,9 @@ function extractRouteMeta(
       handlerName:
         typeof obj.handler === 'function' ? nameOf(obj.handler) : null,
       hasSchema: obj.request != null,
+      requestContentTypes: isContentTypeRequestMap(obj.request)
+        ? Object.keys(obj.request)
+        : undefined,
       hasQuerySchema: obj.query != null,
     };
   }

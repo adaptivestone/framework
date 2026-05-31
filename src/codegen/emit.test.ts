@@ -204,3 +204,46 @@ export default Standalone;
     expect(output).toContain('UnionAppInfoProvides<readonly []>');
   });
 });
+
+describe('emit content-type request map', () => {
+  it('emits a contentType-discriminated union for a content-type map request', async () => {
+    const srcPath = await writeFile(
+      'Upload.ts',
+      `import AbstractController from '@adaptivestone/framework/modules/AbstractController.js';
+
+class Upload extends AbstractController {
+  get routes() {
+    return { post: { '/upload': { handler: this.upload, request: {} } } };
+  }
+  async upload() { return; }
+}
+export default Upload;
+`,
+    );
+
+    const controller: ControllerMeta = {
+      className: 'Upload',
+      prefix: '',
+      urlPrefix: '/upload',
+      routes: [
+        {
+          method: 'post',
+          path: '/upload',
+          handlerName: 'upload',
+          hasSchema: true,
+          requestContentTypes: ['application/json', 'multipart/form-data'],
+          hasQuerySchema: false,
+        } satisfies RouteMeta,
+      ],
+    };
+
+    const output = await emitGenFile({ controller, srcPath, chains: [[]] });
+
+    expect(output).toContain("{ contentType: 'application/json' }");
+    expect(output).toContain("['request']['application/json']");
+    expect(output).toContain("{ contentType: 'multipart/form-data' }");
+    expect(output).toContain("['request']['multipart/form-data']");
+    // The two media-type branches are joined as a union.
+    expect(output).toMatch(/\) \| \(/);
+  });
+});
