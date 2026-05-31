@@ -1,9 +1,10 @@
 import type { Response } from 'express';
-import { object, string } from 'yup';
 import type { TUser } from '../models/User.ts';
 import AbstractController from '../modules/AbstractController.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.ts';
+import { defineSchema } from '../services/validate/defineSchema.ts';
+import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import type {
   PostLoginRequest,
   PostLogoutRequest,
@@ -16,58 +17,192 @@ import type {
 
 type UserInstance = InstanceType<TUser>;
 
+// Zero-dependency validation for the built-in auth routes. Messages are i18n
+// keys (see `src/locales/*`); the framework auto-translates them via the
+// request's `i18n.t` before the error is serialized.
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PASSWORD_RE = /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/;
+const NICK_RE = /^[a-zA-Z0-9_\-.]+$/;
+const isMissing = (v: unknown) => v === undefined || v === null || v === '';
+// Coerce primitives to string the way yup's `string()` did, so numeric/boolean
+// JSON values keep validating (e.g. `password: 123` → `"123"`). `null`,
+// `undefined`, and non-primitives (arrays/objects) pass through unchanged — yup
+// did not stringify those either, so the type/required checks still fire.
+const coerceStr = (v: unknown): unknown =>
+  v == null || typeof v === 'object' ? v : String(v);
+
+const pushEmailIssues = (email: unknown, issues: StandardSchemaV1.Issue[]) => {
+  if (isMissing(email)) {
+    issues.push({ message: 'auth.emailProvided', path: ['email'] });
+  } else if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
+    issues.push({ message: 'auth.emailValid', path: ['email'] });
+  }
+};
+
 class Auth extends AbstractController {
   get routes() {
     return {
       post: {
         '/login': {
           handler: this.postLogin,
-          request: object().shape({
-            email: string().email().required('auth.emailProvided'), // if not provided then error will be generated
-            password: string().required('auth.passwordProvided'), // possible to provide values from translation
-          }),
+          request: defineSchema<{ email: string; password: string }>(
+            (value) => {
+              const v = (value ?? {}) as Record<string, unknown>;
+              const email = coerceStr(v.email);
+              const password = coerceStr(v.password);
+              const issues: StandardSchemaV1.Issue[] = [];
+              pushEmailIssues(email, issues);
+              if (isMissing(password) || typeof password !== 'string') {
+                issues.push({
+                  message: 'auth.passwordProvided',
+                  path: ['password'],
+                });
+              }
+              if (issues.length) {
+                return { issues };
+              }
+              return {
+                value: {
+                  email: email as string,
+                  password: password as string,
+                },
+              };
+            },
+          ),
         },
         '/register': {
           handler: this.postRegister,
-          request: object().shape({
-            email: string()
-              .email('auth.emailValid')
-              .required('auth.emailProvided'),
-            password: string()
-              .matches(
-                /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
-                'auth.passwordValid',
-              )
-              .required('auth.passwordProvided'),
-            nickName: string().matches(
-              /^[a-zA-Z0-9_\-.]+$/,
-              'auth.nickNameValid',
-            ),
-            firstName: string(),
-            lastName: string(),
+          request: defineSchema<{
+            email: string;
+            password: string;
+            nickName?: string;
+            firstName?: string;
+            lastName?: string;
+          }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            const email = coerceStr(v.email);
+            const password = coerceStr(v.password);
+            const nickName = coerceStr(v.nickName);
+            const firstName = coerceStr(v.firstName);
+            const lastName = coerceStr(v.lastName);
+            const issues: StandardSchemaV1.Issue[] = [];
+            pushEmailIssues(email, issues);
+            if (isMissing(password)) {
+              issues.push({
+                message: 'auth.passwordProvided',
+                path: ['password'],
+              });
+            } else if (
+              typeof password !== 'string' ||
+              !PASSWORD_RE.test(password)
+            ) {
+              issues.push({
+                message: 'auth.passwordValid',
+                path: ['password'],
+              });
+            }
+            // nickName is optional, but an empty string is invalid (matches the
+            // old yup `.matches()` behavior — only `null`/`undefined` skip).
+            if (
+              nickName != null &&
+              (typeof nickName !== 'string' || !NICK_RE.test(nickName))
+            ) {
+              issues.push({
+                message: 'auth.nickNameValid',
+                path: ['nickName'],
+              });
+            }
+            // firstName/lastName are optional free-form strings, but a non-string
+            // (array/object) would otherwise reach `User.create` and fail the
+            // Mongoose String cast with a 500. Reject it as a 400 (yup parity).
+            if (firstName != null && typeof firstName !== 'string') {
+              issues.push({ message: 'auth.nameValid', path: ['firstName'] });
+            }
+            if (lastName != null && typeof lastName !== 'string') {
+              issues.push({ message: 'auth.nameValid', path: ['lastName'] });
+            }
+            if (issues.length) {
+              return { issues };
+            }
+            return {
+              value: {
+                email: email as string,
+                password: password as string,
+                nickName: nickName as string | undefined,
+                firstName: firstName as string | undefined,
+                lastName: lastName as string | undefined,
+              },
+            };
           }),
         },
         '/logout': this.postLogout,
         '/verify': this.verifyUser,
         '/send-recovery-email': {
           handler: this.sendPasswordRecoveryEmail,
-          request: object().shape({ email: string().email().required() }),
+          request: defineSchema<{ email: string }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            const email = coerceStr(v.email);
+            const issues: StandardSchemaV1.Issue[] = [];
+            pushEmailIssues(email, issues);
+            if (issues.length) {
+              return { issues };
+            }
+            return { value: { email: email as string } };
+          }),
         },
         '/recover-password': {
           handler: this.recoverPassword,
-          request: object().shape({
-            password: string()
-              .matches(
-                /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/,
-                'auth.passwordValid',
-              )
-              .required(),
-            passwordRecoveryToken: string().required(),
+          request: defineSchema<{
+            password: string;
+            passwordRecoveryToken: string;
+          }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            const password = coerceStr(v.password);
+            const passwordRecoveryToken = coerceStr(v.passwordRecoveryToken);
+            const issues: StandardSchemaV1.Issue[] = [];
+            if (isMissing(password)) {
+              issues.push({
+                message: 'auth.passwordProvided',
+                path: ['password'],
+              });
+            } else if (
+              typeof password !== 'string' ||
+              !PASSWORD_RE.test(password)
+            ) {
+              issues.push({
+                message: 'auth.passwordValid',
+                path: ['password'],
+              });
+            }
+            if (isMissing(passwordRecoveryToken)) {
+              issues.push({
+                message: 'auth.passwordRecoveryTokenProvided',
+                path: ['passwordRecoveryToken'],
+              });
+            }
+            if (issues.length) {
+              return { issues };
+            }
+            return {
+              value: {
+                password: password as string,
+                passwordRecoveryToken: passwordRecoveryToken as string,
+              },
+            };
           }),
         },
         '/send-verification': {
           handler: this.sendVerification,
-          request: object().shape({ email: string().email().required() }),
+          request: defineSchema<{ email: string }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            const email = coerceStr(v.email);
+            const issues: StandardSchemaV1.Issue[] = [];
+            pushEmailIssues(email, issues);
+            if (issues.length) {
+              return { issues };
+            }
+            return { value: { email: email as string } };
+          }),
         },
       },
     };

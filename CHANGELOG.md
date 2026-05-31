@@ -83,6 +83,12 @@ Main feature of that release is full TypeScript support insluding mongoose model
 ## [5.0.0-beta.51]
 
 - **[NEW]** `KeyValue` model: a minimal persistent key/value store backed by MongoDB for lightweight caching, runtime config, and feature flags.
+- **[NEW]** `defineSchema<Output>(validate)` helper (`@adaptivestone/framework/services/validate/defineSchema.js`) — wrap a plain validate function into a zero-dependency Standard Schema. Codegen reads its `Output` generic for handler request types via `StandardSchemaV1.InferOutput`.
+- **[NEW]** `File` type exported from `@adaptivestone/framework/types.js` — vendor-neutral uploaded-file type (aliases formidable's `PersistentFile` today; re-points at the web-standard `File` after the P3 parser swap). Validate uploads with your validator's idiom, e.g. `z.instanceof(File)`.
+- **[NEW]** Content-type-keyed request schemas: a route's `request` can be a map (`{ 'application/json': schemaA, 'multipart/form-data': schemaB }`, mirrors OpenAPI `requestBody.content`). The framework validates with the schema matching the request's `Content-Type` (415 on no match) and `req.appInfo.request` becomes a `contentType`-discriminated union; codegen emits the union automatically. Media-type matching is case-insensitive and ignores parameters (`; charset=...`); `contentType` is a reserved field on the validated request object.
+- **[CHANGE]** Built-in `Auth` controller and `Pagination` middleware now validate with `defineSchema` instead of yup. The framework runtime and built-ins are yup-free.
+- **[BREAKING]** `yup` moved from `dependencies` to an optional `peerDependency`. It is no longer bundled. Apps that use yup schemas (including `YupFile`) must add `yup` to their own `dependencies`. Zod/Valibot/ArkType users are unaffected.
+- **[DEPRECATED]** `YupFile` (`@adaptivestone/framework/helpers/yup.js`) — removed in v6. Validate files via the new `File` export + your validator's `instanceof` idiom instead.
 
 ---
 ## [5.0.0-beta.50]

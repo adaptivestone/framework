@@ -1,5 +1,6 @@
 import type { NextFunction, Response } from 'express';
-import { number, object } from 'yup';
+import { defineSchema } from '../../validate/defineSchema.ts';
+import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
@@ -26,9 +27,25 @@ class Pagination extends AbstractMiddleware {
   }
 
   get relatedQueryParameters() {
-    return object().shape({
-      page: number(),
-      limit: number(),
+    return defineSchema<{ page?: number; limit?: number }>((value) => {
+      const v = (value ?? {}) as Record<string, unknown>;
+      const issues: StandardSchemaV1.Issue[] = [];
+      const out: { page?: number; limit?: number } = {};
+      for (const key of ['page', 'limit'] as const) {
+        if (v[key] === undefined || v[key] === null || v[key] === '') {
+          continue;
+        }
+        const n = Number(v[key]);
+        if (Number.isNaN(n)) {
+          issues.push({ message: `${key} must be a number`, path: [key] });
+        } else {
+          out[key] = n;
+        }
+      }
+      if (issues.length) {
+        return { issues };
+      }
+      return { value: out };
     });
   }
 

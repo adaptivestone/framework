@@ -3,6 +3,7 @@ import type AbstractMiddleware from '../services/http/middleware/AbstractMiddlew
 import Auth from '../services/http/middleware/Auth.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import type { BodyParsingMode } from '../services/http/routing/RouteNode.ts';
+import type { RequestContentTypeMap } from '../services/validate/contentType.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import Base from './Base.ts';
 
@@ -19,7 +20,17 @@ type RouteObject = {
   handler: RouteHandler;
   description?: string;
   middleware?: TMiddleware | null;
-  request?: StandardSchemaV1 | null;
+  /**
+   * Body schema. Either a single Standard Schema (validates any body), or a
+   * content-type map (`{ 'application/json': schema, 'multipart/form-data':
+   * schema }`) validated by the request's `Content-Type` — mirrors OpenAPI's
+   * `requestBody.content`. Media-type matching is case-insensitive and ignores
+   * parameters (`; charset=...`). With a map, `req.appInfo.request` is a
+   * discriminated union keyed by a reserved `contentType` field — it holds the
+   * matched media type and overwrites any body field of the same name, so do
+   * not declare a schema field named `contentType`.
+   */
+  request?: StandardSchemaV1 | RequestContentTypeMap | null;
   query?: StandardSchemaV1 | null;
   bodyParsing?: BodyParsingMode;
 };

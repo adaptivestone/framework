@@ -13,6 +13,7 @@ import GetUserByToken from '../../../services/http/middleware/GetUserByToken.ts'
 import Pagination from '../../../services/http/middleware/Pagination.ts';
 import RateLimiter from '../../../services/http/middleware/RateLimiter.ts';
 import RoleMiddleware from '../../../services/http/middleware/Role.ts';
+import { defineSchema } from '../../../services/validate/defineSchema.ts';
 import CheckFlag from '../middleware/CheckFlag.ts';
 
 class SomeController extends AbstractController {
@@ -68,6 +69,17 @@ class SomeController extends AbstractController {
             name: string(),
           }),
         },
+        '/contentTypeBody': {
+          handler: this.contentTypeBody,
+          request: {
+            'application/json': defineSchema<{ via: string }>(() => ({
+              value: { via: 'json' },
+            })),
+            'application/x-www-form-urlencoded': defineSchema<{ via: string }>(
+              () => ({ value: { via: 'form' } }),
+            ),
+          },
+        },
       },
       patch: {
         '/userAvatar': {
@@ -112,6 +124,12 @@ class SomeController extends AbstractController {
         name,
       },
     });
+  }
+
+  async contentTypeBody(req: FrameworkRequest, res: Response) {
+    // `req.appInfo.request` is `{ via, contentType }` — the schema selected by
+    // the request's Content-Type, plus the injected `contentType` discriminant.
+    return res.status(200).json({ data: req.appInfo.request });
   }
 
   async addPost(req: FrameworkRequest, res: Response) {

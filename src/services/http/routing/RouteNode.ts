@@ -6,6 +6,7 @@
  * shape.
  */
 
+import type { RequestContentTypeMap } from '../../validate/contentType.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 
@@ -55,7 +56,7 @@ export interface MiddlewareEntry {
 export interface HandlerEntry {
   // biome-ignore lint/complexity/noBannedTypes: handlers are user-provided callables of varying shape
   handler: Function;
-  request?: StandardSchemaV1;
+  request?: StandardSchemaV1 | RequestContentTypeMap;
   query?: StandardSchemaV1;
   middlewares?: MiddlewareEntry[];
   bodyParsing?: BodyParsingMode;
