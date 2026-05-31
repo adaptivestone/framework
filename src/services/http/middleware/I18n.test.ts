@@ -81,11 +81,11 @@ describe('i18n middleware methods', () => {
       appInfo: {
         i18n?: {
           language: string;
-          t: (string) => string;
+          t: (value: string) => string;
         };
       };
       i18n?: {
-        t: (string) => string;
+        t: (value: string) => string;
       };
     } = {
       get: () => 'en',
@@ -131,12 +131,12 @@ describe('i18n middleware methods', () => {
       appInfo: {
         i18n?: {
           language: string;
-          t: (string) => string;
+          t: (value: string) => string;
         };
       };
       i18n?: {
         language: string;
-        t: (string) => string;
+        t: (value: string) => string;
       };
     } = {
       get: () => 'en',

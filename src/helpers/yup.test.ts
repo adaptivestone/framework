@@ -9,10 +9,11 @@ describe('YupFile (deprecated)', () => {
 
     process.on('warning', handler);
     try {
-      // biome-ignore lint/correctness/noUnusedVariables: constructed for the side effect
+      // Construct twice; the deprecation warning must still fire only once.
       const a = new YupFile();
-      // biome-ignore lint/correctness/noUnusedVariables: constructed for the side effect
       const b = new YupFile();
+      expect(a).toBeInstanceOf(YupFile);
+      expect(b).toBeInstanceOf(YupFile);
       // process.emitWarning fires on the next tick — let it flush.
       await new Promise((resolve) => setImmediate(resolve));
     } finally {

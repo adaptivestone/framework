@@ -112,8 +112,8 @@ function translateInPlace(err: ValidationError, t: TFunction): void {
 
 function buildNoDriverMessage(schema: unknown): string {
   const looksLegacy =
-    typeof schema === 'object' &&
     schema !== null &&
+    typeof schema === 'object' &&
     typeof (schema as { validate?: unknown }).validate === 'function' &&
     typeof (schema as { cast?: unknown }).cast === 'function';
 
