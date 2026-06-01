@@ -1,6 +1,6 @@
 # P1e — Boot-time route tree log
 
-**Status**: ⏸ deferred to v5.1
+**Status**: ✅ shipped — `formatRouteTree` in `src/services/http/routing/formatTree.ts`, called from `server.ts` at `verbose` level after controllers initialize. (Landed in `services/http/routing/`, not the `src/codegen/routeTreeLog.ts` this doc originally proposed.)
 **Depends on**: P1b (RouteRegistry shipped)
 **Time**: ~½ day
 **Origin**: noticed missing during 2026-05-10 dogfooding against tht-server — the old `AbstractController` constructor logged a per-controller routes/middleware table at boot; the step-3 cutover dropped it.

@@ -1,7 +1,11 @@
 # P1k — Yup optional (un-bundle the validator)
 
-**Status**: ⏸ deferred to v5.1
+**Status**: ✅ shipped (beta.51, commit `2f0655d`).
 **Depends on**: P1a-runtime (Standard Schema dispatch + `standardSchemaDriver` shipped)
+
+> **Shipped reality (differs from this plan below):** `defineSchema` + a vendor-neutral `File` export (`@adaptivestone/framework/types.js`) landed; `Auth`/`Pagination` migrated off yup; yup moved to an optional `peerDependency`. **`YupFile` was deprecated** (JSDoc `@deprecated` + a runtime `DeprecationWarning`, removal in v6) rather than kept unchanged. Also shipped beyond this doc's scope: **content-type-keyed request schemas** (`request` accepts a media-type map → `contentType`-discriminated union, 415 on no match). The `multipartScalar` helper was prototyped and **dropped** in favor of validator-native cardinality + a planned route-level option. See CHANGELOG `[5.0.0-beta.51]`.
+
+
 **Time**: ~½ day
 **Parallelizable with**: everything (isolated to the validate layer + 3 built-in files)
 **Origin**: surfaced 2026-05-31 — yup is in `dependencies` only because ~6 trivial built-in schemas (Auth + Pagination + `YupFile`) use it. Goal: framework ships **no** bundled validator, while keeping typed route generation. P1a left this as out-of-scope ("future migration to inline Standard Schema, ~250 lines").

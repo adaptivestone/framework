@@ -37,11 +37,9 @@ Blocking: docs-sweep blocks llm-skills
 | File | Ref | Summary |
 |---|---|---|
 | [docs-sweep](queued/docs-sweep.md) | P1g | Audit `framework-documenation-github/docs/` against v5 behavior. Blocks llm-skills. ~1 d. |
-| [boot-route-tree-log](queued/boot-route-tree-log.md) | P1e | Restore per-controller boot log as project-wide tree from `RouteRegistry`. ~½ d. |
 | [rate-limiter-lazy](queued/rate-limiter-lazy.md) | P1b+ | Lazy-import RateLimiter. Small. |
 | [cache-drivers](queued/cache-drivers.md) | P1c | Cache driver abstraction. Small. |
 | [test-helpers](queued/test-helpers.md) | P1i | Framework test helpers usable from `node:test` + vitest. ~½ d. |
-| [yup-optional](queued/yup-optional.md) | P1k | Un-bundle yup: built-in schemas → `defineSchema` (zero-dep Standard Schema). yup leaves `dependencies`. Codegen unchanged. ~½ d. |
 | [codegen-incremental](queued/codegen-incremental.md) | P2a | File-based codegen cache + OpenAPI surface. TBD. |
 
 ### later/
@@ -68,6 +66,8 @@ Blocking: docs-sweep blocks llm-skills
 | [codegen-mvp](done/codegen-mvp.md) | P1a | Per-handler `<Method>Request` aliases via runtime introspection. 137/137 tests. Replaced by P1b codegen rewrite. |
 | [tree-router](done/tree-router.md) | P1b | Tree-based `RouteRegistry`, `ExpressAdapter`, `ControllerManager`. +28% plaintext / +10% realistic. 211/211 tests. |
 | [controller-migration](done/controller-migration.md) | P1d | Home + SomeController translated through the registry. |
+| [boot-route-tree-log](done/boot-route-tree-log.md) | P1e | Boot-time project-wide route tree log from `RouteRegistry` (`formatTree.ts`, verbose level). |
+| [yup-optional](done/yup-optional.md) | P1k | yup un-bundled: `defineSchema` + `File` export (optional peer); `YupFile` deprecated; content-type-keyed request schemas. beta.51. |
 
 ## v5.1 extras (no phase doc — tracked as bullets)
 
