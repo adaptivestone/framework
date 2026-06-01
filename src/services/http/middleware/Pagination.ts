@@ -26,7 +26,7 @@ class Pagination extends AbstractMiddleware {
     return {} as PaginationMiddlewareAppInfo['appInfo'];
   }
 
-  get relatedQueryParameters() {
+  static get relatedQueryParameters() {
     return defineSchema<{ page?: number; limit?: number }>((value) => {
       const v = (value ?? {}) as Record<string, unknown>;
       const issues: StandardSchemaV1.Issue[] = [];

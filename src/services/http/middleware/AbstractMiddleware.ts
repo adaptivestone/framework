@@ -27,27 +27,50 @@ class AbstractMiddleware extends Base {
   }
 
   /**
-   * Optional schema describing query parameters consumed by this middleware.
-   * Override with any Standard Schema-conformant schema (Yup, Zod, Valibot,
-   * ArkType, custom). Default `null` — no schema declared.
+   * Schema describing query parameters this middleware consumes. Declared
+   * **statically** so the framework (and codegen) can read it without
+   * instantiating the middleware. Override with any Standard Schema-conformant
+   * schema (Zod, Valibot, ArkType, yup ≥1.7, `defineSchema`). Default `null`.
    *
    * Example:
-   *   get relatedQueryParameters() {
-   *     return yup.object().shape({ page: yup.number(), limit: yup.number() });
+   *   static get relatedQueryParameters() {
+   *     return z.object({ page: z.number(), limit: z.number() });
    *   }
+   */
+  static get relatedQueryParameters(): StandardSchemaV1 | null {
+    return null;
+  }
+
+  /**
+   * Schema describing request-body parameters this middleware consumes. Static;
+   * same rules as `relatedQueryParameters`.
+   */
+  static get relatedRequestParameters(): StandardSchemaV1 | null {
+    return null;
+  }
+
+  /**
+   * @deprecated Since 5.0.0-beta.51 — declare the schema **statically**
+   * (`static get relatedQueryParameters()`) instead. The instance form forces
+   * the framework to instantiate the middleware just to read the schema (which
+   * runs its constructor side effects); it will be removed in v6.
    */
   get relatedQueryParameters(): StandardSchemaV1 | null {
     return null;
   }
 
   /**
-   * Optional schema describing request-body parameters consumed by this
-   * middleware. Same shape rules as `relatedQueryParameters`.
+   * @deprecated Since 5.0.0-beta.51 — use `static get relatedRequestParameters()`.
+   * Removed in v6.
    */
   get relatedRequestParameters(): StandardSchemaV1 | null {
     return null;
   }
 
+  /**
+   * @deprecated Since 5.0.0-beta.51 — read the static getters instead.
+   * Removed in v6.
+   */
   get relatedReqParameters() {
     return {
       request: this.relatedRequestParameters,

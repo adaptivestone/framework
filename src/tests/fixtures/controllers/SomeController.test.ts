@@ -348,4 +348,16 @@ describe('middlewares correct works', () => {
       }
     });
   });
+
+  describe('deprecated middleware instance schema (back-compat)', () => {
+    const deprecatedPath = '/test/somecontroller/deprecatedMwQuery';
+
+    it('still validates query via the deprecated instance getter', async () => {
+      expect.assertions(2);
+      const ok = await fetch(getTestServerURL(`${deprecatedPath}?count=5`));
+      const bad = await fetch(getTestServerURL(`${deprecatedPath}?count=abc`));
+      expect(ok.status).toBe(200);
+      expect(bad.status).toBe(400);
+    });
+  });
 });

@@ -15,6 +15,7 @@ import RateLimiter from '../../../services/http/middleware/RateLimiter.ts';
 import RoleMiddleware from '../../../services/http/middleware/Role.ts';
 import { defineSchema } from '../../../services/validate/defineSchema.ts';
 import CheckFlag from '../middleware/CheckFlag.ts';
+import DeprecatedSchemaMiddleware from '../middleware/DeprecatedSchemaMiddleware.ts';
 
 class SomeController extends AbstractController {
   get routes(): RouteParams {
@@ -53,6 +54,10 @@ class SomeController extends AbstractController {
             name: string(),
           }),
           middleware: [Pagination],
+        },
+        '/deprecatedMwQuery': {
+          handler: this.getSomething,
+          middleware: [DeprecatedSchemaMiddleware],
         },
       },
       post: {

@@ -5,6 +5,7 @@ import type AbstractController from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import {
   type MiddlewareSpec,
   normalizeMiddlewares,
@@ -29,6 +30,41 @@ const ROUTE_HTTP_METHODS: ReadonlySet<string> = new Set(HTTP_METHODS);
 
 /** HTTP methods plus the `'ALL'` pseudo-verb for middleware-Map scope keys. */
 const MAP_KEY_METHODS: ReadonlySet<string> = new Set([...HTTP_METHODS, 'ALL']);
+
+// Middleware schema reading (P1j Phase 1): prefer the static getters; the
+// instance form is deprecated. A middleware is only instantiated when it
+// actually overrides the deprecated instance getter — warned once per class.
+const warnedInstanceSchema = new WeakSet<MiddlewareEntry['Class']>();
+
+function warnInstanceSchemaDeprecated(Class: MiddlewareEntry['Class']): void {
+  if (warnedInstanceSchema.has(Class)) {
+    return;
+  }
+  warnedInstanceSchema.add(Class);
+  process.emitWarning(
+    `Middleware "${Class.name}" declares request/query schemas via the deprecated instance getter (relatedRequestParameters / relatedQueryParameters). Switch to the static form (static get relatedRequestParameters() { ... }) — the instance form forces instantiation and will be removed in v6.`,
+    { type: 'DeprecationWarning', code: 'ASF_DEP_MW_INSTANCE_SCHEMA' },
+  );
+}
+
+/**
+ * Does a middleware class override the deprecated instance schema getters? Walks
+ * its prototype chain (excluding `AbstractMiddleware`'s own defaults) without
+ * instantiating, so middlewares with no instance schema are never constructed.
+ */
+function overridesInstanceSchema(Class: MiddlewareEntry['Class']): boolean {
+  let proto: object | null = Class.prototype;
+  while (proto && proto !== AbstractMiddleware.prototype) {
+    if (
+      Object.getOwnPropertyDescriptor(proto, 'relatedRequestParameters') ||
+      Object.getOwnPropertyDescriptor(proto, 'relatedQueryParameters')
+    ) {
+      return true;
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return false;
+}
 
 /**
  * Class does autoloading a http controllers
@@ -261,13 +297,20 @@ class ControllerManager extends Base {
     const app = this.app;
     const logger = this.logger;
 
-    // Collect middleware-declared schemas at translation time.
+    // Collect middleware-declared schemas at translation time. Static-first (no
+    // instantiation); the instance form is deprecated and only read — via
+    // instantiation — when a middleware actually overrides it.
     const middlewareRequestSchemas: StandardSchemaV1[] = [];
     const middlewareQuerySchemas: StandardSchemaV1[] = [];
     for (const mw of chain) {
-      const inst = new mw.Class(app, mw.params ?? {});
-      const r = inst.relatedReqParameters?.request;
-      const q = inst.relatedReqParameters?.query;
+      let r = mw.Class.relatedRequestParameters;
+      let q = mw.Class.relatedQueryParameters;
+      if (!r && !q && overridesInstanceSchema(mw.Class)) {
+        warnInstanceSchemaDeprecated(mw.Class);
+        const inst = new mw.Class(app, mw.params ?? {});
+        r = inst.relatedRequestParameters;
+        q = inst.relatedQueryParameters;
+      }
       if (r) {
         middlewareRequestSchemas.push(r);
       }
