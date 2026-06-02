@@ -20,6 +20,13 @@ import type { I18n } from './services/i18n/I18n.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
+  /**
+   * Per-config-name source file paths, post-inheritance: `{ default, [env] }`.
+   * Kept alongside the merged `configs` values so codegen can emit `getConfig`
+   * types as references to the config modules' shapes instead of serializing
+   * live values (which leaks secrets / drops env-only fields).
+   */
+  configPaths: Map<string, Record<string, string>>;
   models: Map<string, AbstractModel['mongooseModel'] | TBaseModel>;
   modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
@@ -74,6 +81,7 @@ class Server {
 
   cache: AppCache = {
     configs: new Map<string, unknown>(),
+    configPaths: new Map<string, Record<string, string>>(),
     models: new Map<string, AbstractModel['mongooseModel'] | TBaseModel>(),
     modelConstructors: new Map<
       string,
@@ -355,6 +363,9 @@ class Server {
     const loadingPromises = [];
 
     for (const [configFile, value] of Object.entries(configFiles)) {
+      // Retain the resolved source paths for codegen (type references, not
+      // serialized values). Runtime reads merged values from `cache.configs`.
+      this.cache.configPaths.set(configFile, value);
       loadingPromises.push(loadConfig(configFile, value));
     }
 

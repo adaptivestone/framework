@@ -21,24 +21,37 @@ export async function generateAppTypes(
   logger?: CodegenLogger | null,
 ): Promise<void> {
   const template = await getTemplate(
-    app.internalFilesCache.configs,
+    app.internalFilesCache.configPaths,
     app.internalFilesCache.modelPaths,
   );
   await fs.writeFile(`${process.cwd()}/genTypes.d.ts`, template);
   logger?.info?.('TypeScript types generated successfully at genTypes.d.ts');
 }
 
-/** Render the `genTypes.d.ts` template text from configs + model paths. */
+/** Render the `genTypes.d.ts` template text from config paths + model paths. */
 export async function getTemplate(
-  configs: Map<string, unknown>,
+  configPaths: Map<string, Record<string, string>>,
   modelPaths: { file: string; path: string }[],
 ): Promise<string> {
   const dir = process.cwd();
-  const configTypes = Array.from(configs)
-    .map(
-      (config) =>
-        `    getConfig(configName: '${config[0]}'): ${JSON.stringify(config[1], null, 6)};`,
-    )
+  // Emit `getConfig` as a reference to each config module's inferred type —
+  // never a serialized value. Serializing live values leaks secrets into the
+  // committed file and drops env-only fields (`JSON.stringify` omits
+  // `undefined`). A config name resolves (post-inheritance) to one base file
+  // plus optional `NODE_ENV` layers; the base is required, each extra layer is
+  // `& Partial<…>` (deep-merged at runtime, optional and env-independent here).
+  const typeRef = (filePath: string) =>
+    `typeof import('${filePath.replace(dir, '.')}').default`;
+  const configTypes = Array.from(configPaths)
+    .map(([name, layers]) => {
+      const baseKey = layers.default ? 'default' : Object.keys(layers)[0];
+      const base = layers[baseKey];
+      const overlays = Object.entries(layers)
+        .filter(([key]) => key !== baseKey)
+        .map(([, p]) => ` & Partial<${typeRef(p)}>`)
+        .join('');
+      return `    getConfig(configName: '${name}'): ${typeRef(base)}${overlays};`;
+    })
     .join('\n');
 
   const modelTypes = (
