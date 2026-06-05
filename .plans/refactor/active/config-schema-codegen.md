@@ -1,69 +1,59 @@
-# P1l — Config codegen: type references, not value snapshots
+# P1l — Config codegen: value-shape types, not literals or import-references
 
-**Status**: ✅ implemented (2026-06-01, beta — pending commit). Verified: 4 unit tests, `tsc` clean, real `npm run gen` emits type references, `server.ts` reads `getConfig('mongo').connectionString` (env-only) and compiles.
-**Depends on**: nothing (self-contained appTypes change)
-**Relates to**: [P1j](codegen-zero-init.md) Phase 3 (same file, `appTypes.ts`; model branch ↔ config branch)
-**Time**: ~½ day
-**Origin**: 2026-06-01 review of `appTypes.ts` — config types are emitted by serializing live runtime values; a design smell with two failure modes.
+**Status**: ✅ implemented (shape-derived form, 2026-06-05). Verified: 5 unit tests, `tsc` clean, real `npm run gen` emits value-shape types, and the insailing regression (below) reproduced + fixed end-to-end in its Docker/CI container.
+**Depends on**: nothing (self-contained `appTypes.ts` change)
+**Relates to**: [P1j](codegen-zero-init.md) Phase 3 (same file)
+**Time**: ~1 day (incl. a reverted first attempt)
+**Origin**: 2026-06-01 review of `appTypes.ts` — config types were emitted by `JSON.stringify`-ing live runtime values; a design smell with three failure modes (below).
 
-## Problem
+## Problem (original)
 
-`appTypes.ts` emits `getConfig()` overloads by `JSON.stringify`-ing the **resolved runtime value** of each config:
-
-```ts
-`getConfig(configName: '${name}'): ${JSON.stringify(value, null, 6)};`
-```
-
-`value` is the deep-merged live object (`server.ts` `#initConfigFiles` → `loadConfig`), every field already evaluated — including `process.env.*` reads. That produces three bugs:
+`appTypes.ts` emitted `getConfig()` overloads by `JSON.stringify`-ing the **resolved runtime value** — every field already evaluated, including `process.env.*`:
 
 | Config field | At gen time | Emitted type | Bug |
 |---|---|---|---|
-| `host: 'localhost'` | `'localhost'` | `"localhost"` | over-narrow **literal** (should be `string`) |
+| `host: 'localhost'` | `'localhost'` | `"localhost"` | over-narrow **literal** |
 | `port: process.env.PORT \|\| 3000` | `3000` | `3000` | literal narrowing |
-| `apiSecret: process.env.API_SECRET` | `undefined` | *(key dropped)* | **field silently vanishes** — `JSON.stringify` omits `undefined` keys |
+| `apiSecret: process.env.API_SECRET` | a real value | `"sk-live-…"` | **secret value baked into the file** |
 
-And the only way to stop an env-only field vanishing is to populate the env var at gen time — which bakes the **secret value** into the committed `genTypes.d.ts`. Vanish or leak; no safe choice.
+## First attempt (REVERTED) — `typeof import()` references
 
-## Fix — mirror the model branch
+Emitted `getConfig('http'): typeof import('./src/config/http.ts').default`. Solved the leak/narrowing, but **regressed a real consumer (insailing)** and was reverted:
 
-The model branch of the same function already does the right thing: it references the module type (`typeof import('…').default`), never a value. Make config consistent.
+- TS infers an array config value's element type as a **union with `?: undefined` keys** (`{ 'a': string; 'b'?: undefined } | …`). That breaks `Object.values(item)` → it widens to `any` (TS7053 downstream). The old value-snapshot kept clean per-element tuple types, so this worked before. → a genuine regression.
+- The `import()` reference also depends on the consumer resolving `import('./config/foo.ts')` inside a `declare module` augmentation — fragile across module settings and **preview compilers** (older `tsgo` builds resolved it to `any`).
+- It only surfaced on **CI**: insailing type-checks with `tsgo`, whose mac binary was broken locally (so `check:types` never ran locally), while GitHub Actions on Linux ran it and caught the error.
+
+## Fix (shipped) — inline value-**shape** types
+
+Walk the resolved config **value** and emit its structure with value *types* (`string`, `number`), never the literals, never an `import()`:
 
 ```ts
-// before: a value snapshot
-getConfig(configName: 'http'): { "port": 3300, "hostname": "0.0.0.0", … };
-
-// after: a type reference (shape, not values)
-getConfig(configName: 'http'): typeof import('./src/config/http.ts').default
-  & Partial<typeof import('./src/config/http.production.ts').default>;
+// value: { domains: [ { 'insailing.com': 'en' }, … ] }
+getConfig(configName: 'siteMap'): { "domains": [{ "insailing.com": string }, { "insailing.ru": string }, { "insailing.de": string }] };
 ```
 
-This dissolves all three bugs:
-- **No leak possible** — types only; zero values in the file.
-- **Env fields stay** — TS types `process.env.X` as `string | undefined`, so the field is present and correctly optional.
-- **No literal narrowing** — `process.env.PORT || 3000` infers `string | number`, not `3000`.
+- **No leak** — value *types*, not values.
+- **No literal narrowing** — `string`, not `"localhost"`.
+- **Inline** — no module resolution, so it can't degrade to `any` on any compiler/preview.
+- **Structure-preserving** — arrays stay **tuples**, so `Object.values(config.list[0])` keeps precise per-element types (the regression fix, validated in the container).
 
-### The merge
-
-Post-inheritance (`getFilesPathWithInheritance`) a project config file **wholesale-replaces** the framework one, so a config name resolves to **one base file + optional `NODE_ENV` layer(s)**. Emit the base as a required type-reference and every other layer as `& Partial<typeof import(layer).default>` — intersection over-approximates deepmerge but captures the shape faithfully, and is `NODE_ENV`-independent (all discovered layers included, not just the active one).
+Trade-off carried over from the original: an `undefined`-valued key at gen time is **dropped** (no knowable type) — the long-standing behavior consumers already tolerated.
 
 ## Plumbing
 
-Codegen currently only receives merged *values* (`cache.configs`); the loader discards the file *paths* after merging. To emit type references we cache the paths, mirroring `cache.modelPaths`:
-
 | File | Change |
 |---|---|
-| `src/server.ts` | `AppCache.configPaths: Map<string, Record<string, string>>`; init in cache literal; populate from `configFiles` in `#initConfigFiles`. `cache.configs` (values) untouched — runtime `getConfig` still needs it. |
-| `src/codegen/appTypes.ts` | `getTemplate` takes `configPaths` instead of `configs`; config branch emits `typeof import(base).default & Partial<…>` per layer; `generateAppTypes` passes `app.internalFilesCache.configPaths`. |
-| `src/codegen/appTypes.test.ts` | NEW — unit test of the config branch (pure string templating; `modelPaths: []` so no model imports). Asserts type-reference output + `Partial<>` env layer; asserts no `JSON`-value snapshot. |
-| `CHANGELOG.md` | entry under `[5.0.0-next]`. |
+| `src/codegen/appTypes.ts` | `getTemplate(configs, modelPaths)` reads `cache.configs` (values); new `valueToTypeString(value)` recursively renders the value-shape type (objects → `{ "k": T }`, arrays → tuples, scalars → their type, exotic → `unknown`, `undefined` keys dropped). |
+| `src/codegen/appTypes.test.ts` | 5 unit tests: value-types-not-literals, array-stays-tuple (the siteMap case), undefined-key dropped, no `import()`, exotic/empty handling. |
+| `src/server.ts` | reverted the first attempt's `configPaths` cache field + population (unused again). |
+| `CHANGELOG.md` | `[FIX]` entry (value-shape form). |
 
 ## Done when
 
-- `getConfig('x')` returns the config module's **inferred type**, not a value snapshot.
-- An env-only field (no `||` default) is present in the generated type (not dropped), and no secret value appears in `genTypes.d.ts`.
-- `npx vitest run src/codegen/appTypes.test.ts` green; `tsc --noEmit` clean; full suite unchanged (minus pre-existing redis-env flakes).
+- `getConfig('x')` returns a value-shape type — no literal values, no `import()`, arrays as tuples.
+- `npx vitest run src/codegen/appTypes.test.ts` green; `tsc` clean; insailing `Object.values(domains[0])` resolves to `string` (not `any`).
 
 ## Out of scope
 
-- Removing config-file `import()` at gen time entirely — `configPaths` is derivable from a pure directory scan (no module evaluation), which would feed [P1j](codegen-zero-init.md)'s zero-init goal. Left as a follow-up; this change is value-coupling removal only.
-- Validating config against a declared schema at boot (a larger "config schema" feature). This is type-shape only.
+- Declared config schemas / runtime validation (a larger feature). This is type-shape only.

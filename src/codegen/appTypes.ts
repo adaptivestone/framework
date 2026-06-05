@@ -21,37 +21,79 @@ export async function generateAppTypes(
   logger?: CodegenLogger | null,
 ): Promise<void> {
   const template = await getTemplate(
-    app.internalFilesCache.configPaths,
+    app.internalFilesCache.configs,
     app.internalFilesCache.modelPaths,
   );
   await fs.writeFile(`${process.cwd()}/genTypes.d.ts`, template);
   logger?.info?.('TypeScript types generated successfully at genTypes.d.ts');
 }
 
-/** Render the `genTypes.d.ts` template text from config paths + model paths. */
+/**
+ * Render a TypeScript type from a runtime config value's **shape** — value
+ * *types* (`string`, `number`), never the literal values. This is emitted
+ * inline (no `import()` to resolve, so output is robust across compilers and
+ * module settings) and structure-preserving (arrays stay tuples, so patterns
+ * like `Object.values(config.list[0])` keep precise per-element types) — while
+ * never serializing a secret value into the generated file.
+ *
+ * `undefined`-valued object keys are dropped (a field whose value is absent at
+ * gen time has no knowable type; same as the historical `JSON.stringify` form).
+ */
+function valueToTypeString(value: unknown): string {
+  if (value === null) {
+    return 'null';
+  }
+  switch (typeof value) {
+    case 'string':
+      return 'string';
+    case 'number':
+      return 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'bigint':
+      return 'bigint';
+    case 'undefined':
+      return 'undefined';
+    case 'function':
+      return '((...args: any[]) => any)';
+    case 'object': {
+      if (Array.isArray(value)) {
+        return value.length === 0
+          ? 'unknown[]'
+          : `[${value.map(valueToTypeString).join(', ')}]`;
+      }
+      // Only walk plain objects; anything exotic (Date, RegExp, Map, …) is opaque.
+      const proto = Object.getPrototypeOf(value);
+      if (proto !== Object.prototype && proto !== null) {
+        return 'unknown';
+      }
+      const entries = Object.entries(value as Record<string, unknown>).filter(
+        ([, v]) => v !== undefined,
+      );
+      if (entries.length === 0) {
+        return '{}';
+      }
+      const body = entries
+        .map(([k, v]) => `${JSON.stringify(k)}: ${valueToTypeString(v)}`)
+        .join('; ');
+      return `{ ${body} }`;
+    }
+    default:
+      return 'unknown';
+  }
+}
+
+/** Render the `genTypes.d.ts` template text from config values + model paths. */
 export async function getTemplate(
-  configPaths: Map<string, Record<string, string>>,
+  configs: Map<string, unknown>,
   modelPaths: { file: string; path: string }[],
 ): Promise<string> {
   const dir = process.cwd();
-  // Emit `getConfig` as a reference to each config module's inferred type —
-  // never a serialized value. Serializing live values leaks secrets into the
-  // committed file and drops env-only fields (`JSON.stringify` omits
-  // `undefined`). A config name resolves (post-inheritance) to one base file
-  // plus optional `NODE_ENV` layers; the base is required, each extra layer is
-  // `& Partial<…>` (deep-merged at runtime, optional and env-independent here).
-  const typeRef = (filePath: string) =>
-    `typeof import('${filePath.replace(dir, '.')}').default`;
-  const configTypes = Array.from(configPaths)
-    .map(([name, layers]) => {
-      const baseKey = layers.default ? 'default' : Object.keys(layers)[0];
-      const base = layers[baseKey];
-      const overlays = Object.entries(layers)
-        .filter(([key]) => key !== baseKey)
-        .map(([, p]) => ` & Partial<${typeRef(p)}>`)
-        .join('');
-      return `    getConfig(configName: '${name}'): ${typeRef(base)}${overlays};`;
-    })
+  const configTypes = Array.from(configs)
+    .map(
+      ([name, value]) =>
+        `    getConfig(configName: '${name}'): ${valueToTypeString(value)};`,
+    )
     .join('\n');
 
   const modelTypes = (

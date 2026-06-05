@@ -2,61 +2,62 @@ import { describe, expect, it } from 'vitest';
 import { getTemplate } from './appTypes.ts';
 
 /**
- * The config branch of `getTemplate` is pure string templating — it references
- * each config module's type via `import()`, it never imports or serializes the
- * config *values*. These tests pin that contract (no value snapshots → no
- * secret leak, no dropped env-only fields). `modelPaths` is empty so nothing is
- * imported; the config paths need not exist on disk.
+ * The config branch of `getTemplate` emits a TypeScript type derived from each
+ * config value's *shape* — value types (`string`, `number`), never the literal
+ * values. These tests pin that contract: no secret leak, structure-preserving
+ * (arrays stay tuples so `Object.values(item)` keeps precise types), and inline
+ * (no `import()` to resolve). `modelPaths` is empty so nothing is imported.
  */
-describe('appTypes — config type emission', () => {
-  const dir = process.cwd();
+describe('appTypes — config type emission (shape-derived)', () => {
+  const get = (name: string, value: unknown) =>
+    getTemplate(new Map<string, unknown>([[name, value]]), []);
 
-  it('emits getConfig as a type reference, not a serialized value', async () => {
-    const configPaths = new Map<string, Record<string, string>>([
-      ['http', { default: `${dir}/src/config/http.ts` }],
-    ]);
-    const out = await getTemplate(configPaths, []);
+  it('emits value TYPES, never literal values', async () => {
+    const out = await get('http', {
+      hostname: '0.0.0.0',
+      port: 3300,
+      cors: true,
+    });
     expect(out).toContain(
-      "getConfig(configName: 'http'): typeof import('./src/config/http.ts').default;",
+      `getConfig(configName: 'http'): { "hostname": string; "port": number; "cors": boolean };`,
     );
+    // no leaked literal value
+    expect(out).not.toContain('0.0.0.0');
+    expect(out).not.toContain('3300');
   });
 
-  it('intersects NODE_ENV layers as Partial<>', async () => {
-    const configPaths = new Map<string, Record<string, string>>([
-      [
-        'mongo',
-        {
-          default: `${dir}/src/config/mongo.ts`,
-          production: `${dir}/src/config/mongo.production.ts`,
-        },
+  it('keeps arrays as tuples so per-element types survive (the siteMap regression)', async () => {
+    const out = await get('siteMap', {
+      domains: [
+        { 'insailing.com': 'en' },
+        { 'insailing.ru': 'ru' },
+        { 'insailing.de': 'de' },
       ],
-    ]);
-    const out = await getTemplate(configPaths, []);
+    });
     expect(out).toContain(
-      "getConfig(configName: 'mongo'): typeof import('./src/config/mongo.ts').default" +
-        " & Partial<typeof import('./src/config/mongo.production.ts').default>;",
+      `getConfig(configName: 'siteMap'): { "domains": [{ "insailing.com": string }, { "insailing.ru": string }, { "insailing.de": string }] };`,
+    );
+    expect(out).not.toContain("'en'");
+    expect(out).not.toContain(': "en"');
+  });
+
+  it('drops keys whose value is undefined at gen time', async () => {
+    const out = await get('mongo', { connectionString: undefined, pool: 5 });
+    expect(out).toContain(
+      `getConfig(configName: 'mongo'): { "pool": number };`,
     );
   });
 
-  it('never serializes config values (no inline object literal can leak)', async () => {
-    // getTemplate receives paths, not values — a secret in a config object can
-    // never be written into genTypes.d.ts. Guard against a regression back to
-    // `getConfig(...): { ...value... }`.
-    const configPaths = new Map<string, Record<string, string>>([
-      ['auth', { default: `${dir}/src/config/auth.ts` }],
-    ]);
-    const out = await getTemplate(configPaths, []);
-    expect(out).not.toMatch(/getConfig\([^)]*\):\s*\{/);
-    expect(out).toContain("typeof import('./src/config/auth.ts').default");
+  it('emits no import() — the type is fully inline (compiler-robust)', async () => {
+    const out = await get('auth', { secret: 'shh', salt: 10 });
+    expect(out).not.toContain('import(');
+    expect(out).not.toContain('shh');
   });
 
-  it('falls back to the first layer when there is no default base file', async () => {
-    const configPaths = new Map<string, Record<string, string>>([
-      ['onlyEnv', { production: `${dir}/src/config/onlyEnv.production.ts` }],
-    ]);
-    const out = await getTemplate(configPaths, []);
+  it('handles empty objects / arrays and exotic values', async () => {
+    const out = await get('misc', { empty: {}, list: [], when: new Date() });
     expect(out).toContain(
-      "getConfig(configName: 'onlyEnv'): typeof import('./src/config/onlyEnv.production.ts').default;",
+      `getConfig(configName: 'misc'): { "empty": {}; "list": unknown[]; "when": unknown };`,
     );
   });
 });
