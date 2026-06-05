@@ -84,7 +84,14 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** `AbstractController` constructor third argument `isExpressMergeParams` removed. The old default Express-router behavior of stripping parent params is gone — all matched params (across the full path, including the controller prefix) are available on `req.params`. If you relied on the merge-params toggle, no action needed in most cases; if you specifically depended on the strip behavior, restructure your handler to filter `req.params` keys.
 
 ---
-## [5.0.0-beta.52-next]
+## [5.0.0-beta.53-next ]
+
+- **[NEW]** Codegen reads controllers without running their constructors. `generatetypes` now introspects each controller via a prototype-only "ghost" (`Object.create(Class.prototype)`) instead of `new Controller(app, prefix)`, so config reads, client construction, and other constructor side effects no longer fire during type generation. Runtime is unchanged — handlers still bind to real instances.
+- **[DEPRECATED]** A controller whose `routes` getter reads **constructor-set state** is deprecated. Codegen transparently falls back to instantiating it (so nothing breaks) and emits a one-per-class `DeprecationWarning`, code `ASF_DEP_CTOR_ROUTES`. Make `routes` independent of constructor state; the instantiation fallback **will be removed in v6**.
+---
+
+
+## [5.0.0-beta.52]
 
 - **[NEW]** Middleware request/query schemas can be declared **statically** — `static get relatedRequestParameters()` / `static get relatedQueryParameters()`. The framework reads them without instantiating the middleware (avoids constructor side effects during route setup / codegen). Framework middlewares (`Pagination`) migrated.
 - **[DEPRECATED]** The **instance** form of those getters (`get relatedRequestParameters()` / `relatedQueryParameters` / `relatedReqParameters`) is deprecated and **will be removed in v6** — migrate to the static form. It still works (the framework detects the override, instantiates as a fallback, and emits a one-per-class `DeprecationWarning`, code `ASF_DEP_MW_INSTANCE_SCHEMA`).
