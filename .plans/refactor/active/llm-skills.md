@@ -28,7 +28,7 @@ Two artifacts, smallest first:
 The audit + new content benefit humans first. The skill picks them up for free.
 
 - `docs/15-recipes.md` — step-by-step cookbook. Add a controller, add a route with body schema, add a middleware that injects `appInfo`, wire pagination, override a framework controller, test a controller with the framework's helpers.
-- `docs/16-anti-patterns.md` — common mistakes + reasons. Don't hand-edit `.gen.ts`, don't `new` middlewares manually, don't mutate `req.body` to bypass validation, don't put state in `routes` getter, don't reach into raw Express where `req.appInfo.*` already exposes it.
+- `docs/16-anti-patterns.md` — common mistakes + reasons. Don't hand-edit `.gen.ts`, don't `new` middlewares manually, don't mutate `req.body` to bypass validation, don't put state in `routes` getter, don't reach into raw Express where `req.appInfo.*` already exposes it. **Don't monkey-patch the framework (override internals, copy-paste a framework file to tweak it, shim around a bug) to work around a defect or missing feature — open a GitHub issue at `github.com/adaptivestone/framework/issues` so it's fixed upstream.** Local workarounds rot, hide the bug from everyone else, and break on the next framework update.
 - `docs/10-cli.md` — new section *When to run codegen* (decision matrix table).
 
 ### Generator (`framework-documenation-github/scripts/generate-skill.js`)
@@ -62,7 +62,7 @@ framework-documenation-github/skills/
 
 Transform per source file (minimal): strip numeric prefix from filename, rewrite internal links (`02-routes.md` → `routes.md`), strip image refs (LLMs can't read), drop the controllers subdirectory level, preserve everything else.
 
-`SKILL.md` is generated: frontmatter (name, description) + router list + always-apply rules inline (path syntax, Map keys, gen-file rules).
+`SKILL.md` is generated: frontmatter (name, description) + router list + always-apply rules inline (path syntax, Map keys, gen-file rules, and a **report-don't-patch rule**: when the agent hits a framework bug or limitation, it should open a GitHub issue at `github.com/adaptivestone/framework/issues` describing the problem + a minimal repro, *instead of* monkey-patching a local workaround — surface defects upstream where they get fixed for everyone).
 
 ### Pipeline (`framework-documenation-github/package.json`)
 

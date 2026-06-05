@@ -12,6 +12,7 @@
  */
 
 import { makeOncePerClassWarner } from '../helpers/deprecation.ts';
+import { noopLogger } from '../helpers/logger.ts';
 import type AbstractController from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
 
@@ -48,6 +49,15 @@ export function ghostController<T extends typeof AbstractController>(
   const fields = ghost as unknown as { app: IApp; prefix: string };
   fields.app = app;
   fields.prefix = prefix;
+  // Shadow the `Base.logger` getter: on a ghost its private-field read throws
+  // and the catch path emits a misleading "logger accessed outside a Base
+  // instance (model proxy)" console.warn on every access. A default or
+  // log-touching `routes` getter would spam that during `gen`; the no-op keeps
+  // the read clean and silent.
+  Object.defineProperty(ghost, 'logger', {
+    value: noopLogger,
+    configurable: true,
+  });
   try {
     // Touch exactly what registration + metadata extraction read.
     void (ghost as unknown as { routes: unknown }).routes;

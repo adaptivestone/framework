@@ -114,4 +114,18 @@ describe('ghostController — codegen read with fallback', () => {
 
     expect(ghostSafeCtor).toBe(before + 1); // real `new`
   });
+
+  it('does not emit a console.warn when a ghost reads the default (logger-touching) routes getter', () => {
+    // A controller that does not override `routes` inherits AbstractController's
+    // default, which calls `this.logger?.warn(...)`. Without the logger shadow,
+    // the ghost's private-field read throws and Base logs a misleading
+    // "model proxy" warning on every access — noisy during `gen`.
+    class NoRoutesController extends AbstractController {}
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    ghostController(NoRoutesController, makeApp(new RouteRegistry()), '');
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });

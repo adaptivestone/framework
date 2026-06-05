@@ -84,10 +84,11 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** `AbstractController` constructor third argument `isExpressMergeParams` removed. The old default Express-router behavior of stripping parent params is gone — all matched params (across the full path, including the controller prefix) are available on `req.params`. If you relied on the merge-params toggle, no action needed in most cases; if you specifically depended on the strip behavior, restructure your handler to filter `req.params` keys.
 
 ---
-## [5.0.0-beta.53-next ]
+## [5.0.0-beta.53]
 
 - **[NEW]** Codegen reads controllers without running their constructors. `generatetypes` now introspects each controller via a prototype-only "ghost" (`Object.create(Class.prototype)`) instead of `new Controller(app, prefix)`, so config reads, client construction, and other constructor side effects no longer fire during type generation. Runtime is unchanged — handlers still bind to real instances.
 - **[DEPRECATED]** A controller whose `routes` getter reads **constructor-set state** is deprecated. Codegen transparently falls back to instantiating it (so nothing breaks) and emits a one-per-class `DeprecationWarning`, code `ASF_DEP_CTOR_ROUTES`. Make `routes` independent of constructor state; the instantiation fallback **will be removed in v6**.
+- **[FIX]** Model-using CLI commands now wait for the MongoDB connection before running. Previously `#mongooseConnect()` was fire-and-forget, so a CLI command (`isShouldInitModels`) could fire its first query before the connection was established and rely on mongoose's buffer (default 10s `bufferTimeoutMS`) — causing intermittent "buffering timed out" failures on slow connects. Now `initAllModels({ waitForConnection: true })` (used only by model-using CLI commands) blocks until the connection is ready, with explicit progress logs (`Connecting to MongoDB…`, `MongoDB connection established in Nms`, `waiting … → ready after Nms`). Modelless commands (e.g. `generatetypes`) and the HTTP server are unaffected — the server stays lazy (requests buffer until ready).
 ---
 
 

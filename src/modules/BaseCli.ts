@@ -180,7 +180,7 @@ class Cli extends Base {
         command,
         parsedArgs.values,
       );
-      await this.server.initAllModels();
+      await this.server.initAllModels({ waitForConnection: true });
     } else {
       console.info(`Command ${command} NOT need to isShouldInitModels`);
     }

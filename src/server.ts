@@ -71,6 +71,14 @@ class Server {
 
   #isModelsLoaded = false;
 
+  /**
+   * The in-flight (or settled) initial mongoose connection. Kicked off once by
+   * `initAllModels`; the HTTP server never blocks on it (requests buffer until
+   * ready), but model-using CLI commands await it so their first query doesn't
+   * race a not-yet-established connection.
+   */
+  #mongooseConnectionPromise: null | Promise<void> = null;
+
   #i18nService?: I18n;
 
   #i18nServicePromise?: Promise<I18n>;
@@ -216,56 +224,83 @@ class Server {
     const mongoose = (await import('mongoose')).default;
     mongoose.set('strictQuery', true);
 
-    if (!mongoose.connection.readyState) {
-      this.app.events.on('shutdown', async () => {
-        this.app.logger.verbose(
-          'Shutdown was called. Closing all mongoose connections',
-        );
-        for (const c of mongoose.connections) {
-          c.close(true);
-        }
-        // await mongoose.disconnect(); // TODO it have problems with replica-set
-      });
-      const connectionParams: {
-        appName?: string;
-      } = {};
-      if (process.env.MONGO_APP_NAME) {
-        if (process.env.MONGO_APP_NAME.length >= 64) {
-          // https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md?plain=1#L460
-          // all metadata 512 and app name 128, better to keep as low as possible
-          this.app.logger.error(
-            `Mongo connection MONGO_APP_NAME mare then 64 symbols. This is a limitation of mogno driver. Ignoring it  ${process.env.MONGO_APP_NAME}`,
-          );
-        } else {
-          connectionParams.appName = process.env.MONGO_APP_NAME;
-        }
+    if (mongoose.connection.readyState) {
+      // already connected or connecting — nothing to wait for
+      return;
+    }
+
+    this.app.events.on('shutdown', async () => {
+      this.app.logger.verbose(
+        'Shutdown was called. Closing all mongoose connections',
+      );
+      for (const c of mongoose.connections) {
+        c.close(true);
       }
-      mongoose
-        .connect(
-          this.app.getConfig('mongo').connectionString as string,
-          connectionParams,
-        )
-        .then(
-          () => {
-            this.app.logger.info(
-              `Mongo connection success ${connectionParams.appName}`,
-            );
-            mongoose.connection.on('error', (err) => {
-              this.app.logger.error('Mongo connection error', err);
-              console.error(err);
-            });
-          },
-          (error) => {
-            this.app.logger.error("Can't install mongodb connection", error);
-          },
+      // await mongoose.disconnect(); // TODO it have problems with replica-set
+    });
+    const connectionParams: {
+      appName?: string;
+    } = {};
+    if (process.env.MONGO_APP_NAME) {
+      if (process.env.MONGO_APP_NAME.length >= 64) {
+        // https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md?plain=1#L460
+        // all metadata 512 and app name 128, better to keep as low as possible
+        this.app.logger.error(
+          `Mongo connection MONGO_APP_NAME mare then 64 symbols. This is a limitation of mogno driver. Ignoring it  ${process.env.MONGO_APP_NAME}`,
         );
+      } else {
+        connectionParams.appName = process.env.MONGO_APP_NAME;
+      }
+    }
+
+    const appNameLog = connectionParams.appName
+      ? ` (appName: ${connectionParams.appName})`
+      : '';
+    this.app.logger.info(`Connecting to MongoDB${appNameLog}…`);
+    const startedAt = performance.now();
+    // Returns/awaits the connect promise (unlike the old fire-and-forget
+    // `.then`), so callers that need a live connection — model-using CLI
+    // commands — can await it. The HTTP server still kicks it off without
+    // awaiting.
+    try {
+      await mongoose.connect(
+        this.app.getConfig('mongo').connectionString as string,
+        connectionParams,
+      );
+      this.app.logger.info(
+        `MongoDB connection established${appNameLog} in ${(
+          performance.now() - startedAt
+        ).toFixed(0)}ms`,
+      );
+      mongoose.connection.on('error', (err) => {
+        this.app.logger.error('Mongo connection error', err);
+        console.error(err);
+      });
+    } catch (error) {
+      this.app.logger.error(
+        `Can't install mongodb connection${appNameLog} after ${(
+          performance.now() - startedAt
+        ).toFixed(0)}ms`,
+        error,
+      );
+      throw error;
     }
   }
 
   /**
-   * Load model and init them
+   * Load model and init them.
+   *
+   * `waitForConnection` (model-using CLI commands): block until the mongoose
+   * connection is actually established before returning, so the command's first
+   * query doesn't race a not-yet-ready connection. The HTTP server leaves it
+   * `false` — it kicks the connection off and lets requests buffer until ready.
+   * Schema registration below never needs a live connection either way.
    */
-  async initAllModels(): Promise<void> {
+  async initAllModels({
+    waitForConnection = false,
+  }: {
+    waitForConnection?: boolean;
+  } = {}): Promise<void> {
     if (this.#isModelsInited) {
       // already inited
       return;
@@ -278,7 +313,11 @@ class Server {
 
     if (this.app.getConfig('mongo').connectionString) {
       const { BaseModel } = await import('./modules/BaseModel.ts');
-      this.#mongooseConnect(); //do not wait for connection. Any time for us it ok
+      // Kick the connection off once (shared promise). Not awaited here — model
+      // schema registration below works against an unconnected mongoose.
+      if (!this.#mongooseConnectionPromise) {
+        this.#mongooseConnectionPromise = this.#mongooseConnect();
+      }
       for (const [modelName, ModelConstructor] of this.cache
         .modelConstructors) {
         try {
@@ -304,6 +343,33 @@ class Server {
             );
           }
         }
+      }
+
+      if (waitForConnection) {
+        this.app.logger.info(
+          'Waiting for the MongoDB connection to be ready before continuing (caller requested a live connection — avoids racing a not-yet-established connection on the first query)…',
+        );
+        const waitStartedAt = performance.now();
+        try {
+          await this.#mongooseConnectionPromise;
+          this.app.logger.info(
+            `MongoDB connection ready after ${(
+              performance.now() - waitStartedAt
+            ).toFixed(0)}ms — continuing.`,
+          );
+        } catch (error) {
+          this.app.logger.error(
+            'MongoDB connection failed — aborting (a ready database connection was required).',
+            error,
+          );
+          throw error;
+        }
+      } else {
+        // HTTP server (and any non-waiting caller): the connection is
+        // fire-and-forget, so attach a handler to keep a connect failure from
+        // surfacing as an unhandled rejection (it's already logged inside
+        // `#mongooseConnect`).
+        this.#mongooseConnectionPromise.catch(() => {});
       }
     } else {
       this.app.logger.warn(
