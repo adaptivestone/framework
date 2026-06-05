@@ -22,6 +22,7 @@ import type {
 } from './collectMetadata.ts';
 import { extractControllerMeta } from './collectMetadata.ts';
 import { emitGenFile } from './emit.ts';
+import { ghostController } from './ghostController.ts';
 
 /** Generate per-controller `.routes.gen.ts` files. */
 export async function generateRouteTypes(
@@ -37,7 +38,15 @@ export async function generateRouteTypes(
   } as any;
 
   const cm = new ControllerManager(app);
-  await cm.initControllers({ skipWrap: true });
+  // Codegen drives its own load->register loop: discover classes (no `new`),
+  // read each via a constructor-less ghost (codegen layer), and register the
+  // ghost instance. `skipWrap: true` skips wrapping handlers with validation
+  // (no middleware instantiation). The runtime path is untouched.
+  const classes = await cm.loadControllerClasses();
+  for (const { ControllerClass, prefix } of classes) {
+    const ghost = ghostController(ControllerClass, app, prefix);
+    cm.registerControllerInstance(ghost, prefix, { skipWrap: true });
+  }
   const flatByKey = indexFlatRoutes(registry.flatten());
 
   const controllers = Object.values(cm.controllers);

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import * as url from 'node:url';
 import type { NextFunction, Response } from 'express';
+import { makeOncePerClassWarner } from '../helpers/deprecation.ts';
 import type AbstractController from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
@@ -33,19 +34,14 @@ const MAP_KEY_METHODS: ReadonlySet<string> = new Set([...HTTP_METHODS, 'ALL']);
 
 // Middleware schema reading (P1j Phase 1): prefer the static getters; the
 // instance form is deprecated. A middleware is only instantiated when it
-// actually overrides the deprecated instance getter — warned once per class.
-const warnedInstanceSchema = new WeakSet<MiddlewareEntry['Class']>();
-
-function warnInstanceSchemaDeprecated(Class: MiddlewareEntry['Class']): void {
-  if (warnedInstanceSchema.has(Class)) {
-    return;
-  }
-  warnedInstanceSchema.add(Class);
-  process.emitWarning(
-    `Middleware "${Class.name}" declares request/query schemas via the deprecated instance getter (relatedRequestParameters / relatedQueryParameters). Switch to the static form (static get relatedRequestParameters() { ... }) — the instance form forces instantiation and will be removed in v6.`,
-    { type: 'DeprecationWarning', code: 'ASF_DEP_MW_INSTANCE_SCHEMA' },
-  );
-}
+// actually overrides the deprecated instance getter — warned once per class
+// (shared neutral warner factory; see `helpers/deprecation.ts`). This is a
+// RUNTIME concern, read in `#wrapHandlerEntry` at server boot.
+const warnInstanceSchemaDeprecated = makeOncePerClassWarner(
+  'ASF_DEP_MW_INSTANCE_SCHEMA',
+  (name) =>
+    `Middleware "${name}" declares request/query schemas via the deprecated instance getter (relatedRequestParameters / relatedQueryParameters). Switch to the static form (static get relatedRequestParameters() { ... }) — the instance form forces instantiation and will be removed in v6.`,
+);
 
 /**
  * Does a middleware class override the deprecated instance schema getters? Walks
@@ -88,9 +84,27 @@ class ControllerManager extends Base {
     prefix = '',
     options: { skipWrap?: boolean } = {},
   ): InstanceType<T> {
-    const name = ControllerClass.name.toLowerCase();
-    const key = prefix ? `${prefix}/${name}` : name;
     const instance = new ControllerClass(this.app, prefix) as InstanceType<T>;
+    return this.registerControllerInstance(instance, prefix, options);
+  }
+
+  /**
+   * Register an already-constructed controller instance: store it, build its
+   * `RouteNode` subtree (from `routes` + the static middleware Map), optionally
+   * wrap handlers with validation, and register with the `RouteRegistry`.
+   *
+   * This is the instance-accepting seam runtime registration and codegen share:
+   * runtime passes a real `new` instance (handlers bind to it); codegen passes a
+   * constructor-less ghost (see `codegen/ghostController.ts`) so type generation
+   * runs no constructor side effects. Tree/middleware semantics live here once.
+   */
+  registerControllerInstance<T extends AbstractController>(
+    instance: T,
+    prefix = '',
+    options: { skipWrap?: boolean } = {},
+  ): T {
+    const name = instance.constructor.name.toLowerCase();
+    const key = prefix ? `${prefix}/${name}` : name;
     this.controllers[key] = instance;
 
     const registry = this.app.httpServer?.routeRegistry;
@@ -103,7 +117,7 @@ class ControllerManager extends Base {
 
     const source: MiddlewareEntry['source'] = {
       kind: 'package',
-      spec: `<${ControllerClass.name}>`,
+      spec: `<${instance.constructor.name}>`,
     };
     const subtree = this.#buildSubtree(instance, source);
     // `skipWrap` is the codegen escape hatch — we only need the tree
@@ -119,22 +133,25 @@ class ControllerManager extends Base {
   }
 
   /**
-   * Auto-load controllers from the framework's internal folder and the user's
-   * external folder, then register each one. User overrides win when filenames
-   * collide (handled by `getFilesPathWithInheritance`).
+   * Discover and import every controller module — framework-internal plus the
+   * user's folder, with user overrides winning on filename collision (handled by
+   * `getFilesPathWithInheritance`). Returns each class with its folder prefix.
    *
-   * `options.skipWrap` (codegen-only): build the registry tree without
-   * wrapping handlers with validation. Skips middleware instantiation —
-   * which avoids side effects (Redis clients, timers) in introspection
-   * commands like `generatetypes`.
+   * The shared "load" step that does not instantiate — runtime boot
+   * (`initControllers`) and codegen both drive the per-class loop from this.
+   * Imports run in parallel; the returned order is the index-first sort, so
+   * registration is deterministic.
    */
-  async initControllers(options: { skipWrap?: boolean } = {}) {
+  async loadControllerClasses(): Promise<
+    { ControllerClass: typeof AbstractController; prefix: string }[]
+  > {
     const dirname = url.fileURLToPath(new URL('.', import.meta.url));
     const controllersToLoad = await this.getFilesPathWithInheritance(
       dirname,
       this.app.foldersConfig.controllers,
     );
 
+    // Index files first so root-level routes/middleware land before nested ones.
     controllersToLoad.sort((a, b) => {
       if (
         a.file.toLowerCase().endsWith('index.js') ||
@@ -150,19 +167,30 @@ class ControllerManager extends Base {
       }
       return 0;
     });
-    const controllers = [];
-    for (const controller of controllersToLoad) {
-      controllers.push(
-        import(controller.path).then(({ default: ControllerModule }) => {
-          let prefix = path.dirname(controller.file);
-          if (prefix === '.') {
-            prefix = '';
-          }
-          this.registerController(ControllerModule, prefix, options);
-        }),
-      );
+
+    return Promise.all(
+      controllersToLoad.map(async ({ path: modulePath, file }) => {
+        const { default: ControllerClass } = await import(modulePath);
+        const dir = path.dirname(file);
+        return { ControllerClass, prefix: dir === '.' ? '' : dir };
+      }),
+    );
+  }
+
+  /**
+   * Auto-load controllers (see `loadControllerClasses`) and register each one
+   * with a real instance.
+   *
+   * `options.skipWrap` (codegen-only): build the registry tree without wrapping
+   * handlers with validation — skips middleware instantiation, which avoids side
+   * effects (Redis clients, timers) in introspection commands like
+   * `generatetypes`.
+   */
+  async initControllers(options: { skipWrap?: boolean } = {}) {
+    const classes = await this.loadControllerClasses();
+    for (const { ControllerClass, prefix } of classes) {
+      this.registerController(ControllerClass, prefix, options);
     }
-    await Promise.all(controllers);
   }
 
   /**
