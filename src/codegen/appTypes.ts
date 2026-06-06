@@ -109,6 +109,24 @@ export async function getTemplate(
     )
   ).join('\n');
 
+  // Bind `req.appInfo.user` to the project's `User` model (if it's a BaseModel),
+  // so it follows a replaced model exactly like `getModel('User')` does.
+  const userModel = modelPaths.find((m) => m.file === 'User');
+  let userAppInfo = '';
+  if (userModel) {
+    const mod = await import(userModel.path);
+    if (mod.default?.prototype instanceof BaseModel) {
+      const relPath = userModel.path.replace(dir, '.');
+      userAppInfo = `
+declare module '@adaptivestone/framework/models/User.js' {
+  export interface AppModels {
+    User: GetModelTypeFromClass<typeof import('${relPath}').default>;
+  }
+}
+`;
+    }
+  }
+
   return `
 import type {} from '@adaptivestone/framework/server.js';
 import type { GetModelTypeFromClass } from '@adaptivestone/framework/modules/BaseModel.js';
@@ -119,5 +137,5 @@ declare module '@adaptivestone/framework/server.js' {
       ${modelTypes}
   }
 }
-`;
+${userAppInfo}`;
 }

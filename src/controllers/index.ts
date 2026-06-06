@@ -115,11 +115,7 @@ class ControllerManager extends Base {
       return instance;
     }
 
-    const source: MiddlewareEntry['source'] = {
-      kind: 'package',
-      spec: `<${instance.constructor.name}>`,
-    };
-    const subtree = this.#buildSubtree(instance, source);
+    const subtree = this.#buildSubtree(instance);
     // `skipWrap` is the codegen escape hatch — we only need the tree
     // structure to emit types, not the runtime validation wrappers.
     // Wrapping instantiates every middleware in every handler's chain
@@ -200,10 +196,7 @@ class ControllerManager extends Base {
    * `{*splat}` → internal `*splat`. Map scope keys: `'METHOD/path'`,
    * `'ALL/path'`, `'/path'`.
    */
-  #buildSubtree(
-    controller: AbstractController,
-    source: MiddlewareEntry['source'],
-  ): RouteNode {
+  #buildSubtree(controller: AbstractController): RouteNode {
     const subtree = createNode('');
     const ctrlName = controller.constructor.name;
 
@@ -225,7 +218,7 @@ class ControllerManager extends Base {
           continue;
         }
         for (const [pathKey, routeSpec] of Object.entries(routeMap)) {
-          const entry = buildHandlerEntry(routeSpec, controller, source);
+          const entry = buildHandlerEntry(routeSpec, controller);
           if (!entry) {
             // Object spec but no callable `handler` field — a common
             // misconfiguration (e.g., `{ request: schema }` without a
@@ -276,7 +269,7 @@ class ControllerManager extends Base {
             `Controller ${ctrlName}: middleware Map key '${scopeKey}' has unknown method prefix '${parsed.unknownMethod}'. Treating the whole key as a path. Expected method prefix is one of: ${[...MAP_KEY_METHODS].join(', ')}.`,
           );
         }
-        const entries = normalizeMiddlewares(mwList, source);
+        const entries = normalizeMiddlewares(mwList);
         attachMiddlewares(
           subtree,
           parsed.method,
@@ -498,7 +491,6 @@ function convertPathSyntax(p: string): string {
 function buildHandlerEntry(
   spec: unknown,
   controller: object,
-  source: MiddlewareEntry['source'],
 ): HandlerEntry | null {
   if (typeof spec === 'function') {
     return {
@@ -540,7 +532,7 @@ function buildHandlerEntry(
     entry.bodyParsing = obj.bodyParsing;
   }
   if (Array.isArray(obj.middleware) && obj.middleware.length > 0) {
-    entry.middlewares = normalizeMiddlewares(obj.middleware, source);
+    entry.middlewares = normalizeMiddlewares(obj.middleware);
   }
   return entry;
 }

@@ -126,17 +126,25 @@ function chainFor(
     seen.add(name);
     out.push({
       className: name,
+      Class: entry.Class,
       ...(entry.params !== undefined ? { params: entry.params } : {}),
     });
   }
   return out;
 }
 
+/**
+ * Join a controller's URL prefix with a route sub-path the same way the
+ * registry builds flat-route paths: concatenate non-empty segments with a
+ * single `/`, no trailing slash. A root sub-path (`/`) under prefix `/file`
+ * must resolve to `/file` (not `/file/`), or the `flatByKey` lookup misses
+ * and the route's middleware chain comes back empty.
+ */
 function joinPath(prefix: string, sub: string): string {
-  const p = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
-  const s = sub.startsWith('/') ? sub : `/${sub}`;
-  const joined = `${p}${s}`;
-  return joined === '' ? '/' : joined;
+  const segments = [...prefix.split('/'), ...sub.split('/')].filter(
+    (s) => s.length > 0,
+  );
+  return segments.length === 0 ? '/' : `/${segments.join('/')}`;
 }
 
 /**

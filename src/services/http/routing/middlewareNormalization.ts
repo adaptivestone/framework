@@ -2,11 +2,6 @@
  * Convert authoring shorthand (`Class` or `[Class, params]`) into
  * canonical `MiddlewareEntry`. The registry stores only canonical form;
  * shorthand exists at the user-authoring boundary.
- *
- * `source` is caller-supplied — class references carry no import-path
- * info at runtime. Convention:
- *   - `{ kind: 'package', spec: 'pkg/sub/path' }` for npm imports
- *   - `{ kind: 'file',    spec: 'src/middleware/My.ts' }` for project files
  */
 
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
@@ -17,10 +12,7 @@ export type MiddlewareSpec =
   | readonly [typeof AbstractMiddleware, Record<string, unknown>];
 
 /** Throws `TypeError` on malformed input. */
-export function normalizeMiddleware(
-  spec: MiddlewareSpec,
-  source: MiddlewareEntry['source'],
-): MiddlewareEntry {
+export function normalizeMiddleware(spec: MiddlewareSpec): MiddlewareEntry {
   if (Array.isArray(spec)) {
     const [Class, params] = spec as [
       typeof AbstractMiddleware,
@@ -31,19 +23,18 @@ export function normalizeMiddleware(
         `normalizeMiddleware: tuple form expected [Class, params] but got [${typeof Class}, …]`,
       );
     }
-    return { Class, params, source };
+    return { Class, params };
   }
   if (typeof spec !== 'function') {
     throw new TypeError(
       `normalizeMiddleware: expected middleware class or [Class, params] tuple, got ${typeof spec}`,
     );
   }
-  return { Class: spec, source };
+  return { Class: spec };
 }
 
 export function normalizeMiddlewares(
   specs: ReadonlyArray<MiddlewareSpec>,
-  source: MiddlewareEntry['source'],
 ): MiddlewareEntry[] {
-  return specs.map((spec) => normalizeMiddleware(spec, source));
+  return specs.map((spec) => normalizeMiddleware(spec));
 }

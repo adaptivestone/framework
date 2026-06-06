@@ -16,6 +16,15 @@ export interface MiddlewareRef {
   className: string;
   /** Present when the middleware was declared as `[Class, params]` in a Map or route-level array. */
   params?: Record<string, unknown>;
+  /**
+   * The resolved middleware class, when the ref came from the live registry
+   * (codegen). Lets `emit` map the class back to the *local import binding*
+   * a controller uses for it — e.g. `Auth.ts` default-exports `AuthMiddleware`
+   * but controllers import it as `Auth`, so `className` ('AuthMiddleware')
+   * won't match the import map (keyed by binding). Absent in synthetic refs.
+   * Typed `unknown` — `emit` only needs reference identity, not the shape.
+   */
+  Class?: unknown;
 }
 
 /** One route registered by a controller. */

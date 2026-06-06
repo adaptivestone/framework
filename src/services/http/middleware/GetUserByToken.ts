@@ -1,11 +1,11 @@
 import type { NextFunction, Response } from 'express';
-import type { TUser } from '../../../models/User.ts';
+import type { AppUser, TUser } from '../../../models/User.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
 export interface GetUserByTokenAppInfo {
   appInfo: {
-    user?: InstanceType<TUser>;
+    user?: AppUser;
   };
 }
 
@@ -21,7 +21,7 @@ class GetUserByToken extends AbstractMiddleware {
    * type matters.
    */
   static get provides() {
-    return {} as { user?: InstanceType<TUser> };
+    return {} as { user?: AppUser };
   }
 
   get usedAuthParameters() {

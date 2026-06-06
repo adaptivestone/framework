@@ -1,7 +1,8 @@
 import type { Response } from 'express';
-import AbstractController from '../modules/AbstractController.ts';
+import AbstractController, {
+  type TMiddleware,
+} from '../modules/AbstractController.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
-import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 
 class Home extends AbstractController {
   get routes() {
@@ -20,8 +21,13 @@ class Home extends AbstractController {
     return '/';
   }
 
-  static get middleware() {
-    return new Map([['/{*splat}', [GetUserByToken]]]);
+  // Home is public AND mounts at `/`, so any `/{*splat}` middleware here would
+  // land on the route-tree root and run on EVERY request in the app. Override
+  // the inherited default `[GetUserByToken, Auth]` with an empty Map: Home adds
+  // no middleware and imposes nothing globally. (Re-add `[GetUserByToken]` if
+  // you want a token-aware, personalized home.)
+  static get middleware(): Map<string, TMiddleware> {
+    return new Map();
   }
 }
 

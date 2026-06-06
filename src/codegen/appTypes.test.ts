@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { getTemplate } from './appTypes.ts';
 
@@ -58,6 +59,37 @@ describe('appTypes — config type emission (shape-derived)', () => {
     const out = await get('misc', { empty: {}, list: [], when: new Date() });
     expect(out).toContain(
       `getConfig(configName: 'misc'): { "empty": {}; "list": unknown[]; "when": unknown };`,
+    );
+  });
+});
+
+/**
+ * `appInfo.user` must follow the project's `User` model (not the framework's)
+ * when it's replaced — so codegen emits an `AppModels` augmentation binding
+ * `User` to the project model, mirroring how it types `getModel('User')`.
+ */
+describe('appTypes — appInfo.user binding', () => {
+  const userModelPath = fileURLToPath(
+    new URL('../models/User.ts', import.meta.url),
+  );
+
+  it('emits an AppModels augmentation binding User to the project model', async () => {
+    const out = await getTemplate(new Map(), [
+      { file: 'User', path: userModelPath },
+    ]);
+    expect(out).toContain(
+      "declare module '@adaptivestone/framework/models/User.js'",
+    );
+    expect(out).toContain('export interface AppModels {');
+    expect(out).toMatch(
+      /User: GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>/,
+    );
+  });
+
+  it('emits no AppModels augmentation when there is no User model', async () => {
+    const out = await getTemplate(new Map(), []);
+    expect(out).not.toContain(
+      "declare module '@adaptivestone/framework/models/User.js'",
     );
   });
 });

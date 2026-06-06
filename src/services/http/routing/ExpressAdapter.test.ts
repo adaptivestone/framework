@@ -167,7 +167,6 @@ describe('createExpressAdapter — middleware order + short-circuit', () => {
     r.root.middlewares.push({
       // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
       Class: FirstMw as any,
-      source: { kind: 'package', spec: 't' },
     });
     r.registerRoute('GET', '/x', {
       handler: async (_req, res) => {
@@ -178,7 +177,6 @@ describe('createExpressAdapter — middleware order + short-circuit', () => {
         {
           // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class for tests
           Class: SecondMw as any,
-          source: { kind: 'package', spec: 't' },
         },
       ],
     });
@@ -204,7 +202,6 @@ describe('createExpressAdapter — middleware order + short-circuit', () => {
     r.root.middlewares.push({
       // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
       Class: ShortCircuitMw as any,
-      source: { kind: 'package', spec: 't' },
     });
     r.registerRoute('GET', '/protected', {
       handler: async () => {
@@ -248,7 +245,6 @@ describe('createExpressAdapter — error propagation', () => {
     r.root.middlewares.push({
       // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
       Class: FailingMw as any,
-      source: { kind: 'package', spec: 't' },
     });
     r.registerRoute('GET', '/x', { handler: async () => {} });
 
@@ -290,7 +286,6 @@ describe('createExpressAdapter — middleware instance caching', () => {
     r.root.middlewares.push({
       // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
       Class: CountedMw as any,
-      source: { kind: 'package', spec: 't' },
     });
     r.registerRoute('GET', '/x', {
       handler: async (_req, res) => {
@@ -325,7 +320,6 @@ describe('createExpressAdapter — middleware instance caching', () => {
     r.root.middlewares.push({
       // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
       Class: CountedMw as any,
-      source: { kind: 'package', spec: 't' },
     });
     r.registerRoute('GET', '/x', {
       handler: async (_req, res) => {

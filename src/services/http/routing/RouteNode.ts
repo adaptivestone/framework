@@ -38,14 +38,10 @@ export type BodyParsingMode = 'parsed' | 'raw' | 'none';
  * Canonical middleware shape stored in the registry. The `[Class, params]`
  * tuple shorthand is normalized to this struct at the boundary
  * (`middlewareNormalization.ts`).
- *
- * `source` carries import-path info so codegen can emit the right import
- * without scanning controller source.
  */
 export interface MiddlewareEntry {
   Class: typeof AbstractMiddleware;
   params?: Record<string, unknown>;
-  source: { kind: 'package' | 'file'; spec: string };
 }
 
 /**

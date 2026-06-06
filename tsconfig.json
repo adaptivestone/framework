@@ -18,5 +18,9 @@
     "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.js", "src/**/*.test.ts"]
+  "exclude": [
+    "src/**/*.test.js",
+    "src/**/*.test.ts",
+    "src/codegen/__fixtures__/**"
+  ]
 }

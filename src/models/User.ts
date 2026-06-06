@@ -16,6 +16,28 @@ export type UserModelLite = GetModelTypeLiteFromSchema<
 
 export type TUser = GetModelTypeFromClass<typeof User>;
 
+/**
+ * Augmentation point so `req.appInfo.user` follows a project's OWN `User` model
+ * when it replaces the framework's. `npm run gen` emits this automatically into
+ * `genTypes.d.ts` (mirroring how it types `app.getModel('User')`); declare it by
+ * hand only if you don't run codegen:
+ *
+ *   declare module '@adaptivestone/framework/models/User.js' {
+ *     interface AppModels { User: InstanceType<typeof MyUser>; }
+ *   }
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: augmentation target — empty by design
+export interface AppModels {}
+
+/**
+ * The `User` instance type middlewares contribute to `req.appInfo.user`: the
+ * project's own model when known (via `AppModels`), otherwise the framework's.
+ * Keeps `appInfo.user` in sync with `app.getModel('User')`.
+ */
+export type AppUser = AppModels extends { User: infer U }
+  ? U
+  : InstanceType<TUser>;
+
 class User extends BaseModel {
   static initHooks(schema: Schema) {
     schema.pre(

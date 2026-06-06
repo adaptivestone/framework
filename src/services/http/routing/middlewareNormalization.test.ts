@@ -15,52 +15,35 @@ class FakeMw {
   }
 }
 
-const source = {
-  kind: 'package' as const,
-  spec: '@adaptivestone/framework/middleware/Fake',
-};
-
 describe('normalizeMiddleware', () => {
   it('handles bare class form (no params)', () => {
     // biome-ignore lint/suspicious/noExplicitAny: synthetic stand-in for a real middleware class
-    const entry = normalizeMiddleware(FakeMw as any, source);
+    const entry = normalizeMiddleware(FakeMw as any);
     expect(entry.Class).toBe(FakeMw);
     expect(entry.params).toBeUndefined();
-    expect(entry.source).toBe(source);
   });
 
   it('handles tuple form [Class, params]', () => {
     const entry = normalizeMiddleware(
       // biome-ignore lint/suspicious/noExplicitAny: synthetic stand-in
       [FakeMw as any, { max: 5 }] as any,
-      source,
     );
     expect(entry.Class).toBe(FakeMw);
     expect(entry.params).toEqual({ max: 5 });
-    expect(entry.source).toBe(source);
   });
 
   it('throws TypeError on tuple with non-class first element', () => {
     expect(() =>
-      normalizeMiddleware(
-        // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
-        ['not-a-class' as any, {}] as any,
-        source,
-      ),
+      // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
+      normalizeMiddleware(['not-a-class' as any, {}] as any),
     ).toThrow(TypeError);
   });
 
   it('throws TypeError on plain non-class, non-tuple input', () => {
     expect(() =>
       // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
-      normalizeMiddleware('plain-string' as any, source),
+      normalizeMiddleware('plain-string' as any),
     ).toThrow(TypeError);
-  });
-
-  it('preserves the source reference (does not copy)', () => {
-    // biome-ignore lint/suspicious/noExplicitAny: synthetic
-    const e = normalizeMiddleware(FakeMw as any, source);
-    expect(e.source).toBe(source);
   });
 });
 
@@ -72,7 +55,7 @@ describe('normalizeMiddlewares', () => {
       // biome-ignore lint/suspicious/noExplicitAny: synthetic
       [FakeMw as any as typeof AbstractMiddleware, { x: 1 }],
     ];
-    const out = normalizeMiddlewares(specs, source);
+    const out = normalizeMiddlewares(specs);
 
     expect(out).toHaveLength(2);
     expect(out[0]?.Class).toBe(FakeMw);
@@ -82,6 +65,6 @@ describe('normalizeMiddlewares', () => {
   });
 
   it('empty input → empty output', () => {
-    expect(normalizeMiddlewares([], source)).toEqual([]);
+    expect(normalizeMiddlewares([])).toEqual([]);
   });
 });

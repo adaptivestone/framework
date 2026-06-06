@@ -8,7 +8,6 @@ const noop: HandlerEntry['handler'] = async () => {};
 const mw = (name: string): MiddlewareEntry => ({
   // biome-ignore lint/suspicious/noExplicitAny: dummy class for tests
   Class: { name } as any,
-  source: { kind: 'package', spec: 'test' },
 });
 
 describe('match — static segments', () => {
