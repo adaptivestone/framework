@@ -1,6 +1,6 @@
 import type { Response } from 'express';
-import { number, object, string } from 'yup';
 import AbstractController from '../../../modules/AbstractController.ts';
+import { defineSchema } from '../../../services/validate/defineSchema.ts';
 import type {
   GetItemRequest,
   PostCreateRequest,
@@ -17,6 +17,12 @@ import type {
  * The assignments to explicitly-typed locals are the gate: if a route's
  * `request`/`query` type falls back to `Record<string, unknown>`, or `params.id`
  * is missing, these lines stop type-checking and the golden test fails.
+ *
+ * Uses the zero-dependency `defineSchema` (not yup) deliberately: the codegen
+ * path is identical (it reads `StandardSchemaV1.InferOutput`), but defineSchema
+ * type-checks cheaply and deterministically — yup's heavy inference would make
+ * this `tsc`-gated test slow and load-sensitive, and yup is already covered
+ * end-to-end by the framework's own yup-based controllers under `check:types`.
  */
 class Schemas extends AbstractController {
   get routes() {
@@ -24,17 +30,23 @@ class Schemas extends AbstractController {
       post: {
         '/': {
           handler: this.postCreate,
-          request: object().shape({
-            title: string().required(),
-            count: number().required(),
+          request: defineSchema<{ title: string; count: number }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            return {
+              value: {
+                title: String(v.title ?? ''),
+                count: Number(v.count ?? 0),
+              },
+            };
           }),
         },
       },
       get: {
         '/:id': {
           handler: this.getItem,
-          query: object().shape({
-            q: string().required(),
+          query: defineSchema<{ q: string }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            return { value: { q: String(v.q ?? '') } };
           }),
         },
       },

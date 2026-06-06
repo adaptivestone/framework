@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.0.0-next]
+## [5.0.0-rc.1] - 2026-06-06
 
 This is a big release that contains a lot of new features and breaking changes.
 Main feature of that release is full TypeScript support including mongoose models.
@@ -66,13 +66,13 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** `RateLimiter` now need to have `IpDetector` middleware before.
 - **[BREAKING]** Removing `staticFiles` middleware as it not used in projects anymore. Docs with nginx config will be provided.
 - **[BREAKING]** Remove default `AUTH_SALT`. It should be provided on a app level now.
-- **[BREAKING]** Minimum node version is 20.12 as for now (`process.loadEnvFile`).
+- **[BREAKING]** Minimum Node version is **24.0.0** (enforced via `engines`). The framework runs your TypeScript sources directly, with no build step, which relies on Node's native type stripping.
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.
 - **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 - **[BREAKING]** Vitest v4 <https://vitest.dev/guide/migration.html#vitest-4>
 - **[BREAKING]** `@redis/client` v6. Now defaults to the RESP3 protocol (was RESP2) and requires a Redis ≥6 server; pass `createClient({ RESP: 2 })` to keep v5 wire behavior. Also adds a default 5s command timeout. <https://github.com/redis/node-redis/blob/master/docs/v5-to-v6.md>
-- **[BREAKING]** Yup ≥1.7 required (was ≥1.0). Stays as a direct dep — used by built-in `Auth` controller. Schemas must implement Standard Schema (`~standard`); yup ≥1.7 does this natively.
+- **[BREAKING]** Yup is no longer bundled — it's now an **optional peer dependency** (`^1.7.0`). The framework runtime is validator-agnostic (Standard Schema) and fully decoupled from yup; built-in controllers use the zero-dependency `defineSchema` helper. Bring your own validator only if you want one — yup (≥1.7, which implements Standard Schema natively), zod, valibot, or arktype. If your own schemas use yup, add it to your `dependencies`.
 - **[BREAKING]** Legacy `{validate, cast}` plain-object validators removed. Wrap as Standard Schema (~10 lines).
 - **[BREAKING]** Yup `req:` context inside `.test()` / `.when()` removed. Use `this.parent` or move logic to handler.
 - **[BREAKING]** Internal driver classes (`AbstractValidator`, `YupValidator`, `CustomValidator`) removed.
