@@ -1,6 +1,7 @@
 # P1j — Codegen zero-init
 
-**Status**: ⏳ in flight (Phase 0 ✅ beta.49 · Phase 1 ✅ beta.52 · Phase 2 ✅ 2026-06-04, pending release)
+**Status**: ⏳ in flight (Phase 0 ✅ beta.49 · Phase 1 ✅ beta.52 · Phase 2 ✅ 2026-06-04, pending release). Phases 3–4 = v5.1 (not a v5.0.0 blocker).
+**Release-readiness (2026-06-06)**: codegen convergence validated for the 5.0.0 tag — 21/21 codegen tests green; `npm run gen` + `tsc --noEmit` over the framework's own controllers clean (no warnings/deprecations); golden-fixture gate **hardened** with `Schemas` fixture locking the schema-output + params typing paths (`request:`/`query:` → typed `req.appInfo.request`/`.query`; `:id` → `req.params.id`) that the gate previously didn't exercise. No codegen bug surfaced — the recent beta.49–55 churn has settled.
 **Depends on**: P1b ✅ (registry primitives)
 **Time**: ~2 days across phases 1–4 (v5.1); ¼ day for phase 5 (v6)
 **Origin**: 2026-05-24 deep-dive on codegen confirmed `skipWrap: true` already avoids middleware instantiation, but controllers, configs, and models still get loaded. Goal: codegen with zero side-effecting `new` calls.

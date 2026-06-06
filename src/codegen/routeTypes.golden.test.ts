@@ -12,6 +12,10 @@
  *   - bug 1b: middleware imported under a binding ≠ its class name (`Auth`)
  *   - bug 2 : `appInfo.user` must be present AND non-optional behind `Auth`
  *   - inherited default middleware (a controller with no own middleware Map)
+ *   - schema-output + params typing (`Schemas` fixture): a route `request:` /
+ *     `query:` schema flows to a typed `req.appInfo.request` / `.query`, and a
+ *     `:id` segment to `req.params.id` — asserted via typed-local assignments
+ *     (a fallback to `Record<string, unknown>` or a missing param fails tsc).
  *
  * The bare-package-ancestor variant of inheritance is unit-tested in
  * `emit.test.ts` (it can't run end-to-end inside this repo).

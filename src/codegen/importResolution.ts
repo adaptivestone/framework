@@ -386,6 +386,29 @@ function stripComments(source: string, blankStrings: boolean): string {
   return out;
 }
 
+/** The nearest ancestor directory of `fromFile` that holds a `package.json`,
+ * or `null` if none up to the filesystem root. Defines the containment boundary
+ * for the extends-walk (see `resolveSiblingSource`). */
+function findPackageRoot(fromFile: string): string | null {
+  let dir = path.dirname(fromFile);
+  for (;;) {
+    if (existsSync(path.join(dir, 'package.json'))) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return null; // reached the filesystem root
+    }
+    dir = parent;
+  }
+}
+
+/** Whether `target` is `root` itself or sits inside it. */
+function isWithin(root: string, target: string): boolean {
+  const rel = path.relative(root, target);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
 /**
  * Given an import path used by `fromFile`, resolve it to an absolute source
  * path that EXISTS. Returns `null` for bare-package specifiers and for paths
@@ -393,6 +416,12 @@ function stripComments(source: string, blankStrings: boolean): string {
  * source is `.ts`, but the same import inside a bare package (node_modules) is
  * the built `.js` — without checking, a non-existent `.ts` would shadow the real
  * `.js` and the ancestor's middleware would be silently dropped.
+ *
+ * Defense-in-depth: a candidate that escapes `fromFile`'s package root (a
+ * malicious `../../../…` extends-import) is skipped. The walk only ever reads a
+ * source to parse its imports — contents are never emitted — but this keeps it
+ * inside the project. (Trade-off: a relative import that crosses a package
+ * boundary, unusual outside a monorepo using bare names, won't be followed.)
  */
 function resolveSiblingSource(
   fromFile: string,
@@ -402,19 +431,22 @@ function resolveSiblingSource(
     return null; // bare package, resolved elsewhere
   }
   const fromDir = path.dirname(fromFile);
+  const root = findPackageRoot(fromFile);
   // Strip the `.js`/`.ts` extension, then probe whichever exists — source is
   // `.ts`, but the same import inside a bare package (node_modules) is the
   // built `.js`. An extensionless specifier keeps `stripped` unchanged, so it's
   // probed too; a directory specifier falls through to its `index.*`.
   const stripped = importPath.replace(/\.[jt]s$/, '');
-  for (const ext of ['.ts', '.js']) {
-    const candidate = path.resolve(fromDir, `${stripped}${ext}`);
-    if (existsSync(candidate)) {
-      return candidate;
+  const candidates = [
+    ...['.ts', '.js'].map((ext) => path.resolve(fromDir, `${stripped}${ext}`)),
+    ...['index.ts', 'index.js'].map((idx) =>
+      path.resolve(fromDir, stripped, idx),
+    ),
+  ];
+  for (const candidate of candidates) {
+    if (root && !isWithin(root, candidate)) {
+      continue; // escapes the package root — don't read it
     }
-  }
-  for (const idx of ['index.ts', 'index.js']) {
-    const candidate = path.resolve(fromDir, stripped, idx);
     if (existsSync(candidate)) {
       return candidate;
     }
