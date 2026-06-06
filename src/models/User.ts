@@ -20,10 +20,14 @@ export type TUser = GetModelTypeFromClass<typeof User>;
  * Augmentation point so `req.appInfo.user` follows a project's OWN `User` model
  * when it replaces the framework's. `npm run gen` emits this automatically into
  * `genTypes.d.ts` (mirroring how it types `app.getModel('User')`); declare it by
- * hand only if you don't run codegen:
+ * hand only if you don't run codegen. `User` must be the hydrated DOCUMENT type,
+ * so wrap the model class in `InstanceType<GetModelTypeFromClass<…>>`:
  *
+ *   import type { GetModelTypeFromClass } from '@adaptivestone/framework/modules/BaseModel.js';
  *   declare module '@adaptivestone/framework/models/User.js' {
- *     interface AppModels { User: InstanceType<typeof MyUser>; }
+ *     interface AppModels {
+ *       User: InstanceType<GetModelTypeFromClass<typeof MyUser>>;
+ *     }
  *   }
  */
 // biome-ignore lint/suspicious/noEmptyInterface: augmentation target — empty by design

@@ -1,6 +1,6 @@
 # P1h — Ship LLM-readable surface (Agent Skills + llms.txt)
 
-**Status**: ⏳ in flight
+**Status**: ⏳ in flight — doc additions landed 2026-06-06 (`15-recipes.md`, `16-anti-patterns.md`, `10-cli` "When to run codegen", linked from `01-intro`; grounded in real consumer-project patterns, kept project-name-free; docs build green). Skill generator + `llms.txt` + pipeline pending.
 **Depends on**: P1g (docs sweep — accuracy upstream feeds skill quality)
 **Time**: ~1.5 days after P1g lands (split across docs additions, generator, validation, publish)
 **Origin**: heavy LLM-assisted dev of the framework itself revealed the same need for framework *consumers* — fast, structured context. 2026-05-24 deep-dive surfaced the open Agent Skills standard (https://agentskills.io) backed by 40+ agents (Claude Code, Cursor, Copilot, Codex, …) plus the `skills.sh` registry (Vercel-Labs `skills` CLI) for cross-agent install.
@@ -117,8 +117,8 @@ any agent that supports the Agent Skills format — see https://agentskills.io.
 
 ## Done when
 
-- `docs/15-recipes.md` + `docs/16-anti-patterns.md` exist, render in Docusaurus, linked from `01-intro.md`
-- `docs/10-cli.md` has the *When to run codegen* section
+- ✅ `docs/15-recipes.md` + `docs/16-anti-patterns.md` exist, render in Docusaurus, linked from `01-intro.md`
+- ✅ `docs/10-cli.md` has the *When to run codegen* section
 - `scripts/generate-skill.js` runs from `npm run build`; output committed at `skills/adaptivestone-framework/`
 - `npm run validate-skill` green (skills-ref accepts the frontmatter)
 - Local smoke test: `npx skills add ./skills/adaptivestone-framework -a claude-code` installs, `/skills` lists `adaptivestone-framework`

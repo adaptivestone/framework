@@ -96,36 +96,42 @@ export async function getTemplate(
     )
     .join('\n');
 
-  const modelTypes = (
-    await Promise.all(
-      modelPaths.map(async (modelPath) => {
-        const modelModule = await import(modelPath.path);
-        const relPath = modelPath.path.replace(dir, '.');
-        if (modelModule.default.prototype instanceof BaseModel) {
-          return `    getModel(modelName: '${modelPath.file}'): GetModelTypeFromClass<typeof import('${relPath}').default>`;
-        }
-        return `    getModel(modelName: '${modelPath.file}'): import('${relPath}').default['mongooseModel']`;
-      }),
+  // Import each model once and reuse the result for both the `getModel`
+  // emission and the `appInfo.user` augmentation below.
+  const models = await Promise.all(
+    modelPaths.map(async (modelPath) => {
+      const modelModule = await import(modelPath.path);
+      return {
+        file: modelPath.file,
+        relPath: modelPath.path.replace(dir, '.'),
+        isBaseModel: modelModule.default?.prototype instanceof BaseModel,
+      };
+    }),
+  );
+
+  const modelTypes = models
+    .map((m) =>
+      m.isBaseModel
+        ? `    getModel(modelName: '${m.file}'): GetModelTypeFromClass<typeof import('${m.relPath}').default>`
+        : `    getModel(modelName: '${m.file}'): import('${m.relPath}').default['mongooseModel']`,
     )
-  ).join('\n');
+    .join('\n');
 
   // Bind `req.appInfo.user` to the project's `User` model (if it's a BaseModel),
-  // so it follows a replaced model exactly like `getModel('User')` does.
-  const userModel = modelPaths.find((m) => m.file === 'User');
-  let userAppInfo = '';
-  if (userModel) {
-    const mod = await import(userModel.path);
-    if (mod.default?.prototype instanceof BaseModel) {
-      const relPath = userModel.path.replace(dir, '.');
-      userAppInfo = `
+  // so it follows a replaced model exactly like `getModel('User')` does. The
+  // augmentation feeds `AppUser`, which is the hydrated DOCUMENT — so wrap the
+  // model class in `InstanceType<…>` (unlike `getModel('User')` above, which
+  // returns the Model class itself).
+  const userModel = models.find((m) => m.file === 'User' && m.isBaseModel);
+  const userAppInfo = userModel
+    ? `
 declare module '@adaptivestone/framework/models/User.js' {
   export interface AppModels {
-    User: GetModelTypeFromClass<typeof import('${relPath}').default>;
+    User: InstanceType<GetModelTypeFromClass<typeof import('${userModel.relPath}').default>>;
   }
 }
-`;
-    }
-  }
+`
+    : '';
 
   return `
 import type {} from '@adaptivestone/framework/server.js';

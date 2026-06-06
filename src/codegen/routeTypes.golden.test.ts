@@ -50,9 +50,9 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
 
     await generateRouteTypes(app, noopLogger);
 
-    // Chain content (clear signal independent of tsc). Order-independent on
-    // purpose: the framework's own `Home` controller mounts at `/` and bleeds
-    // its root-splat middleware into every chain, so assert that both inherited
+    // Chain content (clear signal independent of tsc). `File` declares its own
+    // `[GetUserByToken, Auth]`; `Inherited` declares none and picks them up from
+    // `AbstractController`'s default middleware via the extends-walk. Assert both
     // middlewares are present (under the `Auth` binding, never `AuthMiddleware`)
     // and the tuple is non-empty — the tsc gate below is the real correctness
     // check. `readFile` throwing here means codegen skipped the fixture.

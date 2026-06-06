@@ -81,8 +81,11 @@ describe('appTypes — appInfo.user binding', () => {
       "declare module '@adaptivestone/framework/models/User.js'",
     );
     expect(out).toContain('export interface AppModels {');
+    // `appInfo.user` is the hydrated DOCUMENT, so the binding must be wrapped in
+    // `InstanceType<…>` — emitting the bare Model class (as `getModel('User')`
+    // returns) inverts the type so `user.id` / `user.email` stop type-checking.
     expect(out).toMatch(
-      /User: GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>/,
+      /User: InstanceType<GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>>/,
     );
   });
 

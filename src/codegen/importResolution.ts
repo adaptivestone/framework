@@ -89,14 +89,26 @@ async function importSpec(
   const candidates: string[] = [];
   if (spec.startsWith('.')) {
     const abs = path.resolve(ctrlDir, spec);
-    candidates.push(pathToFileURL(abs).href);
-    const swapped = abs.endsWith('.js')
-      ? `${abs.slice(0, -3)}.ts`
-      : abs.endsWith('.ts')
-        ? `${abs.slice(0, -3)}.js`
-        : null;
-    if (swapped) {
-      candidates.push(pathToFileURL(swapped).href);
+    if (abs.endsWith('.js') || abs.endsWith('.ts')) {
+      const base = abs.slice(0, -3);
+      candidates.push(pathToFileURL(abs).href);
+      // Tolerate the `.js` ↔ `.ts` mismatch (source is `.ts`, specifiers `.js`).
+      candidates.push(
+        pathToFileURL(`${base}.${abs.endsWith('.js') ? 'ts' : 'js'}`).href,
+      );
+    } else {
+      // Extensionless relative specifier (`./Auth`): probe the TS source, the
+      // built JS, and index files. Without this the import fails identity match
+      // and the middleware is silently dropped from the emitted chain.
+      for (const cand of [
+        `${abs}.ts`,
+        `${abs}.js`,
+        path.join(abs, 'index.ts'),
+        path.join(abs, 'index.js'),
+        abs,
+      ]) {
+        candidates.push(pathToFileURL(cand).href);
+      }
     }
   } else {
     // `createRequire` anchored in the controller's directory honors that
@@ -296,10 +308,82 @@ function rewriteRelativeToBare(spec: string, base: string | null): string {
   return bare.endsWith('.ts') ? `${bare.slice(0, -3)}.js` : bare;
 }
 
-/** `class X extends Y {` → `'Y'`. Returns `null` if no extends clause. */
+/**
+ * `class X extends Y {` → `'Y'`. Returns `null` if no extends clause.
+ * Runs over comment/string-stripped source so a commented-out or quoted
+ * `class Decoy extends Wrong` can't poison the extends-walk.
+ */
 function parseExtendsParent(source: string): string | null {
-  const m = source.match(/\bclass\s+\w+\s+extends\s+(\w+)/);
+  // `blankStrings` so a quoted `"class X extends Y"` can't false-match either.
+  const m = stripComments(source, true).match(
+    /\bclass\s+\w+\s+extends\s+(\w+)/,
+  );
   return m ? (m[1] ?? null) : null;
+}
+
+/**
+ * Remove comments from `source`, replacing them with spaces (newlines preserved,
+ * so positions and line counts stay intact). String / template literals are
+ * skipped while scanning, so a `//` or `/* *​/` inside a string is never treated
+ * as a comment. When `blankStrings` is set, the literal *contents* are blanked
+ * too (delimiters kept) — used by the `extends`-scanner so quoted code can't be
+ * mistaken for the real declaration; the import-statement scanner keeps strings
+ * intact because it needs the specifier.
+ *
+ * Not a full TS lexer — it doesn't track regex literals — but that's harmless
+ * for the two narrow jobs here (a top-of-file `extends` clause and an already
+ * isolated import statement), both of which sit in code the scanner reaches
+ * before any regex-vs-division ambiguity.
+ */
+function stripComments(source: string, blankStrings: boolean): string {
+  let out = '';
+  let i = 0;
+  const n = source.length;
+  while (i < n) {
+    const c = source[i];
+    const next = source[i + 1];
+    if (c === '/' && next === '/') {
+      while (i < n && source[i] !== '\n') {
+        out += ' ';
+        i++;
+      }
+      continue;
+    }
+    if (c === '/' && next === '*') {
+      out += '  ';
+      i += 2;
+      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) {
+        out += source[i] === '\n' ? '\n' : ' ';
+        i++;
+      }
+      if (i < n) {
+        out += '  ';
+        i += 2;
+      }
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      out += c;
+      i++;
+      while (i < n && source[i] !== c) {
+        if (source[i] === '\\' && i + 1 < n) {
+          out += blankStrings ? '  ' : source.slice(i, i + 2);
+          i += 2;
+          continue;
+        }
+        out += blankStrings ? (source[i] === '\n' ? '\n' : ' ') : source[i];
+        i++;
+      }
+      if (i < n) {
+        out += c; // closing delimiter
+        i++;
+      }
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
 }
 
 /**
@@ -320,7 +404,8 @@ function resolveSiblingSource(
   const fromDir = path.dirname(fromFile);
   // Strip the `.js`/`.ts` extension, then probe whichever exists — source is
   // `.ts`, but the same import inside a bare package (node_modules) is the
-  // built `.js`.
+  // built `.js`. An extensionless specifier keeps `stripped` unchanged, so it's
+  // probed too; a directory specifier falls through to its `index.*`.
   const stripped = importPath.replace(/\.[jt]s$/, '');
   for (const ext of ['.ts', '.js']) {
     const candidate = path.resolve(fromDir, `${stripped}${ext}`);
@@ -328,31 +413,63 @@ function resolveSiblingSource(
       return candidate;
     }
   }
+  for (const idx of ['index.ts', 'index.js']) {
+    const candidate = path.resolve(fromDir, stripped, idx);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
   return null;
 }
 
+/** True if `s` contains any control character (newline, NUL, …). */
+function hasControlChar(s: string): boolean {
+  for (let k = 0; k < s.length; k++) {
+    if (s.charCodeAt(k) < 0x20) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
- * Parse top-of-file `import` declarations into a binding-name → path map.
- * Handles default imports (`import X from '…'`), namespace-style default
+ * Parse a file's top-of-module `import` declarations into a binding-name → path
+ * map. Handles default imports (`import X from '…'`), namespace-style default
  * (`import * as X from '…'`), and named imports (`import { A, B as C }
  * from '…'`). Strips `import type` and `as Alias` rebinding.
+ *
+ * Scans only the import prologue — `extractImportStatements` skips comments and
+ * string/template literals and stops at the first non-import statement — so a
+ * commented-out import, a JSDoc `@example import X from '…'`, or import-like text
+ * inside a template literal can never overwrite a real binding (the flat-regex
+ * bug class). Each statement is small and individually matched, so the per-piece
+ * `as` regex can't blow up on a giant source either.
  */
 function parseImports(source: string): Map<string, string> {
   const map = new Map<string, string>();
+  // Anchored to a single (already-isolated) statement: default, `* as`, and a
+  // named block, then the specifier. `\*\s*as` tolerates `*as` without a space.
   const re =
-    /import\s+(?:type\s+)?(?:(\w+)\s*,?\s*)?(?:\*\s+as\s+(\w+)\s+)?(?:\{([^}]+)\}\s+)?from\s+['"]([^'"]+)['"]/g;
-  let m: RegExpExecArray | null;
-  while (true) {
-    m = re.exec(source);
+    /^import\s+(?:type\s+)?(?:(\w+)\s*,?\s*)?(?:\*\s*as\s+(\w+)\s*)?(?:\{([^}]*)\}\s*)?from\s*(['"])([^'"]+)\4/;
+  for (const rawStmt of extractImportStatements(source)) {
+    // Drop comments (keep the specifier string) so a comment anywhere in the
+    // statement — including inside the `{ … }` block — can't corrupt a binding.
+    const stmt = stripComments(rawStmt, false);
+    const m = re.exec(stmt);
     if (m === null) {
-      break;
+      continue;
     }
-    const [, defaultName, starName, namedBlock, importPath] = m;
+    const [, defaultName, starName, namedBlock, , importPath] = m;
+    // Reject newlines / control chars: a real specifier never contains them, and
+    // emitting one would inject a top-level statement into the gen file.
+    if (!importPath || hasControlChar(importPath)) {
+      continue;
+    }
     if (defaultName) {
-      map.set(defaultName, importPath ?? '');
+      map.set(defaultName, importPath);
     }
     if (starName) {
-      map.set(starName, importPath ?? '');
+      map.set(starName, importPath);
     }
     if (namedBlock) {
       for (const piece of namedBlock.split(',')) {
@@ -360,18 +477,93 @@ function parseImports(source: string): Map<string, string> {
         if (!trimmed) {
           continue;
         }
-        // `OrigName as LocalName` → bind LocalName
-        const asMatch = trimmed.match(/(\w+)\s+as\s+(\w+)/);
+        // `OrigName as LocalName` → bind LocalName. Anchored so it can't
+        // backtrack quadratically (the piece is already a small slice).
+        const asMatch = /^(?:type\s+)?\w+\s+as\s+(\w+)$/.exec(trimmed);
         const localName = asMatch
-          ? asMatch[2]
+          ? asMatch[1]
           : trimmed.replace(/^type\s+/, '').trim();
-        if (localName) {
-          map.set(localName, importPath ?? '');
+        if (localName && /^\w+$/.test(localName)) {
+          map.set(localName, importPath);
         }
       }
     }
   }
   return map;
+}
+
+/**
+ * Extract a file's leading `import` declarations as individual statement strings.
+ * Walks from the top, skipping whitespace and comments, and stops at the first
+ * construct that isn't a static `import` — so nothing below the import prologue
+ * (template literals, JSDoc, real code) is ever scanned for bindings. While
+ * capturing a statement we track string state so a `;` inside a specifier can't
+ * end it early. Each returned slice runs from `import` to its terminating `;`.
+ */
+function extractImportStatements(source: string): string[] {
+  const statements: string[] = [];
+  const n = source.length;
+  let i = 0;
+
+  const skipTrivia = () => {
+    while (i < n) {
+      const c = source[i];
+      if (c === ' ' || c === '\t' || c === '\r' || c === '\n') {
+        i++;
+      } else if (c === '/' && source[i + 1] === '/') {
+        while (i < n && source[i] !== '\n') {
+          i++;
+        }
+      } else if (c === '/' && source[i + 1] === '*') {
+        i += 2;
+        while (i < n && !(source[i] === '*' && source[i + 1] === '/')) {
+          i++;
+        }
+        i += 2;
+      } else {
+        break;
+      }
+    }
+  };
+
+  while (i < n) {
+    skipTrivia();
+    if (i >= n || !source.startsWith('import', i)) {
+      break; // first non-import statement → prologue is over
+    }
+    // Guard against an identifier that merely starts with "import": a real
+    // declaration is followed by whitespace or one of `'"{*`.
+    const after = source[i + 6];
+    if (after !== undefined && !/[\s'"{*]/.test(after)) {
+      break;
+    }
+    const start = i;
+    i += 6;
+    let inString: string | null = null;
+    while (i < n) {
+      const c = source[i];
+      if (inString) {
+        if (c === '\\') {
+          i += 2;
+          continue;
+        }
+        if (c === inString) {
+          inString = null;
+        }
+        i++;
+      } else if (c === '"' || c === "'" || c === '`') {
+        inString = c;
+        i++;
+      } else if (c === ';') {
+        i++;
+        break;
+      } else {
+        i++;
+      }
+    }
+    statements.push(source.slice(start, i));
+  }
+  return statements;
 }
 
 /** Compute a TS-style relative import specifier from `fromDir` to `toFile`. */

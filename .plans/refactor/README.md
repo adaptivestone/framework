@@ -29,7 +29,7 @@ Blocking: docs-sweep blocks llm-skills
 
 | File | Ref | Summary |
 |---|---|---|
-| [codegen-zero-init](active/codegen-zero-init.md) | P1j | Kill controller/middleware/model `new` calls during `npm run gen`. Phase 0 ✅ (beta.49). Phases 1–4 v5.1; Phase 5 v6. ~2 d. |
+| [codegen-zero-init](active/codegen-zero-init.md) | P1j | Kill controller/middleware/model `new` calls during `npm run gen`. Phase 0 ✅ (beta.49) · 1 ✅ (beta.52) · 2 ✅ (beta.53). Phases 3–4 v5.1; Phase 5 v6. ~1 d left. |
 | [llm-skills](active/llm-skills.md) | P1h | Generate Agent Skill from docs, ship via `npx skills add`. Cross-agent. Depends on docs-sweep. ~1.5 d. |
 
 ### queued/
@@ -68,6 +68,7 @@ Blocking: docs-sweep blocks llm-skills
 | [controller-migration](done/controller-migration.md) | P1d | Home + SomeController translated through the registry. |
 | [boot-route-tree-log](done/boot-route-tree-log.md) | P1e | Boot-time project-wide route tree log from `RouteRegistry` (`formatTree.ts`, verbose level). |
 | [yup-optional](done/yup-optional.md) | P1k | yup un-bundled: `defineSchema` + `File` export (optional peer); `YupFile` deprecated; content-type-keyed request schemas. beta.51. |
+| [config-schema-codegen](done/config-schema-codegen.md) | P1l | `getConfig()` emits inline value-**shape** types (no literals, no secrets, no `import()`; arrays stay tuples). beta.54. |
 
 ## v5.1 extras (no phase doc — tracked as bullets)
 
