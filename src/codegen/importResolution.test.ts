@@ -7,8 +7,11 @@
  * poisoned the walk; the `as` sub-regex was quadratic; and extensionless
  * specifiers were never resolved. Later: the extends-walk followed the first
  * `class … extends` (a helper before the controller, not the controller), and
- * semicolon-less (ASI) imports collapsed so all but the first dropped. These
- * tests pin each fixed behavior.
+ * semicolon-less (ASI) imports collapsed so all but the first dropped. Later
+ * still: a regex literal could poison the extends-scan, a `export default class
+ * Ctrl {}` with no parent fell through to a helper's parent, a trailing-backslash
+ * specifier swallowed the next import, and a multi-line `with { … }` attributes
+ * clause dropped later imports. These tests pin each fixed behavior.
  *
  * The parser internals aren't exported, so they're exercised through the public
  * `buildExtendsImportMap` (binding map) and `resolveBinding` (identity match).
@@ -147,6 +150,32 @@ class X extends NotImported {}
     expect(map.get('A')).toBe('./a.js');
     expect(map.get('B')).toBe('./b.js');
   });
+
+  it('drops a trailing-backslash specifier without swallowing the next import (Finding 3)', async () => {
+    // The `\` before the closing quote escaped it, so the malformed first import
+    // both produced a quote-breaking specifier AND consumed the next import.
+    const src = `import Mw from './a\\';\nimport Next from './next.js';\nclass X extends NotImported {}\n`;
+    const map = await buildExtendsImportMap(path.join(tmpDir, 'bs.ts'), src);
+    expect(map.has('Mw')).toBe(false); // backslash specifier rejected
+    expect(map.get('Next')).toBe('./next.js'); // following import still parses
+  });
+
+  it('rejects a specifier with a U+2028 line separator (L-b)', async () => {
+    const ls = String.fromCharCode(0x2028); // line separator, never valid in a specifier
+    const src = `import Bad from './a${ls}b.js';\nimport Good from './good.js';\nclass X extends NotImported {}\n`;
+    const map = await buildExtendsImportMap(path.join(tmpDir, 'ls.ts'), src);
+    expect(map.has('Bad')).toBe(false);
+    expect(map.get('Good')).toBe('./good.js');
+  });
+
+  it('continues past a multi-line `with { … }` import-attributes clause (L-a)', async () => {
+    // The ASI newline-break used to fire inside a newline-split attributes
+    // clause, ending the prologue early and dropping every later import.
+    const src = `import data from './data.json'\n  with { type: 'json' }\nimport B from './b.js'\nclass X extends NotImported {}\n`;
+    const map = await buildExtendsImportMap(path.join(tmpDir, 'attrs.ts'), src);
+    expect(map.get('data')).toBe('./data.json');
+    expect(map.get('B')).toBe('./b.js');
+  });
 });
 
 describe('resolveBinding / extends walk', () => {
@@ -282,5 +311,53 @@ export default NamedCtrl;
     const ctrlPath = await write('NamedCtrl.ts', ctrlSrc);
     const map = await buildExtendsImportMap(ctrlPath, ctrlSrc);
     expect(map.get('NamedMw')).toBe('./NamedMw.js');
+  });
+
+  it('ignores a regex literal whose body looks like a class declaration (Finding 1)', async () => {
+    // A regex literal `/export default class … extends Wrong/` lexically precedes
+    // the real controller; its body must not hijack the extends-walk.
+    await write(
+      'RightParent.ts',
+      `import RightMw from './RightMw.js';
+class RightParent {
+  static get middleware() {
+    return new Map([['/{*splat}', [RightMw]]]);
+  }
+}
+export default RightParent;
+`,
+    );
+    const ctrlSrc = `import RightParent from './RightParent.ts';
+import WrongParent from './WrongParent.ts';
+
+const re = /export default class Z extends WrongParent/;
+export default class Ctrl extends RightParent {}
+`;
+    const ctrlPath = await write('RegexCtrl.ts', ctrlSrc);
+    const map = await buildExtendsImportMap(ctrlPath, ctrlSrc);
+    expect(map.get('RightMw')).toBe('./RightMw.js');
+  });
+
+  it('inherits nothing when the exported class has no extends, despite a helper (Finding 2)', async () => {
+    // `export default class Ctrl {}` has no parent; a helper above it extends
+    // something. The walk must NOT fall through to the helper's parent.
+    await write(
+      'HelperParent.ts',
+      `import HelperMw from './HelperMw.js';
+class HelperParent {
+  static get middleware() {
+    return new Map([['/{*splat}', [HelperMw]]]);
+  }
+}
+export default HelperParent;
+`,
+    );
+    const ctrlSrc = `import HelperParent from './HelperParent.ts';
+class Helper extends HelperParent {}
+export default class Ctrl {}
+`;
+    const ctrlPath = await write('NoExtendsCtrl.ts', ctrlSrc);
+    const map = await buildExtendsImportMap(ctrlPath, ctrlSrc);
+    expect(map.has('HelperMw')).toBe(false);
   });
 });

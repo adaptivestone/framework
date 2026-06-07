@@ -310,49 +310,65 @@ function rewriteRelativeToBare(spec: string, base: string | null): string {
 
 /**
  * Find the parent class the file's EXPORTED controller extends — `'Y'` for
- * `class Ctrl extends Y`. Returns `null` when there's no extends clause.
+ * `class Ctrl extends Y`. Returns `null` when the exported class has no extends
+ * clause (so the walk inherits nothing rather than a helper's parent).
  *
  * Resolving the *exported* class matters: a file may declare helper classes
  * before the controller (`class Helper extends X` … then `export default class
  * Ctrl extends Y`), and the walk must follow the controller's parent, not the
- * helper's. Preference order: an `export default class … extends`, an
- * `export class … extends`, the class named by a bare `export default Name`,
- * then — as a fallback — the LAST `class … extends` in the file (the controller
- * conventionally follows its helpers).
+ * helper's. Order: a directly-exported class (`export default class …` /
+ * `export class Name …`) — if it has no `extends`, return `null` immediately
+ * rather than falling through; else the class named by a bare `export default
+ * Name`; else, as a last resort (no exported declaration found), the LAST
+ * `class … extends` in the file.
  *
- * Runs over comment/string-stripped source so a commented-out or quoted
- * `class Decoy extends Wrong` can't poison the walk. Generic parents work
- * (`extends Base<T>` → `Base`, the regex stops at `<`). Known residual gaps,
- * rare in controllers and left unhandled: qualified parents (`extends ns.Base`
- * captures `ns`) and mixin parents (`extends mixin(Base)` captures `mixin`).
+ * Runs over comment/string-stripped source — AND with regex-literal bodies
+ * blanked — so a commented-out, quoted, OR regex-literal `class Decoy extends
+ * Wrong` can't poison the scan. Generic parents work (`extends Base<T>` →
+ * `Base`, the regex stops at `<`). Known residual gaps, rare in controllers and
+ * left unhandled: qualified parents (`extends ns.Base` → `ns`), mixin parents
+ * (`extends mixin(Base)` → `mixin`), and a regex literal in a non-expression
+ * position (e.g. after `return`) — none of which crash; at worst a middleware
+ * is missed.
  */
 function parseExtendsParent(source: string): string | null {
-  // `blankStrings` so a quoted `"class X extends Y"` can't false-match either.
-  const clean = stripComments(source, true);
+  // Blank comments + string contents, then regex-literal bodies — their text
+  // (`/… export default class Z extends Wrong …/`) would otherwise win the scan.
+  // A `/` opens a regex only in expression-start position (after one of
+  // `= ( , [ { ; : ! & | ? + - * % ^ ~ < >`), never right after a value
+  // (identifier / `)` / `]` / digit), which is division.
+  const clean = stripComments(source, true).replace(
+    /([=(,[{;:!&|?+\-*%^~<>]\s*)\/(?![*/])(?:\\.|\[(?:\\.|[^\]\n])*\]|[^/\n\\])+\/[a-z]*/g,
+    (_m, pre) => pre,
+  );
 
-  // 1. A directly-exported class wins (default preferred over a named export).
-  //    The class name is optional so `export default class extends Y` works.
-  const exportedClass =
-    clean.match(/\bexport\s+default\s+class\s+(?:\w+\s+)?extends\s+(\w+)/) ??
-    clean.match(/\bexport\s+class\s+\w+\s+extends\s+(\w+)/);
-  if (exportedClass) {
-    return exportedClass[1] ?? null;
+  // 1. A directly-exported class. Capture everything up to the class body `{`,
+  //    then read its `extends` — present-but-no-extends returns null (does NOT
+  //    fall through to a helper's parent). Default preferred over named export.
+  const head =
+    clean.match(/\bexport\s+default\s+class\b([^{]*)/)?.[1] ??
+    clean.match(/\bexport\s+class\s+\w+\b([^{]*)/)?.[1];
+  if (head !== undefined) {
+    const ext = head.match(/\bextends\s+(\w+)/);
+    return ext ? (ext[1] ?? null) : null;
   }
 
   // 2. `class Ctrl extends Y { … }` then `export default Ctrl;` — resolve the
   //    extends clause of the class the default export names.
-  const exportedName = clean.match(/\bexport\s+default\s+([A-Za-z_$][\w$]*)/);
-  if (exportedName?.[1] && exportedName[1] !== 'class') {
-    const name = exportedName[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const named = clean.match(
-      new RegExp(`\\bclass\\s+${name}\\s+extends\\s+(\\w+)`),
-    );
-    if (named) {
-      return named[1] ?? null;
+  const exportedName = clean.match(
+    /\bexport\s+default\s+([A-Za-z_$][\w$]*)/,
+  )?.[1];
+  if (exportedName && exportedName !== 'class' && exportedName !== 'function') {
+    const name = exportedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const decl = clean.match(new RegExp(`\\bclass\\s+${name}\\b([^{]*)`));
+    if (decl?.[1] !== undefined) {
+      const ext = decl[1].match(/\bextends\s+(\w+)/);
+      return ext ? (ext[1] ?? null) : null;
     }
   }
 
-  // 3. Fallback: the LAST `class … extends` (the controller follows its helpers).
+  // 3. Fallback: the LAST `class … extends` (no exported declaration resolved;
+  //    the controller conventionally follows its helpers).
   const all = [...clean.matchAll(/\bclass\s+\w+\s+extends\s+(\w+)/g)];
   const last = all[all.length - 1];
   return last ? (last[1] ?? null) : null;
@@ -491,10 +507,16 @@ function resolveSiblingSource(
   return null;
 }
 
-/** True if `s` contains any control character (newline, NUL, …). */
+/**
+ * True if `s` contains any character never legitimate in a module specifier:
+ * an ASCII control char (newline, NUL, …) or a Unicode line separator
+ * (U+2028 / U+2029). Emitting one into the gen file would break or split a
+ * top-level statement.
+ */
 function hasControlChar(s: string): boolean {
   for (let k = 0; k < s.length; k++) {
-    if (s.charCodeAt(k) < 0x20) {
+    const code = s.charCodeAt(k);
+    if (code < 0x20 || code === 0x2028 || code === 0x2029) {
       return true;
     }
   }
@@ -529,9 +551,15 @@ function parseImports(source: string): Map<string, string> {
       continue;
     }
     const [, defaultName, starName, namedBlock, , importPath] = m;
-    // Reject newlines / control chars: a real specifier never contains them, and
-    // emitting one would inject a top-level statement into the gen file.
-    if (!importPath || hasControlChar(importPath)) {
+    // Reject anything a real specifier never contains: control chars / line
+    // separators (would inject a statement into the gen file) and a backslash
+    // (specifiers use forward slashes; a trailing `\` would escape the emitted
+    // closing quote and break the gen file).
+    if (
+      !importPath ||
+      hasControlChar(importPath) ||
+      importPath.includes('\\')
+    ) {
       continue;
     }
     if (defaultName) {
@@ -576,8 +604,13 @@ function parseImports(source: string): Map<string, string> {
  * `import A from './a'` / `import B from './b'` parse as two statements instead
  * of collapsing into one (which dropped all but the first). Newlines inside a
  * multi-line `{ … }` block come before the specifier closes, so they don't
- * terminate early; same-line attribute clauses (`with { … }`) keep flowing to
- * the `;`.
+ * terminate early, and an attribute clause (`with`/`assert { … }`) on the next
+ * line continues the statement rather than ending it.
+ *
+ * The specifier string is scanned WITHOUT honoring `\`-escapes (a real specifier
+ * has none), so a malformed `import X from './a\'` closes at its quote instead
+ * of escaping it and swallowing the imports that follow; the bad specifier is
+ * then dropped by `parseImports`.
  */
 function extractImportStatements(source: string): string[] {
   const statements: string[] = [];
@@ -623,10 +656,11 @@ function extractImportStatements(source: string): string[] {
     while (i < n) {
       const c = source[i];
       if (inString) {
-        if (c === '\\') {
-          i += 2;
-          continue;
-        }
+        // No escape handling: a real module specifier contains no `\`-escapes,
+        // so treating `\` as a literal char means a trailing-backslash specifier
+        // (`'./a\'`) closes at its quote instead of escaping it and swallowing
+        // the following imports. Such a specifier is then rejected downstream
+        // (the backslash gate in `parseImports`).
         if (c === inString) {
           inString = null;
           specifierClosed = true; // the only string in an import is the specifier
@@ -639,7 +673,21 @@ function extractImportStatements(source: string): string[] {
         i++;
         break;
       } else if (specifierClosed && c === '\n') {
-        break; // ASI: a newline after the specifier ends a semicolon-less import
+        // ASI: a newline after the specifier ends a semicolon-less import —
+        // UNLESS an import-attributes clause (`with`/`assert { … }`) continues
+        // it on the next line.
+        let j = i + 1;
+        while (j < n && /\s/.test(source[j] as string)) {
+          j++;
+        }
+        const isAttrs =
+          (source.startsWith('with', j) && /[\s{]/.test(source[j + 4] ?? '')) ||
+          (source.startsWith('assert', j) && /[\s{]/.test(source[j + 6] ?? ''));
+        if (isAttrs) {
+          i++; // fold the attributes clause into this statement
+        } else {
+          break;
+        }
       } else {
         i++;
       }
