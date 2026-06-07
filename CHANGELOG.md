@@ -84,6 +84,11 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** `AbstractController` constructor third argument `isExpressMergeParams` removed. The old default Express-router behavior of stripping parent params is gone — all matched params (across the full path, including the controller prefix) are available on `req.params`. If you relied on the merge-params toggle, no action needed in most cases; if you specifically depended on the strip behavior, restructure your handler to filter `req.params` keys.
 - **[BREAKING]** The built-in `Home` controller no longer runs `GetUserByToken` globally. It previously declared `'/{*splat}': [GetUserByToken]`, and since `Home` mounts at `/` that landed on the route-tree root and ran on **every request**. `Home` now adds no middleware. Controllers still parse the token via their own/inherited `[GetUserByToken, Auth]`; only routes that don't include it themselves (e.g. ad-hoc `registerRoute` endpoints) lose the implicit `req.appInfo.user`. See the beta.55 note below.
 
+### Bug Fixes
+
+- **[FIX]** Codegen's `extends`-walk now follows the *exported* controller's parent, not the first `class … extends` in the file. A helper or secondary class declared before the controller (e.g. `class Helper extends X` … `export default class Ctrl extends Y`) used to hijack the walk, so middleware inherited from the controller's real parent was silently dropped from the generated `req.appInfo` types. The parent is now resolved from the `export default`/`export class` declaration (falling back to the last `class … extends`).
+- **[FIX]** Codegen's import scanner now parses semicolon-less (ASI) imports. Statements were terminated only at `;` or end-of-file, so under a no-semicolon style (Prettier `semi: false`, StandardJS) consecutive `import` lines collapsed into one and all but the first binding were dropped — quietly losing those middlewares' type narrowing. A statement now also ends at the newline after its specifier string closes; `;`-terminated, multi-line `{ … }`, and side-effect (`import './x'`) imports are unaffected.
+
 ---
 ## [5.0.0-beta.55]
 

@@ -5,7 +5,10 @@
  * JSDoc-`@example`, or template-literal "imports" could overwrite real bindings;
  * comments inside `{ … }` blocks dropped bindings; a quoted/commented `extends`
  * poisoned the walk; the `as` sub-regex was quadratic; and extensionless
- * specifiers were never resolved. These tests pin each fixed behavior.
+ * specifiers were never resolved. Later: the extends-walk followed the first
+ * `class … extends` (a helper before the controller, not the controller), and
+ * semicolon-less (ASI) imports collapsed so all but the first dropped. These
+ * tests pin each fixed behavior.
  *
  * The parser internals aren't exported, so they're exercised through the public
  * `buildExtendsImportMap` (binding map) and `resolveBinding` (identity match).
@@ -112,6 +115,38 @@ class X extends NotImported {}
     // The whole block is one (malformed) binding name → still parsed, fast.
     expect(map.get('a'.repeat(200_000))).toBe('./x.js');
   }, 5000);
+
+  it('parses consecutive semicolon-less (ASI) imports (Bug 2)', async () => {
+    // Prettier `semi:false` / StandardJS style omits semicolons. Each import
+    // must still be captured as its own statement — not collapsed so that only
+    // the first is read. The side-effect import in the middle also must not
+    // swallow the import that follows it.
+    const src = `import A from './a.js'
+import B from './b.js'
+import './polyfill.js'
+import {
+  C,
+  D,
+} from './cd.js'
+
+class X extends NotImported {}
+`;
+    const map = await buildExtendsImportMap(path.join(tmpDir, 'asi.ts'), src);
+    expect(map.get('A')).toBe('./a.js');
+    expect(map.get('B')).toBe('./b.js'); // dropped before the ASI fix
+    expect(map.get('C')).toBe('./cd.js'); // multi-line braces survive too
+    expect(map.get('D')).toBe('./cd.js');
+  });
+
+  it('still handles a newline between the binding and `from`', async () => {
+    const src = `import A\n from './a.js';\nimport B from './b.js';\nclass X extends NotImported {}\n`;
+    const map = await buildExtendsImportMap(
+      path.join(tmpDir, 'nlfrom.ts'),
+      src,
+    );
+    expect(map.get('A')).toBe('./a.js');
+    expect(map.get('B')).toBe('./b.js');
+  });
 });
 
 describe('resolveBinding / extends walk', () => {
@@ -194,5 +229,58 @@ export default Escaper;
     const map = await buildExtendsImportMap(childPath, childSrc);
     // The escaping parent is not walked, so its middleware import never merges.
     expect(map.has('OutsideMw')).toBe(false);
+  });
+
+  it('follows the exported controller, not a helper class declared first (Bug 1)', async () => {
+    // A helper class is declared BEFORE the exported controller and extends a
+    // DIFFERENT parent. The walk must follow the controller's parent (ExpBase),
+    // so middleware inherited from ExpBase is present — not the helper's.
+    await write(
+      'ExpBase.ts',
+      `import ExpInheritedMw from './ExpInheritedMw.js';
+class ExpBase {
+  static get middleware() {
+    return new Map([['/{*splat}', [ExpInheritedMw]]]);
+  }
+}
+export default ExpBase;
+`,
+    );
+    const ctrlSrc = `import ExpBase from './ExpBase.ts';
+import OtherBase from './OtherBase.ts';
+
+class Helper extends OtherBase {}
+export default class ExportedCtrl extends ExpBase {}
+`;
+    const ctrlPath = await write('ExportedCtrl.ts', ctrlSrc);
+    const map = await buildExtendsImportMap(ctrlPath, ctrlSrc);
+    expect(map.get('ExpInheritedMw')).toBe('./ExpInheritedMw.js');
+  });
+
+  it('resolves the parent via `export default Name` past a helper (Bug 1)', async () => {
+    // The framework's own style: `class Ctrl extends Base { … }` then a separate
+    // `export default Ctrl;`, with a helper class declared first. The exported
+    // name must drive which class's `extends` clause the walk follows.
+    await write(
+      'NamedBase.ts',
+      `import NamedMw from './NamedMw.js';
+class NamedBase {
+  static get middleware() {
+    return new Map([['/{*splat}', [NamedMw]]]);
+  }
+}
+export default NamedBase;
+`,
+    );
+    const ctrlSrc = `import NamedBase from './NamedBase.ts';
+import HelperBase from './HelperBase.ts';
+
+class Helper extends HelperBase {}
+class NamedCtrl extends NamedBase {}
+export default NamedCtrl;
+`;
+    const ctrlPath = await write('NamedCtrl.ts', ctrlSrc);
+    const map = await buildExtendsImportMap(ctrlPath, ctrlSrc);
+    expect(map.get('NamedMw')).toBe('./NamedMw.js');
   });
 });

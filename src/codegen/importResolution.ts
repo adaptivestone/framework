@@ -309,16 +309,53 @@ function rewriteRelativeToBare(spec: string, base: string | null): string {
 }
 
 /**
- * `class X extends Y {` → `'Y'`. Returns `null` if no extends clause.
+ * Find the parent class the file's EXPORTED controller extends — `'Y'` for
+ * `class Ctrl extends Y`. Returns `null` when there's no extends clause.
+ *
+ * Resolving the *exported* class matters: a file may declare helper classes
+ * before the controller (`class Helper extends X` … then `export default class
+ * Ctrl extends Y`), and the walk must follow the controller's parent, not the
+ * helper's. Preference order: an `export default class … extends`, an
+ * `export class … extends`, the class named by a bare `export default Name`,
+ * then — as a fallback — the LAST `class … extends` in the file (the controller
+ * conventionally follows its helpers).
+ *
  * Runs over comment/string-stripped source so a commented-out or quoted
- * `class Decoy extends Wrong` can't poison the extends-walk.
+ * `class Decoy extends Wrong` can't poison the walk. Generic parents work
+ * (`extends Base<T>` → `Base`, the regex stops at `<`). Known residual gaps,
+ * rare in controllers and left unhandled: qualified parents (`extends ns.Base`
+ * captures `ns`) and mixin parents (`extends mixin(Base)` captures `mixin`).
  */
 function parseExtendsParent(source: string): string | null {
   // `blankStrings` so a quoted `"class X extends Y"` can't false-match either.
-  const m = stripComments(source, true).match(
-    /\bclass\s+\w+\s+extends\s+(\w+)/,
-  );
-  return m ? (m[1] ?? null) : null;
+  const clean = stripComments(source, true);
+
+  // 1. A directly-exported class wins (default preferred over a named export).
+  //    The class name is optional so `export default class extends Y` works.
+  const exportedClass =
+    clean.match(/\bexport\s+default\s+class\s+(?:\w+\s+)?extends\s+(\w+)/) ??
+    clean.match(/\bexport\s+class\s+\w+\s+extends\s+(\w+)/);
+  if (exportedClass) {
+    return exportedClass[1] ?? null;
+  }
+
+  // 2. `class Ctrl extends Y { … }` then `export default Ctrl;` — resolve the
+  //    extends clause of the class the default export names.
+  const exportedName = clean.match(/\bexport\s+default\s+([A-Za-z_$][\w$]*)/);
+  if (exportedName?.[1] && exportedName[1] !== 'class') {
+    const name = exportedName[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const named = clean.match(
+      new RegExp(`\\bclass\\s+${name}\\s+extends\\s+(\\w+)`),
+    );
+    if (named) {
+      return named[1] ?? null;
+    }
+  }
+
+  // 3. Fallback: the LAST `class … extends` (the controller follows its helpers).
+  const all = [...clean.matchAll(/\bclass\s+\w+\s+extends\s+(\w+)/g)];
+  const last = all[all.length - 1];
+  return last ? (last[1] ?? null) : null;
 }
 
 /**
@@ -530,7 +567,17 @@ function parseImports(source: string): Map<string, string> {
  * construct that isn't a static `import` — so nothing below the import prologue
  * (template literals, JSDoc, real code) is ever scanned for bindings. While
  * capturing a statement we track string state so a `;` inside a specifier can't
- * end it early. Each returned slice runs from `import` to its terminating `;`.
+ * end it early.
+ *
+ * A statement ends at its terminating `;` OR — for semicolon-less (ASI) code —
+ * at the first newline AFTER the specifier string has closed. An import
+ * declaration's only string literal is its specifier, so "specifier closed"
+ * means the declaration is complete; ending on the newline lets back-to-back
+ * `import A from './a'` / `import B from './b'` parse as two statements instead
+ * of collapsing into one (which dropped all but the first). Newlines inside a
+ * multi-line `{ … }` block come before the specifier closes, so they don't
+ * terminate early; same-line attribute clauses (`with { … }`) keep flowing to
+ * the `;`.
  */
 function extractImportStatements(source: string): string[] {
   const statements: string[] = [];
@@ -572,6 +619,7 @@ function extractImportStatements(source: string): string[] {
     const start = i;
     i += 6;
     let inString: string | null = null;
+    let specifierClosed = false;
     while (i < n) {
       const c = source[i];
       if (inString) {
@@ -581,6 +629,7 @@ function extractImportStatements(source: string): string[] {
         }
         if (c === inString) {
           inString = null;
+          specifierClosed = true; // the only string in an import is the specifier
         }
         i++;
       } else if (c === '"' || c === "'" || c === '`') {
@@ -589,6 +638,8 @@ function extractImportStatements(source: string): string[] {
       } else if (c === ';') {
         i++;
         break;
+      } else if (specifierClosed && c === '\n') {
+        break; // ASI: a newline after the specifier ends a semicolon-less import
       } else {
         i++;
       }
