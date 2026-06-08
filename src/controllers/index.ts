@@ -190,15 +190,29 @@ class ControllerManager extends Base {
   }
 
   /**
-   * Build a `RouteNode` subtree for one controller — walks `routes` getter,
-   * places handlers in the tree, then attaches the `static middleware` Map
-   * entries to the right tree positions. Path syntax conversion: user-facing
-   * `{*splat}` → internal `*splat`. Map scope keys: `'METHOD/path'`,
-   * `'ALL/path'`, `'/path'`.
+   * Build a `RouteNode` subtree for one controller. Two steps, decoupled so the
+   * codegen AST path can feed the SAME assembler without an instance: read the
+   * instance into a plain `ControllerSubtreeSpec` (`#specFromInstance`), then
+   * assemble the tree from that spec (`buildSubtreeFromSpec`). Tree/scope
+   * semantics live entirely in the assembler — there is no parallel builder.
    */
   #buildSubtree(controller: AbstractController): RouteNode {
-    const subtree = createNode('');
+    return buildSubtreeFromSpec(this.#specFromInstance(controller));
+  }
+
+  /**
+   * Read a controller instance into a plain `ControllerSubtreeSpec`: walk the
+   * `routes` getter into placed `HandlerEntry`s (handlers bound to the instance)
+   * and the `static middleware` Map into normalized, scope-parsed entries. Path
+   * syntax is converted here (`{*splat}` → `*splat`); the assembler attaches
+   * verbatim. All authoring-time warnings (unknown verb, missing handler,
+   * unknown method prefix) live here — the instance is the only thing that can
+   * be malformed.
+   */
+  #specFromInstance(controller: AbstractController): ControllerSubtreeSpec {
     const ctrlName = controller.constructor.name;
+    const handlers: ControllerSubtreeSpec['handlers'] = [];
+    const middleware: ControllerSubtreeSpec['middleware'] = [];
 
     // 1. Routes first — handlers placed in the tree before middleware
     //    attachments look for them.
@@ -235,17 +249,16 @@ class ControllerManager extends Base {
             }
             continue;
           }
-          attachHandler(
-            subtree,
-            upperVerb as HttpMethod,
-            convertPathSyntax(pathKey),
+          handlers.push({
+            method: upperVerb as HttpMethod,
+            path: convertPathSyntax(pathKey),
             entry,
-          );
+          });
         }
       }
     }
 
-    // 2. Middleware Map — attach to nodes / per-handler.
+    // 2. Middleware Map — normalize + scope-parse.
     // `static get middleware()` lives on the class; instance.constructor
     // types as `Function`, so cast to read the static member.
     const ControllerClass = controller.constructor as unknown as {
@@ -269,17 +282,15 @@ class ControllerManager extends Base {
             `Controller ${ctrlName}: middleware Map key '${scopeKey}' has unknown method prefix '${parsed.unknownMethod}'. Treating the whole key as a path. Expected method prefix is one of: ${[...MAP_KEY_METHODS].join(', ')}.`,
           );
         }
-        const entries = normalizeMiddlewares(mwList);
-        attachMiddlewares(
-          subtree,
-          parsed.method,
-          convertPathSyntax(parsed.path),
-          entries,
-        );
+        middleware.push({
+          method: parsed.method,
+          path: convertPathSyntax(parsed.path),
+          entries: normalizeMiddlewares(mwList),
+        });
       }
     }
 
-    return subtree;
+    return { ctrlName, handlers, middleware };
   }
 
   /**
@@ -452,6 +463,45 @@ class ControllerManager extends Base {
   }
 }
 
+// ─── subtree assembly (shared boundary) ──────────────────────────────
+
+/**
+ * The plain, instance-free description of a controller's subtree: handlers to
+ * place and middleware scopes to attach, both already path-converted and
+ * (for middleware) normalized. The runtime builds this from a controller
+ * instance (`#specFromInstance`); the codegen AST front-end builds the same
+ * shape from parsed source — so both feed one assembler with zero drift.
+ *
+ * Paths are INTERNAL syntax (`*splat`, not `{*splat}`); `method` is upper-case
+ * (`'ALL'` for path-only middleware scopes).
+ */
+export interface ControllerSubtreeSpec {
+  ctrlName: string;
+  handlers: { method: HttpMethod; path: string; entry: HandlerEntry }[];
+  middleware: {
+    method: HttpMethod | 'ALL';
+    path: string;
+    entries: MiddlewareEntry[];
+  }[];
+}
+
+/**
+ * Assemble a `RouteNode` subtree from a `ControllerSubtreeSpec`: place every
+ * handler, then attach every middleware scope (handlers first, so middleware
+ * attachments find them). This is the single home of tree/scope semantics —
+ * runtime and codegen both reach it through here.
+ */
+export function buildSubtreeFromSpec(spec: ControllerSubtreeSpec): RouteNode {
+  const subtree = createNode('');
+  for (const h of spec.handlers) {
+    attachHandler(subtree, h.method, h.path, h.entry);
+  }
+  for (const m of spec.middleware) {
+    attachMiddlewares(subtree, m.method, m.path, m.entries);
+  }
+  return subtree;
+}
+
 // ─── translation helpers (file-local) ────────────────────────────────
 
 /**
@@ -461,7 +511,7 @@ class ControllerManager extends Base {
  * (likely a typo, e.g., `'PATC/login'`), returns `unknownMethod` so the
  * caller can warn instead of silently treating the whole key as a path.
  */
-function parseScopeKey(key: string): {
+export function parseScopeKey(key: string): {
   method: HttpMethod | 'ALL';
   path: string;
   unknownMethod?: string;
@@ -484,7 +534,7 @@ function parseScopeKey(key: string): {
 }
 
 /** `{*splat}` → `*splat`. Other syntax stays as-is. */
-function convertPathSyntax(p: string): string {
+export function convertPathSyntax(p: string): string {
   return p.replace(/\{\*([a-zA-Z_][a-zA-Z0-9_]*)\}/g, '*$1');
 }
 

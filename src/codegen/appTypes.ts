@@ -6,8 +6,8 @@
  */
 
 import fs from 'node:fs/promises';
-import { BaseModel } from '../modules/BaseModel.ts';
 import type { IApp } from '../server.ts';
+import { isBaseModelSource } from './astModel.ts';
 
 /** Subset of the framework logger we use here. */
 export interface CodegenLogger {
@@ -96,17 +96,15 @@ export async function getTemplate(
     )
     .join('\n');
 
-  // Import each model once and reuse the result for both the `getModel`
-  // emission and the `appInfo.user` augmentation below.
+  // Detect `BaseModel` subclasses by parsing each model's source (no runtime
+  // import — codegen never loads the model graph / Mongoose). Result drives both
+  // the `getModel` emission and the `appInfo.user` augmentation below.
   const models = await Promise.all(
-    modelPaths.map(async (modelPath) => {
-      const modelModule = await import(modelPath.path);
-      return {
-        file: modelPath.file,
-        relPath: modelPath.path.replace(dir, '.'),
-        isBaseModel: modelModule.default?.prototype instanceof BaseModel,
-      };
-    }),
+    modelPaths.map(async (modelPath) => ({
+      file: modelPath.file,
+      relPath: modelPath.path.replace(dir, '.'),
+      isBaseModel: await isBaseModelSource(modelPath.path),
+    })),
   );
 
   const modelTypes = models

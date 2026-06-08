@@ -81,6 +81,32 @@ export async function emitGenFile(input: EmitInput): Promise<string> {
     }
     filteredChains.push(resolved);
   }
+  return renderGenFile({ controller, srcPath, filteredChains, importMap });
+}
+
+/**
+ * Inputs for the pure renderer — resolution (the middleware chains as binding
+ * names + the `binding → specifier` import map) is already done by the caller.
+ */
+export interface RenderInput {
+  controller: ControllerMeta;
+  /** Absolute path to the controller's source `.ts` file. */
+  srcPath: string;
+  /** Resolved+filtered chains (binding names), parallel to `controller.routes`. */
+  filteredChains: MiddlewareRef[][];
+  /** `binding → specifier` for every binding referenced in `filteredChains`. */
+  importMap: Map<string, string>;
+}
+
+/**
+ * Render the gen.ts text from already-resolved chains + import map. Shared by the
+ * boot path (`emitGenFile`, which resolves bindings via `importResolution`) and
+ * the AST path (which resolves them from parsed source) — so both produce
+ * byte-identical output given the same resolved inputs.
+ */
+export function renderGenFile(input: RenderInput): string {
+  const { controller, srcPath, filteredChains, importMap } = input;
+  const ctrlDir = path.dirname(srcPath);
   const uniqueMiddlewares = collectUniqueMiddlewares(filteredChains);
 
   const frameworkRoot = findFrameworkSrcRoot(srcPath);

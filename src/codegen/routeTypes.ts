@@ -84,7 +84,7 @@ export async function generateRouteTypes(
  * Index flat routes by `"<METHOD> <absolute-path>"` for cheap lookup
  * during per-controller chain resolution.
  */
-function indexFlatRoutes(flat: FlatRoute[]): Map<string, FlatRoute> {
+export function indexFlatRoutes(flat: FlatRoute[]): Map<string, FlatRoute> {
   const out = new Map<string, FlatRoute>();
   for (const fr of flat) {
     out.set(`${fr.method} ${fr.path}`, fr);
@@ -102,7 +102,7 @@ function indexFlatRoutes(flat: FlatRoute[]): Map<string, FlatRoute> {
  * controller mounts at `/` with a splat-scoped middleware, which then
  * appears in every other controller's chain via the registry root).
  */
-function chainFor(
+export function chainFor(
   route: RouteMeta,
   urlPrefix: string,
   flatByKey: Map<string, FlatRoute>,
