@@ -41,12 +41,13 @@ Blocking: docs-sweep blocks llm-skills
 | [cache-drivers](queued/cache-drivers.md) | P1c | Cache driver abstraction. Small. |
 | [test-helpers](queued/test-helpers.md) | P1i | Framework test helpers usable from `node:test` + vitest. ~½ d. |
 | [codegen-incremental](queued/codegen-incremental.md) | P2a | File-based codegen cache + OpenAPI surface. TBD. |
+| [codegen-ast](queued/codegen-ast.md) | P1n | oxc AST codegen front-end — deletes `importResolution.ts`, drives the model scan too. Prototype ✅. **v5.1, non-breaking** (boot kept as fallback); fallback removal is v6. |
 
 ### later/
 
 | File | Ref | Summary |
 |---|---|---|
-| [static-middleware-cutover](later/static-middleware-cutover.md) | P1f | v6: drop instance schema getters, remove `skipWrap`. v5.x bridge in P1j Phase 1. |
+| [static-middleware-cutover](later/static-middleware-cutover.md) | P1f | v6: drop instance schema getters, remove `skipWrap`. v5.x bridge in P1j Phase 1. AST fallback removal (P1n Phase 7) rides here. |
 | [observability](later/observability.md) | P2b | OTel, Sentry, metrics, healthz. |
 | [performance](later/performance.md) | P2c | find-my-way, fast-json-stringify. |
 | [mcp-surface](later/mcp-surface.md) | P2d | Full MCP server (read + write). |

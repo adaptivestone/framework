@@ -145,3 +145,56 @@ a prototype:
 If it's meaningfully faster and the fallback set is small, it's a strong v6 refactor that
 deletes boot + ghost + `importResolution`. If controllers lean on dynamic route-building,
 the boot approach stays.
+
+## Prototype results (2026-06-07)
+
+A prototype lives in `prototypes/codegen-ast/` (extractor `astExtract.ts`, runner
+`run.ts`, bare-package check `bare-package-check.ts`). It was first written against the
+**TypeScript compiler API** to validate the approach dependency-free, then **ported to
+oxc** (Phase 0, 2026-06-08) with byte-identical results — confirming the extraction is
+parser-agnostic and oxc is the durable production pick (`ts.createSourceFile` is dropped
+in TS 7's Go port). It ran over 5 representative controllers: the framework's
+`Auth` (literal `routes` with `defineSchema(...)` *values* + bare `this.x` handlers +
+top-level regex/helpers) and `Home` (`new Map()` empty middleware), plus the codegen
+fixtures `File` (own middleware, `Auth` binding ≠ `AuthMiddleware` class), `Inherited`
+(no own middleware → inherited), and `Schemas` (schema routes).
+
+| Check | Result |
+| --- | --- |
+| **Coverage** — fully declarative (AST-only, no boot) | **5/5**, 0 fallbacks |
+| **Routes** — AST metadata == the ghost oracle (`method/path/handler/hasRequest`) | **5/5** |
+| **Chain** — AST middleware bindings == the emitted `.gen.ts` `typeof X` set | **5/5** |
+| **Speed** — AST extract vs the boot path's per-controller dynamic `import()` | oxc: **sub-millisecond**/controller vs tens-of-ms→seconds (~97× aggregate; ~50× on the TS API), **before** the one-time app boot |
+
+What this validates:
+
+- **The binding-vs-class-name problem disappears.** `File` emits `Auth` (the import
+  binding), not `AuthMiddleware` (the class), with no identity matching — read straight
+  off the import node. A 1-level `extends`-walk recovered the inherited `[GetUserByToken,
+  Auth]` for `Inherited`/`Schemas` the same way.
+- **`request: defineSchema(...)` and `request: object().shape(...)` are fine** — the
+  extractor reads only that a `request` key is present, never the value. AST *doesn't*
+  evaluate it; the boot path *does* (importing `Auth` pulled the whole Mongoose model
+  graph — ~5 s — which AST skips entirely).
+- **`routes` and `middleware` extract independently.** The base `AbstractController` has a
+  non-literal `routes` (`logger.warn` + `return {}`) but a literal middleware Map — the
+  walk needs only the latter, so a dynamic `routes` doesn't block inheritance.
+
+Caveats / not yet exercised (for the real migration):
+
+- **Bare-package ancestors** — ✅ **validated** (Phase 0, `bare-package-check.ts`): a
+  synthetic consumer extending `@adaptivestone/framework/modules/AbstractController.js`
+  resolves the bare specifier via `createRequire` (honoring the package `exports` map),
+  walks into the installed file, and recovers the inherited `[GetUserByToken, Auth]` — no
+  class-identity matching. Still to do: confirm on a *real* installed consumer project.
+- **Specifier path math** (rebasing relative ancestor imports to the gen-file dir; bare
+  rewrites) is orthogonal and shared with the current emit — not reproduced here.
+- Only 5 controllers, all framework/fixtures; a real consumer project (with its own
+  dynamic getters) should be measured to confirm the fallback rate stays near zero.
+- Full migration still requires the `#buildSubtree(instance)` → `#buildSubtree(extracted)`
+  decoupling so the extracted data feeds the real `flatten()`.
+
+**Verdict: green light.** 100% declarative coverage on this set, a large speed win, and the
+binding approach reproduces the emitted chains exactly — the core risks the doc flagged are
+retired. Next steps: cover the bare-package-ancestor walk + run on a real consumer project,
+then do the `buildSubtree` decoupling and delete `importResolution.ts`.
