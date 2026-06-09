@@ -63,9 +63,14 @@ export async function resolveController(
 
   // The controller's own routes + needsBoot come from itself. Middleware may be
   // inherited, so it's resolved by walking `extends`.
-  const definer = self.middleware
+  const found = self.middleware
     ? { file: srcPath, ex: self, rewriteBase: null as string | null }
     : await findMiddlewareDefiner(srcPath, self);
+  // A non-literal `static get middleware()` reached UP the chain (the child's own
+  // is already covered by `self.ok`): treat it like the child case — not
+  // statically analyzable, so the run throws instead of dropping real middleware.
+  const ancestorMiddlewareDynamic = found === 'dynamic';
+  const definer = found === 'dynamic' ? null : found;
 
   const middleware = definer?.ex.middleware ?? [];
 
@@ -109,9 +114,10 @@ export async function resolveController(
   const imports = [...byBinding.values()];
 
   // `self.ok` is false when routes / own-middleware / getHttpPath weren't
-  // literals; any of those (or no exported class) → not statically analyzable
-  // (the run throws; the `needsBoot` name is kept for the flag's history).
-  const needsBoot = !self.ok || !self.className;
+  // literals; that (or no exported class, or a dynamic ancestor middleware Map)
+  // → not statically analyzable (the run throws; the `needsBoot` name is kept for
+  // the flag's history).
+  const needsBoot = !self.ok || !self.className || ancestorMiddlewareDynamic;
   const urlPrefix = self.httpPath ?? `/${(self.className ?? '').toLowerCase()}`;
 
   return {
@@ -121,7 +127,12 @@ export async function resolveController(
     middleware,
     imports,
     needsBoot,
-    reason: needsBoot ? self.reason : undefined,
+    reason: needsBoot
+      ? (self.reason ??
+        (ancestorMiddlewareDynamic
+          ? "an ancestor's `static get middleware()` is not a literal Map"
+          : 'no exported controller class found'))
+      : undefined,
   };
 }
 
@@ -135,18 +146,26 @@ interface Definer {
 }
 
 /** Walk `extends` from `srcPath` to the nearest ancestor that declares a
- * `static get middleware()`. Returns `null` if none is found. */
+ * `static get middleware()`. Returns the `Definer`, `'dynamic'` if an ancestor
+ * defines middleware but not as a literal Map (can't be analyzed), or `null` if
+ * no ancestor declares middleware. */
 async function findMiddlewareDefiner(
   srcPath: string,
   selfEx: ExtractResult,
-): Promise<Definer | null> {
+): Promise<Definer | 'dynamic' | null> {
   const visited = new Set<string>([srcPath]);
 
   async function visit(
     fromFile: string,
     ex: ExtractResult,
     rewriteBase: string | null,
-  ): Promise<Definer | null> {
+  ): Promise<Definer | 'dynamic' | null> {
+    // A `static get middleware()` that exists here but isn't a literal Map: the
+    // chain stops being analyzable. Distinct from "no getter here" (keep walking)
+    // — conflating them would silently drop this ancestor's real middleware.
+    if (ex.middlewareDynamic) {
+      return 'dynamic';
+    }
     if (ex.middleware !== undefined) {
       return { file: fromFile, ex, rewriteBase };
     }

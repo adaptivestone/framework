@@ -219,9 +219,14 @@ async function discoverControllerFiles(dir: string): Promise<string[]> {
       continue;
     }
     const base = e.name;
+    // Mirror the runtime controller loader (`helpers/files.ts`), which skips
+    // `.d.ts` / `.gen.*` / `.test.*`. Missing `.d.ts` here lets a colocated
+    // declaration file (e.g. `Foo.d.ts`, `Foo.gen.d.ts`) reach the extractor,
+    // which finds no class → `needsBoot` → the whole run throws.
     if (
       !/^[A-Z]/.test(base) ||
       !base.endsWith('.ts') ||
+      base.endsWith('.d.ts') ||
       base.endsWith('.gen.ts') ||
       base.includes('.test.')
     ) {

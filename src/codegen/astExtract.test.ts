@@ -66,6 +66,14 @@ export default class Ctrl extends Right {}`);
     expect(ex.extendsName).toBe('Right');
   });
 
+  it('follows `export { Ctrl as default }`, not a trailing helper class', () => {
+    const ex = extract(`class Ctrl extends Right {}
+class Helper extends Wrong {}
+export { Ctrl as default };`);
+    expect(ex.className).toBe('Ctrl');
+    expect(ex.extendsName).toBe('Right');
+  });
+
   it('returns null for a qualified / mixin parent (documented residual)', () => {
     expect(
       extract('export default class C extends ns.Base {}').extendsName,
@@ -156,6 +164,30 @@ describe('astExtract — routes', () => {
     expect(ex.reason).toMatch(/computed\/spread/);
   });
 
+  it('rejects a route with no identifiable handler (shorthand / optional chain / absent)', () => {
+    // Each of these would otherwise yield handler:null and be silently dropped at emit.
+    for (const entry of [
+      '{ handler }', // object shorthand
+      '{ handler: this?.x }', // optional-chain member (ChainExpression)
+      '{ request: s() }', // no handler key at all
+      'this?.x', // bare optional-chain handler
+    ]) {
+      const ex = extract(`export default class C extends B {
+  get routes() { return { get: { '/x': ${entry} } }; }
+}`);
+      expect(ex.ok, entry).toBe(false);
+      expect(ex.reason, entry).toMatch(/no identifiable handler/);
+    }
+  });
+
+  it('rejects a spread route entry (a spread can hide handler/request/middleware)', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() { return { get: { '/x': { ...defaults, handler: this.x } } }; }
+}`);
+    expect(ex.ok).toBe(false);
+    expect(ex.reason).toMatch(/spread in the route entry/);
+  });
+
   it('flags a dynamic routes getter as needsBoot but still extracts middleware', () => {
     // The base AbstractController shape: a non-literal `routes`, a literal Map.
     const ex = extract(`export default class C extends B {
@@ -209,14 +241,19 @@ describe('astExtract — middleware', () => {
     );
     expect(ex.ok).toBe(true);
     expect(ex.middleware).toBeUndefined();
+    // No getter here → NOT dynamic (so the walk keeps inheriting from above).
+    expect(ex.middlewareDynamic).toBe(false);
   });
 
-  it('flags a dynamic middleware getter as needsBoot', () => {
+  it('flags a dynamic middleware getter as needsBoot + sets middlewareDynamic', () => {
     const ex = extract(`export default class C extends B {
   static get middleware() { return buildMap(); }
 }`);
     expect(ex.ok).toBe(false);
     expect(ex.reason).toMatch(/middleware getter not a literal Map/);
+    // The flag lets the extends-walk tell "non-literal getter here" apart from
+    // "no getter here" (which inherits) — see astResolve's ancestor handling.
+    expect(ex.middlewareDynamic).toBe(true);
   });
 });
 

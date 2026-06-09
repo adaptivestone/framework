@@ -133,6 +133,29 @@ export default class Dyn extends Base {
     expect(r.reason).toMatch(/routes getter/);
     expect(r.middleware).toEqual([{ scope: '/{*splat}', bindings: ['OwnMW'] }]);
   });
+
+  it('throws (needsBoot) on a dynamic ANCESTOR middleware Map — never silently empty', async () => {
+    // The ancestor DEFINES middleware, but not as a literal Map. The walk must
+    // not treat that like "no middleware here" (which would emit the child with
+    // an empty chain and needsBoot:false — silent wrong output).
+    await write(
+      'DynBase.ts',
+      `export default class DynBase extends Base {
+  static get middleware() { return buildMap(); }
+}`,
+    );
+    const child = await write(
+      'ChildOfDynBase.ts',
+      `import DynBase from './DynBase.ts';
+export default class ChildOfDynBase extends DynBase {
+  get routes() { return { get: { '/': this.list } }; }
+}`,
+    );
+    const r = await resolveController(child);
+    expect(r.needsBoot).toBe(true);
+    expect(r.reason).toMatch(/ancestor/);
+    expect(r.middleware).toEqual([]); // not emitted as a "valid" empty chain
+  });
 });
 
 describe('astResolve — bare-package ancestor', () => {

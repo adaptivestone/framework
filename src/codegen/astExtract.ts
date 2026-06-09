@@ -66,6 +66,10 @@ export interface ExtractResult {
   routes: RouteInfo[];
   /** `undefined` = no own middleware (inherits); `[]` is a real empty map. */
   middleware?: MiddlewareScope[];
+  /** A `static get middleware()` is defined here but isn't a literal `new Map([…])`
+   * — so `middleware` is `undefined` for a reason the extends-walk must NOT treat
+   * as "inherits from above" (that would silently drop the real middleware). */
+  middlewareDynamic?: boolean;
   /** Literal `getHttpPath()` return (e.g. `'/'`), if the method returns a string
    * literal. `undefined` = method not defined (caller uses the default mount). */
   httpPath?: string;
@@ -166,6 +170,7 @@ export function extractController(
     imports,
     routes,
     middleware,
+    middlewareDynamic: !!mwFailed,
     httpPath,
     httpPathDynamic,
   };
@@ -239,6 +244,21 @@ function findExportedClass(body: Node[]): Node | undefined {
       }
     }
   }
+  // `class X {} … export { X as default }` (local re-export, not `… from '…'`)
+  for (const n of body) {
+    if (n.type !== 'ExportNamedDeclaration' || n.source) {
+      continue;
+    }
+    for (const spec of n.specifiers ?? []) {
+      if (spec.exported?.name !== 'default') {
+        continue;
+      }
+      const named = classes.find((c) => c.id?.name === spec.local?.name);
+      if (named) {
+        return named;
+      }
+    }
+  }
   return classes[classes.length - 1]; // last class as a last resort
 }
 
@@ -285,7 +305,16 @@ function extractRoutes(
       if (unanalyzable) {
         return { ok: false, reason: `route uses ${unanalyzable}` };
       }
-      routes.push(readRouteEntry(method, p, routeProp.value));
+      const entry = readRouteEntry(method, p, routeProp.value);
+      // No identifiable `handler` (shorthand `{ handler }`, `this?.h`, a computed
+      // member, …) → the route would be silently dropped at emit. Refuse instead.
+      if (entry.handler === null) {
+        return {
+          ok: false,
+          reason: `route '${method} ${p}' has no identifiable handler`,
+        };
+      }
+      routes.push(entry);
     }
   }
   return { ok: true, routes };
@@ -301,7 +330,10 @@ function unanalyzableRoute(init: Node): string | null {
   }
   for (const prop of init.properties) {
     if (prop.type !== 'Property') {
-      continue;
+      // A spread (`{ ...defaults, handler: this.h }`) can hide a handler /
+      // request / query / middleware key the extractor can't see → don't risk
+      // emitting a half-read or silently-dropped route.
+      return 'a spread in the route entry';
     }
     const key = propName(prop.key);
     if (

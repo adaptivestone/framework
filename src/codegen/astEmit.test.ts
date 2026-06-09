@@ -6,6 +6,8 @@
  * wiring: every fixture emits via AST with no needsBoot deferral.
  */
 
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -40,5 +42,45 @@ describe('astEmit', () => {
     );
     expect(needsBoot).toEqual([]);
     expect(written).toBe(FIXTURES.length);
+  }, 30_000);
+
+  it('skips colocated .d.ts / .gen.d.ts files (no spurious needsBoot)', async () => {
+    // Mirrors the runtime loader: a declaration file next to controllers has no
+    // class → would be needsBoot → would throw, blocking ALL codegen. Must be
+    // excluded by discovery instead.
+    const dir = await mkdtemp(path.join(tmpdir(), 'ast-discover-'));
+    try {
+      await writeFile(
+        path.join(dir, 'Widget.ts'),
+        `export default class Widget extends Base {
+  get routes() { return { get: { '/': this.list } }; }
+}`,
+        'utf8',
+      );
+      // Capitalized declaration files that pass the old (`.ts`-only) filter:
+      await writeFile(
+        path.join(dir, 'Widget.gen.d.ts'),
+        'export type Foo = { a: number };\n',
+        'utf8',
+      );
+      await writeFile(
+        path.join(dir, 'Ambient.d.ts'),
+        'declare module "x" { export const y: number; }\n',
+        'utf8',
+      );
+      const app = {
+        logger: noopLogger,
+        foldersConfig: { controllers: dir },
+        httpServer: null,
+      } as unknown as IApp;
+      const { written, needsBoot } = await generateRouteTypesViaAst(
+        app,
+        noopLogger,
+      );
+      expect(needsBoot).toEqual([]); // the .d.ts files were NOT discovered
+      expect(written).toBe(1); // only Widget.ts
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   }, 30_000);
 });
