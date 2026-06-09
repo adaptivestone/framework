@@ -244,13 +244,16 @@ function findExportedClass(body: Node[]): Node | undefined {
       }
     }
   }
-  // `class X {} … export { X as default }` (local re-export, not `… from '…'`)
+  // `class X {} … export { X as default }` (local re-export, not `… from '…'`).
+  // The exported name is an Identifier (`as default`) or, since ES2022 arbitrary
+  // module namespace names, a string Literal (`as "default"`).
   for (const n of body) {
     if (n.type !== 'ExportNamedDeclaration' || n.source) {
       continue;
     }
     for (const spec of n.specifiers ?? []) {
-      if (spec.exported?.name !== 'default') {
+      const exported = spec.exported?.name ?? spec.exported?.value;
+      if (exported !== 'default') {
         continue;
       }
       const named = classes.find((c) => c.id?.name === spec.local?.name);

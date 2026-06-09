@@ -113,7 +113,8 @@ export async function generateRouteTypesViaAst(
     );
     const outPath = path.join(
       path.dirname(r.srcPath),
-      `${path.basename(r.srcPath, '.ts')}.routes.gen.ts`,
+      // Strip whichever source extension (.ts or .js); the gen file is always .ts.
+      `${path.basename(r.srcPath, path.extname(r.srcPath))}.routes.gen.ts`,
     );
     await fs.writeFile(outPath, text, 'utf8');
     logger?.info?.(`  → ${outPath}`);
@@ -219,15 +220,18 @@ async function discoverControllerFiles(dir: string): Promise<string[]> {
       continue;
     }
     const base = e.name;
-    // Mirror the runtime controller loader (`helpers/files.ts`), which skips
-    // `.d.ts` / `.gen.*` / `.test.*`. Missing `.d.ts` here lets a colocated
-    // declaration file (e.g. `Foo.d.ts`, `Foo.gen.d.ts`) reach the extractor,
-    // which finds no class → `needsBoot` → the whole run throws.
+    // Mirror the runtime controller loader (`helpers/files.ts`): it loads `.ts`
+    // AND `.js` controllers and skips `.d.ts` / `.gen.*` / `.test.*`. Missing
+    // `.d.ts` here lets a colocated declaration file (e.g. `Foo.d.ts`,
+    // `Foo.gen.d.ts`) reach the extractor, which finds no class → `needsBoot` →
+    // the whole run throws; missing `.js` would leave a runtime-loaded
+    // controller untyped AND absent from the shared bleed registry.
     if (
       !/^[A-Z]/.test(base) ||
-      !base.endsWith('.ts') ||
+      !(base.endsWith('.ts') || base.endsWith('.js')) ||
       base.endsWith('.d.ts') ||
       base.endsWith('.gen.ts') ||
+      base.endsWith('.gen.js') ||
       base.includes('.test.')
     ) {
       continue;

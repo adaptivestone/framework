@@ -74,6 +74,14 @@ export { Ctrl as default };`);
     expect(ex.extendsName).toBe('Right');
   });
 
+  it('follows the string-literal form `export { Ctrl as "default" }` (ES2022)', () => {
+    const ex = extract(`class Ctrl extends Right {}
+class Helper extends Wrong {}
+export { Ctrl as "default" };`);
+    expect(ex.className).toBe('Ctrl');
+    expect(ex.extendsName).toBe('Right');
+  });
+
   it('returns null for a qualified / mixin parent (documented residual)', () => {
     expect(
       extract('export default class C extends ns.Base {}').extendsName,

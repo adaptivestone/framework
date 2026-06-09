@@ -58,8 +58,11 @@ export function renderGenFile(input: RenderInput): string {
   const validateTypesPath = isFrameworkOwnController
     ? relFromCtrl(path.join(frameworkRoot, 'services/validate/types.ts'))
     : '@adaptivestone/framework/services/validate/types.js';
-  const ctrlBaseName = path.basename(srcPath, '.ts');
-  const ctrlImportPath = `./${ctrlBaseName}.ts`;
+  // Controllers may be .ts or .js (the runtime loader accepts both); the gen
+  // file's self-import must use the controller's real extension.
+  const ctrlExt = path.extname(srcPath);
+  const ctrlBaseName = path.basename(srcPath, ctrlExt);
+  const ctrlImportPath = `./${ctrlBaseName}${ctrlExt}`;
 
   const middlewareImports = uniqueMiddlewares
     .map((mw) => `import type ${mw} from '${importMap.get(mw)}';`)
@@ -126,7 +129,7 @@ export function renderGenFile(input: RenderInput): string {
  *
  * Regenerate with: \`npm run gen\`
  *
- * Source of truth: \`${ctrlBaseName}.ts\`'s \`routes\` getter and
+ * Source of truth: \`${ctrlBaseName}${ctrlExt}\`'s \`routes\` getter and
  * \`static get middleware()\` Map.
  */
 `;
