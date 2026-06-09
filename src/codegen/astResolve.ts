@@ -8,19 +8,19 @@
  * an emittable `binding → specifier` import map for those middlewares, resolved
  * across relative AND bare-package ancestors.
  *
- * This is the AST replacement for `importResolution.ts`. The hard part the regex
+ * This replaced `importResolution.ts` (since deleted). The hard part the regex
  * version paid for — recovering a binding from a live class by identity matching,
  * because the registry handed it class objects with no source path — is gone:
  * the binding IS the import-node name, read directly. What remains is pure path
- * math, shared with the old emit:
+ * math (was shared with the old emit):
  *  - a relative ancestor's middleware imports are rebased to the child gen-file
  *    directory (the gen file sits next to the controller);
  *  - a bare-package ancestor's relative imports are rewritten into bare specifiers
  *    rooted at that ancestor's package subpath (the public subpath tree mirrors
  *    `src/`).
  *
- * When the controller's `routes` getter isn't a literal, `needsBoot` is set so the
- * caller falls back to the boot path for that one controller (the hybrid).
+ * When the controller's `routes` getter isn't a literal, `needsBoot` is set; the
+ * controller can't be statically analyzed and `generateAll` throws (no fallback).
  */
 
 import { existsSync, promises as fs } from 'node:fs';
@@ -41,12 +41,14 @@ export interface ResolvedImport extends ImportInfo {
 
 export interface ResolvedController {
   className?: string;
+  /** Mount path: the literal `getHttpPath()` return, else `/<classname>`. */
+  urlPrefix: string;
   routes: RouteInfo[];
   /** Effective middleware (own, or inherited from the nearest defining ancestor). */
   middleware: MiddlewareScope[];
   /** Emittable import for each middleware binding in `middleware`. */
   imports: ResolvedImport[];
-  /** True when `routes` (or middleware) wasn't a literal — fall back to boot. */
+  /** True when a getter / `getHttpPath` wasn't a literal — not analyzable (throws). */
   needsBoot: boolean;
   reason?: string;
 }
@@ -66,19 +68,60 @@ export async function resolveController(
     : await findMiddlewareDefiner(srcPath, self);
 
   const middleware = definer?.ex.middleware ?? [];
-  const imports = definer ? resolveImports(definer, srcPath, childDir) : [];
 
-  // `routes` non-literal (or no exported class) → boot fallback for this one.
-  const routesFailed =
-    self.reason?.startsWith('routes getter') || !self.className;
+  // Emittable imports cover BOTH the effective (Map) middleware — from the
+  // defining file (an ancestor, rebased) — and route-level middleware, which is
+  // always declared in (and imported by) the controller itself. A binding in
+  // both resolves to the controller's own import (child wins), so route-level is
+  // merged last.
+  const mapBindings = new Set<string>();
+  for (const scope of middleware) {
+    for (const b of scope.bindings) {
+      mapBindings.add(b);
+    }
+  }
+  const routeBindings = new Set<string>();
+  for (const r of self.routes) {
+    for (const b of r.middleware ?? []) {
+      routeBindings.add(b);
+    }
+  }
+  const byBinding = new Map<string, ResolvedImport>();
+  if (definer) {
+    for (const i of resolveBindingImports(
+      mapBindings,
+      definer,
+      srcPath,
+      childDir,
+    )) {
+      byBinding.set(i.binding, i);
+    }
+  }
+  const selfDefiner: Definer = { file: srcPath, ex: self, rewriteBase: null };
+  for (const i of resolveBindingImports(
+    routeBindings,
+    selfDefiner,
+    srcPath,
+    childDir,
+  )) {
+    byBinding.set(i.binding, i);
+  }
+  const imports = [...byBinding.values()];
+
+  // `self.ok` is false when routes / own-middleware / getHttpPath weren't
+  // literals; any of those (or no exported class) → not statically analyzable
+  // (the run throws; the `needsBoot` name is kept for the flag's history).
+  const needsBoot = !self.ok || !self.className;
+  const urlPrefix = self.httpPath ?? `/${(self.className ?? '').toLowerCase()}`;
 
   return {
     className: self.className,
+    urlPrefix,
     routes: self.routes,
     middleware,
     imports,
-    needsBoot: routesFailed,
-    reason: routesFailed ? self.reason : undefined,
+    needsBoot,
+    reason: needsBoot ? self.reason : undefined,
   };
 }
 
@@ -165,29 +208,24 @@ function resolveAncestor(
 
 // ─── import resolution ───────────────────────────────────────────────────────
 
-/** Build the emittable import for each middleware binding in the definer. */
-function resolveImports(
-  definer: Definer,
+/** Build the emittable import for each `binding` declared in `from`'s file. */
+function resolveBindingImports(
+  bindings: Set<string>,
+  from: Definer,
   srcPath: string,
   childDir: string,
 ): ResolvedImport[] {
-  const bindings = new Set<string>();
-  for (const scope of definer.ex.middleware ?? []) {
-    for (const b of scope.bindings) {
-      bindings.add(b);
-    }
-  }
   const out: ResolvedImport[] = [];
   for (const binding of bindings) {
-    const info = definer.ex.imports[binding];
+    const info = from.ex.imports[binding];
     if (!info) {
-      continue; // not imported in the defining file — dropped (can't emit)
+      continue; // not imported in that file — dropped (can't emit)
     }
     out.push({
       binding,
       kind: info.kind,
       ...(info.orig ? { orig: info.orig } : {}),
-      specifier: emitSpecifier(info.specifier, definer, srcPath, childDir),
+      specifier: emitSpecifier(info.specifier, from, srcPath, childDir),
     });
   }
   return out;

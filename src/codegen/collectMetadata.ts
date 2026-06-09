@@ -1,127 +1,42 @@
 /**
- * Pure controller-shape extraction. Given an instantiated controller,
- * walks the `routes` getter and returns a structural manifest with
- * one entry per (method, path).
- *
- * Middleware chains are NOT computed here — that's the registry's job
- * (`RouteRegistry.flatten()`). Codegen pairs this metadata with the
- * registry output to render per-handler `<MethodName>Request` aliases.
+ * Shared codegen metadata types. The AST front-end (`astExtract`/`astResolve`/
+ * `astEmit`) produces these; `emit` renders from them. (Middleware chains are
+ * computed by `RouteRegistry.flatten()`, not here.)
  */
 
-import type AbstractController from '../modules/AbstractController.ts';
-import { isContentTypeRequestMap } from '../services/validate/contentType.ts';
-
-/** One middleware reference, with its parameters if it was declared as a tuple. */
+/** One middleware reference in a route's chain, by its local import binding. */
 export interface MiddlewareRef {
+  /** The local import binding the gen file emits (`typeof <className>`). */
   className: string;
-  /** Present when the middleware was declared as `[Class, params]` in a Map or route-level array. */
+  /** Present when declared as `[Class, params]` in a Map / route-level array. */
   params?: Record<string, unknown>;
-  /**
-   * The resolved middleware class, when the ref came from the live registry
-   * (codegen). Lets `emit` map the class back to the *local import binding*
-   * a controller uses for it — e.g. `Auth.ts` default-exports `AuthMiddleware`
-   * but controllers import it as `Auth`, so `className` ('AuthMiddleware')
-   * won't match the import map (keyed by binding). Absent in synthetic refs.
-   * Typed `unknown` — `emit` only needs reference identity, not the shape.
-   */
-  Class?: unknown;
 }
 
 /** One route registered by a controller. */
 export interface RouteMeta {
   method: string;
   path: string;
-  /** Method name on the controller (e.g., `'postLogin'`). `null` if the route's handler couldn't be identified. */
+  /** Method name on the controller (e.g. `'postLogin'`); `null` if unidentifiable. */
   handlerName: string | null;
-  /** True when the route entry is `{ handler, request }` and `request` is set. */
+  /** True when the route entry has a `request` schema. */
   hasSchema: boolean;
   /**
    * Media-type keys when `request` is a content-type map (`{ 'application/json':
-   * schema, ... }`). Drives the discriminated-union request type. Absent for a
+   * schema, … }`). Drives the discriminated-union request type. Absent for a
    * single-schema `request`.
    */
   requestContentTypes?: string[];
-  /** True when the route entry is `{ handler, query }` and `query` is set. */
+  /** True when the route entry has a `query` schema. */
   hasQuerySchema: boolean;
 }
 
 /** Aggregate metadata for one controller. */
 export interface ControllerMeta {
-  /** Class name (e.g., `'Auth'`). */
+  /** Class name (e.g. `'Auth'`). */
   className: string;
-  /** Folder prefix from auto-loader (`''` for top-level, `'test'` for `controllers/test/Foo.ts`). */
+  /** Folder prefix from the auto-loader (`''` for top-level). */
   prefix: string;
-  /** URL prefix the controller mounts at (e.g., `/auth`). */
+  /** URL prefix the controller mounts at (e.g. `/auth`). */
   urlPrefix: string;
   routes: RouteMeta[];
-}
-
-/** Extract metadata from one already-instantiated controller. */
-export function extractControllerMeta(
-  controller: AbstractController,
-): ControllerMeta {
-  const className = controller.constructor.name;
-  const prefix = controller.prefix;
-  const urlPrefix = controller.getHttpPath();
-
-  const routes: RouteMeta[] = [];
-  for (const [verb, methodRoutes] of Object.entries(
-    controller.routes as Record<string, Record<string, unknown>>,
-  )) {
-    for (const [path, entry] of Object.entries(methodRoutes)) {
-      routes.push(extractRouteMeta(verb, path, entry));
-    }
-  }
-
-  return { className, prefix, urlPrefix, routes };
-}
-
-function extractRouteMeta(
-  verb: string,
-  path: string,
-  entry: unknown,
-): RouteMeta {
-  // Bare method ref: `'/logout': this.postLogout`
-  if (typeof entry === 'function') {
-    return {
-      method: verb,
-      path,
-      handlerName: nameOf(entry),
-      hasSchema: false,
-      hasQuerySchema: false,
-    };
-  }
-  if (entry && typeof entry === 'object') {
-    const obj = entry as {
-      handler?: unknown;
-      request?: unknown;
-      query?: unknown;
-    };
-    return {
-      method: verb,
-      path,
-      handlerName:
-        typeof obj.handler === 'function' ? nameOf(obj.handler) : null,
-      hasSchema: obj.request != null,
-      requestContentTypes: isContentTypeRequestMap(obj.request)
-        ? Object.keys(obj.request)
-        : undefined,
-      hasQuerySchema: obj.query != null,
-    };
-  }
-  return {
-    method: verb,
-    path,
-    handlerName: null,
-    hasSchema: false,
-    hasQuerySchema: false,
-  };
-}
-
-function nameOf(value: unknown): string | null {
-  if (typeof value === 'function') {
-    const fn = value as { name?: string };
-    return fn.name && fn.name.length > 0 ? fn.name : null;
-  }
-  return null;
 }

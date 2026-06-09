@@ -1,9 +1,9 @@
 /**
  * Codegen AST extractor (plan: `.plans/refactor/queued/codegen-ast.md` · design:
  * `docs/codegen-ast-approach.md`). Parses a controller's source with **oxc** and
- * reads, declaratively from the AST, everything the codegen front-end needs —
- * replacing the regex/char-loop reconstruction in `importResolution.ts` and the
- * boot-time reflection.
+ * reads, declaratively from the AST, everything the codegen front-end needs — this
+ * (with `astResolve`/`astEmit`) is the whole front-end; the old regex/char-loop
+ * reconstruction and boot-time reflection have been removed.
  *
  * Per controller source it returns:
  *   - `imports`:    binding → { specifier, kind, orig? }. Keyed on the LOCAL
@@ -20,8 +20,8 @@
  * doesn't discard a literal `middleware` Map (the base `AbstractController` has
  * exactly that shape — a `logger.warn` + stub `return {}` for routes, a literal
  * Map for middleware). When a getter isn't a literal structure, the relevant
- * aspect is flagged via `ok: false` / `reason` so the caller can fall back to the
- * boot path for that controller (the hybrid).
+ * aspect is flagged via `ok: false` / `reason`; codegen can't statically analyze
+ * that controller and the run throws (no boot fallback — declarative-only).
  *
  * oxc, not the TypeScript API: `ts.createSourceFile` is dropped in TS 7's Go port;
  * oxc is a stable in-process napi parser, and codegen needs only syntactic
@@ -44,6 +44,11 @@ export interface RouteInfo {
   handler: string | null;
   hasRequest: boolean;
   hasQuery: boolean;
+  /** Media-type keys when `request` is a content-type map (`{ 'application/json':
+   * … }`); absent for a single-schema request. */
+  requestContentTypes?: string[];
+  /** Route-level middleware binding names (`{ handler, middleware: [X] }`). */
+  middleware?: string[];
 }
 
 export interface MiddlewareScope {
@@ -52,7 +57,7 @@ export interface MiddlewareScope {
 }
 
 export interface ExtractResult {
-  /** False when a getter isn't a literal structure → fall back to boot. */
+  /** False when a getter isn't a literal structure → not statically analyzable. */
   ok: boolean;
   reason?: string;
   className?: string;
@@ -61,6 +66,11 @@ export interface ExtractResult {
   routes: RouteInfo[];
   /** `undefined` = no own middleware (inherits); `[]` is a real empty map. */
   middleware?: MiddlewareScope[];
+  /** Literal `getHttpPath()` return (e.g. `'/'`), if the method returns a string
+   * literal. `undefined` = method not defined (caller uses the default mount). */
+  httpPath?: string;
+  /** `getHttpPath()` is defined but not a literal return → mount path unknown. */
+  httpPathDynamic?: boolean;
 }
 
 // oxc emits an ESTree-shaped AST; we walk it structurally (no type info needed).
@@ -119,11 +129,34 @@ export function extractController(
     }
   }
 
+  // getHttpPath(): a literal-string return gives the mount path; a non-literal
+  // body means the mount is unknown to static analysis (→ caller falls back).
+  const httpPathNode = cls.body.body.find(
+    (m: Node) =>
+      m.type === 'MethodDefinition' &&
+      m.kind === 'method' &&
+      !m.static &&
+      !m.computed &&
+      propName(m.key) === 'getHttpPath',
+  );
+  let httpPath: string | undefined;
+  let httpPathDynamic = false;
+  if (httpPathNode) {
+    const ret = literalReturn(httpPathNode);
+    if (ret?.type === 'Literal' && typeof ret.value === 'string') {
+      httpPath = ret.value;
+    } else {
+      httpPathDynamic = true;
+    }
+  }
+
   const reason = routesFailed
     ? `routes getter not a literal: ${routesFailed}`
     : mwFailed
       ? `middleware getter not a literal Map: ${mwFailed}`
-      : undefined;
+      : httpPathDynamic
+        ? 'getHttpPath() is not a literal-string return'
+        : undefined;
 
   return {
     ok: !reason,
@@ -133,6 +166,8 @@ export function extractController(
     imports,
     routes,
     middleware,
+    httpPath,
+    httpPathDynamic,
   };
 }
 
@@ -242,10 +277,45 @@ function extractRoutes(
       if (p === null) {
         return { ok: false, reason: 'computed route key' };
       }
+      // Some route-entry features affect the emitted chain/types but aren't read
+      // by this extractor (a content-type request map needs media-type keys;
+      // route-level `middleware` adds to the chain). Flag such a controller as
+      // unanalyzable (→ hard error) rather than misrender it.
+      const unanalyzable = unanalyzableRoute(routeProp.value);
+      if (unanalyzable) {
+        return { ok: false, reason: `route uses ${unanalyzable}` };
+      }
       routes.push(readRouteEntry(method, p, routeProp.value));
     }
   }
   return { ok: true, routes };
+}
+
+/** A route-entry shape this extractor can't read (→ `ok: false`, hard error), or
+ * null. Content-type maps and route-level middleware ARE extracted (below); only
+ * their unanalyzable variants — a request map with computed/spread keys, or a
+ * `middleware` value that isn't a literal array of binding identifiers — flag. */
+function unanalyzableRoute(init: Node): string | null {
+  if (init.type !== 'ObjectExpression') {
+    return null;
+  }
+  for (const prop of init.properties) {
+    if (prop.type !== 'Property') {
+      continue;
+    }
+    const key = propName(prop.key);
+    if (
+      key === 'request' &&
+      prop.value?.type === 'ObjectExpression' &&
+      !objectKeys(prop.value)
+    ) {
+      return 'a request map with computed/spread keys';
+    }
+    if (key === 'middleware' && middlewareBindings(prop.value) === undefined) {
+      return 'unanalyzable route-level middleware';
+    }
+  }
+  return null;
 }
 
 function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
@@ -262,27 +332,80 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
       hasQuery: false,
     };
   }
-  // `{ handler: this.x, request?, query? }`
+  // `{ handler: this.x, request?, query?, middleware? }`
   if (init.type === 'ObjectExpression') {
-    let handler: string | null = null;
-    let hasRequest = false;
-    let hasQuery = false;
+    const out: RouteInfo = {
+      method,
+      path,
+      handler: null,
+      hasRequest: false,
+      hasQuery: false,
+    };
     for (const prop of init.properties) {
       if (prop.type !== 'Property') {
         continue;
       }
       const key = propName(prop.key);
       if (key === 'handler' && prop.value.type === 'MemberExpression') {
-        handler = prop.value.property?.name ?? null;
+        out.handler = prop.value.property?.name ?? null;
       } else if (key === 'request') {
-        hasRequest = true; // the VALUE (defineSchema(...)) is never evaluated
+        out.hasRequest = true; // the VALUE (defineSchema(...)) is never evaluated
+        // A content-type map → its media-type keys (mirrors the runtime
+        // `isContentTypeRequestMap`: a plain object whose keys all contain `/`).
+        const keys = objectKeys(prop.value);
+        if (keys && keys.length > 0 && keys.every((k) => k.includes('/'))) {
+          out.requestContentTypes = keys;
+        }
       } else if (key === 'query') {
-        hasQuery = true;
+        out.hasQuery = true;
+      } else if (key === 'middleware') {
+        out.middleware = middlewareBindings(prop.value);
       }
     }
-    return { method, path, handler, hasRequest, hasQuery };
+    return out;
   }
   return { method, path, handler: null, hasRequest: false, hasQuery: false };
+}
+
+/** The literal keys of an object expression, or `null` if any is computed/spread. */
+function objectKeys(value: Node): string[] | null {
+  if (value.type !== 'ObjectExpression') {
+    return null;
+  }
+  const keys: string[] = [];
+  for (const p of value.properties) {
+    if (p.type !== 'Property' || p.computed) {
+      return null;
+    }
+    const k = propName(p.key);
+    if (k === null) {
+      return null;
+    }
+    keys.push(k);
+  }
+  return keys;
+}
+
+/** Binding names from a `[X, [Y, params]]` middleware array, or `undefined` if
+ * the value isn't a literal array of binding identifiers. */
+function middlewareBindings(value: Node): string[] | undefined {
+  if (value.type !== 'ArrayExpression') {
+    return undefined;
+  }
+  const out: string[] = [];
+  for (const el of value.elements) {
+    if (el?.type === 'Identifier') {
+      out.push(el.name);
+    } else if (
+      el?.type === 'ArrayExpression' &&
+      el.elements[0]?.type === 'Identifier'
+    ) {
+      out.push(el.elements[0].name);
+    } else {
+      return undefined;
+    }
+  }
+  return out;
 }
 
 // ─── middleware ──────────────────────────────────────────────────────────────

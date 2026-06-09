@@ -1,8 +1,11 @@
 # Codegen via AST extraction (design note)
 
-Status: **proposal / not implemented.** Target: v6-scale refactor of the route-type
-codegen front-end. The current boot-based codegen works and is fully tested; this
-documents a faster, leaner alternative and its trade-offs so the decision is recorded.
+Status: **✅ shipped (2026-06-09, v5.0.0).** This started as a design note and is now the
+sole codegen front-end — the boot path (`ghostController.ts`, app boot in `routeTypes.ts`,
+and `importResolution.ts`) has been **deleted**. The sections below are kept as the
+rationale of record; see **[Final implementation](#final-implementation-2026-06-09)** at
+the end for what actually shipped and how it differs from the original proposal (chiefly:
+non-declarative controllers are now a **hard error**, not a boot fallback).
 
 ## TL;DR
 
@@ -108,16 +111,21 @@ supported.)
 
 ## The one real constraint
 
-AST extraction only works when `routes` / `middleware` are **literal structures**
-(`return { … }` / `new Map([ … ])`). *Values* may be expressions — `request: defineSchema(...)`
-is fine, since codegen reads only the keys, the handler name, and "is `request` present",
-never evaluating the expression. What breaks is a getter that *builds* the object
-dynamically (loops, conditionals, spreads, computed keys). For those, **fall back to boot**
-for that controller — a clean hybrid. This aligns with the existing direction (ghost-only /
-declarative controllers in v6).
+AST extraction only works when `routes` / `middleware` / `getHttpPath` are **literal
+structures** (`return { … }` / `new Map([ … ])` / `return '/path'`). *Values* may be
+expressions — `request: defineSchema(...)` is fine, since codegen reads only the keys, the
+handler name, and "is `request` present", never evaluating the expression. What breaks is a
+getter that *builds* the object dynamically (loops, conditionals, spreads, computed keys).
+
+> **Shipped behavior (changed from the proposal):** the original plan was a per-controller
+> **boot fallback** for these. The shipped codegen has **no boot path to fall back to**, so a
+> non-declarative controller is a **hard error** — `npm run gen` throws and names the
+> controller (`generateAll` in `index.ts`). The audited consumer projects and the framework's
+> own controllers are all declarative, so this is a guardrail, not a hot path. See the
+> [Final implementation](#final-implementation-2026-06-09) section.
 
 Edge case: namespace-member middleware references (`import * as mw` then `mw.Auth` in the
-Map) → fall back to boot, or document as unsupported.
+Map) → flagged `needsBoot` (the same hard error), or document as unsupported.
 
 ## Why NOT Rust / swc / oxc-for-types
 
@@ -198,3 +206,41 @@ Caveats / not yet exercised (for the real migration):
 binding approach reproduces the emitted chains exactly — the core risks the doc flagged are
 retired. Next steps: cover the bare-package-ancestor walk + run on a real consumer project,
 then do the `buildSubtree` decoupling and delete `importResolution.ts`.
+
+## Final implementation (2026-06-09)
+
+Shipped in v5.0.0 — built straight into the final v5 tag (not deferred to v6). The boot path
+was **deleted in the same release** once the AST path was proven byte-identical, so the
+codebase carries exactly **one** codegen front-end.
+
+### Modules (all under `src/codegen/`)
+
+| Module | Responsibility |
+| --- | --- |
+| `astExtract.ts` | One oxc source pass → `{ imports, extends, routes, middleware, httpPath } \| { needsBoot, reason }`. Extracts default/named/aliased/namespace imports (skips type-only), the **exported** class's `extends`, literal `routes` (method/path/handler/`hasRequest`/`hasQuery`/`requestContentTypes`/route-level `middleware`), the static `middleware` Map, and a literal `getHttpPath()`. |
+| `astResolve.ts` | Walks `extends` (relative **and** bare-package via `createRequire`) to the middleware definer; resolves every `binding → specifier` for both the Map middleware (rebased from the definer) and route-level middleware (from self). Computes `urlPrefix` from the literal `getHttpPath()` or `'/' + className.toLowerCase()`. |
+| `astSpec.ts` | Adapts the extracted data into the shared `ControllerSubtreeSpec` (synthetic name-tagged middleware stubs) consumed by `buildSubtreeFromSpec`. |
+| `astEmit.ts` | Registers **all** controllers into one `RouteRegistry` (cross-controller bleed resolves exactly like runtime), `flatten()`s once, filters each chain to the controller's own importable bindings, and renders via `emit.renderGenFile`. |
+| `astModel.ts` | Detects `extends BaseModel` from source (chain walk, basename match) — used by `appTypes.ts` so the app-types scan does **zero** model `import()` (no Mongoose load). |
+| `emit.ts` | Pure renderer (`renderGenFile`) — unchanged output shape; the boot-era `emitGenFile`/`EmitInput` were removed. |
+| `index.ts` | `generateAll` = `generateAppTypes` + `generateRouteTypesViaAst`; **throws** (naming the controllers) if any are `needsBoot`. |
+
+### What changed vs. the proposal
+
+- **No boot fallback.** The hybrid in "[The one real constraint](#the-one-real-constraint)"
+  was dropped in favour of a hard error, because there is no longer a boot path to fall back
+  to. This is the one **[BREAKING]** note in the changelog: controllers must be statically
+  analyzable.
+- **Gaps closed before the cutover** that the prototype hadn't covered: **content-type
+  request maps** (`request: { 'application/json': …, 'multipart/form-data': … }` → media-type
+  keys → discriminated-union request type) and **route-level `middleware`** (per-handler
+  `middleware: [RateLimiter]` → folded into the chain + imports). Both are now extracted, not
+  `needsBoot`.
+
+### Correctness gate
+
+`routeTypes.golden.test.ts` runs the **AST pipeline** over the fixtures and `tsc`-checks the
+emitted `.routes.gen.ts` against the real handler signatures (the byte-identical-to-boot
+differential gate did its job during the cutover and was retired with the boot path).
+Per-module units live in `astExtract`/`astResolve`/`astModel`/`astEmit` tests. All green:
+128 codegen + routing tests, `tsc` 0, biome clean.

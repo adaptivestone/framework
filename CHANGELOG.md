@@ -94,6 +94,11 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[FIX]** Multi-line import-attributes clauses (`import x from './x.json'` then `with { type: 'json' }` on the next line) no longer end the import prologue early and drop every later import; the clause is folded into the statement.
 - **[FIX]** `req.appInfo.user` is typed as the hydrated **document**, not the Mongoose model class. Codegen's `AppModels` augmentation emitted `User: GetModelTypeFromClass<…>` (the model class) where the runtime assigns `InstanceType<…>`, so after `npm run gen` `user.id` / `user.email` stopped type-checking. The augmentation now wraps the model in `InstanceType<GetModelTypeFromClass<…>>` (while `getModel('User')` correctly keeps returning the class). Verified with a `tsc` probe.
 
+### Internal
+
+- **[CHANGE]** `npm run gen` now generates types from a single **AST front-end** (`oxc-parser`) — the boot-based codegen (`importResolution`, the ghost controller, app boot) has been removed. It parses controller and model sources directly, reuses the real `RouteRegistry.flatten()` for middleware chains, and emits — with **no app boot, no model imports (no Mongoose load), and no live-class identity matching** (the binding is read straight off the import node, retiring the whole regex reconstruction bug class). For declarative controllers the output is **byte-identical** to the old codegen (proven against the framework's own `Auth`/`Home` + fixtures before the boot path was removed); literal `routes`, `static get middleware()`, `getHttpPath()`, content-type request maps, and route-level `middleware` are all supported. Adds `oxc-parser` as a dependency (codegen runs in consumer projects).
+- **[BREAKING]** Route-type codegen requires **statically analyzable controllers**. A controller whose `routes` / `static get middleware()` / `getHttpPath()` is built dynamically (loops, conditionals, computed values) can no longer be reflected — `npm run gen` now throws and names the controller instead of booting the app to read it. Make those getters return literal structures (the framework's own controllers and the audited consumer projects already do).
+
 ---
 ## [5.0.0-beta.55]
 

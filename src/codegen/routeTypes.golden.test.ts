@@ -5,8 +5,8 @@
  * which is exactly why a string of type-level codegen bugs shipped (an empty
  * `UnionAppInfoProvides<readonly []>` is wrong, but a `toContain` check never
  * notices unless someone thought to assert it). This test runs the REAL
- * pipeline (`generateRouteTypes`, boot-free) against fixture controllers and
- * then `tsc`-checks the generated types against handlers that actually read
+ * pipeline (`generateRouteTypesViaAst`, boot-free) against fixture controllers
+ * and then `tsc`-checks the generated types against handlers that actually read
  * `req.appInfo.user` with no guard. It covers, in one gate:
  *   - bug 1a: empty chain for a root `/` route under a non-root prefix
  *   - bug 1b: middleware imported under a binding ≠ its class name (`Auth`)
@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { noopLogger } from '../helpers/logger.ts';
 import type { IApp } from '../server.ts';
-import { generateRouteTypes } from './routeTypes.ts';
+import { generateRouteTypesViaAst } from './astEmit.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
@@ -52,7 +52,7 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       }
     }
 
-    await generateRouteTypes(app, noopLogger);
+    await generateRouteTypesViaAst(app, noopLogger);
 
     // Chain content (clear signal independent of tsc). `File` declares its own
     // `[GetUserByToken, Auth]`; `Inherited` declares none and picks them up from

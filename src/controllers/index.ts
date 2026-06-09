@@ -93,10 +93,10 @@ class ControllerManager extends Base {
    * `RouteNode` subtree (from `routes` + the static middleware Map), optionally
    * wrap handlers with validation, and register with the `RouteRegistry`.
    *
-   * This is the instance-accepting seam runtime registration and codegen share:
-   * runtime passes a real `new` instance (handlers bind to it); codegen passes a
-   * constructor-less ghost (see `codegen/ghostController.ts`) so type generation
-   * runs no constructor side effects. Tree/middleware semantics live here once.
+   * Reads the instance into a `ControllerSubtreeSpec` (`#specFromInstance`) and
+   * assembles the tree via the shared `buildSubtreeFromSpec`. Codegen reaches the
+   * same assembler directly from parsed source (no instance) — see
+   * `codegen/astSpec.ts` — so tree/middleware semantics live in one place.
    */
   registerControllerInstance<T extends AbstractController>(
     instance: T,

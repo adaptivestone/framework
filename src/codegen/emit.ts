@@ -1,16 +1,14 @@
 /**
  * Render one controller's metadata + resolved middleware chains into
- * `<File>.routes.gen.ts` text. The output matches the hand-written format
- * shipped in step 1.5 — same import shape, same per-handler `<Method>Request`
- * aliases, same `InstanceType<typeof Controller>['routes']` navigation pattern.
+ * `<File>.routes.gen.ts` text — per-handler `<Method>Request` aliases over the
+ * `InstanceType<typeof Controller>['routes']` navigation pattern.
  *
- * Middleware import bindings + specifiers are resolved in `importResolution.ts`
- * (the heavy part — reconstructing paths from controller source); this file just
- * renders the resolved chains into text. Framework types (`BaseRequestContext`,
- * `StandardSchemaV1`) are computed relative to the controller's location.
+ * Pure rendering: the caller (the AST front-end in `astEmit.ts`) supplies the
+ * resolved chains as binding NAMES plus the `binding → specifier` import map.
+ * Framework type paths (`BaseRequestContext`, `StandardSchemaV1`) are computed
+ * relative to the controller's location.
  */
 
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
@@ -18,75 +16,10 @@ import type {
   MiddlewareRef,
   RouteMeta,
 } from './collectMetadata.ts';
-import {
-  buildExtendsImportMap,
-  type ModuleNamespace,
-  relativeImport,
-  resolveBinding,
-} from './importResolution.ts';
 
 /**
- * Inputs the emit step needs that aren't in the metadata itself.
- *
- * `chains` is parallel to `controller.routes`: chains[i] is the resolved
- * middleware list for routes[i], pre-computed by the caller via
- * `RouteRegistry.flatten()` (single source of truth shared with runtime).
- */
-export interface EmitInput {
-  controller: ControllerMeta;
-  /** Absolute path to the controller's source `.ts` file. */
-  srcPath: string;
-  /** Resolved middleware chains, parallel to `controller.routes`. */
-  chains: MiddlewareRef[][];
-}
-
-/** Emit the gen.ts text for one controller. */
-export async function emitGenFile(input: EmitInput): Promise<string> {
-  const { controller, srcPath, chains } = input;
-  const source = await fs.readFile(srcPath, 'utf8');
-  // Walk the `extends` chain — child controllers inheriting `static get
-  // middleware()` from a parent don't import those middleware classes
-  // themselves, but their parent does. We need the parent's import paths
-  // to emit `import type` lines in the child's gen file. Child imports
-  // win on collisions.
-  const importMap = await buildExtendsImportMap(srcPath, source);
-  const ctrlDir = path.dirname(srcPath);
-
-  // Resolve each chain entry to the *local import binding* the controller (or
-  // an ancestor) uses for it, and drop entries not imported anywhere in the
-  // extends chain. Two cases collapse here:
-  //  - binding === class name (the common case) → matched directly by name.
-  //  - binding !== class name (a default export aliased on import, e.g.
-  //    `Auth.ts` exports `AuthMiddleware` but controllers `import Auth`) →
-  //    matched by module identity against the live class.
-  //  - imported nowhere (cross-controller `/{*splat}` bleed) → dropped.
-  // `className` is rewritten to the binding so the import line, the
-  // `typeof <binding>` reference, and the import-map lookup all agree.
-  const moduleCache = new Map<string, ModuleNamespace | null>();
-  const bindingCache = new Map<unknown, string | null>();
-  const filteredChains: MiddlewareRef[][] = [];
-  for (const chain of chains) {
-    const resolved: MiddlewareRef[] = [];
-    for (const mw of chain) {
-      const binding = await resolveBinding(
-        mw,
-        importMap,
-        ctrlDir,
-        moduleCache,
-        bindingCache,
-      );
-      if (binding !== null) {
-        resolved.push({ ...mw, className: binding });
-      }
-    }
-    filteredChains.push(resolved);
-  }
-  return renderGenFile({ controller, srcPath, filteredChains, importMap });
-}
-
-/**
- * Inputs for the pure renderer — resolution (the middleware chains as binding
- * names + the `binding → specifier` import map) is already done by the caller.
+ * Inputs for the renderer — resolution (the middleware chains as binding names +
+ * the `binding → specifier` import map) is already done by the caller.
  */
 export interface RenderInput {
   controller: ControllerMeta;
@@ -99,10 +32,9 @@ export interface RenderInput {
 }
 
 /**
- * Render the gen.ts text from already-resolved chains + import map. Shared by the
- * boot path (`emitGenFile`, which resolves bindings via `importResolution`) and
- * the AST path (which resolves them from parsed source) — so both produce
- * byte-identical output given the same resolved inputs.
+ * Render the gen.ts text from already-resolved chains + import map. The AST
+ * front-end (`astEmit.ts`) resolves the chains (binding names) + the import map
+ * from parsed source and feeds them here.
  */
 export function renderGenFile(input: RenderInput): string {
   const { controller, srcPath, filteredChains, importMap } = input;
@@ -311,6 +243,15 @@ function parsePathParams(routePath: string): string[] {
     names.push(match[1] as string);
   }
   return names;
+}
+
+/** A TS-style relative import specifier from `fromDir` to `toFile` (forward slashes). */
+function relativeImport(fromDir: string, toFile: string): string {
+  let rel = path.relative(fromDir, toFile);
+  if (!rel.startsWith('.')) {
+    rel = `./${rel}`;
+  }
+  return rel.split(path.sep).join('/');
 }
 
 function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {

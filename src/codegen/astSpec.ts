@@ -62,6 +62,9 @@ export async function specFromExtracted(srcPath: string): Promise<AstSpec> {
       if (r.hasQuery) {
         entry.query = {} as StandardSchemaV1;
       }
+      if (r.middleware?.length) {
+        entry.middlewares = r.middleware.map(syntheticMiddleware);
+      }
       return {
         method: r.method.toUpperCase() as HttpMethod,
         path: convertPathSyntax(r.path),

@@ -3,7 +3,8 @@
  *
  *  1. Extraction — imports / extends / routes / middleware are read correctly
  *     from literal structures, and non-literal getters report `ok: false` so the
- *     caller can fall back to boot (routes & middleware judged independently).
+ *     run throws instead of mis-generating (routes & middleware judged
+ *     independently).
  *  2. Lexical robustness — the whole class of bugs the regex parser
  *     (`importResolution.ts`) kept producing (commented/regex-literal/ASI imports,
  *     a helper class before the controller) is FREE with a real parser: the
@@ -112,6 +113,47 @@ describe('astExtract — routes', () => {
         hasQuery: true,
       },
     ]);
+  });
+
+  it('extracts a content-type request map’s media-type keys', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() {
+    return {
+      post: { '/up': { handler: this.up, request: { 'application/json': s(), 'multipart/form-data': s() } } },
+    };
+  }
+}`);
+    expect(ex.ok).toBe(true);
+    expect(ex.routes[0]?.hasRequest).toBe(true);
+    expect(ex.routes[0]?.requestContentTypes).toEqual([
+      'application/json',
+      'multipart/form-data',
+    ]);
+  });
+
+  it('extracts route-level middleware bindings', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() { return { get: { '/': { handler: this.r, middleware: [Mw, [Other, { x: 1 }]] } } }; }
+}`);
+    expect(ex.ok).toBe(true);
+    expect(ex.routes[0]?.middleware).toEqual(['Mw', 'Other']);
+  });
+
+  it('keeps a single-schema (non-content-type) object request without media types', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() { return { post: { '/x': { handler: this.x, request: { a: s() } } } }; }
+}`);
+    expect(ex.ok).toBe(true);
+    expect(ex.routes[0]?.hasRequest).toBe(true);
+    expect(ex.routes[0]?.requestContentTypes).toBeUndefined();
+  });
+
+  it('flags a request map with computed keys as unanalyzable', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() { return { post: { '/x': { handler: this.x, request: { [k]: s() } } } }; }
+}`);
+    expect(ex.ok).toBe(false);
+    expect(ex.reason).toMatch(/computed\/spread/);
   });
 
   it('flags a dynamic routes getter as needsBoot but still extracts middleware', () => {
