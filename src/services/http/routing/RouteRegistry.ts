@@ -138,10 +138,16 @@ function ensureChildBySegment(node: RouteNode, segment: string): RouteNode {
     }
     return node.splatChild;
   }
-  let child = node.children.get(segment);
+  // Static children are keyed by lowercase segment so case-insensitive matching
+  // is an O(1) `Map.get` (no per-request scan). The node keeps the original-cased
+  // `segment` for display and case-sensitive matching. Segments differing only by
+  // case fold onto one node (insensitive matching already treated them as one);
+  // a same-method collision then surfaces via the conflicting-handler error.
+  const key = segment.toLowerCase();
+  let child = node.children.get(key);
   if (!child) {
     child = createNode(segment);
-    node.children.set(segment, child);
+    node.children.set(key, child);
   }
   return child;
 }
@@ -193,11 +199,14 @@ function mergeNode(target: RouteNode, source: RouteNode): void {
   }
 
   for (const [seg, child] of source.children) {
-    const existing = target.children.get(seg);
+    // Normalize to the lowercase key scheme (see ensureChildBySegment) so a
+    // subtree built elsewhere still merges by case-folded segment.
+    const key = seg.toLowerCase();
+    const existing = target.children.get(key);
     if (existing) {
       mergeNode(existing, child);
     } else {
-      target.children.set(seg, child);
+      target.children.set(key, child);
     }
   }
 

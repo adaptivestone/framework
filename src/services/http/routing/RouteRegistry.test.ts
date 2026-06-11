@@ -9,6 +9,26 @@ const mw = (name: string): MiddlewareEntry => ({
   Class: { name } as any,
 });
 
+describe('RouteRegistry — case-folded static segments (doc 23)', () => {
+  const noop2: HandlerEntry['handler'] = async () => {};
+
+  it('folds case-only-different segments onto one node (different methods coexist)', () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/Admin', { handler: noop });
+    r.registerRoute('POST', '/admin', { handler: noop2 });
+
+    expect(r.root.children.size).toBe(1); // one node, not two
+    expect(r.match('GET', '/admin')?.entry?.handler).toBe(noop);
+    expect(r.match('POST', '/Admin')?.entry?.handler).toBe(noop2);
+  });
+
+  it('throws when the same method is registered under a case-only-different segment', () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/Admin', { handler: noop });
+    expect(() => r.registerRoute('GET', '/admin', { handler: noop })).toThrow();
+  });
+});
+
 describe('RouteRegistry — registerRoute', () => {
   it('registers a flat route and matches it', () => {
     const r = new RouteRegistry();

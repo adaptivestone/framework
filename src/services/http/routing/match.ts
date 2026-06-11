@@ -235,16 +235,15 @@ function lookupStaticChild(
   seg: string,
   caseSensitive: boolean,
 ): RouteNode | undefined {
-  if (caseSensitive) {
-    return children.get(seg);
+  // Children are keyed by lowercase segment (set at registration), so the
+  // default insensitive path is a plain O(1) get — no per-request linear scan.
+  // The sensitive path looks up the same key, then verifies the original-cased
+  // segment matches exactly.
+  const child = children.get(seg.toLowerCase());
+  if (child && caseSensitive && child.segment !== seg) {
+    return undefined;
   }
-  const lower = seg.toLowerCase();
-  for (const [key, child] of children) {
-    if (key.toLowerCase() === lower) {
-      return child;
-    }
-  }
-  return undefined;
+  return child;
 }
 
 function pathToSegments(path: string, strict: boolean): string[] {
