@@ -8,7 +8,17 @@
   },
   "exports": {
     "./package.json": "./package.json",
-    "./*": "./dist/*"
+    "./server.js": "./dist/server.js",
+    "./Cli.js": "./dist/Cli.js",
+    "./types.js": "./dist/types.js",
+    "./folderConfig.js": "./dist/folderConfig.js",
+    "./modules/*": "./dist/modules/*",
+    "./models/*": "./dist/models/*",
+    "./helpers/*": "./dist/helpers/*",
+    "./services/*": "./dist/services/*",
+    "./controllers/*": "./dist/controllers/*",
+    "./tests/*": "./dist/tests/*",
+    "./migrations/*": "./dist/migrations/*"
   },
   "repository": {
     "type": "git",

@@ -14,3 +14,22 @@ node cliCommand.ts generatetypes --check
 ```
 
 It writes nothing and exits non-zero if any generated file is out of date.
+
+## Public API & stability
+
+Only the subpaths listed under `exports` in `package.json` are importable as
+`@adaptivestone/framework/<path>`. Internal modules (`codegen/*`, `commands/*`,
+`config/*`, `locales/*`, the top-level entry files) are intentionally **not**
+exported and may be renamed without a major bump. The CLI loads commands and
+migrations by filesystem path, so leaving `commands/*` unexported does not affect
+`npm run cli`.
+
+Exported paths follow semver, in two tiers:
+
+- **Tier 1 — stable.** `server.js`, `Cli.js`, `types.js`, `folderConfig.js`,
+  `modules/*`, `models/*`, `controllers/*`, `tests/*`, `migrations/*`. Breaking
+  changes only on a major.
+- **Tier 2 — extension surface.** `helpers/*` and `services/*` (including
+  `services/http/routing/*` and the middleware classes). Exported so codegen and
+  advanced extensions can reach them, but they **may change in a minor** with a
+  deprecation cycle — pin to a minor if you import them directly.
