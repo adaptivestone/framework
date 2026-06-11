@@ -91,22 +91,25 @@ describe('cache', () => {
   });
 
   describe('failure paths (doc 09)', () => {
-    it('does not deadlock the key when redis get fails mid-flight', async () => {
+    it('falls back to onNotFound on a redis read failure, without deadlocking the key', async () => {
       expect.assertions(2);
       const { cache } = appInstance;
       const spy = vi
         .spyOn(cache.redisClient, 'get')
         .mockRejectedValueOnce(new Error('redis down'));
 
-      await expect(
-        cache.getSetValue('DEADLOCK', async () => 'v'),
-      ).rejects.toThrow('redis down');
+      // Cache outage degrades to computing the value, not failing the request.
+      const first = await cache.getSetValue('DEADLOCK', async () => 'computed');
+      expect(first).toBe('computed');
       spy.mockRestore();
 
-      // The in-flight mapping cleared (finally), so a retry isn't stuck on a
+      // The in-flight mapping cleared (finally), so a later call isn't stuck on a
       // forever-pending promise — it recomputes and succeeds.
-      const res = await cache.getSetValue('DEADLOCK', async () => 'recovered');
-      expect(res).toBe('recovered');
+      const second = await cache.getSetValue(
+        'DEADLOCK',
+        async () => 'recovered',
+      );
+      expect(second).toBe('recovered');
     });
 
     it('a single-caller onNotFound failure causes no unhandled rejection', async () => {

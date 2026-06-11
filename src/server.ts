@@ -52,6 +52,13 @@ try {
   console.warn('No env file found. This is ok. But please check youself.');
 }
 
+// Process-global guard so signal handlers register at most once even if
+// startServer runs more than once in a process (a process runs a single Server,
+// but be defensive). This does NOT dedupe across vitest test files — each gets a
+// fresh module graph that resets this — but that's moot: registration is skipped
+// entirely under VITEST.
+let signalHandlersRegistered = false;
+
 /**
  * Main framework class.
  */
@@ -129,14 +136,6 @@ class Server {
       internalFilesCache: that.cache,
     };
 
-    this.app.events.on('shutdown', () => {
-      const forceShutdownTimer = setTimeout(() => {
-        console.error('Shutdown timed out, forcing exit');
-        process.exit(1);
-      }, 5_000);
-      // Unref the timer so it doesn't keep the process alive
-      forceShutdownTimer.unref();
-    });
     setAppInstance(this.app);
   }
 
@@ -175,6 +174,55 @@ class Server {
     // cross-controller middleware accumulation is visible. Verbose-only:
     // production filters this out by default via the logger level.
     this.app.logger.verbose(formatRouteTree(this.app.httpServer.routeRegistry));
+
+    this.#registerShutdownSignals();
+  }
+
+  /**
+   * Wire SIGTERM/SIGINT to a graceful shutdown: stop accepting connections,
+   * drain in-flight requests, then tear down mongo/redis/logger via the
+   * `'shutdown'` event. A single unref'd force-exit timer is the safety net —
+   * the process dies even if draining or a teardown hook hangs.
+   *
+   * Registered here (after HTTP is up), never at import time, so importing the
+   * framework for tests/codegen has no process-level side effects. Skipped
+   * under vitest so these handlers don't intercept the signals vitest uses to
+   * manage its workers.
+   */
+  #registerShutdownSignals(): void {
+    if (process.env.VITEST || signalHandlersRegistered) {
+      return;
+    }
+    signalHandlersRegistered = true;
+
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+      // `once`: a second Ctrl-C falls through to Node's default (immediate
+      // termination) instead of being swallowed.
+      process.once(signal, async () => {
+        this.app.logger.info(`${signal} received — shutting down`);
+        // Force-exit safety net: fires only if draining or a teardown hook
+        // hangs past 10s. Unref'd, so it never keeps the process alive on its
+        // own — but it still fires while something ELSE keeps the loop running.
+        const forceExit = setTimeout(() => {
+          console.error('Shutdown timed out, forcing exit');
+          process.exit(1);
+        }, 10_000);
+        forceExit.unref();
+        try {
+          await this.app.httpServer?.shutdown();
+        } catch (e) {
+          this.app.logger.error('Error closing HTTP server on shutdown', e);
+        }
+        // Tear down mongo/redis/logger. The listeners' async halves (redis
+        // quit(), winston flush) outlive the synchronous `emit`, so set the exit
+        // code and let the event loop drain naturally rather than `process.exit(0)`
+        // — a hard exit here would cut them off (lost final logs, reset redis
+        // socket). With every handle closed the process exits 0 on its own; a
+        // leaked handle is force-killed (code 1) by the timer above.
+        this.app.events.emit('shutdown');
+        process.exitCode = 0;
+      });
+    }
   }
 
   /**

@@ -305,5 +305,28 @@ describe('rate limiter methods', () => {
       expect(status).toBe(429);
       expect(retryAfter).toBe('5');
     });
+
+    it('keeps limiting via the memory insurance when the redis store fails', async () => {
+      expect.assertions(2);
+      const rateLimiter = new RateLimiter(appInstance, { driver: 'redis' });
+      // Force every redis store write to fail so rate-limiter-flexible falls back
+      // to the insurance limiter. `_upsert` is the library's store-write hook
+      // (RateLimiterStoreAbstract) — if it ever renames, this test breaks loudly.
+      vi.spyOn(
+        rateLimiter.limiter as unknown as { _upsert: () => Promise<unknown> },
+        '_upsert',
+      ).mockRejectedValue(new Error('store down'));
+
+      // Same shape as the real redis-limit test, but with the store broken: the
+      // memory insurance (same limiterOptions) must still enforce the limit.
+      const data = await Promise.all(
+        Array.from({ length: 20 }, () =>
+          makeOneRequest({ rateLimiter, request: { ip: '10.10.0.9' } }),
+        ),
+      );
+
+      expect(data.some((r) => r.status === 429)).toBe(true); // insurance limits
+      expect(data.some((r) => r.isNextCalled)).toBe(true); // and some pass
+    });
   });
 });

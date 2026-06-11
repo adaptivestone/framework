@@ -50,9 +50,6 @@ class Cache extends Base {
     storeTime = 60 * 5,
   ) {
     await this.whenReady;
-    if (!this.redisClient.isOpen) {
-      await this.redisClient.connect();
-    }
     const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
     let resolve = (_value: unknown) => {};
@@ -75,25 +72,25 @@ class Cache extends Base {
     // that would survive redis recovery).
     try {
       let parsedResult: T | undefined;
-      const cached = await this.redisClient.get(key);
-      if (!cached) {
-        this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
-        parsedResult = await onNotFound();
 
-        const serialized = JSON.stringify(parsedResult, (_jsonkey, value) =>
-          typeof value === 'bigint' ? `${value}n` : value,
-        );
-        // `undefined` results serialize to `undefined`, which the redis client
-        // rejects — skip the write. The cache write is best-effort either way:
-        // the value is already computed, so a failed write must not fail the call.
-        if (serialized !== undefined) {
-          await this.redisClient
-            .set(key, serialized, { EX: storeTime })
-            .catch((e) =>
-              this.logger?.error(`Cache set failed for key '${key}': ${e}`),
-            );
+      // A cache outage is NOT a request outage: if redis is unreachable, degrade
+      // to computing the value via `onNotFound` every call (slow, not broken)
+      // rather than failing. Only `onNotFound`'s own errors propagate.
+      let cached: string | null = null;
+      let cacheUsable = true;
+      try {
+        if (!this.redisClient.isOpen) {
+          await this.redisClient.connect();
         }
-      } else {
+        cached = await this.redisClient.get(key);
+      } catch (e) {
+        cacheUsable = false;
+        this.logger?.error(
+          `Cache read failed for key '${key}', falling back to onNotFound: ${e}`,
+        );
+      }
+
+      if (cached) {
         this.logger?.verbose(
           `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
             0,
@@ -111,6 +108,24 @@ class Cache extends Base {
           this.logger?.warn(
             'Not able to parse json from redis cache. That can be a normal in case you store string here',
           );
+        }
+      } else {
+        this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
+        parsedResult = await onNotFound();
+
+        const serialized = JSON.stringify(parsedResult, (_jsonkey, value) =>
+          typeof value === 'bigint' ? `${value}n` : value,
+        );
+        // Skip the write when the cache is unreachable, or the value serializes
+        // to `undefined` (which the redis client rejects). The write is
+        // best-effort: the value is already computed, so a failed write — like a
+        // failed read — must not fail the call.
+        if (cacheUsable && serialized !== undefined) {
+          await this.redisClient
+            .set(key, serialized, { EX: storeTime })
+            .catch((e) =>
+              this.logger?.error(`Cache set failed for key '${key}': ${e}`),
+            );
         }
       }
 

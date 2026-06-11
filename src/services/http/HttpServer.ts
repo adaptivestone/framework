@@ -72,6 +72,15 @@ class HttpServer extends Base {
 
     this.httpServer = http.createServer(this.express);
 
+    // A server that can't bind (EADDRINUSE / EACCES) has no purpose: exit so a
+    // supervisor restarts it, instead of lingering as a healthy-looking process
+    // serving nothing. Without this listener the 'error' would surface as an
+    // uncaughtException (only logged) — a silent dead process.
+    this.httpServer.on('error', (err) => {
+      this.logger?.error(`HTTP server failed to start: ${err}`);
+      process.exit(1);
+    });
+
     const listener = this.httpServer.listen(
       httpConfig.port as number,
       httpConfig.hostname,
@@ -127,10 +136,17 @@ class HttpServer extends Base {
   }
 
   /**
-   * Stop http server (mostly for unit testing)
+   * Stop the HTTP server: refuse new connections and resolve once in-flight
+   * requests have drained, so a caller can await the drain before downstream
+   * resources (mongo, redis) are torn down.
    */
-  shutdown() {
-    this.httpServer.close();
+  shutdown(): Promise<void> {
+    return new Promise((resolve) => {
+      this.httpServer.close(() => resolve());
+      // Idle keep-alive sockets would otherwise hold the drain open until the
+      // client/LB times out; active requests still finish.
+      this.httpServer.closeIdleConnections();
+    });
   }
 }
 
