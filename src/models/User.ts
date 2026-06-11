@@ -19,6 +19,14 @@ const createRandomToken = () => randomBytes(32).toString('base64url');
  * KDF would only add latency. Stored hashed so a DB read leak can't be replayed
  * as live bearer tokens. Exported so callers that match tokens directly (e.g.
  * logout's `$pull`) hash the same way.
+ *
+ * NOTE: `token` is ALWAYS a `createRandomToken()` output (256-bit `randomBytes`),
+ * never a user-chosen password — including the `passwordRecoveryToken` /
+ * `verificationToken` / `sessionToken` values that flow in. CodeQL's
+ * `js/insufficient-password-hash` assumes low-entropy, human-chosen input and so
+ * does not apply: a slow password KDF (bcrypt/scrypt/Argon2) would protect
+ * nothing across a 2^256 search space. Real user passwords are hashed separately
+ * with `hashPassword` (a proper KDF) in the `save` pre-hook below.
  */
 export const hashToken = (token: string) =>
   createHash('sha256').update(token).digest('base64url');
