@@ -15,6 +15,18 @@ node cliCommand.ts generatetypes --check
 
 It writes nothing and exits non-zero if any generated file is out of date.
 
+## Configuration & boot requirements
+
+The framework **requires Mongo** and an **`AUTH_SALT`**. Boot fails fast (rather
+than limping into request-time 500s) when either is missing:
+
+- No `MONGO_DSN` → boot throws "No Mongo connection configured".
+- No `AUTH_SALT` → boot throws with a hint (`npm run cli generateRandomBytes`).
+
+To **replace or disable** any built-in controller (auth or otherwise), shadow it
+by filename: create a controller of the same filename in your controllers folder
+(e.g. `controllers/Auth.js`) — your version wins. An empty class disables it.
+
 ## Public API & stability
 
 Only the subpaths listed under `exports` in `package.json` are importable as

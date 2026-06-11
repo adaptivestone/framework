@@ -50,6 +50,11 @@ beforeAll(async () => {
   });
   server.updateConfig('http', { port: 0 }); // allow to use random
   server.updateConfig('mail', { transport: 'stub' });
+  // Use the in-memory rate limiter for the default (controller-mounted) limiter:
+  // it's synchronous, so it can't time out and fail-open under the CPU load of
+  // parallel workers (which made the Auth 429 test flaky). The Mongo/Redis
+  // drivers are still covered explicitly in RateLimiter.test.ts.
+  server.updateConfig('rateLimiter', { driver: 'memory' });
   // scrypt is memory-hard: the production ln=17 (~0.5s/hash) run across vitest's
   // parallel workers starves each other and trips hook timeouts. Lower the cost
   // for tests (~15ms/hash). The verify/rehash paths read this same config, so

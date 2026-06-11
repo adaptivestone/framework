@@ -158,6 +158,7 @@ class Server {
     ]);
 
     this.addErrorHandling();
+    this.#assertBootConfig();
 
     // TODO config
     this.app.httpServer = new HttpServer(this.app);
@@ -176,6 +177,23 @@ class Server {
     this.app.logger.verbose(formatRouteTree(this.app.httpServer.routeRegistry));
 
     this.#registerShutdownSignals();
+  }
+
+  /**
+   * Fail fast at boot on misconfiguration that would otherwise surface as a
+   * confusing request-time 500: the framework requires Mongo, and an `AUTH_SALT`.
+   */
+  #assertBootConfig(): void {
+    if (!this.getConfig('mongo').connectionString) {
+      throw new Error(
+        'No Mongo connection configured — set the MONGO_DSN env var. The framework requires a database.',
+      );
+    }
+    if (!this.getConfig('auth').saltSecret) {
+      throw new Error(
+        'AUTH_SALT is not set. Generate one with `npm run cli generateRandomBytes` and set the AUTH_SALT env var.',
+      );
+    }
   }
 
   /**
@@ -372,16 +390,18 @@ class Server {
             this.cache.models.set(modelName, model.mongooseModel);
           }
         } catch (e: unknown) {
-          if (e instanceof Error) {
-            this.app.logger.error(
-              `Problem with model ${modelName}, ${e.message}`,
-            );
-            this.app.logger.error(e);
-          } else {
-            this.app.logger.error(
-              `Problem with model ${modelName}, Unknown error`,
-            );
-          }
+          // Fail fast at boot: a broken model that's logged-and-skipped here
+          // just becomes a confusing request-time crash when `getModel` returns
+          // false. Name the model and its file so the cause is obvious.
+          const file = this.cache.modelPaths.find(
+            (p) => p.file === modelName,
+          )?.path;
+          throw new Error(
+            `Failed to initialize model '${modelName}'${
+              file ? ` (${file})` : ''
+            }: ${e instanceof Error ? e.message : String(e)}`,
+            { cause: e },
+          );
         }
       }
 
@@ -535,9 +555,16 @@ class Server {
    * Add error logging on promise reject
    */
   addErrorHandling(): void {
-    process.on('uncaughtException', (e) =>
-      this.app.logger.error('uncaughtException', e),
-    );
+    process.on('uncaughtException', (e) => {
+      this.app.logger.error('uncaughtException', e);
+      // After an uncaught exception the process state is undefined — a
+      // crash-looping process under an orchestrator is visible and recovers
+      // cleanly, whereas one that keeps serving from a corrupted state is not.
+      // (Skipped under vitest so a stray test-time throw doesn't kill the run.)
+      if (!process.env.VITEST) {
+        process.exit(1);
+      }
+    });
     process.on('unhandledRejection', (e) => {
       this.app.logger.error('unhandledRejection', e);
     });

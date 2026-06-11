@@ -142,10 +142,14 @@ class HttpServer extends Base {
    */
   addErrorHandler() {
     this.express.use(
-      (err: Error, _req: Request, res: Response, _next: NextFunction) => {
-        // error handling
-        console.error(err.stack);
-        // TODO
+      (err: Error, _req: Request, res: Response, next: NextFunction) => {
+        this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
+        // If the response already started (e.g. a handler that threw mid-stream),
+        // we can't set a 500 — hand off to Express's default finalizer instead
+        // of crashing with ERR_HTTP_HEADERS_SENT.
+        if (res.headersSent) {
+          return next(err);
+        }
         res.status(500).json({ message: 'Something broke!' });
       },
     );

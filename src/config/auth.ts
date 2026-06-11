@@ -4,11 +4,10 @@ export default {
   // params (N/r/p) live inside each stored hash. Do not treat this as a work
   // factor — it never was one.
   hashRounds: 64,
-  saltSecret:
-    process.env.AUTH_SALT ||
-    console.error(
-      'AUTH_SALT is not defined. You can "npm run cli generateRandomBytes" and use it',
-    ),
+  // The pepper mixed into every password hash. Read honestly here (no fallback
+  // messaging) — `startServer` asserts it at boot when the auth flow is active
+  // and throws with the `generateRandomBytes` hint if it's missing.
+  saltSecret: process.env.AUTH_SALT,
   isAuthWithVefificationFlow: true,
   // Password hashing cost for the v2 scrypt scheme. `ln` = log2(N). Raise over
   // time to harden — existing hashes upgrade to the new cost on next login.
