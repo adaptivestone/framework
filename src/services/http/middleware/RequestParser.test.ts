@@ -1,5 +1,8 @@
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
 import type { NextFunction, Response } from 'express';
 import { PersistentFile } from 'formidable';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +10,92 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
 import RequestParser from './RequestParser.ts';
+
+const boundary = 'testboundary18';
+const multipartBody =
+  `--${boundary}\r\n` +
+  `Content-Disposition: form-data; name="title"\r\n\r\n` +
+  `hello\r\n` +
+  `--${boundary}\r\n` +
+  `Content-Disposition: form-data; name="upload"; filename="x.txt"\r\n` +
+  `Content-Type: text/plain\r\n\r\n` +
+  `file-contents-here\r\n` +
+  `--${boundary}--\r\n`;
+const multipartCT = `multipart/form-data; boundary=${boundary}`;
+
+const waitFor = async (pred: () => boolean, timeoutMs = 2000) => {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (pred()) {
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  throw new Error('condition not met in time');
+};
+
+// Drives RequestParser through a real HTTP round-trip and returns the resulting
+// status + parsed `req.body`. A shim gives the (Express-shaped) status/json the
+// error path needs while delegating `once` to the real response so the
+// temp-file cleanup (registered on 'finish'/'close') actually runs.
+const postToParser = ({
+  body,
+  contentType,
+  params,
+}: {
+  body: string;
+  contentType: string;
+  params?: Record<string, unknown>;
+}): Promise<{ status: number; body: Record<string, unknown> }> =>
+  new Promise((resolve) => {
+    let result = { status: 0, body: {} as Record<string, unknown> };
+    const server = createServer(async (req, res) => {
+      const frReq = req as unknown as FrameworkRequest;
+      frReq.appInfo = { app: appInstance, request: {}, query: {} };
+      frReq.body = {};
+      let status = 200;
+      const resShim = {
+        status(code: number) {
+          status = code;
+          return resShim;
+        },
+        json() {
+          res.writeHead(status);
+          res.end('{}');
+          return resShim;
+        },
+        once(event: string, cb: () => void) {
+          res.once(event, cb);
+          return resShim;
+        },
+      };
+      await new RequestParser(appInstance, params).middleware(
+        frReq,
+        resShim as unknown as Response,
+        (() => {
+          result = { status: 200, body: frReq.body };
+          res.writeHead(200);
+          res.end('ok');
+        }) as NextFunction,
+      );
+      if (status !== 200) {
+        result = { status, body: frReq.body };
+      }
+    });
+    server.listen(null, async () => {
+      const address = server.address();
+      const port = typeof address === 'string' ? 0 : address?.port;
+      await fetch(`http://localhost:${port}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': Buffer.byteLength(body).toString(),
+        },
+        body,
+      }).catch(() => {});
+      server.close(() => resolve(result));
+    });
+  });
 
 describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
@@ -34,7 +123,8 @@ describe('reqest parser limiter methods', () => {
         const middleware = new RequestParser(appInstance);
         middleware.middleware(
           req as FrameworkRequest,
-          {} as Response,
+          // pass the real response so the cleanup hooks (res.once) attach
+          res as unknown as Response,
           ((err?: Error) => {
             expect(err).toBeUndefined();
 
@@ -116,10 +206,11 @@ d\r
             return resp;
           },
           json: () => resp,
+          once: () => resp,
         };
         await middleware.middleware(
           frReq,
-          resp as Response,
+          resp as unknown as Response,
           (() => {}) as NextFunction,
         );
 
@@ -150,6 +241,60 @@ d\r
           done(true);
         });
       });
+    });
+  });
+
+  describe('limits + cleanup + field shapes (doc 18)', () => {
+    it('removes the spooled temp file after the response finishes', async () => {
+      const { body } = await postToParser({
+        body: multipartBody,
+        contentType: multipartCT,
+      });
+      const upload = body.upload as { filepath: string }[];
+      const filepath = upload[0].filepath;
+      expect(filepath).toBeTruthy();
+      // cleanup unlinks asynchronously on 'finish'; poll for removal.
+      await waitFor(() => !existsSync(filepath));
+    });
+
+    it('returns 413 and leaves no temp file when an upload exceeds maxFileSize', async () => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'rp-413-'));
+      try {
+        const { status } = await postToParser({
+          body: multipartBody,
+          contentType: multipartCT,
+          params: { maxFileSize: 2, uploadDir: dir },
+        });
+        expect(status).toBe(413);
+        await waitFor(() => readdirSync(dir).length === 0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('normalizes a single urlencoded field to a scalar (fixes GetUserByToken)', async () => {
+      const { body } = await postToParser({
+        body: 'token=abc',
+        contentType: 'application/x-www-form-urlencoded',
+      });
+      expect(body.token).toBe('abc'); // scalar, not ['abc']
+    });
+
+    it('keeps repeated urlencoded keys as arrays', async () => {
+      const { body } = await postToParser({
+        body: 'tags=a&tags=b',
+        contentType: 'application/x-www-form-urlencoded',
+      });
+      expect(body.tags).toEqual(['a', 'b']);
+    });
+
+    it('leaves json bodies untouched (single-element arrays not collapsed)', async () => {
+      const { body } = await postToParser({
+        body: JSON.stringify({ token: 'abc', tags: ['x'] }),
+        contentType: 'application/json',
+      });
+      expect(body.token).toBe('abc');
+      expect(body.tags).toEqual(['x']);
     });
   });
 });

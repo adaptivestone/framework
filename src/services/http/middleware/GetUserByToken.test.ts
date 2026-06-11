@@ -1,9 +1,13 @@
-import type { Response } from 'express';
+import { createServer } from 'node:http';
+import type { NextFunction, Response } from 'express';
 import { describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { defaultAuthToken } from '../../../tests/testHelpers.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
-import GetUserByToken from './GetUserByToken.ts';
+import GetUserByToken, {
+  type GetUserByTokenAppInfo,
+} from './GetUserByToken.ts';
+import RequestParser from './RequestParser.ts';
 
 describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {
@@ -148,6 +152,53 @@ describe('getUserByToken middleware methods', () => {
 
     expect(isCalled).toBeTruthy();
     expect(req.appInfo.user).toBeDefined();
+  });
+
+  // End-to-end belt-and-braces for doc 18: a urlencoded token reaches
+  // GetUserByToken as a scalar (RequestParser normalizes formidable's array),
+  // so `token.replace(...)` no longer throws a 500. Pins the original symptom.
+  it('resolves a urlencoded token end-to-end (RequestParser → GetUserByToken)', async () => {
+    expect.assertions(1);
+
+    const status = await new Promise<number>((resolve) => {
+      const server = createServer((req, res) => {
+        const frReq = req as unknown as FrameworkRequest &
+          GetUserByTokenAppInfo;
+        frReq.appInfo = { app: appInstance, request: {}, query: {} };
+        frReq.body = {};
+        // GetUserByToken reads req.get('Authorization') (logging + fallback).
+        frReq.get = (() => undefined) as FrameworkRequest['get'];
+
+        new RequestParser(appInstance).middleware(
+          frReq,
+          { once: () => {} } as unknown as Response,
+          (() => {
+            new GetUserByToken(appInstance).middleware(
+              frReq,
+              {} as Response,
+              (() => {
+                const code = frReq.appInfo.user ? 200 : 401;
+                res.writeHead(code);
+                res.end();
+                resolve(code);
+              }) as NextFunction,
+            );
+          }) as NextFunction,
+        );
+      });
+      server.listen(null, async () => {
+        const address = server.address();
+        const port = typeof address === 'string' ? 0 : address?.port;
+        await fetch(`http://localhost:${port}/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `token=${defaultAuthToken}`,
+        }).catch(() => {});
+        server.close();
+      });
+    });
+
+    expect(status).toBe(200);
   });
 
   it('should getuser with a Bearer token in header', async () => {
