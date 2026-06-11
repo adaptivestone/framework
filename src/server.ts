@@ -638,20 +638,32 @@ class Server {
               console.warn('[Framework] Sentry transport not available');
             });
         } else {
-          import(log.transport).then((Tr) => {
-            let Transport = Tr.default;
-            if (!IsConstructor(Transport) && Transport.default) {
-              Transport = Transport.default;
-            } else {
+          import(log.transport)
+            .then((Tr) => {
+              // Unwrap the default export, then the CJS-interop double-wrap
+              // (`{ default: { default: Class } }`), then validate ONCE before
+              // `new`. The previous check was inverted — a normal transport
+              // whose default export is the constructor failed the guard and was
+              // never added.
+              let Transport = Tr.default ?? Tr;
+              if (!IsConstructor(Transport) && Transport?.default) {
+                Transport = Transport.default;
+              }
+              if (!IsConstructor(Transport)) {
+                console.error(
+                  `${log.transport} not a constructor. Please check it`,
+                );
+                return;
+              }
+              logger.add(new Transport(log.transportOptions));
+            })
+            .catch((e) => {
+              // A bad module name must not become an unhandled rejection
+              // (mirrors the sentry branch above).
               console.error(
-                `${log.transport} not a constructor. Please check it`,
+                `Failed to load logger transport ${log.transport}: ${e}`,
               );
-              return;
-            }
-            logger.profile(`Adding new logger ${log.transport}`);
-            logger.add(new Transport(log.transportOptions));
-            logger.profile(`Adding new logger ${log.transport}`);
-          });
+            });
         }
       }
     }

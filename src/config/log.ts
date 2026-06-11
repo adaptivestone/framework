@@ -1,4 +1,5 @@
 import type { transports } from 'winston';
+import { envBool } from '../helpers/env.ts';
 
 export type TLogConfig = {
   transports: {
@@ -17,7 +18,7 @@ export default {
       transportOptions: {
         level: process.env.LOGGER_SENTRY_LEVEL || 'info',
       } as transports.StreamTransportOptions,
-      enable: process.env.LOGGER_SENTRY_ENABLE || false,
+      enable: envBool('LOGGER_SENTRY_ENABLE', false),
     },
     {
       transport: 'console',
@@ -25,7 +26,7 @@ export default {
         level: process.env.LOGGER_CONSOLE_LEVEL || 'silly',
         timestamp: true,
       } as transports.ConsoleTransportOptions,
-      enable: process.env.LOGGER_CONSOLE_ENABLE || true,
+      enable: envBool('LOGGER_CONSOLE_ENABLE', true),
     },
   ],
 } as TLogConfig;
