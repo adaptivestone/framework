@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
@@ -8,6 +9,20 @@ const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 
 const userEmail2 = 'testing2@test.com';
+
+// Records every log entry the app logger emits, so a test can assert a secret
+// never appears. `silly` level captures verbose/debug/info too.
+class CaptureTransport extends Transport {
+  sink: string[];
+  constructor(sink: string[]) {
+    super({ level: 'silly' });
+    this.sink = sink;
+  }
+  log(info: unknown, callback: () => void) {
+    this.sink.push(JSON.stringify(info));
+    callback();
+  }
+}
 
 describe('auth', () => {
   describe('registration', () => {
@@ -261,23 +276,21 @@ describe('auth', () => {
       expect(isVerified).toBeFalsy();
     });
 
-    it('can NOT send recovery to not exist email', async () => {
-      expect.assertions(1);
+    it('send-recovery-email is identical for known and unknown emails (no enumeration, doc 19)', async () => {
+      expect.assertions(2);
 
-      const { status } = await fetch(
-        getTestServerURL('/auth/send-recovery-email'),
-        {
+      const post = (email: string) =>
+        fetch(getTestServerURL('/auth/send-recovery-email'), {
           method: 'POST',
-          headers: {
-            'Content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: 'notExists@gmail.com',
-          }),
-        },
-      );
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
 
-      expect(status).toBe(400);
+      const known = await post(userEmail);
+      const unknown = await post('notExists@gmail.com');
+
+      expect(unknown.status).toBe(known.status);
+      expect(await unknown.text()).toBe(await known.text());
     });
 
     it('can send recovery to exist email', async () => {
@@ -297,6 +310,68 @@ describe('auth', () => {
       );
 
       expect(status).toBe(200);
+    });
+
+    it('send-recovery-email still creates a recovery token for a known user (doc 19)', async () => {
+      expect.assertions(1);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'rec-token@example.com';
+      await UserModel.create({
+        email,
+        password: 'userPassword',
+        name: { nick: 'recTokenNick' },
+      });
+
+      await fetch(getTestServerURL('/auth/send-recovery-email'), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      // The dispatch (which generates + stores the recovery token) is now
+      // fire-and-forget, so poll briefly until the token lands.
+      let count = 0;
+      for (let i = 0; i < 50 && count === 0; i += 1) {
+        const user = await UserModel.findOne({ email }).orFail();
+        count = user.passwordRecoveryTokens?.length ?? 0;
+        if (count === 0) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+      }
+      expect(count).toBeGreaterThan(0);
+    });
+
+    it('does not log the password hash during recovery (doc 20)', async () => {
+      expect.assertions(2);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const created = await UserModel.create({
+        email: 'logleak@example.com',
+        password: 'userPassword',
+        name: { nick: 'logleakNick' },
+      });
+      const { token } =
+        await userHelpers.generateUserPasswordRecoveryToken(created);
+      const hash = (await UserModel.findById(created._id).orFail()).password;
+
+      const captured: string[] = [];
+      const transport = new CaptureTransport(captured);
+      appInstance.logger.add(transport);
+      try {
+        await fetch(getTestServerURL('/auth/recover-password'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({
+            password: 'newPass',
+            passwordRecoveryToken: token,
+          }),
+        });
+      } finally {
+        appInstance.logger.remove(transport);
+      }
+
+      const all = captured.join('\n');
+      expect(all).not.toContain(hash);
+      expect(all).not.toContain(token);
     });
 
     it('can recover password', async () => {
@@ -436,23 +511,21 @@ describe('auth', () => {
     expect(status).toBe(200);
   });
 
-  it('can not user send verification to wrong email', async () => {
-    expect.assertions(1);
+  it('send-verification is identical for known and unknown emails (no enumeration, doc 19)', async () => {
+    expect.assertions(2);
 
-    const { status } = await fetch(
-      getTestServerURL('/auth/send-verification'),
-      {
+    const post = (email: string) =>
+      fetch(getTestServerURL('/auth/send-verification'), {
         method: 'POST',
-        headers: {
-          'Content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: 'wrong@gmail.com',
-        }),
-      },
-    );
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
 
-    expect(status).toBe(400);
+    const known = await post(userEmail2);
+    const unknown = await post('wrong@gmail.com');
+
+    expect(unknown.status).toBe(known.status);
+    expect(await unknown.text()).toBe(await known.text());
   });
 
   describe('logout', () => {

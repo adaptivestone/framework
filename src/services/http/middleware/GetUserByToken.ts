@@ -51,10 +51,12 @@ class GetUserByToken extends AbstractMiddleware {
       return next();
     }
     let { token } = req.body || {};
+    // Log presence only — never the token value or the Authorization header
+    // (they are live bearer credentials).
     this.logger?.verbose(
-      `GetUserByToken token in BODY ${token}. Token in Authorization header ${req.get(
-        'Authorization',
-      )}`,
+      `GetUserByToken: body token ${
+        token ? 'present' : 'absent'
+      }, Authorization header ${req.get('Authorization') ? 'present' : 'absent'}`,
     );
     if (!token) {
       token = req.get('Authorization');

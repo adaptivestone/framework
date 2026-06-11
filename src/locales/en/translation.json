@@ -12,6 +12,8 @@
     "errorUPValid": "User/password not valid",
     "messageSome": "Some server problem. Please try later",
     "errorUExist": "User with such email isn't registered on this site",
+    "recoveryEmailSent": "If an account exists for this address, a recovery email has been sent.",
+    "verificationEmailSent": "If an account exists for this address, a verification email has been sent.",
     "errorUAlready": "That user already exists",
     "nicknameExists": "User with such nickname already exists",
     "noAccessRights": "No access rights"

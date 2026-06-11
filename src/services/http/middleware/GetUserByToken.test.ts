@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import type { NextFunction, Response } from 'express';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { defaultAuthToken } from '../../../tests/testHelpers.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
@@ -199,6 +199,28 @@ describe('getUserByToken middleware methods', () => {
     });
 
     expect(status).toBe(200);
+  });
+
+  it('never logs the token value (doc 20)', async () => {
+    expect.assertions(1);
+
+    const middleware = new GetUserByToken(appInstance);
+    const spy = vi.spyOn(middleware.logger, 'verbose');
+    const SECRET = 'super-secret-token-value-xyz';
+
+    await middleware.middleware(
+      {
+        appInfo: {},
+        body: { token: SECRET },
+        get: () => undefined,
+      } as unknown as FrameworkRequest,
+      {} as Response,
+      (() => {}) as NextFunction,
+    );
+
+    const logged = spy.mock.calls.map((c) => String(c[0])).join('\n');
+    spy.mockRestore();
+    expect(logged).not.toContain(SECRET);
   });
 
   it('should getuser with a Bearer token in header', async () => {

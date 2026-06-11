@@ -304,7 +304,7 @@ class Auth extends AbstractController {
         message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
       });
     }
-    this.logger?.debug(`Verify user user is :${user}`);
+    this.logger?.debug(`Verify user ${user?.id}`);
     if (!user) {
       return res.status(400).json({
         message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
@@ -321,21 +321,23 @@ class Auth extends AbstractController {
     res: Response,
   ) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
+    // Uniform response whether or not the account exists — the old 400-vs-200
+    // split was an account-existence oracle. The dispatch is fire-and-forget so
+    // the known-email path isn't slower (token gen + SMTP), which would be a
+    // timing oracle; the response never depends on the send outcome.
     try {
       const user = await User.getUserByEmail(req.appInfo.request.email);
-      if (!user) {
-        return res
-          .status(400)
-          .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
+      if (user) {
+        void (user as UserInstance)
+          .sendPasswordRecoveryEmail(req.appInfo.i18n)
+          .catch((e: Error) => this.logger?.error(e));
       }
-      await (user as UserInstance).sendPasswordRecoveryEmail(req.appInfo.i18n);
-      return res.status(200).json();
     } catch (e) {
       this.logger?.error(e);
-      return res
-        .status(400)
-        .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
     }
+    return res
+      .status(200)
+      .json({ message: req.appInfo.i18n?.t('auth.recoveryEmailSent') });
   }
 
   async recoverPassword(req: RecoverPasswordRequest, res: Response) {
@@ -352,7 +354,7 @@ class Auth extends AbstractController {
         .json({ message: req.appInfo.i18n?.t('password.wrongToken') });
     }
 
-    this.logger?.debug(`Password recovery user is :${user}`);
+    this.logger?.debug(`Password recovery user ${user.id}`);
 
     user.password = req.appInfo.request.password;
     user.isVerified = true;
@@ -362,14 +364,21 @@ class Auth extends AbstractController {
 
   async sendVerification(req: SendVerificationRequest, res: Response) {
     const User = this.app.getModel('User') as unknown as TUser;
-    const user = await User.getUserByEmail(req.appInfo.request.email);
-    if (!user) {
-      return res
-        .status(400)
-        .json({ message: req.appInfo.i18n?.t('auth.errorUExist') });
+    // Uniform response + fire-and-forget dispatch — no existence oracle and no
+    // timing oracle (the known-email path doesn't block on token gen + SMTP).
+    try {
+      const user = await User.getUserByEmail(req.appInfo.request.email);
+      if (user) {
+        void (user as UserInstance)
+          .sendVerificationEmail(req.appInfo.i18n)
+          .catch((e: Error) => this.logger?.error(e));
+      }
+    } catch (e) {
+      this.logger?.error(e);
     }
-    await (user as UserInstance).sendVerificationEmail(req.appInfo.i18n);
-    return res.status(200).json();
+    return res
+      .status(200)
+      .json({ message: req.appInfo.i18n?.t('auth.verificationEmailSent') });
   }
 
   static get middleware() {

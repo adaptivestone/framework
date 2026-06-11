@@ -100,8 +100,12 @@ class CreateUser extends AbstractCommand {
 
     await user.generateToken();
 
+    // Log identifiers only — serializing the document leaks the password hash
+    // and all session/recovery/verification tokens.
     this.logger?.info(
-      `User was created/updated ${JSON.stringify(user, null, 4)}`,
+      `User was created/updated: id=${user.id}, email=${user.email}, nick=${
+        user.name?.nick ?? ''
+      }`,
     );
 
     return true;
