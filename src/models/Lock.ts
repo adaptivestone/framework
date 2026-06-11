@@ -31,7 +31,11 @@ class Lock extends BaseModel {
 
     return {
       /**
-       * acquire lock based on lock name
+       * Acquire an advisory lock by name. Locks have NO ownership token: any
+       * caller may release any lock, so only release from the flow that
+       * acquired it. Steal-if-expired is atomic — an expired lock is reclaimed
+       * immediately rather than waiting on Mongo's TTL reaper (which lags up to
+       * ~60s). The TTL index stays as garbage collection.
        * @param {string} name
        * @param {number} [ttlSeconds=30]
        */
@@ -41,22 +45,31 @@ class Lock extends BaseModel {
         ttlSeconds = 30,
       ) {
         try {
-          await this.create({
-            _id: name,
-            expiredAt: new Date(Date.now() + ttlSeconds * 1000),
-          });
+          // Absent → upsert inserts (acquired). Present & expired → filter
+          // matches, update steals it (acquired). Present & live → filter
+          // misses, upsert tries to insert the same _id → E11000 → not
+          // acquired. The documented upsert-race-safe pattern.
+          await this.findOneAndUpdate(
+            { _id: name, expiredAt: { $lt: new Date() } },
+            { expiredAt: new Date(Date.now() + ttlSeconds * 1000) },
+            { upsert: true },
+          );
         } catch (error: unknown) {
           if ((error as MongoError).code !== 11000) {
-            // not a duplicate keys
+            // a real DB error, not a duplicate key — surface it
             throw error;
           }
+          // E11000: a live (unexpired) lock already exists
           return false;
         }
         return true;
       },
 
       /**
-       * release lock based on lock name
+       * Release an advisory lock by name. Unconditional: this does NOT verify
+       * the caller still holds the lock (no ownership token), so a lock that
+       * expired and was re-acquired by another worker can be released by the
+       * original holder. Release only from the flow that acquired it.
        * @param {string} name
        */
       releaseLock: async function (this: LockModelLite, name: string) {
@@ -68,24 +81,42 @@ class Lock extends BaseModel {
       },
 
       /**
-       * wait lock based on lock name
+       * Resolve once the named lock is gone. Optionally reject after
+       * `timeoutMs` so callers can bound the wait.
        * @param {string} name
+       * @param {number} [timeoutMs] reject after this many ms if still locked
        */
-      waitForUnlock: async function (this: LockModelLite, name: string) {
-        const res = await this.findOne({ _id: name });
-        if (!res) {
-          return Promise.resolve();
-        }
-
-        return new Promise((resolve) => {
-          const stream = this.watch([
-            { $match: { operationType: 'delete', 'documentKey._id': name } },
-          ]);
-          stream.on('change', () => {
-            stream.close();
-            resolve(true);
+      waitForUnlock: async function (
+        this: LockModelLite,
+        name: string,
+        timeoutMs?: number,
+      ) {
+        // Register the change stream BEFORE checking existence: a delete that
+        // lands between the two would otherwise be missed and the promise would
+        // never resolve.
+        const stream = this.watch([
+          { $match: { operationType: 'delete', 'documentKey._id': name } },
+        ]);
+        try {
+          const exists = await this.findOne({ _id: name });
+          if (!exists) {
+            return undefined;
+          }
+          return await new Promise((resolve, reject) => {
+            stream.on('change', () => resolve(true));
+            // A standalone Mongo (change streams need a replica set) or a stream
+            // failure emits 'error'; unhandled, it would crash the process.
+            stream.on('error', reject);
+            if (timeoutMs) {
+              setTimeout(
+                () => reject(new Error(`waitForUnlock('${name}') timed out`)),
+                timeoutMs,
+              ).unref();
+            }
           });
-        });
+        } finally {
+          await stream.close().catch(() => {});
+        }
       },
 
       /**

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TLock } from './Lock.ts';
 
@@ -26,11 +26,16 @@ describe('Lock Model', () => {
       expect(result).toBe(false);
     });
 
-    it('should throw non-duplicate key errors', async () => {
-      // Simulate a validation error
-      const invalidLockName = null;
-      // biome-ignore lint/style/noNonNullAssertion: we speciall send wrong type
-      await expect(Lock.acquireLock(invalidLockName!)).rejects.toThrow();
+    it('rethrows a non-duplicate-key error instead of swallowing it', async () => {
+      // The old null-name validation trick no longer applies (findOneAndUpdate
+      // upsert accepts it), so force a non-11000 failure directly: only E11000
+      // (a live lock already exists) should be swallowed into `false`.
+      const err = Object.assign(new Error('db exploded'), { code: 121 });
+      const spy = vi
+        .spyOn(Lock, 'findOneAndUpdate')
+        .mockRejectedValueOnce(err as never);
+      await expect(Lock.acquireLock('any-lock')).rejects.toThrow('db exploded');
+      spy.mockRestore();
     });
   });
 
@@ -85,6 +90,36 @@ describe('Lock Model', () => {
     });
   });
 
+  describe('acquireLock() expiry + concurrency (doc 16)', () => {
+    it('steals an expired lock immediately, without waiting for the TTL reaper', async () => {
+      const name = 'reaper-lock';
+      // A logically-expired doc the TTL monitor hasn't reaped yet.
+      await Lock.create({ _id: name, expiredAt: new Date(Date.now() - 1000) });
+
+      const result = await Lock.acquireLock(name, testTtl);
+      expect(result).toBe(true);
+
+      const data = await Lock.getLockData(name);
+      expect(data.ttl).toBeGreaterThan(0); // expiry was pushed into the future
+    });
+
+    it('does not steal a live (unexpired) lock', async () => {
+      const name = 'live-lock';
+      expect(await Lock.acquireLock(name, testTtl)).toBe(true);
+      expect(await Lock.acquireLock(name, testTtl)).toBe(false);
+      expect(await Lock.releaseLock(name)).toBe(true);
+      expect(await Lock.acquireLock(name, testTtl)).toBe(true);
+    });
+
+    it('grants exactly one winner under concurrent contention', async () => {
+      const name = 'concurrency-lock';
+      const results = await Promise.all(
+        Array.from({ length: 10 }, () => Lock.acquireLock(name, testTtl)),
+      );
+      expect(results.filter((r) => r === true)).toHaveLength(1);
+    });
+  });
+
   describe('waitForUnlock()', () => {
     it('should resolve immediately if lock does not exist', async () => {
       await expect(Lock.waitForUnlock('non-existent')).resolves.toBeUndefined();
@@ -107,5 +142,21 @@ describe('Lock Model', () => {
       await waitPromise;
       expect(unlocked).toBe(true);
     }, 1000); // Increase timeout if needed
+
+    it('resolves for a lock deleted just before the call (stream-first ordering)', async () => {
+      const name = 'delete-race-lock';
+      await Lock.acquireLock(name);
+      await Lock.releaseLock(name);
+      // The doc is already gone; the stream is registered before the existence
+      // re-check, so this resolves rather than hanging.
+      await expect(Lock.waitForUnlock(name)).resolves.toBeUndefined();
+    });
+
+    it('rejects after timeoutMs while a lock is still held', async () => {
+      const name = 'timeout-lock';
+      await Lock.acquireLock(name, testTtl);
+      await expect(Lock.waitForUnlock(name, 50)).rejects.toThrow(/timed out/);
+      await Lock.releaseLock(name);
+    }, 1000);
   });
 });
