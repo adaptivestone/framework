@@ -371,7 +371,7 @@ describe('password hashing (doc 02)', () => {
   });
 
   it('fails cleanly (no throw) on a corrupted or unknown-version hash', async () => {
-    expect.assertions(3);
+    expect.assertions(4);
 
     const model = appInstance.getModel('User') as unknown as TUser;
     const email = 'corrupt-hash@test.com';
@@ -387,6 +387,9 @@ describe('password hashing (doc 02)', () => {
       'v2:scrypt:ln=garbage,r=8,p=1:zzzz:zzzz',
       'v3:scrypt:ln=17,r=8,p=1:zzzz:zzzz',
       'v2:scrypt:ln=17,r=8,p=1',
+      // Absurd-but-integer cost: scrypt rejects it (required > maxmem ceiling)
+      // rather than attempting a huge allocation.
+      'v2:scrypt:ln=40,r=8,p=1:zzzz:zzzz',
     ];
     for (const bad of badHashes) {
       await model.updateOne({ email }, { password: bad });

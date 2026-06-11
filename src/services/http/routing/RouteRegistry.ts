@@ -40,8 +40,18 @@ export class RouteRegistry {
    */
   registerSubtree(prefix: string, subtree: RouteNode): void {
     let target = this.root;
+    const prefixParamNames: string[] = [];
     for (const seg of pathSegments(prefix)) {
+      if (seg.startsWith(':') || seg.startsWith('*')) {
+        prefixParamNames.push(seg.slice(1));
+      }
       target = ensureChildBySegment(target, seg);
+    }
+    // A handler's `paramNames` only covers params in its OWN path, not in the
+    // mount prefix. `match()` zips paramNames against ALL collected values by
+    // index, so prefix params must be prepended or the values mis-align.
+    if (prefixParamNames.length > 0) {
+      prependParamNames(subtree, prefixParamNames);
     }
     mergeNode(target, subtree);
   }
@@ -134,6 +144,31 @@ function ensureChildBySegment(node: RouteNode, segment: string): RouteNode {
     node.children.set(segment, child);
   }
   return child;
+}
+
+/**
+ * Prepend mount-prefix param names to every handler in the subtree that already
+ * carries a `paramNames` array. Handlers without `paramNames` rely on `match()`'s
+ * tree-segment-name fallback, which already accounts for the prefix nodes.
+ */
+function prependParamNames(node: RouteNode, prefixNames: string[]): void {
+  if (node.methods) {
+    for (const m of Object.keys(node.methods) as HttpMethod[]) {
+      const handler = node.methods[m];
+      if (handler?.paramNames) {
+        handler.paramNames = [...prefixNames, ...handler.paramNames];
+      }
+    }
+  }
+  for (const child of node.children.values()) {
+    prependParamNames(child, prefixNames);
+  }
+  if (node.paramChild) {
+    prependParamNames(node.paramChild, prefixNames);
+  }
+  if (node.splatChild) {
+    prependParamNames(node.splatChild, prefixNames);
+  }
 }
 
 function mergeNode(target: RouteNode, source: RouteNode): void {

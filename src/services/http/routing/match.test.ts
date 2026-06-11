@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MalformedPathError, match } from './match.ts';
 import type { HandlerEntry, MiddlewareEntry } from './RouteNode.ts';
-import { createNode } from './RouteRegistry.ts';
+import { createNode, RouteRegistry } from './RouteRegistry.ts';
 
 const noop: HandlerEntry['handler'] = async () => {};
 
@@ -514,5 +514,117 @@ describe('match — duplicate tree param names (mergeNode edge case)', () => {
 
     const m = match(root, 'GET', '/first/second');
     expect(m?.params).toEqual({ parentId: 'first', childId: 'second' });
+  });
+});
+
+describe('match — backtracking past method-less static nodes (doc 05)', () => {
+  // /users/:id  +  /users/me/avatar  → `me` exists as a method-less node.
+  const buildUsers = () => {
+    const root = createNode('');
+    const users = createNode('users');
+    const me = createNode('me');
+    const avatar = createNode('avatar');
+    avatar.methods = { GET: { handler: noop } };
+    me.children.set('avatar', avatar);
+    users.children.set('me', me);
+    const idNode = createNode(':id');
+    idNode.methods = { GET: { handler: async () => 'param' } };
+    users.paramChild = idNode;
+    root.children.set('users', users);
+    return { root, me };
+  };
+
+  it('a method-less static node does not shadow a sibling param route', () => {
+    const { root } = buildUsers();
+    // Main regression: /users/me must fall through to /users/:id.
+    expect(match(root, 'GET', '/users/me')?.params).toEqual({ id: 'me' });
+    // The deep static route and other param values still work.
+    expect(match(root, 'GET', '/users/me/avatar')?.entry?.handler).toBe(noop);
+    expect(match(root, 'GET', '/users/42')?.params).toEqual({ id: '42' });
+  });
+
+  it('middleware on the abandoned static node does not leak into the param match', () => {
+    const { root, me } = buildUsers();
+    me.middlewares.push(mw('MeOnly'));
+    const m = match(root, 'GET', '/users/me');
+    expect(m?.params).toEqual({ id: 'me' });
+    expect(m?.middlewares.map((e) => e.Class.name)).not.toContain('MeOnly');
+  });
+
+  it('PINNED: a static node with a different method wins (405), not the param route', () => {
+    // Deliberate choice: the most-specific node reports 405 rather than
+    // backtracking to the param route. Change this only with intent.
+    const root = createNode('');
+    const u = createNode('u');
+    const me = createNode('me');
+    me.methods = { POST: { handler: noop } };
+    const idNode = createNode(':id');
+    idNode.methods = { GET: { handler: async () => 'param' } };
+    u.children.set('me', me);
+    u.paramChild = idNode;
+    root.children.set('u', u);
+
+    const m = match(root, 'GET', '/u/me');
+    expect(m?.entry).toBeNull();
+    expect(m?.allowedMethods).toEqual(['POST']);
+  });
+});
+
+describe('match — empty segments (doc 05)', () => {
+  it('an empty path segment does not match a param as ""', () => {
+    const root = createNode('');
+    const users = createNode('users');
+    const idNode = createNode(':id');
+    idNode.methods = { GET: { handler: noop } };
+    users.paramChild = idNode;
+    root.children.set('users', users);
+
+    expect(match(root, 'GET', '/users//')).toBeNull();
+    expect(match(root, 'GET', '/users//x')).toBeNull();
+  });
+});
+
+describe('match — zero-segment splat (doc 05)', () => {
+  it('{*splat} matches zero trailing segments with rest = ""', () => {
+    const root = createNode('');
+    const api = createNode('api');
+    const splat = createNode('*rest');
+    splat.methods = { GET: { handler: noop } };
+    api.splatChild = splat;
+    root.children.set('api', api);
+
+    const m = match(root, 'GET', '/api');
+    expect(m?.entry?.handler).toBe(noop);
+    expect(m?.params).toEqual({ rest: '' });
+    // non-empty path still captured
+    expect(match(root, 'GET', '/api/v1/x')?.params).toEqual({ rest: 'v1/x' });
+  });
+
+  it('an exact node still wins over its own zero-segment splat child', () => {
+    const root = createNode('');
+    const api = createNode('api');
+    api.methods = { GET: { handler: noop } };
+    const splat = createNode('*rest');
+    splat.methods = { GET: { handler: async () => 'splat' } };
+    api.splatChild = splat;
+    root.children.set('api', api);
+
+    expect(match(root, 'GET', '/api')?.entry?.handler).toBe(noop);
+  });
+});
+
+describe('RouteRegistry.registerSubtree — param prefix (doc 05)', () => {
+  it('prepends prefix param names so values align with handler paramNames', () => {
+    const registry = new RouteRegistry();
+    const subtreeRoot = createNode('');
+    const itemNode = createNode(':itemId');
+    itemNode.methods = { GET: { handler: noop, paramNames: ['itemId'] } };
+    subtreeRoot.paramChild = itemNode;
+
+    registry.registerSubtree('/tenant/:tenantId', subtreeRoot);
+
+    const m = registry.match('GET', '/tenant/t1/i9');
+    expect(m?.entry?.handler).toBe(noop);
+    expect(m?.params).toEqual({ tenantId: 't1', itemId: 'i9' });
   });
 });

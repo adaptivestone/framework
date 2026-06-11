@@ -78,10 +78,18 @@ const getScryptParams = () => {
   return { ...SCRYPT_DEFAULTS, ...cfg };
 };
 
+// Hard ceiling on scrypt working memory (under Node's ~INT_MAX maxmem cap).
+// Allows realistic ratcheting (≈ up to ln=20, r=8 → ~1 GiB) while bounding the
+// allocation a tampered/corrupted stored hash can request: an absurd `ln`/`r`
+// makes the required memory exceed this, so scrypt rejects it up front instead
+// of attempting a huge allocation.
+const SCRYPT_MAXMEM_CEILING = 1536 * 1024 * 1024; // 1.5 GiB
+
 // scrypt needs ~128*N*r bytes; size maxmem from the actual params (with
-// headroom) so cost can be ratcheted in either direction without tripping
-// Node's 32 MB default ceiling or failing to verify a higher-cost stored hash.
-const scryptMaxmem = (ln: number, r: number) => 128 * 2 ** ln * r * 2;
+// headroom, capped) so cost can be ratcheted in either direction without
+// tripping Node's 32 MB default or failing to verify a higher-cost stored hash.
+const scryptMaxmem = (ln: number, r: number) =>
+  Math.min(128 * 2 ** ln * r * 2, SCRYPT_MAXMEM_CEILING);
 
 /** Hash a password with the current (v2) scheme: per-user salt + pepper. */
 export const hashPassword = async (password: string) => {

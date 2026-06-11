@@ -9,6 +9,13 @@
  * `/a/foo%2Fbar/baz` and `/a/foo/bar/baz` produce the same splat value.
  * Documented trade-off — handle the rare encoded-slash case in `'raw'`
  * body mode if needed.
+ *
+ * Two deliberate semantics:
+ * - A `{*splat}` matches ZERO trailing segments, so `/api/{*rest}` matches
+ *   `/api` (with `rest: ''`).
+ * - A method-less structural node is NOT a match: walking to a dead end fails
+ *   and backtracks to param/splat siblings (so `/users/me` still matches
+ *   `/users/:id` even when `/users/me/avatar` created a method-less `me` node).
  */
 
 import type {
@@ -58,6 +65,12 @@ export function match(
   const upMethod = method.toUpperCase() as HttpMethod;
   const segments = pathToSegments(path, options.strictTrailingSlash ?? false);
 
+  // An empty segment (from `//`) is unroutable — it must never match a param as
+  // ''. The path is well-formed (not a MalformedPathError), just a 404.
+  if (segments.includes('')) {
+    return null;
+  }
+
   const result = walk(
     root,
     segments,
@@ -102,6 +115,10 @@ export function match(
   };
 }
 
+function nodeHasMethods(node: RouteNode): boolean {
+  return !!node.methods && Object.keys(node.methods).length > 0;
+}
+
 function resolveHandler(
   methods: NonNullable<RouteNode['methods']>,
   method: HttpMethod,
@@ -130,13 +147,30 @@ function walk(
   const bodyParsing = node.bodyParsing ?? parentBodyParsing;
 
   if (index === segments.length) {
-    return {
-      node,
-      middlewares,
-      params: parentParams,
-      paramValues: parentParamValues,
-      bodyParsing,
-    };
+    if (nodeHasMethods(node)) {
+      return {
+        node,
+        middlewares,
+        params: parentParams,
+        paramValues: parentParamValues,
+        bodyParsing,
+      };
+    }
+    // Zero-segment splat: a method-less node with a splat child that HAS
+    // methods matches the splat as ''.
+    if (node.splatChild && nodeHasMethods(node.splatChild)) {
+      const splatName = node.splatChild.segment.slice(1);
+      return {
+        node: node.splatChild,
+        middlewares: [...middlewares, ...node.splatChild.middlewares],
+        params: { ...parentParams, [splatName]: '' },
+        paramValues: [...parentParamValues, ''],
+        bodyParsing: node.splatChild.bodyParsing ?? bodyParsing,
+      };
+    }
+    // Dead-end structural node: fail so the caller falls through to its
+    // param/splat siblings instead of reporting a spurious 404.
+    return null;
   }
 
   const seg = segments[index] as string;

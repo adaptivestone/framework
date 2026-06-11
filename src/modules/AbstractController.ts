@@ -42,6 +42,32 @@ export type RouteParams = {
 };
 
 /**
+ * The default mount segment for a controller: `ClassName`, prefixed by the
+ * folder when nested (`admin/Users.ts` → `Admin/Users`). Exported so codegen
+ * computes the same mount path as the runtime instance method below — the two
+ * must never drift on where a controller mounts (see codegen doc 06).
+ */
+export function controllerConstructorName(
+  prefix: string,
+  className: string,
+): string {
+  return prefix
+    ? `${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}/${className}`
+    : className;
+}
+
+/** Default HTTP mount path for a controller that doesn't override `getHttpPath`. */
+export function defaultControllerHttpPath(
+  prefix: string,
+  className: string,
+): string {
+  return `/${controllerConstructorName(prefix, className).toLowerCase()}`.replace(
+    '//',
+    '/',
+  );
+}
+
+/**
  * Abstract controller. You should extend any controller from them.
  * Place you cintroller into controller folder and it be inited in auto way.
  * By default name of route will be controller name not file name. But please name it in same ways.
@@ -96,19 +122,14 @@ class AbstractController extends Base {
    * Get constructor name that can include preix
    */
   getConstructorName() {
-    if (this.prefix) {
-      return `${this.prefix.charAt(0).toUpperCase()}${this.prefix.slice(1)}/${
-        this.constructor.name
-      }`;
-    }
-    return this.constructor.name;
+    return controllerConstructorName(this.prefix, this.constructor.name);
   }
 
   /**
    * Get http path with inheritance of path
    */
   getHttpPath() {
-    return `/${this.getConstructorName().toLowerCase()}`.replace('//', '/');
+    return defaultControllerHttpPath(this.prefix, this.constructor.name);
   }
 
   static get loggerGroup() {
