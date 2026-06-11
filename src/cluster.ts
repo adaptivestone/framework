@@ -11,6 +11,11 @@ if (cluster.isPrimary) {
   }
 
   cluster.on('exit', (worker, code, signal) => {
+    // Deliberate shutdown (clean exit, no kill signal) — do not resurrect,
+    // otherwise the primary fights a graceful shutdown forever.
+    if (code === 0 && !signal) {
+      return;
+    }
     console.log(
       `Worker \x1B[45m ${
         worker.process.pid
@@ -21,5 +26,8 @@ if (cluster.isPrimary) {
     cluster.fork();
   });
 } else {
-  import('./server.ts');
+  // index.ts is the entry that actually constructs the Server and starts
+  // listening. server.ts only DEFINES the class, so importing it here would
+  // let the worker's event loop drain and exit → infinite fork storm.
+  import('./index.ts');
 }

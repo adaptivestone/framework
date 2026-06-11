@@ -50,6 +50,11 @@ beforeAll(async () => {
   });
   server.updateConfig('http', { port: 0 }); // allow to use random
   server.updateConfig('mail', { transport: 'stub' });
+  // scrypt is memory-hard: the production ln=17 (~0.5s/hash) run across vitest's
+  // parallel workers starves each other and trips hook timeouts. Lower the cost
+  // for tests (~15ms/hash). The verify/rehash paths read this same config, so
+  // the v2 round-trip and upgrade logic are still exercised.
+  server.updateConfig('auth', { scrypt: { ln: 12, r: 8, p: 1 } });
   await server.initAllModels();
 
   // if (!global.testSetup) {

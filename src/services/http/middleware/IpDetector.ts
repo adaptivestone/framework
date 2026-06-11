@@ -1,5 +1,5 @@
 import type { IncomingMessage } from 'node:http';
-import { BlockList } from 'node:net';
+import { BlockList, isIP } from 'node:net';
 import type { NextFunction, Response } from 'express';
 import type ipDetectorConfig from '../../../config/ipDetector.ts';
 import type { IApp } from '../../../server.ts';
@@ -48,18 +48,43 @@ class IpDetector extends AbstractMiddleware {
     ) as typeof ipDetectorConfig;
     const initialIp = req.socket.remoteAddress;
     let ip = initialIp;
-    const addressType = initialIp?.includes(':') ? 'ipv6' : 'ipv4';
+    const initialType = initialIp?.includes(':') ? 'ipv6' : 'ipv4';
 
-    if (this.blockList.check(initialIp ?? '', addressType)) {
-      // we can trust this source
+    // Only honor forwarding headers when the socket peer is itself a trusted
+    // proxy — otherwise a direct client could spoof its own address.
+    if (this.blockList.check(initialIp ?? '', initialType)) {
       for (const header of headers) {
-        // in a range
+        // first present header wins
         const ipHeader = req.headers[header.toLowerCase()] as string;
-        if (ipHeader) {
-          const [firstIp] = ipHeader.split(',').map((ip) => ip.trim());
-          ip = firstIp;
-          break;
+        if (!ipHeader) {
+          continue;
         }
+        // Standard reverse proxies APPEND the real client IP, so the chain
+        // reads `<client-supplied…>, <real client>, <inner proxies>`. Walk it
+        // right-to-left (closest hop first): the first entry that is NOT a
+        // trusted proxy is the client. Cap the scan so a hostile header with
+        // thousands of entries can't burn CPU.
+        const entries = ipHeader.split(',').map((entry) => entry.trim());
+        const stopAt = Math.max(0, entries.length - 20);
+        for (let i = entries.length - 1; i >= stopAt; i -= 1) {
+          const candidate = entries[i];
+          // A non-IP entry means the left part of the chain is attacker-
+          // controlled garbage — stop and keep the last trustworthy value.
+          if (isIP(candidate) === 0) {
+            break;
+          }
+          ip = candidate;
+          // addressType must be per-candidate: an IPv6 socket can still carry
+          // IPv4 entries in the header (and vice versa).
+          const type = candidate.includes(':') ? 'ipv6' : 'ipv4';
+          if (!this.blockList.check(candidate, type)) {
+            // first untrusted hop = the client
+            break;
+          }
+          // else: trusted proxy, keep walking left. If every entry is trusted
+          // the loop ends with `ip` = the left-most examined entry.
+        }
+        break;
       }
     }
     return ip;

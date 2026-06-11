@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import type { Response } from 'express';
 import { describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
@@ -136,7 +137,11 @@ describe('ipDetector methods', () => {
           appInfo: {
             ip: undefined,
           },
-          headers: { 'x-forwarded-for': 'notAnIP' },
+          // A valid but untrusted client IP. When the socket peer is trusted
+          // the walk returns this header value; otherwise the header is
+          // ignored and the socket address wins. (The old test used a non-IP
+          // sentinel, which the right-to-left walk now correctly rejects.)
+          headers: { 'x-forwarded-for': '203.0.113.7' },
           socket: { remoteAddress: test.ip },
         };
         await middleware.middleware(
@@ -144,10 +149,72 @@ describe('ipDetector methods', () => {
           {} as Response,
           nextFunction,
         );
-        const result = req.appInfo.ip === 'notAnIP';
 
-        expect(result).toBe(test.matches);
+        expect(req.appInfo.ip).toBe(test.matches ? '203.0.113.7' : test.ip);
       }
     }
+  });
+});
+
+// X-Forwarded-For trusted-hop walk (doc 04). Standard proxies APPEND the real
+// client, so the framework must walk the chain right-to-left and skip trusted
+// hops, NOT trust the spoofable left-most entry.
+describe('getIpAdressFromIncomingMessage trusted-hop walk', () => {
+  const makeReq = (remoteAddress: string, xff?: string) =>
+    ({
+      headers: xff === undefined ? {} : { 'x-forwarded-for': xff },
+      socket: { remoteAddress },
+    }) as unknown as IncomingMessage;
+
+  // 127.0.0.1 = trusted socket peer; 10.0.0.0/8 = a trusted inner hop;
+  // 203.0.113.x / 1.2.3.4 = untrusted (public) clients.
+  const detector = () => {
+    appInstance.updateConfig('ipDetector', {
+      headers: ['X-Forwarded-For'],
+      trustedProxy: ['127.0.0.1/8', '10.0.0.0/8'],
+    });
+    return new IpDetector(appInstance);
+  };
+
+  it('returns the right-most untrusted hop, not the spoofable left-most', () => {
+    expect.assertions(1);
+    // Client spoofs `1.2.3.4`; the proxy appends the real `203.0.113.7`.
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', '1.2.3.4, 203.0.113.7'),
+    );
+    expect(ip).toBe('203.0.113.7');
+  });
+
+  it('skips trailing trusted-proxy hops to find the client', () => {
+    expect.assertions(1);
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', '203.0.113.7, 10.0.0.5'),
+    );
+    expect(ip).toBe('203.0.113.7');
+  });
+
+  it('ignores the header when the socket peer is not trusted', () => {
+    expect.assertions(1);
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('203.0.113.9', '1.2.3.4'),
+    );
+    expect(ip).toBe('203.0.113.9');
+  });
+
+  it('falls back to the left-most when the whole chain is trusted', () => {
+    expect.assertions(1);
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', '10.1.1.1, 10.0.0.5'),
+    );
+    expect(ip).toBe('10.1.1.1');
+  });
+
+  it('does not return a garbage entry to the left of the real client', () => {
+    expect.assertions(2);
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', 'evil, 203.0.113.7'),
+    );
+    expect(ip).toBe('203.0.113.7');
+    expect(ip).not.toBe('evil');
   });
 });

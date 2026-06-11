@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
+import { hashToken, userHelpers } from '../models/User.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
 
 const userEmail = 'testing@test.com';
@@ -206,14 +207,12 @@ describe('auth', () => {
         },
       });
 
-      user.verificationTokens?.push({
-        token: 'testToken',
-      });
-
-      await user.save();
+      // Tokens are stored hashed; generate through the helper to get a raw
+      // token to send while the DB holds only its hash.
+      const { token } = await userHelpers.generateUserVerificationToken(user);
 
       const { status } = await fetch(
-        `${getTestServerURL('/auth/verify')}?verification_token=testToken`,
+        `${getTestServerURL('/auth/verify')}?verification_token=${token}`,
         {
           method: 'POST',
         },
@@ -312,11 +311,10 @@ describe('auth', () => {
         },
       });
 
-      user.passwordRecoveryTokens?.push({
-        token: 'superPassword',
-      });
-
-      await user.save();
+      // Tokens are stored hashed; generate through the helper to get a raw
+      // token to send while the DB holds only its hash.
+      const { token } =
+        await userHelpers.generateUserPasswordRecoveryToken(user);
 
       const { status } = await fetch(
         getTestServerURL('/auth/recover-password'),
@@ -327,7 +325,7 @@ describe('auth', () => {
           },
           body: JSON.stringify({
             password: 'newPass',
-            passwordRecoveryToken: 'superPassword',
+            passwordRecoveryToken: token,
           }),
         },
       );
@@ -482,9 +480,11 @@ describe('auth', () => {
       const loginData = await loginResponse.json();
       const token = loginData.data.token.token;
 
-      // 3. Verify token in DB
+      // 3. Verify token in DB (stored hashed, so match by hash)
       let userInDb = await UserModel.findOne({ email: 'logout@test.com' });
-      const hasToken = userInDb?.sessionTokens?.some((t) => t.token === token);
+      const hasToken = userInDb?.sessionTokens?.some(
+        (t) => t.token === hashToken(token),
+      );
       expect(hasToken).toBeTruthy();
 
       // 4. Logout
@@ -499,7 +499,7 @@ describe('auth', () => {
       // 5. Verify token removed
       userInDb = await UserModel.findOne({ email: 'logout@test.com' });
       const hasTokenAfter = userInDb?.sessionTokens?.some(
-        (t) => t.token === token,
+        (t) => t.token === hashToken(token),
       );
       expect(hasTokenAfter).toBeFalsy();
     });

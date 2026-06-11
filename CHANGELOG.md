@@ -66,6 +66,7 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** `RateLimiter` now need to have `IpDetector` middleware before.
 - **[BREAKING]** Removing `staticFiles` middleware as it not used in projects anymore. Docs with nginx config will be provided.
 - **[BREAKING]** Remove default `AUTH_SALT`. It should be provided on a app level now.
+- **[BREAKING]** Auth tokens & password hashing hardened (security). Session, password-recovery, and email-verification tokens are now random (`randomBytes`) and stored as SHA-256 hashes with an enforced expiry filter; passwords use a per-user random salt + a versioned scrypt scheme (`v2:scrypt:…`) with `AUTH_SALT` as a pepper. **On upgrade, all existing sessions, password-recovery links, and email-verification links become invalid** — stored plaintext tokens no longer match the hashed lookups, so users must log in again / request new links. Passwords migrate silently: a legacy hash is re-hashed to the new scheme on the user's next successful login (no batch migration is possible — the plaintext only exists at login). The login/recovery wire format is unchanged.
 - **[BREAKING]** Minimum Node version is **24.0.0** (enforced via `engines`). The framework runs your TypeScript sources directly, with no build step, which relies on Node's native type stripping.
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
 - **[BREAKING]** Mongoose v8. <https://mongoosejs.com/docs/migrating_to_8.html>.

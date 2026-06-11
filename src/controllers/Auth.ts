@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import type { TUser } from '../models/User.ts';
+import { hashToken } from '../models/User.ts';
 import AbstractController from '../modules/AbstractController.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.ts';
@@ -278,12 +279,15 @@ class Auth extends AbstractController {
   async postLogout(req: PostLogoutRequest, res: Response) {
     const user = req.appInfo.user;
     if (user) {
-      const token = req.headers.authorization?.replace(/^Bearer\s+/i, '');
-      const UserModel = this.app.getModel('User') as unknown as TUser;
-      await UserModel.updateOne(
-        { _id: user._id },
-        { $pull: { sessionTokens: { token } } },
-      );
+      const rawToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      if (rawToken) {
+        const UserModel = this.app.getModel('User') as unknown as TUser;
+        // Tokens are stored hashed, so match by hash.
+        await UserModel.updateOne(
+          { _id: user._id },
+          { $pull: { sessionTokens: { token: hashToken(rawToken) } } },
+        );
+      }
     }
     return res.status(200).json({ message: 'Ok' });
   }

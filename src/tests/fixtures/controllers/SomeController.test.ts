@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { TUser } from '../../../models/User.ts';
+import { hashToken } from '../../../models/User.ts';
 import { getTestServerURL } from '../../../tests/testHelpers.ts';
 import SomeController from './SomeController.ts';
 
@@ -18,7 +19,11 @@ describe('middlewares correct works', () => {
         last: 'Testov',
       },
       roles: ['user'],
-      sessionTokens: [{ token: 'testUser1' }],
+      // Tokens are stored hashed with an expiry; the raw token sent in the
+      // Authorization header below is 'testUser1'.
+      sessionTokens: [
+        { token: hashToken('testUser1'), valid: new Date(Date.now() + 60_000) },
+      ],
     });
   });
 

@@ -1,13 +1,27 @@
+import { createHash, randomBytes } from 'node:crypto';
 import type { TFunction } from 'i18next';
 import type { Schema } from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
-import { scryptAsyncWithSaltAsString } from '../helpers/crypto.ts';
+import { hashPassword, verifyPassword } from '../helpers/crypto.ts';
 import type {
   ExtractProperty,
   GetModelTypeFromClass,
   GetModelTypeLiteFromSchema,
 } from '../modules/BaseModel.ts';
 import { BaseModel } from '../modules/BaseModel.ts';
+
+/** A fresh, unguessable bearer token (43-char base64url, 256 bits). */
+const createRandomToken = () => randomBytes(32).toString('base64url');
+
+/**
+ * Hash a token for storage/lookup. Tokens are high-entropy random values, so a
+ * fast hash (SHA-256) is correct here — brute-force is infeasible and a slow
+ * KDF would only add latency. Stored hashed so a DB read leak can't be replayed
+ * as live bearer tokens. Exported so callers that match tokens directly (e.g.
+ * logout's `$pull`) hash the same way.
+ */
+export const hashToken = (token: string) =>
+  createHash('sha256').update(token).digest('base64url');
 
 export type UserModelLite = GetModelTypeLiteFromSchema<
   typeof User.modelSchema,
@@ -48,9 +62,7 @@ class User extends BaseModel {
       'save',
       async function userPreSaveHook(this: InstanceType<UserModelLite>) {
         if (this.isModified('password')) {
-          this.password = await scryptAsyncWithSaltAsString(
-            this.password as string,
-          );
+          this.password = await hashPassword(this.password as string);
         }
       },
     );
@@ -115,13 +127,28 @@ class User extends BaseModel {
         const data = await this.findOne<InstanceType<T>>({
           email: String(email),
         });
-        if (!data) {
+        if (!data?.password) {
           return false;
         }
-        const hashedPasswords = await scryptAsyncWithSaltAsString(password);
-
-        if (data.password !== hashedPasswords) {
+        const { valid, needsRehash } = await verifyPassword(
+          password,
+          data.password as string,
+        );
+        if (!valid) {
           return false;
+        }
+        // Login is the only time we hold the plaintext, so it is the only place
+        // a legacy/under-target hash can be upgraded. Never fail the login if
+        // the upgrade write fails — the user already authenticated correctly.
+        if (needsRehash) {
+          try {
+            const newHash = await hashPassword(password);
+            // Direct update bypasses the pre-save hook, which would otherwise
+            // re-hash the already-hashed string and lock the user out.
+            await this.updateOne({ _id: data._id }, { password: newHash });
+          } catch (e) {
+            appInstance.logger?.error('Failed to upgrade password hash', e);
+          }
         }
         return data;
       },
@@ -135,7 +162,12 @@ class User extends BaseModel {
         token: string,
       ) {
         const data = await this.findOne({
-          'sessionTokens.token': String(token),
+          sessionTokens: {
+            $elemMatch: {
+              token: hashToken(String(token)),
+              valid: { $gt: new Date() },
+            },
+          },
         });
         return data || false;
       },
@@ -166,13 +198,15 @@ class User extends BaseModel {
         ) {
           const data = await this.findOne({
             passwordRecoveryTokens: {
-              $elemMatch: { token: String(passwordRecoveryToken) },
+              $elemMatch: {
+                token: hashToken(String(passwordRecoveryToken)),
+                until: { $gt: new Date() },
+              },
             },
           });
           if (!data) {
             return Promise.reject(new Error('User not exists'));
           }
-          // TODO token expiration and remove that token
 
           data.passwordRecoveryTokens?.pop();
 
@@ -190,13 +224,15 @@ class User extends BaseModel {
       ) {
         const data = await this.findOne({
           verificationTokens: {
-            $elemMatch: { token: String(verificationToken) },
+            $elemMatch: {
+              token: hashToken(String(verificationToken)),
+              until: { $gt: new Date() },
+            },
           },
         });
         if (!data) {
           return Promise.reject(new Error('User not exists'));
         }
-        // TODO token expiration and remove that token
 
         data.verificationTokens?.pop();
 
@@ -238,17 +274,23 @@ class User extends BaseModel {
         if (!this.email) {
           throw new Error('Email is requiried');
         }
-        const token = await scryptAsyncWithSaltAsString(
-          this.email + Date.now(),
-        );
+        const token = createRandomToken();
         if (!this.sessionTokens) {
           this.sessionTokens = [];
         }
+        // Prune already-expired tokens on append so the array can't grow
+        // forever (keep only tokens still valid right now).
+        const now = new Date();
+        this.sessionTokens = this.sessionTokens.filter(
+          (t) => t.valid && new Date(t.valid) > now,
+        ) as typeof this.sessionTokens;
         this.sessionTokens.push({
-          token,
+          token: hashToken(token),
           valid: timestamp,
         } as (typeof this.sessionTokens)[number]);
         await this.save();
+        // The raw token is returned to the caller exactly once; only its hash
+        // is persisted. Wire format is unchanged.
         return { token, valid: timestamp };
       },
       /**
@@ -353,20 +395,14 @@ export const userHelpers = {
     if (!userMongoose.email) {
       throw new Error('Email is required');
     }
-    const token = await scryptAsyncWithSaltAsString(
-      userMongoose.email + Date.now(),
-    );
-    // if (err) {
-    //     this.logger.error("Hash 2 error ", err);
-    //     reject(err);
-    //     return;
-    // }
+    const token = createRandomToken();
     userMongoose.verificationTokens = [];
     userMongoose.verificationTokens.push({
       until: date,
-      token,
+      token: hashToken(token),
     } as (typeof userMongoose.verificationTokens)[number]);
     await userMongoose.save();
+    // Raw token goes into the email link; only its hash is persisted.
     return { token, until: date.getTime() };
   },
   /**
@@ -383,16 +419,15 @@ export const userHelpers = {
       if (!userMongoose.email) {
         throw new Error('Email is requiried');
       }
-      const token = await scryptAsyncWithSaltAsString(
-        userMongoose.email + Date.now(),
-      );
+      const token = createRandomToken();
 
       userMongoose.passwordRecoveryTokens = [];
       userMongoose.passwordRecoveryTokens.push({
         until: date,
-        token,
+        token: hashToken(token),
       } as (typeof userMongoose.passwordRecoveryTokens)[number]);
       await userMongoose.save();
+      // Raw token goes into the recovery email link; only its hash is persisted.
       return { token, until: date.getTime() };
     },
 };
