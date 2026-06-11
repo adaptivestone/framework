@@ -1,5 +1,5 @@
 import { setTimeout } from 'node:timers/promises';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../helpers/appInstance.ts';
 
 describe('cache', () => {
@@ -88,5 +88,56 @@ describe('cache', () => {
     }
 
     expect(err?.message).toBe('err');
+  });
+
+  describe('failure paths (doc 09)', () => {
+    it('does not deadlock the key when redis get fails mid-flight', async () => {
+      expect.assertions(2);
+      const { cache } = appInstance;
+      const spy = vi
+        .spyOn(cache.redisClient, 'get')
+        .mockRejectedValueOnce(new Error('redis down'));
+
+      await expect(
+        cache.getSetValue('DEADLOCK', async () => 'v'),
+      ).rejects.toThrow('redis down');
+      spy.mockRestore();
+
+      // The in-flight mapping cleared (finally), so a retry isn't stuck on a
+      // forever-pending promise — it recomputes and succeeds.
+      const res = await cache.getSetValue('DEADLOCK', async () => 'recovered');
+      expect(res).toBe('recovered');
+    });
+
+    it('a single-caller onNotFound failure causes no unhandled rejection', async () => {
+      expect.assertions(1);
+      const { cache } = appInstance;
+      // vitest fails the run on an unhandled rejection; the no-op `.catch` on the
+      // in-flight promise is what keeps this single-caller failure clean.
+      await expect(
+        cache.getSetValue('SINGLE_THROW', async () => {
+          throw new Error('boom');
+        }),
+      ).rejects.toThrow('boom');
+    });
+
+    it('a failed cache write still returns the computed value', async () => {
+      expect.assertions(1);
+      const { cache } = appInstance;
+      const spy = vi
+        .spyOn(cache.redisClient, 'set')
+        .mockRejectedValueOnce(new Error('set down'));
+
+      const res = await cache.getSetValue('SET_FAIL', async () => 'computed');
+      expect(res).toBe('computed');
+      spy.mockRestore();
+    });
+
+    it('onNotFound returning undefined does not crash (skips the write)', async () => {
+      expect.assertions(1);
+      const { cache } = appInstance;
+      const res = await cache.getSetValue('UNDEF', async () => undefined);
+      expect(res).toBeUndefined();
+    });
   });
 });

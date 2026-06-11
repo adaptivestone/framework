@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { setTimeout } from 'node:timers/promises';
 import type { Response } from 'express';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import RateLimiter from './RateLimiter.ts';
@@ -258,5 +258,52 @@ describe('rate limiter methods', () => {
 
     expect(status?.status).toBe(429);
     expect(isSend?.isSend).toBeTruthy();
+  });
+
+  describe('store failure handling (doc 10)', () => {
+    it('a store failure (consume rejects with an Error) fails OPEN, not 429', async () => {
+      expect.assertions(2);
+      const rateLimiter = new RateLimiter(appInstance, { driver: 'memory' });
+      vi.spyOn(rateLimiter.limiter, 'consume').mockRejectedValue(
+        new Error('store down'),
+      );
+      const { status, isNextCalled } = await makeOneRequest({
+        rateLimiter,
+        request: { ip: '10.10.0.2' },
+      });
+      expect(isNextCalled).toBe(true);
+      expect(status).not.toBe(429);
+    });
+
+    it('a real limit hit (consume rejects with RateLimiterRes) → 429 + Retry-After', async () => {
+      expect.assertions(2);
+      const rateLimiter = new RateLimiter(appInstance, { driver: 'memory' });
+      vi.spyOn(rateLimiter.limiter, 'consume').mockRejectedValue({
+        msBeforeNext: 5000,
+      } as never);
+
+      let status = 0;
+      let retryAfter = '';
+      await rateLimiter.middleware(
+        { appInfo: {}, ip: '10.10.0.3' } as unknown as FrameworkRequest,
+        {
+          status(s: number) {
+            status = s;
+            return this;
+          },
+          json() {},
+          setHeader(name: string, value: string) {
+            if (name === 'Retry-After') {
+              retryAfter = value;
+            }
+            return this;
+          },
+        } as unknown as Response,
+        () => {},
+      );
+
+      expect(status).toBe(429);
+      expect(retryAfter).toBe('5');
+    });
   });
 });

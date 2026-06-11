@@ -61,60 +61,68 @@ class Cache extends Base {
       return this.promiseMapping.get(key);
     }
 
-    this.promiseMapping.set(
-      key,
-      new Promise((res, rej) => {
-        resolve = res;
-        reject = rej;
-      }),
-    );
+    const inflight = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    // Concurrent waiters get any rejection via their own `await`; this no-op
+    // handler prevents a zero-waiter `unhandledRejection` when `reject` fires.
+    inflight.catch(() => {});
+    this.promiseMapping.set(key, inflight);
 
-    let parsedResult: T | undefined;
-    const cached = await this.redisClient.get(key);
-    if (!cached) {
-      this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
-      try {
+    // One try/finally so the mapping entry ALWAYS settles and clears — a redis
+    // failure mid-flight must not leave a forever-pending entry (per-key deadlock
+    // that would survive redis recovery).
+    try {
+      let parsedResult: T | undefined;
+      const cached = await this.redisClient.get(key);
+      if (!cached) {
+        this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
         parsedResult = await onNotFound();
-      } catch (e) {
-        this.logger?.error(`Cache onNotFound for key '${key}' error: ${e}`);
-        this.promiseMapping.delete(key);
-        reject(e);
-        return Promise.reject(e);
-      }
 
-      this.redisClient.set(
-        key,
-        JSON.stringify(parsedResult, (_jsonkey, value) =>
+        const serialized = JSON.stringify(parsedResult, (_jsonkey, value) =>
           typeof value === 'bigint' ? `${value}n` : value,
-        ),
-        {
-          EX: storeTime,
-        },
-      );
-    } else {
-      this.logger?.verbose(
-        `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
-          0,
-          100,
-        )}`,
-      );
-      try {
-        parsedResult = JSON.parse(cached, (_jsonkey, value) => {
-          if (typeof value === 'string' && /^\d+n$/.test(value)) {
-            return BigInt(value.slice(0, value.length - 1));
-          }
-          return value;
-        });
-      } catch {
-        this.logger?.warn(
-          'Not able to parse json from redis cache. That can be a normal in case you store string here',
         );
+        // `undefined` results serialize to `undefined`, which the redis client
+        // rejects — skip the write. The cache write is best-effort either way:
+        // the value is already computed, so a failed write must not fail the call.
+        if (serialized !== undefined) {
+          await this.redisClient
+            .set(key, serialized, { EX: storeTime })
+            .catch((e) =>
+              this.logger?.error(`Cache set failed for key '${key}': ${e}`),
+            );
+        }
+      } else {
+        this.logger?.verbose(
+          `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
+            0,
+            100,
+          )}`,
+        );
+        try {
+          parsedResult = JSON.parse(cached, (_jsonkey, value) => {
+            if (typeof value === 'string' && /^\d+n$/.test(value)) {
+              return BigInt(value.slice(0, value.length - 1));
+            }
+            return value;
+          });
+        } catch {
+          this.logger?.warn(
+            'Not able to parse json from redis cache. That can be a normal in case you store string here',
+          );
+        }
       }
-    }
 
-    resolve(parsedResult);
-    this.promiseMapping.delete(key);
-    return parsedResult;
+      resolve(parsedResult);
+      return parsedResult;
+    } catch (e) {
+      this.logger?.error(`Cache getSetValue for key '${key}' error: ${e}`);
+      reject(e);
+      throw e;
+    } finally {
+      this.promiseMapping.delete(key);
+    }
   }
 
   /**

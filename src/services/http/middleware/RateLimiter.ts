@@ -46,6 +46,10 @@ class RateLimiter extends AbstractMiddleware {
         this.limiter = new RateLimiterMongo({
           storeClient: mongoose.connection,
           disableIndexesCreation: process.env.TEST === 'true', // disable in test env, but we can still overrite it later
+          // Memory fallback so a Mongo outage doesn't drop limiting entirely.
+          insuranceLimiter: new RateLimiterMemory(
+            this.finalOptions.limiterOptions,
+          ),
           ...this.finalOptions.limiterOptions,
         });
         break;
@@ -64,6 +68,10 @@ class RateLimiter extends AbstractMiddleware {
     return new RateLimiterRedis({
       storeClient: redisClient,
       useRedisPackage: true,
+      // Memory fallback so a Redis outage doesn't drop limiting entirely; the
+      // library serves from this when the store errors, and doc-10's fail-open
+      // in `consumeResult` is the last resort.
+      insuranceLimiter: new RateLimiterMemory(this.finalOptions.limiterOptions),
       ...this.finalOptions.limiterOptions,
     });
   }
@@ -90,7 +98,7 @@ class RateLimiter extends AbstractMiddleware {
 
     if (request?.length) {
       request.forEach((val) => {
-        if (req?.body[val]) {
+        if (req.body?.[val]) {
           key.push(req.body[val]);
         }
         // if (req.appInfo.request && req.appInfo.request[val]) {
@@ -110,6 +118,18 @@ class RateLimiter extends AbstractMiddleware {
       );
       return { isAllowed: true, retryAfter: 0, ...result };
     } catch (e: unknown) {
+      // `rate-limiter-flexible` rejects with a `RateLimiterRes` (plain object)
+      // when the limit is hit, but with an `Error` when the backing store
+      // (Redis/Mongo) fails. A store outage must NOT turn every request into a
+      // 429 — fail open (the insurance limiter above absorbs most cases, so this
+      // is the last resort). `RateLimiterRes` is not an Error, so `instanceof`
+      // is a reliable discriminator.
+      if (e instanceof Error) {
+        this.logger?.error(
+          `RateLimiter store failure for key '${consumeKey}': ${e}`,
+        );
+        return { isAllowed: true, retryAfter: 0, storeFailure: true };
+      }
       this.logger?.warn(`Too many requests. Consume key: ${consumeKey}`);
       const result = e as RateLimiterRes;
       const retryAfter = Math.round(result.msBeforeNext / 1000) || 1;
@@ -126,6 +146,9 @@ class RateLimiter extends AbstractMiddleware {
       return res.status(500).json({ message: 'RateLimiter error' });
     }
 
+    // The redis `namespace` prefixes the consume key regardless of driver
+    // (memory/mongo too) — intentional, so keys stay stable across a driver
+    // switch. Not a redis dependency; don't "fix" it to be redis-only.
     const { namespace } = this.app.getConfig('redis');
 
     const consumeKey = `${namespace}-${this.gerenateConsumeKey(req)}`;
