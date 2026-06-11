@@ -15,6 +15,19 @@ class Cors extends AbstractMiddleware {
     if (!Array.isArray(params?.origins) || !params.origins.length) {
       throw new Error('Cors inited without origin config');
     }
+    // An unanchored regex matches more than intended — `/example\.com/` also
+    // matches evil-example.com. Warn (don't change behavior) so the misconfig
+    // is visible at boot.
+    for (const origin of params.origins) {
+      if (
+        origin instanceof RegExp &&
+        (!origin.source.startsWith('^') || !origin.source.endsWith('$'))
+      ) {
+        this.logger?.warn(
+          `CORS regex /${origin.source}/ is not anchored — it can match unintended origins (e.g. evil-example.com). Anchor it with ^…$.`,
+        );
+      }
+    }
   }
 
   static get description() {

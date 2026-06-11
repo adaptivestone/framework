@@ -50,6 +50,27 @@ class HttpServer extends Base {
     this.express.disable('x-powered-by');
     this.routeRegistry = new RouteRegistry();
 
+    const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
+
+    // Security headers first, so every response path (routes, 404, 405, errors)
+    // carries them. The header list is precomputed; `enabled` is re-read per
+    // request so it can be toggled via config without a reboot.
+    const securityHeaderEntries = Object.entries(
+      httpConfig.securityHeaders ?? {},
+    ).filter(
+      ([key, value]) => key !== 'enabled' && typeof value === 'string',
+    ) as [string, string][];
+    this.express.use((_req, res, next) => {
+      const securityHeaders = (this.app.getConfig('http') as typeof ThttpConfig)
+        .securityHeaders;
+      if (securityHeaders?.enabled) {
+        for (const [name, value] of securityHeaderEntries) {
+          res.setHeader(name, value);
+        }
+      }
+      next();
+    });
+
     this.express.use(
       new RequestLoggerMiddleware(this.app).getMiddleware() as Handler,
     );
@@ -59,7 +80,6 @@ class HttpServer extends Base {
     this.express.use(new IpDetector(this.app).getMiddleware() as Handler);
     this.express.use(new I18nMiddleware(this.app).getMiddleware() as Handler);
 
-    const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
     this.express.use(
       new Cors(this.app, {
         origins: httpConfig.corsDomains,

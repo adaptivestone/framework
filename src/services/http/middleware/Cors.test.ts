@@ -1,8 +1,22 @@
 import type { Response } from 'express';
 import { describe, expect, it } from 'vitest';
+import Transport from 'winston-transport';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import Cors from './Cors.ts';
+
+// Captures app log entries so a test can assert the boot-time CORS warning.
+class CaptureTransport extends Transport {
+  sink: string[];
+  constructor(sink: string[]) {
+    super({ level: 'silly' });
+    this.sink = sink;
+  }
+  log(info: unknown, callback: () => void) {
+    this.sink.push(JSON.stringify(info));
+    callback();
+  }
+}
 
 describe('cors middleware methods', () => {
   it('have description fields', async () => {
@@ -178,5 +192,51 @@ describe('cors middleware methods', () => {
     expect(map.get('Access-Control-Allow-Methods')).toBe(
       'GET,HEAD,PUT,PATCH,POST,DELETE',
     );
+  });
+
+  it('an unanchored regex matches unintended origins; an anchored one does not (doc 21)', async () => {
+    expect.assertions(2);
+
+    const reflect = async (origins: (string | RegExp)[], origin: string) => {
+      const map = new Map();
+      await new Cors(appInstance, { origins }).middleware(
+        { method: 'GET', headers: { origin } } as FrameworkRequest,
+        { set: (k: string, v: string) => map.set(k, v) } as unknown as Response,
+        () => {},
+      );
+      return map.get('Access-Control-Allow-Origin');
+    };
+
+    // Footgun: `/example\.com/` (unanchored) reflects an attacker origin.
+    expect(await reflect([/example\.com/], 'https://evil-example.com')).toBe(
+      'https://evil-example.com',
+    );
+    // Anchored regex does not.
+    expect(
+      await reflect(
+        [/^https:\/\/([a-z0-9-]+\.)?example\.com$/],
+        'https://evil-example.com',
+      ),
+    ).toBeUndefined();
+  });
+
+  it('warns at construction for an unanchored CORS regex only (doc 21)', async () => {
+    expect.assertions(2);
+
+    const captured: string[] = [];
+    const transport = new CaptureTransport(captured);
+    appInstance.logger.add(transport);
+    try {
+      new Cors(appInstance, { origins: [/example\.com/] }); // unanchored → warn
+      new Cors(appInstance, {
+        origins: [/^https:\/\/app\.example\.com$/, 'https://x.com'], // anchored + string → no warn
+      });
+    } finally {
+      appInstance.logger.remove(transport);
+    }
+
+    const all = captured.join('\n');
+    expect(all).toContain('not anchored');
+    expect((all.match(/not anchored/g) ?? []).length).toBe(1);
   });
 });
