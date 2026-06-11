@@ -10,8 +10,8 @@ import type { GetInheritedRequest } from './Inherited.routes.gen.ts';
  * Guards the regression where an inheriting controller emitted an empty chain.
  *
  * (The bare-package-ancestor variant of this — a consumer extending the
- * framework from `node_modules` — is unit-tested in `emit.test.ts`, since it
- * can't be exercised end-to-end inside this repo.)
+ * framework from `node_modules` — is unit-tested in `astResolve.test.ts`, since
+ * it can't be exercised end-to-end inside this repo.)
  */
 class Inherited extends AbstractController {
   get routes() {

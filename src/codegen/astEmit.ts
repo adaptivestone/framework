@@ -12,17 +12,19 @@
  * (`generateAll`) throws and names it — there is no boot fallback.
  */
 
-import { promises as fs } from 'node:fs';
+import { type Dirent, existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   buildSubtreeFromSpec,
   convertPathSyntax,
 } from '../controllers/index.ts';
+import { getFilesPathWithInheritance } from '../helpers/files.ts';
 import type { IApp } from '../server.ts';
 import type { FlatRoute } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
 import type { CodegenLogger } from './appTypes.ts';
-import type { ResolvedController } from './astResolve.ts';
+import type { ExtractCache, ResolvedController } from './astResolve.ts';
 import { specFromExtracted } from './astSpec.ts';
 import type {
   ControllerMeta,
@@ -31,57 +33,53 @@ import type {
 } from './collectMetadata.ts';
 import { renderGenFile } from './emit.ts';
 
-export interface AstEmitResult {
-  /** The gen.ts text, or `null` when `needsBoot` (not statically analyzable). */
-  text: string | null;
-  needsBoot: boolean;
-  reason?: string;
+/** A planned gen-file write: its target path and rendered text. */
+export interface PlannedOutput {
+  outPath: string;
+  text: string;
 }
 
-/** Emit one controller's `.routes.gen.ts` via the AST path (single-controller
- * flatten — correct for a controller with no cross-controller bleed). */
-export async function emitGenFileViaAst(
-  srcPath: string,
-): Promise<AstEmitResult> {
-  const { spec, resolved } = await specFromExtracted(srcPath);
-  if (resolved.needsBoot) {
-    return { text: null, needsBoot: true, reason: resolved.reason };
-  }
-  // Chains at a route are prefix-independent in isolation, so a synthetic prefix
-  // is fine — we look it up with the same prefix.
-  const urlPrefix = '/__codegen';
-  const registry = new RouteRegistry();
-  registry.registerSubtree(urlPrefix, buildSubtreeFromSpec(spec));
-  const flatByKey = indexFlat(registry.flatten());
-  return {
-    text: renderResolved(srcPath, resolved, flatByKey, urlPrefix),
-    needsBoot: false,
-  };
+/** Result of analyzing (but not writing) the route types. */
+export interface RoutePlan {
+  /** Gen files to write (user controllers only; framework-internal skipped). */
+  outputs: PlannedOutput[];
+  /** Controllers that aren't statically analyzable (caller throws). */
+  needsBoot: string[];
+  /** Existing `*.routes.gen.ts` in the user folder with no sibling source. */
+  orphans: string[];
 }
 
 /**
- * AST-primary route-type generation: discover the project's controller sources
- * (no import, no boot), register them ALL into one registry (bleed-correct),
- * flatten once, and emit each `<File>.routes.gen.ts` from the shared renderer.
+ * Analyze the project's controller sources (no import, no boot) and return the
+ * gen files to write — WITHOUT writing anything. Registers all controllers
+ * (framework-internal + user) into one registry so cross-controller bleed
+ * resolves exactly like runtime, then renders each user controller's gen text.
  *
- * If ANY controller isn't statically analyzable (`needsBoot` — a non-literal
- * `routes`/`middleware`/`getHttpPath`), nothing is written and their paths are
- * returned so the caller (`generateAll`) throws and names them. There is no boot
- * fallback — non-declarative controllers are a hard error.
+ * Pure analysis so the caller can fail before any write (atomicity) and so a
+ * `--check` run can compare against disk using the exact same rendering path.
  */
-export async function generateRouteTypesViaAst(
+export async function planRouteTypes(
   app: IApp,
   logger?: CodegenLogger | null,
-): Promise<{ written: number; needsBoot: string[] }> {
-  const files = await discoverControllerFiles(app.foldersConfig.controllers);
-  logger?.info?.(`Found ${files.length} controller source(s) for route types`);
+): Promise<RoutePlan> {
+  const discovered = await discoverControllers(
+    app.foldersConfig.controllers,
+    logger,
+  );
+  logger?.info?.(
+    `Found ${discovered.length} controller source(s) for route types`,
+  );
 
+  // One parse cache for the whole run — shared ancestors parse once.
+  const cache: ExtractCache = new Map();
   const resolvedAll = await Promise.all(
-    files.map(async (srcPath) => ({
-      srcPath,
-      ...(await specFromExtracted(srcPath)),
+    discovered.map(async (d) => ({
+      ...d,
+      ...(await specFromExtracted(d.srcPath, d.prefix, cache)),
     })),
   );
+
+  const orphans = await findOrphanGenFiles(app.foldersConfig.controllers);
 
   const needsBoot = resolvedAll
     .filter((r) => r.resolved.needsBoot)
@@ -90,12 +88,33 @@ export async function generateRouteTypesViaAst(
     logger?.info?.(
       `${needsBoot.length} controller(s) aren't statically analyzable — no route types written (caller will throw)`,
     );
-    return { written: 0, needsBoot };
+    return { outputs: [], needsBoot, orphans };
   }
 
-  // All declarative → one registry resolves cross-controller bleed like runtime.
+  // One registry resolves cross-controller bleed exactly like runtime. Register
+  // BOTH framework-internal and user controllers so bleed/conflict sees the full
+  // picture. A per-controller collision pre-check names BOTH offending files —
+  // the raw registry error only carries the segment.
+  //
+  // Note: the runtime sorts `index` controllers first; codegen registers in
+  // discovery order. That divergence is harmless — the emitted types are
+  // order-insensitive (the middleware chain at each leaf is the same set, and
+  // type intersections commute). Do not "fix" the order into a real difference.
   const registry = new RouteRegistry();
+  const owner = new Map<string, string>();
   for (const r of resolvedAll) {
+    const check = new RouteRegistry();
+    check.registerSubtree(r.resolved.urlPrefix, buildSubtreeFromSpec(r.spec));
+    for (const fr of check.flatten()) {
+      const key = `${fr.method} ${fr.path}`;
+      const prev = owner.get(key);
+      if (prev && prev !== r.srcPath) {
+        throw new Error(
+          `Route-type codegen: conflicting route ${key} is declared by both ${prev} and ${r.srcPath}`,
+        );
+      }
+      owner.set(key, r.srcPath);
+    }
     registry.registerSubtree(
       r.resolved.urlPrefix,
       buildSubtreeFromSpec(r.spec),
@@ -103,8 +122,13 @@ export async function generateRouteTypesViaAst(
   }
   const flatByKey = indexFlat(registry.flatten());
 
-  let written = 0;
+  const outputs: PlannedOutput[] = [];
   for (const r of resolvedAll) {
+    // Framework-internal controllers ship pre-generated gen files — registered
+    // above for bleed, but never written into the installed package.
+    if (r.isInternal) {
+      continue;
+    }
     const text = renderResolved(
       r.srcPath,
       r.resolved,
@@ -116,12 +140,85 @@ export async function generateRouteTypesViaAst(
       // Strip whichever source extension (.ts or .js); the gen file is always .ts.
       `${path.basename(r.srcPath, path.extname(r.srcPath))}.routes.gen.ts`,
     );
+    outputs.push({ outPath, text });
+  }
+  return { outputs, needsBoot: [], orphans };
+}
+
+/**
+ * AST-primary route-type generation: plan, then write each user controller's
+ * `<File>.routes.gen.ts` and delete orphaned gen files. If ANY controller isn't
+ * statically analyzable nothing is written and the paths are returned so the
+ * caller throws and names them. There is no boot fallback.
+ */
+export async function generateRouteTypesViaAst(
+  app: IApp,
+  logger?: CodegenLogger | null,
+): Promise<{ written: number; needsBoot: string[] }> {
+  const plan = await planRouteTypes(app, logger);
+  if (plan.needsBoot.length > 0) {
+    return { written: 0, needsBoot: plan.needsBoot };
+  }
+  await writePlanned(plan.outputs, logger);
+  await deleteOrphans(plan.orphans, logger);
+  logger?.info?.(`Wrote ${plan.outputs.length} route-type file(s) via AST`);
+  return { written: plan.outputs.length, needsBoot: [] };
+}
+
+/** Write the planned gen files to disk. */
+export async function writePlanned(
+  outputs: PlannedOutput[],
+  logger?: CodegenLogger | null,
+): Promise<void> {
+  for (const { outPath, text } of outputs) {
     await fs.writeFile(outPath, text, 'utf8');
     logger?.info?.(`  → ${outPath}`);
-    written++;
   }
-  logger?.info?.(`Wrote ${written} route-type file(s) via AST`);
-  return { written, needsBoot: [] };
+}
+
+/** Delete orphaned gen files (those with no sibling controller source). */
+export async function deleteOrphans(
+  orphans: string[],
+  logger?: CodegenLogger | null,
+): Promise<void> {
+  for (const orphan of orphans) {
+    await fs.rm(orphan, { force: true });
+    logger?.info?.(`  ✗ removed orphan gen file ${orphan}`);
+  }
+}
+
+/**
+ * Find `*.routes.gen.ts` files under `userDir` that have no sibling controller
+ * source (`<base>.ts`/`.js`) — left behind when a controller is renamed/deleted,
+ * and a `tsc`-breaker for consumers. Scoped to the user folder; never touches the
+ * installed framework package.
+ */
+async function findOrphanGenFiles(userDir: string): Promise<string[]> {
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(userDir, {
+      recursive: true,
+      withFileTypes: true,
+    });
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  for (const e of entries) {
+    if (!e.isFile() || !e.name.endsWith('.routes.gen.ts')) {
+      continue;
+    }
+    const parent =
+      (e as unknown as { parentPath?: string }).parentPath ?? userDir;
+    const base = e.name.slice(0, -'.routes.gen.ts'.length);
+    const hasSource =
+      existsSync(path.join(parent, `${base}.ts`)) ||
+      existsSync(path.join(parent, `${base}.js`));
+    if (!hasSource) {
+      out.push(path.join(parent, e.name));
+    }
+  }
+  return out;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -208,39 +305,53 @@ function joinPath(prefix: string, sub: string): string {
   return segments.length === 0 ? '/' : `/${segments.join('/')}`;
 }
 
-/** Controller source files in `dir`: `.ts`, capitalized, not a test or gen file. */
-async function discoverControllerFiles(dir: string): Promise<string[]> {
-  const entries = await fs.readdir(dir, {
-    recursive: true,
-    withFileTypes: true,
+/** The framework's own controllers dir (a sibling of this codegen module). */
+function frameworkControllersDir(): string {
+  return path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../controllers',
+  );
+}
+
+function isUnder(parent: string, child: string): boolean {
+  const rel = path.relative(parent, child);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+interface DiscoveredController {
+  srcPath: string;
+  /** Folder relative to the controllers root, '' for root-level. */
+  prefix: string;
+  /** Framework-internal file: register for bleed, but never emit (ships its own). */
+  isInternal: boolean;
+}
+
+/**
+ * Discover controller sources exactly like the runtime loader
+ * (`getFilesPathWithInheritance`): merge the framework's internal controllers
+ * with the user folder (user filename wins on collision), applying the same
+ * capital-first / not-test / not-gen / not-`.d.ts` filter. Each file carries its
+ * folder `prefix` (drives the default mount path) and an `isInternal` flag.
+ */
+async function discoverControllers(
+  userDir: string,
+  logger?: CodegenLogger | null,
+): Promise<DiscoveredController[]> {
+  const internalDir = frameworkControllersDir();
+  // When codegen runs inside the framework repo itself, the user dir IS the
+  // internal dir — there's nothing external to skip, so emit everything.
+  const sameTree = path.resolve(internalDir) === path.resolve(userDir);
+  const files = await getFilesPathWithInheritance({
+    internalFolder: internalDir,
+    externalFolder: userDir,
+    logger: (m) => logger?.info?.(m),
   });
-  const out: string[] = [];
-  for (const e of entries) {
-    if (!e.isFile()) {
-      continue;
-    }
-    const base = e.name;
-    // Mirror the runtime controller loader (`helpers/files.ts`): it loads `.ts`
-    // AND `.js` controllers and skips `.d.ts` / `.gen.*` / `.test.*`. Missing
-    // `.d.ts` here lets a colocated declaration file (e.g. `Foo.d.ts`,
-    // `Foo.gen.d.ts`) reach the extractor, which finds no class → `needsBoot` →
-    // the whole run throws; missing `.js` would leave a runtime-loaded
-    // controller untyped AND absent from the shared bleed registry.
-    if (
-      !/^[A-Z]/.test(base) ||
-      !(base.endsWith('.ts') || base.endsWith('.js')) ||
-      base.endsWith('.d.ts') ||
-      base.endsWith('.gen.ts') ||
-      base.endsWith('.gen.js') ||
-      base.includes('.test.')
-    ) {
-      continue;
-    }
-    const parent =
-      (e as unknown as { parentPath?: string; path?: string }).parentPath ??
-      (e as unknown as { path?: string }).path ??
-      dir;
-    out.push(path.join(parent, base));
-  }
-  return out;
+  return files.map(({ path: srcPath, file }) => {
+    const dir = path.dirname(file);
+    return {
+      srcPath,
+      prefix: dir === '.' ? '' : dir,
+      isInternal: !sameTree && isUnder(internalDir, srcPath),
+    };
+  });
 }

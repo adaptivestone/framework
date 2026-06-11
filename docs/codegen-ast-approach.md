@@ -218,9 +218,9 @@ codebase carries exactly **one** codegen front-end.
 | Module | Responsibility |
 | --- | --- |
 | `astExtract.ts` | One oxc source pass → `{ imports, extends, routes, middleware, httpPath } \| { needsBoot, reason }`. Extracts default/named/aliased/namespace imports (skips type-only), the **exported** class's `extends`, literal `routes` (method/path/handler/`hasRequest`/`hasQuery`/`requestContentTypes`/route-level `middleware`), the static `middleware` Map, and a literal `getHttpPath()`. |
-| `astResolve.ts` | Walks `extends` (relative **and** bare-package via `createRequire`) to the middleware definer; resolves every `binding → specifier` for both the Map middleware (rebased from the definer) and route-level middleware (from self). Computes `urlPrefix` from the literal `getHttpPath()` or `'/' + className.toLowerCase()`. |
+| `astResolve.ts` | Walks `extends` (relative **and** bare-package via `createRequire`) to the middleware definer; resolves every `binding → specifier` for both the Map middleware (rebased from the definer) and route-level middleware (from self). Computes `urlPrefix` from the literal `getHttpPath()`, else from the folder prefix + class name via the shared `defaultControllerHttpPath` (same function the runtime `getHttpPath` uses, so nested controllers mount identically). |
 | `astSpec.ts` | Adapts the extracted data into the shared `ControllerSubtreeSpec` (synthetic name-tagged middleware stubs) consumed by `buildSubtreeFromSpec`. |
-| `astEmit.ts` | Registers **all** controllers into one `RouteRegistry` (cross-controller bleed resolves exactly like runtime), `flatten()`s once, filters each chain to the controller's own importable bindings, and renders via `emit.renderGenFile`. |
+| `astEmit.ts` | Discovers controllers via the runtime `getFilesPathWithInheritance` (framework-internal + user folder, user overrides win), registers **all** of them — including framework-internal — into one `RouteRegistry` (cross-controller bleed resolves exactly like runtime), `flatten()`s once, filters each chain to the controller's own importable bindings, and renders via `emit.renderGenFile`. Emits gen files for **user** controllers only (never writes into the installed package). |
 | `astModel.ts` | Detects `extends BaseModel` from source (chain walk, basename match) — used by `appTypes.ts` so the app-types scan does **zero** model `import()` (no Mongoose load). |
 | `emit.ts` | Pure renderer (`renderGenFile`) — unchanged output shape; the boot-era `emitGenFile`/`EmitInput` were removed. |
 | `index.ts` | `generateAll` = `generateAppTypes` + `generateRouteTypesViaAst`; **throws** (naming the controllers) if any are `needsBoot`. |
@@ -244,3 +244,37 @@ emitted `.routes.gen.ts` against the real handler signatures (the byte-identical
 differential gate did its job during the cutover and was retired with the boot path).
 Per-module units live in `astExtract`/`astResolve`/`astModel`/`astEmit` tests. All green:
 128 codegen + routing tests, `tsc` 0, biome clean.
+
+### Known limitation: shipped `Auth.routes.gen.ts` can't know a consumer's bleed
+
+The framework ships **pre-generated** `.routes.gen.ts` files for its own controllers
+(`Auth`, `Home`). Those were generated against the framework's own route tree, so they
+cannot account for middleware that a *particular consumer* bleeds into the framework's
+subtrees — e.g. a consumer registering a root-mounted `'/{*splat}'` middleware that, at
+runtime, also wraps `/auth/*`. Codegen registers the framework-internal controllers into the
+shared registry so a consumer's bleed is computed correctly for the consumer's **own** gen
+files, but it deliberately does **not** re-emit the framework's shipped gen files into
+`node_modules`. So the *types* on the built-in `Auth`/`Home` request objects reflect only the
+framework's own chain; the extra consumer middleware still runs at runtime, it's just not
+reflected in those shipped types. This is an inherent limit of shipping pre-generated types,
+not a codegen bug.
+
+### Gen-file lifecycle
+
+`generatetypes` analyzes every controller first, then writes — so a failure (a non-analyzable
+controller, a route conflict) never leaves partially-refreshed output. After writing it deletes
+**orphan** `*.routes.gen.ts` files (a gen file whose controller source was renamed/deleted),
+which would otherwise break the consumer's `tsc` by importing a missing module. Orphan deletion
+is scoped to the user's controllers folder — it never touches the installed framework package.
+
+Gen files are gitignored, so the one silent drift risk is a stale gen file that still compiles
+but lies (e.g. `appInfo.user` typed as present after `Auth` was removed from the chain). Guard
+it in CI:
+
+```sh
+npm run gen -- --check    # or: node cliCommand.ts generatetypes --check
+```
+
+`--check` renders everything through the exact same path as the write mode, byte-compares
+against disk, writes nothing, and exits non-zero (listing every missing/stale/orphan file) on
+any difference.

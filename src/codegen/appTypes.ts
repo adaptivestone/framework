@@ -6,8 +6,22 @@
  */
 
 import fs from 'node:fs/promises';
+import path from 'node:path';
 import type { IApp } from '../server.ts';
 import { isBaseModelSource } from './astModel.ts';
+
+/** A `./`-rooted, forward-slash specifier from `dir` to `target` for the emitted
+ * `import('…')`. Throws if `target` is outside `dir` (can't be a relative import)
+ * — better a clear error than an accidental absolute path baked into the file. */
+function toRelativeSpecifier(dir: string, target: string): string {
+  const rel = path.relative(dir, target);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error(
+      `Model path "${target}" is outside the project root "${dir}"; cannot emit a relative import into genTypes.d.ts`,
+    );
+  }
+  return `./${rel.split(path.sep).join('/')}`;
+}
 
 /** Subset of the framework logger we use here. */
 export interface CodegenLogger {
@@ -99,11 +113,13 @@ export async function getTemplate(
   // Detect `BaseModel` subclasses by parsing each model's source (no runtime
   // import — codegen never loads the model graph / Mongoose). Result drives both
   // the `getModel` emission and the `appInfo.user` augmentation below.
+  // One probe cache for the whole run — a shared base model parses once.
+  const modelCache = new Map<string, boolean>();
   const models = await Promise.all(
     modelPaths.map(async (modelPath) => ({
       file: modelPath.file,
-      relPath: modelPath.path.replace(dir, '.'),
-      isBaseModel: await isBaseModelSource(modelPath.path),
+      relPath: toRelativeSpecifier(dir, modelPath.path),
+      isBaseModel: await isBaseModelSource(modelPath.path, 0, modelCache),
     })),
   );
 

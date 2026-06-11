@@ -16,6 +16,7 @@ import type {
   MiddlewareRef,
   RouteMeta,
 } from './collectMetadata.ts';
+import { relativeImport } from './paths.ts';
 
 /**
  * Inputs for the renderer — resolution (the middleware chains as binding names +
@@ -41,7 +42,7 @@ export function renderGenFile(input: RenderInput): string {
   const ctrlDir = path.dirname(srcPath);
   const uniqueMiddlewares = collectUniqueMiddlewares(filteredChains);
 
-  const frameworkRoot = findFrameworkSrcRoot(srcPath);
+  const frameworkRoot = findFrameworkSrcRoot();
   const isFrameworkOwnController = srcPath.startsWith(
     `${frameworkRoot}${path.sep}`,
   );
@@ -248,15 +249,6 @@ function parsePathParams(routePath: string): string[] {
   return names;
 }
 
-/** A TS-style relative import specifier from `fromDir` to `toFile` (forward slashes). */
-function relativeImport(fromDir: string, toFile: string): string {
-  let rel = path.relative(fromDir, toFile);
-  if (!rel.startsWith('.')) {
-    rel = `./${rel}`;
-  }
-  return rel.split(path.sep).join('/');
-}
-
 function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {
   const set = new Set<string>();
   for (const chain of chains) {
@@ -275,14 +267,12 @@ function pascalCase(name: string): string {
 }
 
 /**
- * Find the framework's `src/` root by walking up from `srcPath` until we hit
- * a directory whose name is `src`. Used to compute import paths to framework
- * type modules. Falls back to walking up from this file's location.
+ * The framework's `src/` (or `dist/`) root — this module's own parent dir, since
+ * codegen ships inside the framework. `import.meta.url` resolves to
+ * `.../src/codegen/emit.ts`, so the root is one level up from `src/codegen/`.
+ * Used to compute import paths to framework type modules.
  */
-function findFrameworkSrcRoot(_srcPath: string): string {
-  // Use this module's own location to find src/, since we ship inside the
-  // framework. `import.meta.url` resolves to .../src/codegen/emit.ts.
-  const here = fileURLToPath(new URL('.', import.meta.url));
-  // here = .../src/codegen/
+function findFrameworkSrcRoot(): string {
+  const here = fileURLToPath(new URL('.', import.meta.url)); // .../src/codegen/
   return path.resolve(here, '..');
 }

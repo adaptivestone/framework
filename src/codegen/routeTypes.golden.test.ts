@@ -18,7 +18,7 @@
  *     (a fallback to `Record<string, unknown>` or a missing param fails tsc).
  *
  * The bare-package-ancestor variant of inheritance is unit-tested in
- * `emit.test.ts` (it can't run end-to-end inside this repo).
+ * `astResolve.test.ts` (it can't run end-to-end inside this repo).
  */
 
 import { execFileSync } from 'node:child_process';

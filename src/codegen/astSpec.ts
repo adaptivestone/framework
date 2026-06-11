@@ -15,7 +15,6 @@
  */
 
 import {
-  buildSubtreeFromSpec,
   type ControllerSubtreeSpec,
   convertPathSyntax,
   parseScopeKey,
@@ -25,10 +24,13 @@ import type {
   HandlerEntry,
   HttpMethod,
   MiddlewareEntry,
-  RouteNode,
 } from '../services/http/routing/RouteNode.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
-import { type ResolvedController, resolveController } from './astResolve.ts';
+import {
+  type ExtractCache,
+  type ResolvedController,
+  resolveController,
+} from './astResolve.ts';
 
 export interface AstSpec {
   spec: ControllerSubtreeSpec;
@@ -46,9 +48,14 @@ function syntheticMiddleware(binding: string): MiddlewareEntry {
   return { Class: named(binding) as unknown as typeof AbstractMiddleware };
 }
 
-/** Build a `ControllerSubtreeSpec` from a controller's source (no instance). */
-export async function specFromExtracted(srcPath: string): Promise<AstSpec> {
-  const resolved = await resolveController(srcPath);
+/** Build a `ControllerSubtreeSpec` from a controller's source (no instance).
+ * `prefix` is the controller's folder relative to the controllers root. */
+export async function specFromExtracted(
+  srcPath: string,
+  prefix = '',
+  cache?: ExtractCache,
+): Promise<AstSpec> {
+  const resolved = await resolveController(srcPath, prefix, cache);
 
   const handlers: ControllerSubtreeSpec['handlers'] = resolved.routes.map(
     (r) => {
@@ -87,13 +94,4 @@ export async function specFromExtracted(srcPath: string): Promise<AstSpec> {
     spec: { ctrlName: resolved.className ?? 'Unknown', handlers, middleware },
     resolved,
   };
-}
-
-/** Convenience: the assembled `RouteNode` subtree for a controller's source. */
-export async function subtreeFromExtracted(srcPath: string): Promise<{
-  subtree: RouteNode;
-  resolved: ResolvedController;
-}> {
-  const { spec, resolved } = await specFromExtracted(srcPath);
-  return { subtree: buildSubtreeFromSpec(spec), resolved };
 }

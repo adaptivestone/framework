@@ -6,10 +6,11 @@
  * run an `instanceof` check.
  */
 
-import { existsSync, promises as fs } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { extractController } from './astExtract.ts';
+import { resolveRelativeFile } from './paths.ts';
 
 /**
  * Is the model at `srcPath` a `BaseModel` subclass? Walks the `extends` chain in
@@ -20,6 +21,21 @@ import { extractController } from './astExtract.ts';
 export async function isBaseModelSource(
   srcPath: string,
   depth = 0,
+  cache?: Map<string, boolean>,
+): Promise<boolean> {
+  const cached = cache?.get(srcPath);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const result = await computeIsBaseModelSource(srcPath, depth, cache);
+  cache?.set(srcPath, result);
+  return result;
+}
+
+async function computeIsBaseModelSource(
+  srcPath: string,
+  depth: number,
+  cache?: Map<string, boolean>,
 ): Promise<boolean> {
   if (depth > 5) {
     return false;
@@ -45,7 +61,7 @@ export async function isBaseModelSource(
   }
   // Indirect: `class User extends MyBase` where `MyBase extends BaseModel`.
   const parent = resolveRelativeOrBare(info.specifier, srcPath);
-  return parent ? isBaseModelSource(parent, depth + 1) : false;
+  return parent ? isBaseModelSource(parent, depth + 1, cache) : false;
 }
 
 /** A specifier's module name without directory or extension (`…/BaseModel.js` → `BaseModel`). */
@@ -57,21 +73,7 @@ function moduleBaseName(spec: string): string {
  * `index.*`) or bare-package (through the importing file's module resolution). */
 function resolveRelativeOrBare(spec: string, fromFile: string): string | null {
   if (spec.startsWith('.')) {
-    const stripped = spec.replace(/\.[jt]s$/, '');
-    const fromDir = path.dirname(fromFile);
-    const candidates = [
-      `${stripped}.ts`,
-      `${stripped}.js`,
-      path.join(stripped, 'index.ts'),
-      path.join(stripped, 'index.js'),
-    ];
-    for (const c of candidates) {
-      const abs = path.resolve(fromDir, c);
-      if (existsSync(abs)) {
-        return abs;
-      }
-    }
-    return null;
+    return resolveRelativeFile(path.dirname(fromFile), spec);
   }
   try {
     return createRequire(fromFile).resolve(spec);

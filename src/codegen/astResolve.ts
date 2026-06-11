@@ -23,9 +23,10 @@
  * controller can't be statically analyzed and `generateAll` throws (no fallback).
  */
 
-import { existsSync, promises as fs } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { defaultControllerHttpPath } from '../modules/AbstractController.ts';
 import {
   type ExtractResult,
   extractController,
@@ -33,10 +34,35 @@ import {
   type MiddlewareScope,
   type RouteInfo,
 } from './astExtract.ts';
+import { relativeImport, resolveRelativeFile } from './paths.ts';
 
 export interface ResolvedImport extends ImportInfo {
   /** The local binding the gen file emits (`import type <binding> from …`). */
   binding: string;
+}
+
+/** Per-run cache of parsed sources by absolute path, so a shared ancestor
+ * (e.g. `AbstractController`) is read + parsed once per generation run, not once
+ * per controller. No mtime/persistence — content is stable within a run. */
+export type ExtractCache = Map<string, ExtractResult>;
+
+async function readAndExtract(
+  absPath: string,
+  cache?: ExtractCache,
+): Promise<ExtractResult | null> {
+  const cached = cache?.get(absPath);
+  if (cached) {
+    return cached;
+  }
+  let source: string;
+  try {
+    source = await fs.readFile(absPath, 'utf8');
+  } catch {
+    return null; // source unreachable
+  }
+  const ex = extractController(source, absPath);
+  cache?.set(absPath, ex);
+  return ex;
 }
 
 export interface ResolvedController {
@@ -53,24 +79,40 @@ export interface ResolvedController {
   reason?: string;
 }
 
-/** Resolve a controller's routes + effective middleware + emittable imports. */
+/**
+ * Resolve a controller's routes + effective middleware + emittable imports.
+ * `prefix` is the controller's folder relative to the controllers root (e.g.
+ * `admin` for `controllers/admin/Users.ts`); it feeds the default mount path
+ * exactly as the runtime loader does, so nested controllers mount correctly.
+ */
 export async function resolveController(
   srcPath: string,
+  prefix = '',
+  cache?: ExtractCache,
 ): Promise<ResolvedController> {
   const childDir = path.dirname(srcPath);
   const source = await fs.readFile(srcPath, 'utf8');
   const self = extractController(source, srcPath);
+  cache?.set(srcPath, self);
 
   // The controller's own routes + needsBoot come from itself. Middleware may be
   // inherited, so it's resolved by walking `extends`.
-  const found = self.middleware
-    ? { file: srcPath, ex: self, rewriteBase: null as string | null }
-    : await findMiddlewareDefiner(srcPath, self);
+  const found: Definer | 'dynamic' | Unresolvable | null = self.middleware
+    ? { file: srcPath, ex: self, rewriteBase: null }
+    : await findMiddlewareDefiner(srcPath, self, cache);
   // A non-literal `static get middleware()` reached UP the chain (the child's own
   // is already covered by `self.ok`): treat it like the child case — not
   // statically analyzable, so the run throws instead of dropping real middleware.
   const ancestorMiddlewareDynamic = found === 'dynamic';
-  const definer = found === 'dynamic' ? null : found;
+  // An `extends` import that couldn't be followed → unknown inherited middleware.
+  const unresolvableAncestor =
+    found !== null && found !== 'dynamic' && 'unresolvable' in found
+      ? found.unresolvable
+      : null;
+  const definer: Definer | null =
+    found !== null && found !== 'dynamic' && !('unresolvable' in found)
+      ? found
+      : null;
 
   const middleware = definer?.ex.middleware ?? [];
 
@@ -111,14 +153,54 @@ export async function resolveController(
   )) {
     byBinding.set(i.binding, i);
   }
+
+  // A middleware the controller references in its OWN map/routes but doesn't
+  // import is either a class declared in this same file — keep it, importing from
+  // the controller's own module if exported, fail loud if not — or a genuinely
+  // foreign bleed-in, left to the importable filter at emit. (Inherited-map
+  // bindings come from the ancestor file, so only the self case is checked.)
+  const ownBindings = new Set<string>(routeBindings);
+  if (definer?.file === srcPath) {
+    for (const b of mapBindings) {
+      ownBindings.add(b);
+    }
+  }
+  const unexportedLocalMw: string[] = [];
+  for (const binding of ownBindings) {
+    if (byBinding.has(binding)) {
+      continue; // resolved via an import
+    }
+    const localExported = self.localClasses[binding];
+    if (localExported === undefined) {
+      continue; // not declared in this file — foreign/global, handled by the filter
+    }
+    if (!localExported) {
+      unexportedLocalMw.push(binding);
+      continue;
+    }
+    byBinding.set(binding, {
+      binding,
+      kind: 'named',
+      specifier: relativeImport(childDir, srcPath),
+    });
+  }
   const imports = [...byBinding.values()];
 
   // `self.ok` is false when routes / own-middleware / getHttpPath weren't
-  // literals; that (or no exported class, or a dynamic ancestor middleware Map)
-  // → not statically analyzable (the run throws; the `needsBoot` name is kept for
-  // the flag's history).
-  const needsBoot = !self.ok || !self.className || ancestorMiddlewareDynamic;
-  const urlPrefix = self.httpPath ?? `/${(self.className ?? '').toLowerCase()}`;
+  // literals; that (or no exported class, a dynamic ancestor middleware Map, an
+  // unresolvable ancestor import, or a locally-declared-but-unexported
+  // middleware) → not statically analyzable (the run throws; the `needsBoot`
+  // name is kept for the flag's history).
+  const needsBoot =
+    !self.ok ||
+    !self.className ||
+    ancestorMiddlewareDynamic ||
+    unresolvableAncestor !== null ||
+    unexportedLocalMw.length > 0;
+  // An explicit literal `getHttpPath()` wins; otherwise the mount path is the
+  // folder prefix + class name, computed identically to the runtime loader.
+  const urlPrefix =
+    self.httpPath ?? defaultControllerHttpPath(prefix, self.className ?? '');
 
   return {
     className: self.className,
@@ -131,7 +213,15 @@ export async function resolveController(
       ? (self.reason ??
         (ancestorMiddlewareDynamic
           ? "an ancestor's `static get middleware()` is not a literal Map"
-          : 'no exported controller class found'))
+          : unresolvableAncestor !== null
+            ? `could not resolve the \`extends\` ancestor '${unresolvableAncestor.specifier}' imported by ${unresolvableAncestor.file}`
+            : unexportedLocalMw.length > 0
+              ? `middleware ${unexportedLocalMw
+                  .map((b) => `\`${b}\``)
+                  .join(
+                    ', ',
+                  )} declared in this file but not exported — export it or move it to its own module`
+              : 'no exported controller class found'))
       : undefined,
   };
 }
@@ -145,21 +235,30 @@ interface Definer {
   rewriteBase: string | null;
 }
 
+/** An `extends` import that exists but couldn't be followed (file missing, bare
+ * package unresolvable, source unreadable). Distinct from a genuine chain end —
+ * the middleware it would contribute is unknown, so the run must fail loud. */
+interface Unresolvable {
+  unresolvable: { specifier: string; file: string };
+}
+
 /** Walk `extends` from `srcPath` to the nearest ancestor that declares a
  * `static get middleware()`. Returns the `Definer`, `'dynamic'` if an ancestor
- * defines middleware but not as a literal Map (can't be analyzed), or `null` if
- * no ancestor declares middleware. */
+ * defines middleware but not as a literal Map, an `Unresolvable` if an ancestor
+ * import couldn't be followed, or `null` if the chain genuinely ends with no
+ * middleware declared. */
 async function findMiddlewareDefiner(
   srcPath: string,
   selfEx: ExtractResult,
-): Promise<Definer | 'dynamic' | null> {
+  cache?: ExtractCache,
+): Promise<Definer | 'dynamic' | Unresolvable | null> {
   const visited = new Set<string>([srcPath]);
 
   async function visit(
     fromFile: string,
     ex: ExtractResult,
     rewriteBase: string | null,
-  ): Promise<Definer | 'dynamic' | null> {
+  ): Promise<Definer | 'dynamic' | Unresolvable | null> {
     // A `static get middleware()` that exists here but isn't a literal Map: the
     // chain stops being analyzable. Distinct from "no getter here" (keep walking)
     // — conflating them would silently drop this ancestor's real middleware.
@@ -170,28 +269,27 @@ async function findMiddlewareDefiner(
       return { file: fromFile, ex, rewriteBase };
     }
     if (!ex.extendsName) {
-      return null;
+      return null; // genuine chain end — no walkable parent
     }
     const spec = ex.imports[ex.extendsName]?.specifier;
     if (!spec) {
-      return null;
+      return null; // parent isn't an imported binding (local/global) — can't walk
     }
     const next = resolveAncestor(spec, fromFile, rewriteBase);
-    if (!next || visited.has(next.file)) {
-      return null;
+    if (!next) {
+      // The `extends` import exists but doesn't resolve to a file — fail loud
+      // rather than emit an empty chain that drops real inherited middleware.
+      return { unresolvable: { specifier: spec, file: fromFile } };
+    }
+    if (visited.has(next.file)) {
+      return null; // cycle stop — a legitimate end, not an unresolved import
     }
     visited.add(next.file);
-    let source: string;
-    try {
-      source = await fs.readFile(next.file, 'utf8');
-    } catch {
-      return null; // ancestor source unreachable
+    const nextEx = await readAndExtract(next.file, cache);
+    if (!nextEx) {
+      return { unresolvable: { specifier: spec, file: fromFile } };
     }
-    return visit(
-      next.file,
-      extractController(source, next.file),
-      next.rewriteBase,
-    );
+    return visit(next.file, nextEx, next.rewriteBase);
   }
 
   return visit(srcPath, selfEx, null);
@@ -276,16 +374,6 @@ function emitSpecifier(
 
 // ─── path helpers ────────────────────────────────────────────────────────────
 
-/** Probe `.ts` / `.js` / `index.*` for a relative specifier; `null` if none exist. */
-function resolveRelativeFile(fromDir: string, spec: string): string | null {
-  const stripped = spec.replace(/\.[jt]s$/, '');
-  const candidates = [
-    ...['.ts', '.js'].map((ext) => path.resolve(fromDir, `${stripped}${ext}`)),
-    ...['index.ts', 'index.js'].map((i) => path.resolve(fromDir, stripped, i)),
-  ];
-  return candidates.find((c) => existsSync(c)) ?? null;
-}
-
 /** Rewrite a relative spec into a bare one rooted at `base`'s package subpath
  * (e.g. inside `…/modules/X.js`, `../services/Auth.ts` → `…/services/Auth.js`).
  * The `.ts` source extension is normalized to `.js` (published tree is built). */
@@ -295,13 +383,4 @@ function rewriteRelativeToBare(spec: string, base: string): string {
   }
   const bare = path.posix.join(path.posix.dirname(base), spec);
   return bare.endsWith('.ts') ? `${bare.slice(0, -3)}.js` : bare;
-}
-
-/** A TS-style relative specifier from `fromDir` to `toFile` (forward slashes). */
-function relativeImport(fromDir: string, toFile: string): string {
-  let rel = path.relative(fromDir, toFile);
-  if (!rel.startsWith('.')) {
-    rel = `./${rel}`;
-  }
-  return rel.split(path.sep).join('/');
 }

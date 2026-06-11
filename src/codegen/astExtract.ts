@@ -29,6 +29,12 @@
  */
 
 import { parseSync } from 'oxc-parser';
+import { HTTP_METHODS } from '../services/http/routing/RouteNode.ts';
+
+/** Valid `routes`-getter verbs (upper-case), the single source of truth shared
+ * with the runtime loader. A route under any other key never matches at runtime,
+ * so codegen must not emit a request type for it. */
+const ROUTE_VERBS: ReadonlySet<string> = new Set(HTTP_METHODS);
 
 export interface ImportInfo {
   specifier: string;
@@ -75,6 +81,10 @@ export interface ExtractResult {
   httpPath?: string;
   /** `getHttpPath()` is defined but not a literal return → mount path unknown. */
   httpPathDynamic?: boolean;
+  /** Top-level class declarations in this file → whether each is exported. Lets
+   * the resolver tell a controller's OWN locally-declared middleware (keep it,
+   * importing from this module) from a genuinely foreign bleed-in (drop it). */
+  localClasses: Record<string, boolean>;
 }
 
 // oxc emits an ESTree-shaped AST; we walk it structurally (no type info needed).
@@ -93,10 +103,12 @@ export function extractController(
       reason: `parse error: ${errors[0]?.message ?? 'unknown'}`,
       imports: {},
       routes: [],
+      localClasses: {},
     };
   }
 
   const imports = collectImports(program.body);
+  const localClasses = collectLocalClasses(program.body);
   const cls = findExportedClass(program.body);
   if (!cls) {
     return {
@@ -104,6 +116,7 @@ export function extractController(
       reason: 'no exported class found',
       imports,
       routes: [],
+      localClasses,
     };
   }
 
@@ -173,7 +186,49 @@ export function extractController(
     middlewareDynamic: !!mwFailed,
     httpPath,
     httpPathDynamic,
+    localClasses,
   };
+}
+
+/** Top-level class declarations and whether each is exported (default or named,
+ * via inline `export class` / `export default class` or a later `export { X }`). */
+function collectLocalClasses(body: Node[]): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  const exported = new Set<string>();
+  for (const n of body) {
+    if (n.type === 'ClassDeclaration' && n.id?.name) {
+      out[n.id.name] ??= false;
+    } else if (
+      n.type === 'ExportNamedDeclaration' &&
+      n.declaration?.type === 'ClassDeclaration' &&
+      n.declaration.id?.name
+    ) {
+      out[n.declaration.id.name] = true;
+    } else if (
+      n.type === 'ExportDefaultDeclaration' &&
+      n.declaration?.type === 'ClassDeclaration' &&
+      n.declaration.id?.name
+    ) {
+      out[n.declaration.id.name] = true;
+    } else if (n.type === 'ExportNamedDeclaration' && !n.source) {
+      for (const spec of n.specifiers ?? []) {
+        if (spec.local?.name) {
+          exported.add(spec.local.name);
+        }
+      }
+    } else if (
+      n.type === 'ExportDefaultDeclaration' &&
+      n.declaration?.type === 'Identifier'
+    ) {
+      exported.add(n.declaration.name);
+    }
+  }
+  for (const name of exported) {
+    if (name in out) {
+      out[name] = true;
+    }
+  }
+  return out;
 }
 
 // ─── imports ─────────────────────────────────────────────────────────────────
@@ -280,7 +335,10 @@ function extractRoutes(
   if (obj?.type !== 'ObjectExpression') {
     return { ok: false, reason: 'not a single `return { … }`' };
   }
-  const routes: RouteInfo[] = [];
+  // Keyed by `${method} ${path}` so duplicate literal keys dedupe last-wins,
+  // mirroring JS object semantics at runtime (the registry would otherwise throw
+  // on the duplicate). Insertion order is preserved by Map.
+  const byKey = new Map<string, RouteInfo>();
   for (const methodProp of obj.properties) {
     if (methodProp.type !== 'Property' || methodProp.computed) {
       return { ok: false, reason: 'non-literal/computed method entry' };
@@ -288,6 +346,11 @@ function extractRoutes(
     const method = propName(methodProp.key);
     if (method === null) {
       return { ok: false, reason: 'computed method key' };
+    }
+    // An unknown verb never matches at runtime — fail loud rather than emit a
+    // request type for a route that doesn't exist.
+    if (!ROUTE_VERBS.has(method.toUpperCase())) {
+      return { ok: false, reason: `unknown HTTP verb "${method}"` };
     }
     if (methodProp.value.type !== 'ObjectExpression') {
       return { ok: false, reason: `method '${method}' value not a literal` };
@@ -317,10 +380,10 @@ function extractRoutes(
           reason: `route '${method} ${p}' has no identifiable handler`,
         };
       }
-      routes.push(entry);
+      byKey.set(`${method} ${p}`, entry);
     }
   }
-  return { ok: true, routes };
+  return { ok: true, routes: [...byKey.values()] };
 }
 
 /** A route-entry shape this extractor can't read (→ `ok: false`, hard error), or
@@ -384,12 +447,16 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
       if (key === 'handler' && prop.value.type === 'MemberExpression') {
         out.handler = prop.value.property?.name ?? null;
       } else if (key === 'request') {
-        out.hasRequest = true; // the VALUE (defineSchema(...)) is never evaluated
-        // A content-type map → its media-type keys (mirrors the runtime
-        // `isContentTypeRequestMap`: a plain object whose keys all contain `/`).
-        const keys = objectKeys(prop.value);
-        if (keys && keys.length > 0 && keys.every((k) => k.includes('/'))) {
-          out.requestContentTypes = keys;
+        // `request: null` is legal (runtime skips validation when `request` is
+        // nullish) — it is NOT a schema, so don't emit `InferOutput<null>`.
+        if (!(prop.value.type === 'Literal' && prop.value.value === null)) {
+          out.hasRequest = true; // the VALUE (defineSchema(...)) is never evaluated
+          // A content-type map → its media-type keys (mirrors the runtime
+          // `isContentTypeRequestMap`: a plain object whose keys all contain `/`).
+          const keys = objectKeys(prop.value);
+          if (keys && keys.length > 0 && keys.every((k) => k.includes('/'))) {
+            out.requestContentTypes = keys;
+          }
         }
       } else if (key === 'query') {
         out.hasQuery = true;

@@ -1,8 +1,8 @@
 /**
  * Tests for the AST extends-walk + inheritance merge (`astResolve.ts`) — the
- * replacement for `importResolution.ts`. Scenarios mirror `emit.test.ts`: own
- * vs inherited middleware, binding≠class-name, bare-package ancestors, and
- * cross-directory specifier rebasing. Fixtures are written to a temp dir; only
+ * replacement for `importResolution.ts`. Scenarios cover own vs inherited
+ * middleware, binding≠class-name, bare-package ancestors, and cross-directory
+ * specifier rebasing. Fixtures are written to a temp dir; only
  * the `extends`-chain files need to exist on disk (the middleware files don't —
  * the binding/specifier come from the import node, not the live class).
  */
@@ -209,5 +209,66 @@ export default class Consumer extends AbstractController {
         specifier: '@adaptivestone/framework/services/http/middleware/Auth.js',
       },
     ]);
+  });
+});
+
+describe('astResolve — fail-loud guards (doc 07)', () => {
+  it('flags an unresolvable relative `extends` ancestor (was a silent empty chain)', async () => {
+    const child = await write(
+      'OrphanChild.ts',
+      `import Missing from './DoesNotExist.ts';
+export default class OrphanChild extends Missing {
+  get routes() { return { get: { '/': this.list } }; }
+}`,
+    );
+    const r = await resolveController(child);
+    expect(r.needsBoot).toBe(true);
+    expect(r.reason).toContain('./DoesNotExist.ts');
+  });
+
+  it('flags an unresolvable bare-package `extends` ancestor', async () => {
+    const child = await write(
+      'BareChild.ts',
+      `import Missing from '@nope/not-installed/Base.js';
+export default class BareChild extends Missing {
+  get routes() { return { get: { '/': this.list } }; }
+}`,
+    );
+    const r = await resolveController(child);
+    expect(r.needsBoot).toBe(true);
+    expect(r.reason).toContain('@nope/not-installed/Base.js');
+  });
+
+  it('keeps a locally-declared EXPORTED middleware, importing from the own module', async () => {
+    const ctrl = await write(
+      'LocalExported.ts',
+      `export class LocalMw {}
+export default class LocalExported {
+  static get middleware() { return new Map([['/{*splat}', [LocalMw]]]); }
+  get routes() { return { get: { '/': this.list } }; }
+}`,
+    );
+    const r = await resolveController(ctrl);
+    expect(r.needsBoot).toBe(false);
+    expect(r.imports).toContainEqual({
+      binding: 'LocalMw',
+      kind: 'named',
+      specifier: './LocalExported.ts',
+    });
+  });
+
+  it('fails loud on a locally-declared NON-exported middleware', async () => {
+    const ctrl = await write(
+      'LocalUnexported.ts',
+      `class LocalMw {}
+export default class LocalUnexported {
+  static get middleware() { return new Map([['/{*splat}', [LocalMw]]]); }
+  get routes() { return { get: { '/': this.list } }; }
+}`,
+    );
+    const r = await resolveController(ctrl);
+    expect(r.needsBoot).toBe(true);
+    expect(r.reason).toContain('LocalMw');
+    expect(r.reason).toContain('not exported');
   });
 });

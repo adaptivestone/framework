@@ -290,3 +290,41 @@ export default class Ctrl extends A {}`);
     expect(ex.imports.B?.specifier).toBe('./b.js');
   });
 });
+
+describe('astExtract — silent-wrong-type guards (doc 07)', () => {
+  it('rejects an unknown HTTP verb', () => {
+    const ex = extract(
+      `export default class Ctrl { get routes() { return { gett: { '/x': this.h } }; } }`,
+    );
+    expect(ex.ok).toBe(false);
+    expect(ex.reason).toContain('unknown HTTP verb "gett"');
+  });
+
+  it('treats `request: null` as no schema (not InferOutput<null>)', () => {
+    const ex = extract(
+      `export default class Ctrl { get routes() { return { post: { '/x': { handler: this.h, request: null } } }; } }`,
+    );
+    expect(ex.ok).toBe(true);
+    expect(ex.routes[0]?.hasRequest).toBe(false);
+  });
+
+  it('dedupes duplicate route keys last-wins (no duplicate push)', () => {
+    const ex = extract(
+      `export default class Ctrl { get routes() { return { get: { '/x': { handler: this.first }, '/x': { handler: this.second } } }; } }`,
+    );
+    expect(ex.ok).toBe(true);
+    expect(ex.routes).toHaveLength(1);
+    expect(ex.routes[0]?.handler).toBe('second');
+  });
+
+  it('records local class declarations and their export status', () => {
+    const ex = extract(
+      `class LocalMw {}
+export class ExportedMw {}
+export default class Ctrl { get routes() { return { get: { '/': this.h } }; } }`,
+    );
+    expect(ex.localClasses.LocalMw).toBe(false);
+    expect(ex.localClasses.ExportedMw).toBe(true);
+    expect(ex.localClasses.Ctrl).toBe(true);
+  });
+});
