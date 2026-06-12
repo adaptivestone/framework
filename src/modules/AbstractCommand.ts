@@ -61,9 +61,9 @@ class AbstractCommand extends Base {
     let name = `CLI: ${commandName} ${JSON.stringify(args)}`;
     // https://github.com/mongodb/specifications/blob/master/source/mongodb-handshake/handshake.md?plain=1#L460
     if (name.length >= 64) {
-      // this is a limit of connection name
+      // Kept well under Mongo's 128-byte appName limit (512-byte total metadata).
       console.warn(
-        `CLI: ${commandName} mongo connection string more then 128 symbols. Switching to hash`,
+        `CLI: ${commandName} mongo connection name is 64+ chars. Switching to a hash.`,
       );
       const hash = createHash('sha256')
         .update(JSON.stringify(args))

@@ -43,7 +43,7 @@ class Cli extends Base {
     );
     for (const com of commandsToLoad) {
       if (com.file.endsWith('.js') || com.file.endsWith('.ts')) {
-        const c = com.file.replace('.js', '').replace('.ts', '');
+        const c = com.file.replace(/\.[jt]s$/, ''); // strip only the extension suffix
         if (this.commands[c.toLowerCase()]) {
           this.logger?.warn(
             `Command ${c.toLowerCase()} already exists with full path ${this.commands[c.toLowerCase()]}. Possible problems - you have two commands with "ts" and "js" extensions. Skipping...`,
@@ -143,12 +143,21 @@ class Cli extends Base {
       ...defaultArgs,
     };
 
-    const parsedArgs = parseArgs({
-      args: process.argv.slice(3), // remove command name
-      options: finalArguments,
-      tokens: true,
-      allowNegative: true,
-    });
+    let parsedArgs: ReturnType<typeof parseArgs>;
+    try {
+      parsedArgs = parseArgs({
+        args: process.argv.slice(3), // remove command name
+        options: finalArguments,
+        tokens: true,
+        allowNegative: true,
+      });
+    } catch (e) {
+      // strict parseArgs throws on an unknown flag — show usage instead of an
+      // uncaught crash.
+      console.log(`\x1b[31m${e instanceof Error ? e.message : e}\x1b[0m`);
+      Cli.showHelp(Command, finalArguments);
+      return false;
+    }
 
     if (parsedArgs.values.help) {
       Cli.showHelp(Command, finalArguments);
@@ -156,7 +165,9 @@ class Cli extends Base {
     }
 
     for (const [key, opt] of Object.entries(finalArguments)) {
-      if (opt.required && !parsedArgs.values[key]) {
+      // `=== undefined` so an explicitly-provided falsy value (`--name=""`,
+      // `--flag=false`) still satisfies a required check.
+      if (opt.required && parsedArgs.values[key] === undefined) {
         console.log(
           `\x1b[31mRequired field not proivded. Please provide "${key}" argument\x1b[0m`,
         );
@@ -176,10 +187,13 @@ class Cli extends Base {
       console.info(
         `Command ${command} isShouldInitModels called. If you want to skip loading and init models, please set isShouldInitModels to false in your command`,
       );
-      process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
-        command,
-        parsedArgs.values,
-      );
+      // Only set when the operator hasn't — don't clobber a user-provided value.
+      if (!process.env.MONGO_APP_NAME) {
+        process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
+          command,
+          parsedArgs.values,
+        );
+      }
       await this.server.initAllModels({ waitForConnection: true });
     } else {
       console.info(`Command ${command} NOT need to isShouldInitModels`);

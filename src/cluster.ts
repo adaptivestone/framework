@@ -10,7 +10,27 @@ if (cluster.isPrimary) {
     cluster.fork();
   }
 
+  // An orchestrator sends SIGTERM/SIGINT to PID 1 (the primary). Forward it to
+  // every worker so each drains gracefully via its own signal handler (workers
+  // run index.ts → startServer); the primary exits once the last worker is gone.
+  let shuttingDown = false;
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+      shuttingDown = true;
+      for (const worker of Object.values(cluster.workers ?? {})) {
+        worker?.kill(signal);
+      }
+    });
+  }
+
   cluster.on('exit', (worker, code, signal) => {
+    if (shuttingDown) {
+      // Tearing down: don't resurrect; exit when the last worker has gone.
+      if (Object.keys(cluster.workers ?? {}).length === 0) {
+        process.exit(0);
+      }
+      return;
+    }
     // Deliberate shutdown (clean exit, no kill signal) — do not resurrect,
     // otherwise the primary fights a graceful shutdown forever.
     if (code === 0 && !signal) {

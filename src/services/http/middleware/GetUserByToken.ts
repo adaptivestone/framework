@@ -60,8 +60,9 @@ class GetUserByToken extends AbstractMiddleware {
     );
     if (!token) {
       token = req.get('Authorization');
+      // Some clients serialize a missing token as the literal string "null"
+      // (e.g. `Authorization: null`) — treat that as absent, not a real token.
       if (!token || token === 'null') {
-        // is null express bug*
         return next();
       }
     }

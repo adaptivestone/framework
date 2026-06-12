@@ -26,24 +26,13 @@ const noopLogger = {
   },
 } as unknown as winston.Logger;
 
-function isLogLevel(level?: string): level is LogLevel {
-  return (
-    typeof level === 'string' &&
-    (levels as ReadonlyArray<string>).includes(level)
-  );
-}
-
+// Early-boot console logger (before winston exists). The previous level filter
+// derived both indexes from the same argument, so it was always true — dropped.
 const consoleLogger = (level: LogLevel, message: string) => {
-  const configuredLevelIndex = isLogLevel(level) ? levels.indexOf(level) : -1;
-  const currentLevelIndex = levels.indexOf(level);
-  const shouldLog =
-    configuredLevelIndex === -1 || configuredLevelIndex >= currentLevelIndex;
-  if (shouldLog) {
-    if (console[level]) {
-      console[level](message);
-    } else {
-      console.log(message);
-    }
+  if (console[level]) {
+    console[level](message);
+  } else {
+    console.log(message);
   }
 };
 

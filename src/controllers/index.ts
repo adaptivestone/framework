@@ -440,6 +440,9 @@ class ControllerManager extends Base {
           req.appInfo.query = Object.assign({}, ...parts);
         }
       } catch (err) {
+        if (res.headersSent) {
+          return next(err);
+        }
         return res.status(400).json({
           errors: err instanceof Error ? err.message : String(err),
         });
@@ -449,6 +452,11 @@ class ControllerManager extends Base {
         return await Promise.resolve(original(req, res, next));
       } catch (err) {
         logger?.error(err);
+        // A handler that already streamed can't be sent a 500 — hand off to the
+        // error finalizer instead of crashing with ERR_HTTP_HEADERS_SENT.
+        if (res.headersSent) {
+          return next(err);
+        }
         return res.status(500).json({
           message: 'Platform error. Please check later or contact support',
         });

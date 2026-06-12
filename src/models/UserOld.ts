@@ -64,7 +64,8 @@ interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {
 }
 
 /**
- * @deprecated use User Model instead of UserOld
+ * @deprecated Use the `User` model instead. `UserOld` is kept for v5 and will be
+ * **removed in v6**.
  */
 class UserOld extends AbstractModel<
   IUser,
@@ -73,7 +74,7 @@ class UserOld extends AbstractModel<
 > {
   constructor(app: IApp) {
     console.warn(
-      'UserOld model is deprecated. Please use User Model instead of UserOld',
+      'UserOld model is deprecated and will be removed in v6. Please use the User model instead.',
     );
     super(app);
   }

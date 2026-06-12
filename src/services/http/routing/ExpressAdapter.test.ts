@@ -6,7 +6,9 @@ import { RouteRegistry } from './RouteRegistry.ts';
 
 // ─── minimal mocks ───────────────────────────────────────────────────
 
-const fakeApp = {} as IApp;
+const fakeApp = {
+  getConfig: () => ({}),
+} as unknown as IApp;
 
 interface MockRes extends EventEmitter {
   statusCode: number;

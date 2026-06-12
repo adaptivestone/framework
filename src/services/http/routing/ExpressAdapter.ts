@@ -25,10 +25,15 @@ export function createExpressAdapter(
   registry: RouteRegistry,
   app: IApp,
 ): ExpressAdapter {
+  // Read once at mount: case sensitivity / trailing-slash strictness from config.
+  const matchOptions = (app.getConfig('http').routing ?? {}) as {
+    caseSensitive?: boolean;
+    strictTrailingSlash?: boolean;
+  };
   return async function dispatch(req, res, next) {
     let result: MatchResult | null;
     try {
-      result = registry.match(req.method, req.path);
+      result = registry.match(req.method, req.path, matchOptions);
     } catch (err) {
       if (err instanceof MalformedPathError) {
         res.status(400).json({ message: 'Malformed URL' });
@@ -60,7 +65,9 @@ export function createExpressAdapter(
     try {
       for (const mwEntry of result.middlewares) {
         await runMiddleware(app, mwEntry, req, res);
-        if (res.writableEnded) {
+        // Stop if the response finished (writableEnded) OR the client aborted
+        // (destroyed) — no point running the rest of the chain on a dead socket.
+        if (res.writableEnded || res.destroyed) {
           return;
         }
       }

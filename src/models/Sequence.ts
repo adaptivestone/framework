@@ -25,12 +25,24 @@ class Sequence extends BaseModel {
         this: SequenceModelLite,
         forType: string,
       ): Promise<number> {
-        const sequence = await this.findByIdAndUpdate(
-          { _id: forType },
-          { $inc: { seq: 1 } },
-          { returnDocument: 'after', upsert: true },
-        );
-        return sequence.seq;
+        // `findByIdAndUpdate` takes the id directly, not a filter object.
+        const bump = () =>
+          this.findByIdAndUpdate(
+            forType,
+            { $inc: { seq: 1 } },
+            { returnDocument: 'after', upsert: true },
+          );
+        try {
+          return (await bump()).seq;
+        } catch (error) {
+          // Two concurrent upserts on a brand-new _id can race to E11000 (a
+          // documented Mongo upsert race) — the loser retries once and the doc
+          // now exists, so the second `$inc` succeeds.
+          if ((error as { code?: number }).code !== 11000) {
+            throw error;
+          }
+          return (await bump()).seq;
+        }
       },
     } as const;
   }

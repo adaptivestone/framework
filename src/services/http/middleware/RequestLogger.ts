@@ -9,7 +9,9 @@ class RequestLogger extends AbstractMiddleware {
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
     const startTime = performance.now();
-    const text = `Request is  [${req.method}] ${req.url}`;
+    // Log the path only, not `req.url` — the query string can carry secrets
+    // (e.g. `/auth/verify?verification_token=…`).
+    const text = `Request is  [${req.method}] ${req.path}`;
     this.logger?.info(text);
     res.on('finish', () => {
       const end = performance.now();

@@ -16,7 +16,7 @@ export type ValidationErrorPayload = Record<string, string | string[]>;
  *
  * Wire compatibility note — `.message` is the path-keyed payload object,
  * NOT a string. This mirrors yup's hack: `res.json({ errors: err.message })`
- * in `AbstractController.ts:222` serializes the object directly to produce
+ * in `controllers/index.ts` (the validation wrapper) serializes the object directly to produce
  * `{ "errors": { "fieldName": [...] | "...", ... } }`. Existing user
  * catch-blocks that read `err.message` keep working unchanged.
  *

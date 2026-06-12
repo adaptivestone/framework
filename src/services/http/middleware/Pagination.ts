@@ -63,29 +63,32 @@ class Pagination extends AbstractMiddleware {
     maxLimit =
       (typeof maxLimit !== 'number' ? parseInt(maxLimit, 10) : maxLimit) || 100;
 
+    // A malformed `?limit=` (NaN) or a non-positive value falls back to the
+    // configured default — never 0, which Mongoose treats as "no limit" and
+    // would bypass `maxLimit`. Then clamp to `maxLimit`.
+    const requestedLimit =
+      typeof req?.query?.limit === 'string'
+        ? parseInt(req.query.limit, 10)
+        : limit;
+    let effectiveLimit =
+      Number.isFinite(requestedLimit) && requestedLimit > 0
+        ? requestedLimit
+        : limit;
+    if (effectiveLimit > maxLimit) {
+      effectiveLimit = maxLimit;
+    }
+
     req.appInfo.pagination = {
       page:
         typeof req?.query?.page === 'string'
           ? parseInt(req?.query?.page, 10) || 1
           : 1,
-
-      limit:
-        typeof req?.query?.limit === 'string'
-          ? parseInt(req?.query?.limit, 10) || 0
-          : limit,
+      limit: effectiveLimit,
       skip: 0,
     };
 
-    if (req.appInfo.pagination.limit > maxLimit) {
-      req.appInfo.pagination.limit = maxLimit;
-    }
-
     if (req.appInfo.pagination.page < 1) {
       req.appInfo.pagination.page = 1;
-    }
-
-    if (req.appInfo.pagination.limit < 0) {
-      req.appInfo.pagination.limit = 0;
     }
 
     req.appInfo.pagination.skip =

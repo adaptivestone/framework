@@ -2,6 +2,15 @@
 
 [https://framework.adaptivestone.com/](https://framework.adaptivestone.com/)
 
+A TypeScript-first Node.js framework: convention-based controllers and Mongoose
+models, a tree-based router with per-controller generated route/handler types,
+and batteries-included auth, rate limiting, i18n, and caching.
+
+**Requirements:** Node ≥ 24, MongoDB, and an `AUTH_SALT` (boot fails fast without
+them — see "Configuration & boot requirements" below). Run `npm run gen` before
+typechecking; a fresh checkout is red in the editor until the first generation.
+The full guide lives at the docs site linked above.
+
 ## Generated types
 
 Run `npm run gen` to (re)generate `genTypes.d.ts` and per-controller

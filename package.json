@@ -42,6 +42,7 @@
     "check": "biome check",
     "check:fix": "biome check --write",
     "prepublishOnly": "npm run gen && npm run build",
+    "smoke": "./scripts/packaging-smoke-test.sh",
     "cli": "node cliCommand.ts",
     "gen": "node cliCommand.ts generatetypes",
     "dev:bench:realistic": "node ./benchmark/fixtures/realistic.ts",

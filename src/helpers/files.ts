@@ -21,9 +21,17 @@ const getFilesPathWithInheritance = async ({
   loggerFileType = '',
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
 }: getFilesPathWithInheritanceProps) => {
+  const readDir = (folder: string, which: string) =>
+    fs
+      .readdir(folder, { recursive: true, withFileTypes: true })
+      .catch((e: unknown) => {
+        throw new Error(
+          `Cannot read the ${which} folder "${folder}" — check your foldersConfig. ${e}`,
+        );
+      });
   const [internalFiles, externalFiles] = await Promise.all([
-    fs.readdir(internalFolder, { recursive: true, withFileTypes: true }),
-    fs.readdir(externalFolder, { recursive: true, withFileTypes: true }),
+    readDir(internalFolder, 'internal'),
+    readDir(externalFolder, 'external'),
   ]);
 
   const filterIndexFile = (fileDirent: Dirent) => {
