@@ -99,7 +99,6 @@ class RequestParser extends AbstractMiddleware {
       return res.status(400).json({
         message: `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
       });
-      // return next(err);
     }
     this.logger?.verbose(
       `Parsing multipart/formdata request DONE ${Date.now() - time}ms`,

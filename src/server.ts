@@ -710,7 +710,6 @@ class Server {
    * @param {Object} config
    */
   updateConfig(configName: string, config: Record<string, unknown>) {
-    // const confName = configName.charAt(0).toUpperCase() + configName.slice(1);
     const conf = this.getConfig(configName);
     const newConf = Object.assign(conf, config); // TODO deep clone
     this.cache.configs.set(configName, newConf);

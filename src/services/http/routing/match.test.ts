@@ -222,18 +222,6 @@ describe('match — case sensitivity', () => {
 
     expect(match(root, 'GET', '/Users')?.entry?.handler).toBe(noop);
   });
-
-  it('sensitive when opted in', () => {
-    const root = createNode('');
-    const users = createNode('users');
-    users.methods = { GET: { handler: noop } };
-    root.children.set('users', users);
-
-    expect(match(root, 'GET', '/Users', { caseSensitive: true })).toBeNull();
-    expect(
-      match(root, 'GET', '/users', { caseSensitive: true })?.entry?.handler,
-    ).toBe(noop);
-  });
 });
 
 describe('match — trailing slash', () => {
@@ -244,17 +232,6 @@ describe('match — trailing slash', () => {
     root.children.set('users', users);
 
     expect(match(root, 'GET', '/users/')?.entry?.handler).toBe(noop);
-  });
-
-  it('strict when opted in', () => {
-    const root = createNode('');
-    const users = createNode('users');
-    users.methods = { GET: { handler: noop } };
-    root.children.set('users', users);
-
-    expect(
-      match(root, 'GET', '/users/', { strictTrailingSlash: true }),
-    ).toBeNull();
   });
 });
 

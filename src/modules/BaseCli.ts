@@ -66,9 +66,6 @@ class Cli extends Base {
     const commandsClasses = [];
     for (const c of commands) {
       commandsClasses.push(import(this.commands[c]));
-      // console.log(
-      //   ` \x1b[36m${c.padEnd(maxLength)}\x1b[0m - ${f.default.description}`,
-      // );
     }
     const commandsClassesLoaded: Array<
       Record<'default', typeof AbstractCommand>
@@ -95,7 +92,6 @@ class Cli extends Base {
       outputLocal.push(`\n\x1b[36m  --${key} \x1b[0m`);
       if (opt.type !== 'boolean') {
         outputLocal.push(`<${opt.type}>`);
-        // flag += `<${opt.type}>`;
       }
       if (opt.required) {
         outputLocal.push('(required)');

@@ -266,20 +266,6 @@ class User extends BaseModel {
         const result = await data.save();
         return result;
       },
-      // TODO
-      // removeVerificationToken: async function removeVerificationToken(
-      //   this: UserModelLite,
-      //   verificationToken: string,
-      // ) {
-      //   this.updateOne(
-      //     {
-      //       verificationTokens: {
-      //         $elemMatch: { token: String(verificationToken) },
-      //       },
-      //     },
-      //     { $pop: { verificationTokens: 1 } },
-      //   );
-      // },
     } as const;
   }
 

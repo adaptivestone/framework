@@ -36,13 +36,6 @@ export class MalformedPathError extends Error {
   }
 }
 
-export interface MatchOptions {
-  /** Default `false` — `'/Users'` matches `'/users'`. */
-  caseSensitive?: boolean;
-  /** Default `false` — `'/users/'` matches `'/users'`. */
-  strictTrailingSlash?: boolean;
-}
-
 interface WalkResult {
   node: RouteNode;
   middlewares: MiddlewareEntry[];
@@ -60,10 +53,9 @@ export function match(
   root: RouteNode,
   method: string,
   path: string,
-  options: MatchOptions = {},
 ): MatchResult | null {
   const upMethod = method.toUpperCase() as HttpMethod;
-  const segments = pathToSegments(path, options.strictTrailingSlash ?? false);
+  const segments = pathToSegments(path);
 
   // An empty segment (from `//`) is unroutable — it must never match a param as
   // ''. The path is well-formed (not a MalformedPathError), just a 404.
@@ -71,16 +63,7 @@ export function match(
     return null;
   }
 
-  const result = walk(
-    root,
-    segments,
-    0,
-    [],
-    {},
-    [],
-    undefined,
-    options.caseSensitive ?? false,
-  );
+  const result = walk(root, segments, 0, [], {}, [], undefined);
   if (!result) {
     return null;
   }
@@ -141,7 +124,6 @@ function walk(
   parentParams: Record<string, string>,
   parentParamValues: string[],
   parentBodyParsing: BodyParsingMode | undefined,
-  caseSensitive: boolean,
 ): WalkResult | null {
   const middlewares = [...parentMw, ...node.middlewares];
   const bodyParsing = node.bodyParsing ?? parentBodyParsing;
@@ -175,7 +157,7 @@ function walk(
 
   const seg = segments[index] as string;
 
-  const staticChild = lookupStaticChild(node.children, seg, caseSensitive);
+  const staticChild = lookupStaticChild(node.children, seg);
   if (staticChild) {
     const result = walk(
       staticChild,
@@ -185,7 +167,6 @@ function walk(
       parentParams,
       parentParamValues,
       bodyParsing,
-      caseSensitive,
     );
     if (result) {
       return result;
@@ -202,7 +183,6 @@ function walk(
       { ...parentParams, [paramName]: seg },
       [...parentParamValues, seg],
       bodyParsing,
-      caseSensitive,
     );
     if (result) {
       return result;
@@ -220,7 +200,6 @@ function walk(
       { ...parentParams, [splatName]: splatValue },
       [...parentParamValues, splatValue],
       bodyParsing,
-      caseSensitive,
     );
     if (result) {
       return result;
@@ -233,22 +212,18 @@ function walk(
 function lookupStaticChild(
   children: Map<string, RouteNode>,
   seg: string,
-  caseSensitive: boolean,
 ): RouteNode | undefined {
-  // Children are keyed by lowercase segment (set at registration), so the
-  // default insensitive path is a plain O(1) get — no per-request linear scan.
-  // The sensitive path looks up the same key, then verifies the original-cased
-  // segment matches exactly.
-  const child = children.get(seg.toLowerCase());
-  if (child && caseSensitive && child.segment !== seg) {
-    return undefined;
-  }
-  return child;
+  // Children are keyed by lowercase segment (set at registration), so matching
+  // is a plain O(1) get — no per-request linear scan. Matching is always
+  // case-insensitive (Express's lenient default); a case-sensitive mode is a
+  // v6 concern and is not wired here.
+  return children.get(seg.toLowerCase());
 }
 
-function pathToSegments(path: string, strict: boolean): string[] {
+function pathToSegments(path: string): string[] {
   let trimmed = path.startsWith('/') ? path.slice(1) : path;
-  if (!strict && trimmed.endsWith('/')) {
+  // Lenient trailing slash: `/users/` matches `/users`.
+  if (trimmed.endsWith('/')) {
     trimmed = trimmed.slice(0, -1);
   }
   if (trimmed === '') {

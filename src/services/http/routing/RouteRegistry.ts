@@ -5,7 +5,6 @@
  * (the runtime adapter, codegen, OpenAPI / MCP emitters) walk it.
  */
 
-import type { MatchOptions } from './match.ts';
 import { match } from './match.ts';
 import type {
   BodyParsingMode,
@@ -100,12 +99,8 @@ export class RouteRegistry {
   }
 
   /** Match a request. See `MatchResult` for return cases (404 / 405 / hit). */
-  match(
-    method: string,
-    path: string,
-    options?: MatchOptions,
-  ): MatchResult | null {
-    return match(this.root, method, path, options);
+  match(method: string, path: string): MatchResult | null {
+    return match(this.root, method, path);
   }
 }
 

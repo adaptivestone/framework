@@ -101,9 +101,6 @@ class RateLimiter extends AbstractMiddleware {
         if (req.body?.[val]) {
           key.push(req.body[val]);
         }
-        // if (req.appInfo.request && req.appInfo.request[val]) {
-        //   key.push(req.appInfo.request[val]);
-        // }
       });
     }
 
