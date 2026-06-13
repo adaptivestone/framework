@@ -10,3 +10,4 @@ genTypes.d.ts
 
 .claude
 benchmark/*.json
+fable-review

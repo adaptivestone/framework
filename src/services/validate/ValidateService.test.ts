@@ -234,6 +234,31 @@ describe('ValidateService', () => {
         password: ['Password must be at least 8 characters'],
       });
     });
+
+    it('does NOT resolve i18next nesting from a user-tainted message (injection guard)', async () => {
+      // yup bakes the raw submitted value into its typeError message. If that
+      // message were fed to i18next as a key/defaultValue, an attacker-supplied
+      // `$t(<key>)` would resolve against the loaded bundle and leak it into the
+      // 400 response. Free-form messages must pass through verbatim instead.
+      const schema = object().shape({ age: number() });
+      const svc = new ValidateService(appInstance, schema);
+      const i18nService = await appInstance.getI18nService();
+      const i18n = await i18nService.getI18nForLang('en');
+
+      let caught: ValidationError | null = null;
+      try {
+        await svc.validate({ age: 'x-$t(auth.emailProvided)-y' }, i18n);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
+      }
+      const message = caught?.issues[0]?.message ?? '';
+      // The nesting token survives unresolved …
+      expect(message).toContain('$t(auth.emailProvided)');
+      // … and the key it points at was NOT substituted in.
+      expect(message).not.toContain('Email must be provided');
+    });
   });
 
   describe('shape — arrays + multi-error', () => {

@@ -78,11 +78,16 @@ class Cache extends Base {
       // rather than failing. Only `onNotFound`'s own errors propagate.
       let cached: string | null = null;
       let cacheUsable = true;
+      let client: RedisClientType | undefined;
       try {
-        if (!this.redisClient.isOpen) {
-          await this.redisClient.connect();
-        }
-        cached = await this.redisClient.get(key);
+        // Resolve the live client through the shared helper every time rather
+        // than reusing `this.redisClient`: after a shutdown/reconnect the module
+        // rebuilds the client, and the helper's single-flight connect avoids the
+        // "Socket already opened" throw two concurrent callers hit when each
+        // calls `connect()` itself.
+        client = await getRedisClient();
+        this.redisClient = client;
+        cached = await client.get(key);
       } catch (e) {
         cacheUsable = false;
         this.logger?.error(
@@ -127,8 +132,8 @@ class Cache extends Base {
         // to `undefined` (which the redis client rejects). The write is
         // best-effort: the value is already computed, so a failed write — like a
         // failed read — must not fail the call.
-        if (cacheUsable && serialized !== undefined) {
-          await this.redisClient
+        if (cacheUsable && serialized !== undefined && client) {
+          await client
             .set(key, serialized, { EX: storeTime })
             .catch((e) =>
               this.logger?.error(`Cache set failed for key '${key}': ${e}`),
@@ -158,10 +163,9 @@ class Cache extends Base {
     // Fail-soft like the read/write paths: a redis blip during invalidation
     // must not throw into business logic.
     try {
-      if (!this.redisClient.isOpen) {
-        await this.redisClient.connect();
-      }
-      return await this.redisClient.del(key);
+      const client = await getRedisClient();
+      this.redisClient = client;
+      return await client.del(key);
     } catch (e) {
       this.logger?.error(`Cache removeKey failed for key '${key}': ${e}`);
       return 0;

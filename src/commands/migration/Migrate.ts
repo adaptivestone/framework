@@ -21,6 +21,17 @@ class Migrate extends AbstractCommand {
     ) as unknown as TMigration;
     const LockModel = this.app.getModel('Lock') as unknown as TLock;
 
+    // Migrations run under the CLI, where mongoose `autoIndex` is disabled, so
+    // the indexes these two models rely on are not built implicitly. Create them
+    // up front: the Lock TTL reaper (`expiredAt`) and — as the backstop behind
+    // the advisory lock — the `migrationFile` uniqueness that stops a stolen-lock
+    // double-deploy from journaling the same migration twice. `createIndexes` is
+    // idempotent and only adds missing indexes (it never drops).
+    await Promise.all([
+      LockModel.createIndexes(),
+      MigrationModel.createIndexes(),
+    ]);
+
     // Serialize concurrent deploys: two instances must not run migrations twice.
     // The lock is advisory with a 600s (10 min) TTL — a run that exceeds it can
     // have the lock stolen by a parallel deploy mid-run. Bump this if real

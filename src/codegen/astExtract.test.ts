@@ -93,6 +93,24 @@ export { Ctrl as "default" };`);
 });
 
 describe('astExtract — routes', () => {
+  it('sees through `as const` / `satisfies` / parens on the routes getter', () => {
+    // These TS-only wrappers don't change the runtime value, so a declarative
+    // `return { … } as const` must still be extracted — not rejected as
+    // non-literal (which would abort codegen for the whole project).
+    for (const wrap of ['as const', 'satisfies Record<string, unknown>']) {
+      const ex = extract(`export default class C extends B {
+  get routes() { return { get: { '/ping': this.ping } } ${wrap}; }
+}`);
+      expect(ex.ok, wrap).toBe(true);
+      expect(ex.routes.map((r) => r.path)).toEqual(['/ping']);
+    }
+    const paren = extract(`export default class C extends B {
+  get routes() { return ({ get: { '/ping': this.ping } }); }
+}`);
+    expect(paren.ok).toBe(true);
+    expect(paren.routes.map((r) => r.path)).toEqual(['/ping']);
+  });
+
   it('reads bare-handler, request, and query route entries', () => {
     const ex = extract(`export default class C extends B {
   get routes() {

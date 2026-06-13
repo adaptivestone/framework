@@ -45,12 +45,16 @@ class Lock extends BaseModel {
         ttlSeconds = 30,
       ) {
         try {
-          // Absent → upsert inserts (acquired). Present & expired → filter
-          // matches, update steals it (acquired). Present & live → filter
-          // misses, upsert tries to insert the same _id → E11000 → not
-          // acquired. The documented upsert-race-safe pattern.
+          // Absent → upsert inserts (acquired). Present & expired (or with a
+          // missing/null `expiredAt`, which `$lt` alone would never match and the
+          // TTL reaper ignores) → filter matches, update steals it (acquired).
+          // Present & live → filter misses, upsert tries to insert the same _id →
+          // E11000 → not acquired. The documented upsert-race-safe pattern.
           await this.findOneAndUpdate(
-            { _id: name, expiredAt: { $lt: new Date() } },
+            {
+              _id: name,
+              $or: [{ expiredAt: { $lt: new Date() } }, { expiredAt: null }],
+            },
             { expiredAt: new Date(Date.now() + ttlSeconds * 1000) },
             { upsert: true },
           );

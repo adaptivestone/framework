@@ -583,10 +583,31 @@ function findAccessor(
   return undefined;
 }
 
+/**
+ * Strip TS-only / grouping wrappers that don't change the runtime value, so a
+ * declarative `return { … } as const` (or `satisfies T`, or a parenthesized
+ * literal) is still seen as the underlying `ObjectExpression`/`Literal`. Without
+ * this, the common `as const` idiom makes the getter look non-literal and aborts
+ * codegen for the whole project.
+ */
+function unwrapExpression(node: Node | undefined): Node | undefined {
+  let n = node;
+  while (
+    n &&
+    (n.type === 'TSAsExpression' ||
+      n.type === 'TSSatisfiesExpression' ||
+      n.type === 'TSNonNullExpression' ||
+      n.type === 'ParenthesizedExpression')
+  ) {
+    n = n.expression ?? undefined;
+  }
+  return n;
+}
+
 /** The single `return <expr>` of a getter body, or a property's initializer. */
 function literalReturn(node: Node): Node | undefined {
   if (node.type === 'PropertyDefinition') {
-    return node.value ?? undefined;
+    return unwrapExpression(node.value ?? undefined);
   }
   // MethodDefinition → FunctionExpression → BlockStatement
   const body = node.value?.body;
@@ -595,7 +616,7 @@ function literalReturn(node: Node): Node | undefined {
   }
   const only = body.body[0];
   return only.type === 'ReturnStatement'
-    ? (only.argument ?? undefined)
+    ? unwrapExpression(only.argument ?? undefined)
     : undefined;
 }
 

@@ -205,26 +205,26 @@ function renderShape(
     if (route.requestContentTypes?.length) {
       // Content-type map → discriminated union keyed by `contentType`. Each
       // branch reads InferOutput of that media type's schema.
-      const base = `${routesAlias}['${route.method}']['${route.path}']['request']`;
+      const base = `${routesAlias}[${sq(route.method)}][${sq(route.path)}]['request']`;
       // Discriminant literal is lower-cased to match the runtime-injected
       // value (the parser normalizes `Content-Type` to lower case); the type
       // navigation keeps the author's original key so the schema resolves.
       const union = route.requestContentTypes
         .map(
           (ct) =>
-            `({ contentType: '${ct.toLowerCase()}' } & StandardSchemaV1.InferOutput<${base}['${ct}']>)`,
+            `({ contentType: ${sq(ct.toLowerCase())} } & StandardSchemaV1.InferOutput<${base}[${sq(ct)}]>)`,
         )
         .join(' | ');
       appInfoOverrides.push(`request: ${union}`);
     } else {
       appInfoOverrides.push(
-        `request: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['request']>`,
+        `request: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['request']>`,
       );
     }
   }
   if (route.hasQuerySchema) {
     appInfoOverrides.push(
-      `query: StandardSchemaV1.InferOutput<${routesAlias}['${route.method}']['${route.path}']['query']>`,
+      `query: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['query']>`,
     );
   }
   const appInfoOverride =
@@ -257,6 +257,16 @@ function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {
     }
   }
   return Array.from(set);
+}
+
+/**
+ * Emit a single-quoted TS string literal for a type-navigation key, escaping the
+ * only two characters a single-quoted string treats specially (`\` and `'`).
+ * Route keys round-trip exactly (the literal denotes the author's original key),
+ * and ordinary paths (no `\`/`'`) come out byte-identical to a plain `'${s}'`.
+ */
+function sq(s: string): string {
+  return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
 
 function pascalCase(name: string): string {

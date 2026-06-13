@@ -18,3 +18,8 @@ biome.json
 lefthook.yml
 .claude/*
 .plans/*
+/fable-review/*
+/scripts/*
+/docs/*
+.env.example
+.npmignore
