@@ -23,3 +23,4 @@ lefthook.yml
 /docs/*
 .env.example
 .npmignore
+CHANGELOG.md
