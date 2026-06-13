@@ -18,6 +18,11 @@ const childEnv = () => {
   env.VITEST_WORKER_ID = undefined;
   env.VITEST_POOL_ID = undefined;
   env.AUTH_SALT ||= 'test-shutdown-salt';
+  // Boot asserts a Mongo DSN is configured (server.ts #assertBootConfig). The
+  // fixture never opens a connection — it skips model init — so any truthy DSN
+  // satisfies the check; no live database is needed. Set explicitly so the test
+  // doesn't depend on a developer's local .env (CI has none → boot would throw).
+  env.MONGO_DSN ||= 'mongodb://127.0.0.1:27017/shutdown-fixture';
   env.LOGGER_CONSOLE_LEVEL = 'error';
   return env;
 };

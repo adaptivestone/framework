@@ -5,8 +5,10 @@ import Server from '../../server.ts';
 
 // Minimal standalone server used by shutdown.test.ts. Booted in a child process
 // so a real SIGTERM / a real port conflict can be observed (exit codes, marker
-// output) — neither is testable in-process. No database: doc 12 is about the
-// process lifecycle, and HTTP boots without mongo.
+// output) — neither is testable in-process. No live database: doc 12 is about
+// the process lifecycle. Model init is skipped, so no connection is ever opened
+// — but boot still asserts a Mongo DSN is configured, which the test supplies
+// via env (MONGO_DSN), so this never reaches the network.
 const port = Number(process.argv[2] ?? 0);
 const srcRoot = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
