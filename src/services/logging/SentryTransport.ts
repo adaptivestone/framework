@@ -84,31 +84,46 @@ class SentryTransport extends Transport {
       WINSTON_LEVEL_TO_LOG_SEVERITY_LEVEL_MAP[levelFromSymbol as string] ??
       'info';
 
-    // Setup Sentry scope with tags, user, and extras
-    const scope = this.#sentry.getCurrentScope();
-    scope.clear();
+    const embeddedError = Object.values(info).find(
+      (value) => value instanceof Error,
+    ) as Error | undefined;
+    // Only a real Error, or a warn/error/fatal-level record, becomes a Sentry
+    // *issue*. An ordinary info/debug log (request lines, boot output) is sent
+    // as a breadcrumb-style message instead — otherwise every log burns issue
+    // quota and pages on noise.
+    const isIssueLevel =
+      logSeverityLevel === 'warn' ||
+      logSeverityLevel === 'error' ||
+      logSeverityLevel === 'fatal';
 
-    if (tags !== undefined && isObject(tags)) {
-      scope.setTags(tags as Record<string, string>);
-    }
+    // Run inside an isolated scope so this log's tags/user/extras don't leak
+    // into — or wipe (`scope.clear()`) — the host application's Sentry scope.
+    this.#sentry.withScope((scope) => {
+      if (tags !== undefined && isObject(tags)) {
+        scope.setTags(tags as Record<string, string>);
+      }
+      if (user !== undefined && isObject(user)) {
+        scope.setUser(user as Sentry.User);
+      }
+      // Filter out undefined values and set extras
+      const extras = Object.fromEntries(
+        Object.entries(attributes).filter(([_, value]) => value !== undefined),
+      );
+      scope.setExtras(extras);
+      scope.setLevel(logSeverityLevel as SeverityLevel);
 
-    if (user !== undefined && isObject(user)) {
-      scope.setUser(user as Sentry.User);
-    }
-
-    // Filter out undefined values and set extras
-    const extras = Object.fromEntries(
-      Object.entries(attributes).filter(([_, value]) => value !== undefined),
-    );
-    scope.setExtras(extras);
-
-    const error =
-      Object.values(info).find((value) => value instanceof Error) ??
-      new ExtendedError(info as Record<string, unknown>);
-
-    this.#sentry.captureException(error, {
-      tags: tags as Record<string, string>,
-      level: logSeverityLevel as SeverityLevel,
+      if (embeddedError) {
+        this.#sentry?.captureException(embeddedError);
+      } else if (isIssueLevel) {
+        this.#sentry?.captureException(
+          new ExtendedError(info as Record<string, unknown>),
+        );
+      } else {
+        this.#sentry?.captureMessage(
+          (message as string) || 'log',
+          logSeverityLevel as SeverityLevel,
+        );
+      }
     });
 
     return callback();

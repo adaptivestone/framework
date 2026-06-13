@@ -186,3 +186,24 @@ export const verifyPassword = async (
     return { valid: false, needsRehash: false };
   }
 };
+
+// A throwaway v2 hash, computed once at the current cost, used only to equalize
+// timing. The comparison result is discarded.
+let dummyHashPromise: Promise<string> | null = null;
+
+/**
+ * Burn one password-verify's worth of scrypt work, then discard the result.
+ * Call this on the "no such user / no password" branch of a login so that a
+ * non-existent account is not distinguishable from a wrong password by response
+ * latency — i.e. it closes the user-enumeration timing oracle.
+ */
+export const burnPasswordVerify = async (password: string): Promise<void> => {
+  if (!dummyHashPromise) {
+    dummyHashPromise = hashPassword('framework:timing-equalizer');
+  }
+  try {
+    await verifyPassword(password, await dummyHashPromise);
+  } catch {
+    // Timing side effect only — any error here is irrelevant.
+  }
+};

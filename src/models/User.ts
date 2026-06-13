@@ -2,7 +2,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { TFunction } from 'i18next';
 import type { Schema } from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
-import { hashPassword, verifyPassword } from '../helpers/crypto.ts';
+import {
+  burnPasswordVerify,
+  hashPassword,
+  verifyPassword,
+} from '../helpers/crypto.ts';
 import type {
   ExtractProperty,
   GetModelTypeFromClass,
@@ -136,6 +140,9 @@ class User extends BaseModel {
           email: String(email),
         });
         if (!data?.password) {
+          // Equalize timing with the real verify path: a missing account (or one
+          // without a password) must not be distinguishable by response latency.
+          await burnPasswordVerify(password);
           return false;
         }
         const { valid, needsRehash } = await verifyPassword(
@@ -204,10 +211,11 @@ class User extends BaseModel {
           this: UserModelLite,
           passwordRecoveryToken: string,
         ) {
+          const hashed = hashToken(String(passwordRecoveryToken));
           const data = await this.findOne({
             passwordRecoveryTokens: {
               $elemMatch: {
-                token: hashToken(String(passwordRecoveryToken)),
+                token: hashed,
                 until: { $gt: new Date() },
               },
             },
@@ -216,7 +224,12 @@ class User extends BaseModel {
             return Promise.reject(new Error('User not exists'));
           }
 
-          data.passwordRecoveryTokens?.pop();
+          // Consume the matched token specifically — not just the last array
+          // element — so a model that ever holds multiple tokens can't leave the
+          // just-used one live.
+          data.passwordRecoveryTokens = data.passwordRecoveryTokens?.filter(
+            (t) => t.token !== hashed,
+          ) as typeof data.passwordRecoveryTokens;
 
           const result = await data.save();
           return result;
@@ -230,10 +243,11 @@ class User extends BaseModel {
         this: UserModelLite,
         verificationToken: string,
       ) {
+        const hashed = hashToken(String(verificationToken));
         const data = await this.findOne({
           verificationTokens: {
             $elemMatch: {
-              token: hashToken(String(verificationToken)),
+              token: hashed,
               until: { $gt: new Date() },
             },
           },
@@ -242,7 +256,12 @@ class User extends BaseModel {
           return Promise.reject(new Error('User not exists'));
         }
 
-        data.verificationTokens?.pop();
+        // Consume the matched token specifically — not just the last array
+        // element — so a model that ever holds multiple tokens can't leave the
+        // just-used one live.
+        data.verificationTokens = data.verificationTokens?.filter(
+          (t) => t.token !== hashed,
+        ) as typeof data.verificationTokens;
 
         const result = await data.save();
         return result;

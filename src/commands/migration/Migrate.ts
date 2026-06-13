@@ -43,6 +43,11 @@ class Migrate extends AbstractCommand {
           (a, b) => Number(a.file.split('_')[0]) - Number(b.file.split('_')[0]),
         );
 
+      // NOTE: `up()` and the journal write below are NOT atomic — no transaction
+      // wraps them. If the process dies (or the lock is stolen after its TTL)
+      // between a migration's side effects landing and its record being written,
+      // that migration re-runs on the next deploy. Each `up()` MUST therefore be
+      // idempotent (guard against re-application).
       for (const migration of pending) {
         this.logger?.info(`=== Start migration ${migration.file} ===`);
         const { default: MigrationCommand } = await import(migration.path);

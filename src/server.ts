@@ -282,11 +282,10 @@ class Server {
     const mongoose = (await import('mongoose')).default;
     mongoose.set('strictQuery', true);
 
-    if (mongoose.connection.readyState) {
-      // already connected or connecting — nothing to wait for
-      return;
-    }
-
+    // Register the shutdown teardown BEFORE the already-connected early-return:
+    // a pre-established connection (CLI reuse, shared-process tests) would
+    // otherwise never be closed on shutdown, leaving the process to hang until
+    // the force-exit timer. `#mongooseConnect` is memoized, so this runs once.
     this.app.events.on('shutdown', async () => {
       this.app.logger.verbose(
         'Shutdown was called. Closing all mongoose connections',
@@ -296,6 +295,11 @@ class Server {
       }
       // await mongoose.disconnect(); // TODO it have problems with replica-set
     });
+
+    if (mongoose.connection.readyState) {
+      // already connected or connecting — nothing to wait for
+      return;
+    }
     const connectionParams: {
       appName?: string;
     } = {};

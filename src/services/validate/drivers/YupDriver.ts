@@ -86,10 +86,28 @@ function fromYupError(e: YupValidationErrorShape): ValidationError {
     const messages = Array.isArray(inner.errors)
       ? inner.errors
       : [inner.message];
+    const params = sanitizeParams(inner.params);
     for (const message of messages) {
-      issues.push({ message, path, params: inner.params });
+      issues.push({ message, path, params });
     }
   }
 
   return new ValidationError(issues);
+}
+
+/**
+ * Drop the raw submitted input from yup's `params`. Yup echoes the offending
+ * value back in `value`/`originalValue`; surfacing it on `.issues` would leak
+ * the rejected input (e.g. a password) into anything that iterates issues for
+ * logging/observability. The interpolation params (`min`, `max`, `length`, …)
+ * are kept so i18n placeholders still resolve.
+ */
+function sanitizeParams(
+  params?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!params) {
+    return undefined;
+  }
+  const { value, originalValue, ...safe } = params;
+  return safe;
 }

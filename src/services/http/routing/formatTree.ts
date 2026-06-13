@@ -71,10 +71,11 @@ function formatNode(
   counts.nodes += 1;
 
   // Filter local node middlewares against ancestor chain — only show what's
-  // newly attached at this node. Re-attachments of an inherited class are
-  // deduped at runtime, so showing them here as `mw:` would be noise.
-  // Inherited ones are listed separately as `pmw:` (parent middleware) so
-  // you can see what came from above.
+  // newly attached at this node. NOTE: this dedup is display-only. At runtime
+  // the dispatcher runs the full accumulated chain in order with NO dedup, so a
+  // class re-attached at multiple levels executes once per attachment; we hide
+  // the repeat here purely to keep the tree readable. Inherited ones are listed
+  // separately as `pmw:` (parent middleware) so you can see what came from above.
   const ancestorClasses = new Set(ancestorMws.map((m) => m.Class));
   const nodeNewMws = node.middlewares.filter(
     (m) => !ancestorClasses.has(m.Class),

@@ -1,5 +1,13 @@
 import type { RedisClientType } from '@redis/client';
 
+/**
+ * Delete every cache / rate-limiter key under a namespace.
+ *
+ * WARNING: keys are matched by the `${namespace}-` prefix, so namespaces must
+ * not be prefixes of one another. Clearing `main` ALSO deletes `main-eu-*`
+ * keys — `main-eu-foo` is indistinguishable from a `main` key named `eu-foo`.
+ * Choose namespaces that are not prefixes of each other.
+ */
 export const clearNamespace = async (
   redisClient: RedisClientType,
   namespace: string,

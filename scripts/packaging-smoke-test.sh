@@ -32,6 +32,7 @@ npm init -y >/dev/null 2>&1
 npm install --silent --no-audit --no-fund "$TARBALL_PATH"
 
 cat > check.mjs <<'EOF'
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
@@ -95,6 +96,19 @@ if (typeof server?.app?.getConfig !== 'function') {
   throw new Error('Server constructed but app.getConfig is missing');
 }
 console.log('  ✓ constructed a Server from the published dist');
+
+// 5. Runtime assets must ship. tsc compiles .ts only — locale JSON and email
+//    .pug templates are copied in postbuild. If they are missing, a consumer on
+//    the default config gets raw i18n keys and the email module can't render.
+for (const asset of [
+  'locales/en/translation.json',
+  'services/messaging/email/templates/verification/html.pug',
+]) {
+  if (!existsSync(f(asset))) {
+    throw new Error(`Expected published asset to exist: dist/${asset}`);
+  }
+  console.log('  ✓ asset', asset);
+}
 EOF
 
 echo "→ Verifying the installed package"

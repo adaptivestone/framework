@@ -90,13 +90,8 @@ class Cache extends Base {
         );
       }
 
+      let cacheHit = false;
       if (cached) {
-        this.logger?.verbose(
-          `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
-            0,
-            100,
-          )}`,
-        );
         try {
           parsedResult = JSON.parse(cached, (_jsonkey, value) => {
             if (typeof value === 'string' && /^\d+n$/.test(value)) {
@@ -104,12 +99,24 @@ class Cache extends Base {
             }
             return value;
           });
+          cacheHit = true;
+          this.logger?.verbose(
+            `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
+              0,
+              100,
+            )}`,
+          );
         } catch {
+          // This class only ever stores `JSON.stringify` output, so a value that
+          // won't parse is genuine corruption. Treat it as a miss — recompute
+          // and overwrite — rather than returning `undefined` to the caller.
           this.logger?.warn(
-            'Not able to parse json from redis cache. That can be a normal in case you store string here',
+            `Corrupt cache value for key '${key}' — recomputing and overwriting`,
           );
         }
-      } else {
+      }
+
+      if (!cacheHit) {
         this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
         parsedResult = await onNotFound();
 
@@ -147,11 +154,18 @@ class Cache extends Base {
   async removeKey(keyValue: string) {
     await this.whenReady;
 
-    if (!this.redisClient.isOpen) {
-      await this.redisClient.connect();
-    }
     const key = this.getKeyWithNameSpace(keyValue);
-    return this.redisClient.del(key);
+    // Fail-soft like the read/write paths: a redis blip during invalidation
+    // must not throw into business logic.
+    try {
+      if (!this.redisClient.isOpen) {
+        await this.redisClient.connect();
+      }
+      return await this.redisClient.del(key);
+    } catch (e) {
+      this.logger?.error(`Cache removeKey failed for key '${key}': ${e}`);
+      return 0;
+    }
   }
 
   static get loggerGroup() {

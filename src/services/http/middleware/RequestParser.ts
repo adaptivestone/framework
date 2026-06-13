@@ -23,7 +23,42 @@ class RequestParser extends AbstractMiddleware {
 
     const { requestParser } = this.app.getConfig('http') as typeof ThttpConfig;
     // Config defaults bound unauthenticated uploads; explicit per-mount params win.
-    const form = formidable({ ...requestParser, ...this.params }); // not in construstor as reuse formidable affects performance
+    const parserOptions = { ...requestParser, ...this.params };
+    const form = formidable(parserOptions); // not in construstor as reuse formidable affects performance
+
+    // formidable enforces `maxFieldsSize` only for MULTIPART field data — its
+    // JSON and urlencoded parsers buffer the whole body with no cap. Apply the
+    // same field-data ceiling to those bodies so a large unauthenticated request
+    // can't exhaust process memory. Multipart keeps formidable's own per-file /
+    // per-field caps.
+    const isMultipart = String(req.headers?.['content-type'] ?? '').includes(
+      'multipart/form-data',
+    );
+    const maxBodySize =
+      typeof parserOptions.maxFieldsSize === 'number'
+        ? parserOptions.maxFieldsSize
+        : 2 * 1024 * 1024;
+    let bodyTooLarge = false;
+    if (!isMultipart) {
+      const declaredLength = Number(req.headers?.['content-length']);
+      if (Number.isFinite(declaredLength) && declaredLength > maxBodySize) {
+        this.logger?.error(
+          `Request body ${declaredLength}B exceeds maxFieldsSize ${maxBodySize}B`,
+        );
+        return res.status(413).json({
+          message:
+            'Request entity too large. Your upload exceeds the allowed size or count limits.',
+        });
+      }
+      // Guard the streaming path too (chunked / absent Content-Length): abort as
+      // soon as the running byte count crosses the ceiling.
+      form.on('progress', (bytesReceived: number) => {
+        if (bytesReceived > maxBodySize) {
+          bodyTooLarge = true;
+          req.destroy();
+        }
+      });
+    }
 
     // Track every temp file formidable opens (via fileBegin, so a file that
     // later errors mid-write is tracked too) and unlink them once the response
@@ -53,9 +88,9 @@ class RequestParser extends AbstractMiddleware {
     } catch (err) {
       this.logger?.error(`Parsing failed ${err}`);
       // formidable tags limit-exceeded errors (file/field size, file/field
-      // count) with httpCode 413; everything else (bad content type / length)
-      // stays a 400.
-      if ((err as { httpCode?: number })?.httpCode === 413) {
+      // count) with httpCode 413; our own JSON/urlencoded body-size guard sets
+      // `bodyTooLarge`. Everything else (bad content type / length) stays a 400.
+      if (bodyTooLarge || (err as { httpCode?: number })?.httpCode === 413) {
         return res.status(413).json({
           message:
             'Request entity too large. Your upload exceeds the allowed size or count limits.',

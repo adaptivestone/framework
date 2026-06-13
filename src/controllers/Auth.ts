@@ -236,6 +236,11 @@ class Auth extends AbstractController {
 
   async postRegister(req: PostRegisterRequest, res: Response) {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
+    // NOTE: registration intentionally reports when an email or nickname is
+    // already taken (distinct 400s). This leaks account existence — a deliberate
+    // UX trade-off, unlike the recovery/verification flows which return a
+    // uniform 200 specifically to avoid that oracle. If your threat model
+    // forbids registration enumeration, move to an email-verification-first flow.
     let user = (await User.getUserByEmail(
       req.appInfo.request.email,
     )) as InstanceType<TUser>;

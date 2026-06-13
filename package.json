@@ -27,7 +27,7 @@
   "homepage": "https://framework.adaptivestone.com/",
   "scripts": {
     "build": "rm -rf dist && tsc",
-    "postbuild": "cp -R ./src/migrations ./dist/migrations",
+    "postbuild": "cp -R ./src/migrations ./dist/migrations && cp -R ./src/locales ./dist/locales && cp -R ./src/services/messaging ./dist/services/messaging",
     "check:types": "npm run gen && tsc --noEmit",
     "check:types:raw": "tsc --noEmit",
     "check:types:fast": "npm run gen && tsgo --noEmit",
@@ -87,6 +87,8 @@
     "@adaptivestone/framework-module-email": "^1.0.0",
     "@sentry/core": "^10.34.0",
     "@sentry/node": "^10.34.0",
+    "mongodb-memory-server": "^11.0.0",
+    "vitest": "^4.0.0",
     "yup": "^1.7.0",
     "zod": "^3.24.0 || ^4.0.0"
   },
@@ -98,6 +100,12 @@
       "optional": true
     },
     "@sentry/node": {
+      "optional": true
+    },
+    "mongodb-memory-server": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     },
     "yup": {

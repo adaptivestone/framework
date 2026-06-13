@@ -97,11 +97,22 @@ function pathToString(path: ValidationIssue['path'] | undefined): string {
   if (!path || path.length === 0) {
     return '';
   }
-  return path
-    .map((segment) =>
+  // Render array indices as `[i]` and object keys dot-separated, so the wire
+  // path is identical across validators: zod yields numeric path *segments*
+  // (`['tags', 1]`), while yup pre-bakes brackets into a single string segment
+  // (`'tags[1]'`). Both must serialize to `tags[1]`.
+  let out = '';
+  for (const segment of path) {
+    const key =
       typeof segment === 'object' && segment !== null && 'key' in segment
-        ? String(segment.key)
-        : String(segment),
-    )
-    .join('.');
+        ? segment.key
+        : segment;
+    const keyStr = String(key);
+    if (typeof key === 'number' || /^\d+$/.test(keyStr)) {
+      out += `[${keyStr}]`;
+    } else {
+      out += out === '' ? keyStr : `.${keyStr}`;
+    }
+  }
+  return out;
 }
