@@ -251,9 +251,22 @@ function renderResolved(
       ? { requestContentTypes: r.requestContentTypes }
       : {}),
   }));
+  const ctrlDir = path.dirname(srcPath);
   const importMap = new Map(
     resolved.imports.map((i) => [i.binding, i.specifier]),
   );
+  // Drop any middleware whose `import type` wouldn't type-check: an untyped `.js`
+  // middleware with no sibling `.d.ts` would be a `TS7016` in a strict consumer
+  // build (no `allowJs`). Removing the binding here drops it from BOTH the
+  // emitted imports AND the `UnionAppInfoProvides` chain (via the `importable`
+  // filter below), so it degrades to "provides nothing" rather than breaking the
+  // consumer's typecheck. Same rule as the controller self-import; framework
+  // middleware come in as bare specifiers (which ship `.d.ts`) and are kept.
+  for (const [binding, specifier] of [...importMap]) {
+    if (!specifierTypeImportable(specifier, ctrlDir)) {
+      importMap.delete(binding);
+    }
+  }
   // Only bindings this controller actually imports are emittable. A middleware
   // that bleeds in from another controller (a root-mounted splat) but isn't in
   // this file's import map is dropped — it can't be referenced by name here, so
@@ -273,20 +286,9 @@ function renderResolved(
     urlPrefix,
     routes,
   };
-  // A `.js` controller has no inferable type unless a sibling `.d.ts` exists, so
-  // the gen file can't `import type` it without a `TS7016` in a strict consumer
-  // build (no `allowJs`). TS sources are always importable.
-  const ctrlExt = path.extname(srcPath);
-  const controllerTypeImportable =
-    ctrlExt === '.ts' ||
-    ctrlExt === '.mts' ||
-    ctrlExt === '.cts' ||
-    existsSync(
-      path.join(
-        path.dirname(srcPath),
-        `${path.basename(srcPath, ctrlExt)}.d.ts`,
-      ),
-    );
+  // The gen file's controller self-import follows the same rule: a `.js`
+  // controller with no sibling `.d.ts` degrades (inline schemas → base type).
+  const controllerTypeImportable = moduleTypeImportable(srcPath);
   return renderGenFile({
     controller,
     srcPath,
@@ -294,6 +296,33 @@ function renderResolved(
     importMap,
     controllerTypeImportable,
   });
+}
+
+/**
+ * Can a gen file `import type` this module and get a usable type? `.ts`/`.mts`/
+ * `.cts` always; a `.js`-family (or extensionless) module only when a sibling
+ * `.d.ts` exists. Importing an untyped `.js` module is a `TS7016` under `strict`
+ * with no `allowJs`, so the gen file must not emit that import.
+ */
+function moduleTypeImportable(absPath: string): boolean {
+  const ext = path.extname(absPath);
+  if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
+    return true;
+  }
+  const base = ext ? absPath.slice(0, -ext.length) : absPath;
+  return existsSync(`${base}.d.ts`);
+}
+
+/**
+ * The {@link moduleTypeImportable} check for an import specifier resolved
+ * relative to `fromDir`. A bare specifier (a package — e.g. the framework's own
+ * middleware) is assumed typed, since published packages ship their `.d.ts`.
+ */
+function specifierTypeImportable(specifier: string, fromDir: string): boolean {
+  if (!specifier.startsWith('.')) {
+    return true;
+  }
+  return moduleTypeImportable(path.resolve(fromDir, specifier));
 }
 
 /** The deduped, importable middleware chain (binding names) for one flat route. */

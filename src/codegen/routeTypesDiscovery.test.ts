@@ -174,6 +174,31 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     expect(typed).toContain("from './Typed.js'");
     expect(typed).toContain('InferOutput');
   });
+
+  it('drops an untyped .js middleware from the provides chain (no TS7016 import)', async () => {
+    expect.assertions(4);
+    const guardedCtrl = (name: string, route: string, mwImport: string) =>
+      `import Guard from '${mwImport}';\nclass ${name} {\n  get routes() { return { get: { '${route}': { handler: this.h } } }; }\n  h() {}\n  static get middleware() { return new Map([['/{*splat}', [Guard]]]); }\n}\nexport default ${name};\n`;
+    const mwSrc = (name: string) =>
+      `class ${name} { async middleware(req, res, next) { return next(); } }\nexport default ${name};\n`;
+    const dir = await makeControllers({
+      // Guarded by an untyped .js middleware (no sibling .d.ts) → must be dropped.
+      'PayJs.ts': guardedCtrl('PayJs', '/a', './GuardJs.js'),
+      'GuardJs.js': mwSrc('GuardJs'),
+      // Guarded by a .ts middleware → kept (precise provides).
+      'PayTs.ts': guardedCtrl('PayTs', '/b', './GuardTs.ts'),
+      'GuardTs.ts': mwSrc('GuardTs'),
+    });
+    await generateRouteTypesViaAst(appFor(dir), noopLogger);
+    const payJs = await readFile(path.join(dir, 'PayJs.routes.gen.ts'), 'utf8');
+    const payTs = await readFile(path.join(dir, 'PayTs.routes.gen.ts'), 'utf8');
+    // Untyped .js middleware → dropped from BOTH the import and the tuple.
+    expect(payJs).not.toContain("from './GuardJs.js'");
+    expect(payJs).not.toContain('typeof Guard');
+    // .ts middleware → kept.
+    expect(payTs).toContain("from './GuardTs.ts'");
+    expect(payTs).toContain('typeof Guard');
+  });
 });
 
 describe('generateAll — atomicity & --check (doc 08)', () => {

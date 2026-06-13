@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.5] - 2026-06-14
+
+- **[FIX]** Route-type codegen extends the rc.4 untyped-`.js` degradation to
+  middleware in the `appInfo` provides chain. A controller guarded by an untyped
+  `.js` middleware (no sibling `.d.ts`) produced a gen file that did `import type
+  Mw from './Mw.js'` to build its `UnionAppInfoProvides<…>` chain — a `TS7016` in
+  a strict consumer build with no `allowJs`. Such a middleware is now dropped
+  from both the import and the chain (it contributes nothing to `appInfo`)
+  instead of breaking the typecheck. Typed middleware — `.ts`, `.js` with a
+  sibling `.d.ts`, or the framework's own (bare specifiers ship declarations) —
+  keep their precise `appInfo` contributions. Same incremental `.js` → `.ts`
+  migration goal as rc.4, now covering middleware as well as controllers.
+
 ## [5.0.0-rc.4] - 2026-06-14
 
 - **[FIX]** Route-type codegen no longer emits an untyped self-import for `.js`

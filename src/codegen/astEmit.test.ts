@@ -53,6 +53,14 @@ export default class Legacy extends Base {
 }`,
         'utf8',
       );
+      // A declaration for `Mw` so its type is importable — an untyped `.js`
+      // middleware with no `.d.ts` is dropped from the chain (TS7016 guard).
+      // `.d.ts` files are skipped by discovery, so `written` stays 1.
+      await writeFile(
+        path.join(dir, 'Mw.d.ts'),
+        'declare class Mw { middleware(): void }\nexport default Mw;\n',
+        'utf8',
+      );
       // Decoys the runtime loader also skips — must not be discovered:
       await writeFile(path.join(dir, 'Old.gen.js'), 'export {};\n', 'utf8');
       await writeFile(path.join(dir, 'Legacy.test.js'), 'export {};\n', 'utf8');
