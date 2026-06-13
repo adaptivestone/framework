@@ -43,7 +43,9 @@ export interface PlannedOutput {
 export interface RoutePlan {
   /** Gen files to write (user controllers only; framework-internal skipped). */
   outputs: PlannedOutput[];
-  /** Controllers that aren't statically analyzable (caller throws). */
+  /** Controllers that aren't statically analyzable. By default the caller
+   * throws; with `skipNonAnalyzable` they're skipped (no types) and listed
+   * here so the caller can warn. */
   needsBoot: string[];
   /** Existing `*.routes.gen.ts` in the user folder with no sibling source. */
   orphans: string[];
@@ -61,6 +63,7 @@ export interface RoutePlan {
 export async function planRouteTypes(
   app: IApp,
   logger?: CodegenLogger | null,
+  options: { skipNonAnalyzable?: boolean } = {},
 ): Promise<RoutePlan> {
   const discovered = await discoverControllers(
     app.foldersConfig.controllers,
@@ -84,12 +87,20 @@ export async function planRouteTypes(
   const needsBoot = resolvedAll
     .filter((r) => r.resolved.needsBoot)
     .map((r) => r.srcPath);
-  if (needsBoot.length > 0) {
+  // Strict default: one non-analyzable controller aborts the whole run (the
+  // caller throws). `skipNonAnalyzable` flips this to skip-those-and-continue,
+  // emitting types for the rest (used by `generateAll`).
+  if (needsBoot.length > 0 && !options.skipNonAnalyzable) {
     logger?.info?.(
       `${needsBoot.length} controller(s) aren't statically analyzable — no route types written (caller will throw)`,
     );
     return { outputs: [], needsBoot, orphans };
   }
+
+  // Analyze only the statically-analyzable controllers (= all of them when none
+  // needsBoot). Non-analyzable ones are skipped from BOTH the registry and the
+  // outputs, so a skipped controller never contributes — or blocks — types.
+  const analyzable = resolvedAll.filter((r) => !r.resolved.needsBoot);
 
   // One registry resolves cross-controller bleed exactly like runtime. Register
   // BOTH framework-internal and user controllers so bleed/conflict sees the full
@@ -102,7 +113,7 @@ export async function planRouteTypes(
   // type intersections commute). Do not "fix" the order into a real difference.
   const registry = new RouteRegistry();
   const owner = new Map<string, string>();
-  for (const r of resolvedAll) {
+  for (const r of analyzable) {
     const check = new RouteRegistry();
     check.registerSubtree(r.resolved.urlPrefix, buildSubtreeFromSpec(r.spec));
     for (const fr of check.flatten()) {
@@ -123,7 +134,7 @@ export async function planRouteTypes(
   const flatByKey = indexFlat(registry.flatten());
 
   const outputs: PlannedOutput[] = [];
-  for (const r of resolvedAll) {
+  for (const r of analyzable) {
     // Framework-internal controllers ship pre-generated gen files — registered
     // above for bleed, but never written into the installed package.
     if (r.isInternal) {
@@ -142,7 +153,7 @@ export async function planRouteTypes(
     );
     outputs.push({ outPath, text });
   }
-  return { outputs, needsBoot: [], orphans };
+  return { outputs, needsBoot, orphans };
 }
 
 /**

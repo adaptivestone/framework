@@ -36,8 +36,11 @@ export interface GenerateAllOptions {
 /**
  * Generate both app-level and per-controller route types from the AST front-end
  * — no app boot, no model imports. A controller whose `routes` / `middleware` /
- * `getHttpPath` isn't a literal can't be statically analyzed; rather than
- * silently mis-generate, codegen throws and names it.
+ * `getHttpPath` isn't a literal (a loop, conditional, computed key, or `super`
+ * — e.g. one that extends another controller and merges `super.routes`) can't be
+ * statically analyzed. Rather than abort the whole run, such controllers are
+ * SKIPPED with a warning: they work at runtime, only their generated request
+ * types are omitted. Types for every analyzable controller are still written.
  *
  * Analysis runs fully BEFORE any write, so a failure never leaves partially
  * refreshed output (atomicity). With `{ check: true }` nothing is written and
@@ -53,13 +56,14 @@ export async function generateAll(
     app.internalFilesCache.configs,
     app.internalFilesCache.modelPaths,
   );
-  const plan = await planRouteTypes(app, logger);
+  const plan = await planRouteTypes(app, logger, { skipNonAnalyzable: true });
   if (plan.needsBoot.length > 0) {
     const names = plan.needsBoot.map((p) => path.basename(p)).join(', ');
-    throw new Error(
-      `Route-type codegen can't statically analyze ${plan.needsBoot.length} controller(s): ${names}. ` +
-        'Their `routes` / `middleware` / `getHttpPath` must be literal (no loops, ' +
-        'conditionals, or computed values). Make them declarative.',
+    logger?.warn?.(
+      `Route-type codegen skipped ${plan.needsBoot.length} controller(s) that aren't statically analyzable: ${names}. ` +
+        'Their `routes` / `middleware` / `getHttpPath` use a loop, conditional, computed value, or `super` ' +
+        '(e.g. a controller that extends another and merges `super.routes`). They work at runtime — only their ' +
+        'generated request types are skipped. Declare literal `routes` to get types.',
     );
   }
 

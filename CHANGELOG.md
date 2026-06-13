@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.3] - 2026-06-13
+
+- **[CHANGE]** Route-type codegen now skips controllers it can't statically
+  analyze instead of aborting the whole run. A controller whose `routes` /
+  `middleware` / `getHttpPath` uses a loop, conditional, computed value, or
+  `super` (e.g. one that extends another controller and merges `super.routes`) is
+  skipped with a warning; types are still generated for every other controller,
+  and the skipped one works at runtime (only its generated request types are
+  omitted). Previously a single such controller failed `npm run gen` for the
+  entire project.
+
+## [5.0.0-rc.2] - 2026-06-13
+
+Patch over `rc.1`, fixing a regression for consumers that extend the framework.
+
+- **[FIX]** Restored `./config/*` to the package `exports` map (it was dropped in
+  `rc.1`). Extending a framework default config — `import http from
+  '@adaptivestone/framework/config/http.js'`, then re-exporting an edited copy
+  from your own `src/config/http.ts` — threw `ERR_PACKAGE_PATH_NOT_EXPORTED` and
+  broke app boot. `config/*` is the intended Tier-2 extension surface and is
+  importable again.
+
 ## [5.0.0-rc.1] - 2026-06-13
 
 This is a big release that contains a lot of new features and breaking changes.
@@ -112,7 +134,7 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[SECURITY]** Stop writing live credentials to logs. `GetUserByToken` logged the raw body token **and** the full `Authorization` header at `verbose`; `Auth.ts` logged the **entire user document** (password hash + all session/recovery/verification tokens) at `debug` during verify/recovery; `CreateUser` logged `JSON.stringify(user)` at `info`. With Sentry wired or debug/verbose enabled, those reached log storage / a third party. All now log identifiers only — token/header **presence** (not value), and `user.id` / `email` instead of the document.
 - **[NEW]** **[SECURITY]** Standard security response headers, **on by default**, applied to every response path (routes, 404, 405, errors — mounted globally before the adapter). `config.http.securityHeaders` ships `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `Referrer-Policy: no-referrer`. `Strict-Transport-Security` is in the config but **off by default** (sending HSTS while also serving plain HTTP in dev causes browser lock-in — set `max-age=…; includeSubDomains` when always behind TLS). Set any header value to `null` to omit it, or `enabled: false` to turn the whole set off. No `helmet` dependency. `x-powered-by` remains disabled.
 - **[SECURITY]** CORS config hardening (docs + boot warning, no behavior change). `config.http.corsDomains` no longer recommends `[/./]` (which reflects **every** origin); the comment now points to explicit origin strings and **anchored** regex examples — an unanchored `/example\.com/` also matches `evil-example.com` and `example.com.attacker.io`. The `Cors` middleware logs a boot-time warning for any regex origin that isn't anchored (`^…$`). Matching semantics and the (still-absent) `Access-Control-Allow-Credentials` are unchanged.
-- **[BREAKING]** Package `exports` are scoped to the intended public surface instead of a global `"./*": "./dist/*"` wildcard, which had made **every** internal file (`codegen/*`, `commands/*`, `config/*`, routing internals, …) importable and therefore semver-frozen the moment 5.0 lands. Exported now: `server.js`, `Cli.js`, `types.js`, `folderConfig.js`, `modules/*`, `models/*`, `helpers/*`, `services/*`, `controllers/*`, `tests/*`, `migrations/*` (`Cli.js` is the consumer CLI bootstrap — `import Cli from '@adaptivestone/framework/Cli.js'`). Internal subpaths (`codegen/*`, `commands/*`, `config/*`, `locales/*`, top-level entries) are no longer importable as `@adaptivestone/framework/<path>` — they were never intended public API, and the CLI loads commands/migrations by filesystem path (unaffected). The bare-specifier paths codegen emits (`server.js`, `models/*`, `modules/*`, `services/*`) all remain exported. See the README "Public API & stability" section for the tier policy that licenses refactoring `helpers/*` and `services/*` in minors.
+- **[BREAKING]** Package `exports` are scoped to the intended public surface instead of a global `"./*": "./dist/*"` wildcard, which had made **every** internal file (`codegen/*`, `commands/*`, `config/*`, routing internals, …) importable and therefore semver-frozen the moment 5.0 lands. Exported now: `server.js`, `Cli.js`, `types.js`, `folderConfig.js`, `modules/*`, `models/*`, `helpers/*`, `services/*`, `controllers/*`, `tests/*`, `migrations/*` (`Cli.js` is the consumer CLI bootstrap — `import Cli from '@adaptivestone/framework/Cli.js'`). Internal subpaths (`codegen/*`, `commands/*`, `locales/*`, top-level entries) are no longer importable as `@adaptivestone/framework/<path>` — they were never intended public API, and the CLI loads commands/migrations by filesystem path (unaffected). The bare-specifier paths codegen emits (`server.js`, `models/*`, `modules/*`, `services/*`) all remain exported. See the README "Public API & stability" section for the tier policy that licenses refactoring `helpers/*` and `services/*` in minors.
 - **[FIX]** **Fail fast at boot** (policy: fail at boot, stay up per-request). (1) A model that fails to initialize now **throws** — naming the model and its file — so `startServer` rejects, instead of being logged-and-skipped and resurfacing later as a confusing request-time crash. (2) `AUTH_SALT` is asserted at boot when the auth flow is active; missing → boot throws with the `npm run cli generateRandomBytes` hint (`config/auth.ts` now reads `process.env.AUTH_SALT` honestly — the boot check owns the messaging). (3) `uncaughtException` now logs and `process.exit(1)` — after an uncaught throw the process state is undefined, so a visible crash-loop under an orchestrator beats serving from a corrupted state (`unhandledRejection` stays log-only). (4) The Express 500 handler logs via winston and guards `res.headersSent` — a handler that throws mid-stream no longer crashes with `ERR_HTTP_HEADERS_SENT`.
 - **[NEW]** **Mongo is required, and boot enforces it.** `startServer` now throws if no Mongo connection string is configured (`MONGO_DSN`) — rather than lazily skipping models and letting every database-using route 500 at request time. The AUTH_SALT boot check is correspondingly unconditional. Disable or replace any built-in controller (e.g. the built-in auth) by filename-shadowing it in your controllers folder (documented in the README). The default controller middleware stays `[GetUserByToken, Auth]` (secure-by-default).
 - **[FIX]** One-Server-per-process is now an explicit contract. The second-`Server` throw — previously a bare "App instance is already set" — explains the rule and points at the fix (per-file test isolation, or the new **test-only** `resetAppInstance()` from `helpers/appInstance.ts`, which clears the singleton but NOT mongoose/redis/env state). Documented in the README.

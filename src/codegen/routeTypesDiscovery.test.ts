@@ -173,25 +173,32 @@ describe('generateAll — atomicity & --check (doc 08)', () => {
     }
   });
 
-  it('writes nothing when a controller is not statically analyzable (atomic)', async () => {
-    expect.assertions(3);
+  it('skips a non-analyzable controller (warning) and still writes the rest', async () => {
+    expect.assertions(4);
     const dir = await makeControllers({
       'Good.ts': ctrl('Good', 'get', '/list'),
-      // Non-literal `routes` getter (two statements) → needsBoot.
+      // Non-literal `routes` getter (computed method key) → needsBoot. A
+      // controller that extends another and merges `super.routes` hits the same
+      // path; it must NOT block codegen for the analyzable controllers.
       'Dynamic.ts': `export default class Dynamic {
   get routes() { const m = 'get'; return { [m]: { '/x': this.h } }; }
   h() {}
 }`,
     });
+    const warnings: string[] = [];
+    const logger = {
+      info() {},
+      warn: (m: string) => warnings.push(m),
+      error() {},
+    };
     const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(dir);
     try {
-      await expect(generateAll(appFor(dir), noopLogger)).rejects.toThrow(
-        /statically analyze/,
-      );
+      // Does not throw — the analyzable controller is generated, the other skipped.
+      await expect(generateAll(appFor(dir), logger)).resolves.toBeUndefined();
       const files = await readdir(dir);
-      // No app-types and no route gen files were written before the failure.
-      expect(files).not.toContain('genTypes.d.ts');
-      expect(files.some((f) => f.endsWith('.routes.gen.ts'))).toBe(false);
+      expect(files).toContain('Good.routes.gen.ts'); // analyzable → written
+      expect(files).not.toContain('Dynamic.routes.gen.ts'); // skipped, not written
+      expect(warnings.join('\n')).toMatch(/skipped[\s\S]*Dynamic\.ts/); // warned + named
     } finally {
       cwdSpy.mockRestore();
     }
