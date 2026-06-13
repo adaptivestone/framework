@@ -59,8 +59,11 @@ exported. Exported paths follow semver in two tiers:
 
 - **Tier 1 — stable:** `server.js`, `Cli.js`, `types.js`, `folderConfig.js`,
   `modules/*`, `models/*`, `controllers/*`, `tests/*`, `migrations/*`.
-- **Tier 2 — extension surface:** `helpers/*` and `services/*` — may change in a
-  minor (with a deprecation cycle); pin to a minor if you import them directly.
+- **Tier 2 — extension surface:** `config/*`, `helpers/*`, and `services/*` — may
+  change in a minor (with a deprecation cycle); pin to a minor if you import them
+  directly. `config/*` is what you import to extend the framework's default
+  config (e.g. `import http from '@adaptivestone/framework/config/http.js'`, then
+  re-export an edited copy from your own `src/config/http.ts`).
 
 ## License
 

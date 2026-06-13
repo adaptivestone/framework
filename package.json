@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0-rc.1",
+  "version": "5.0.0-rc.2",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
@@ -12,6 +12,7 @@
     "./Cli.js": "./dist/Cli.js",
     "./types.js": "./dist/types.js",
     "./folderConfig.js": "./dist/folderConfig.js",
+    "./config/*": "./dist/config/*",
     "./modules/*": "./dist/modules/*",
     "./models/*": "./dist/models/*",
     "./helpers/*": "./dist/helpers/*",

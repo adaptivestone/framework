@@ -56,11 +56,16 @@ for (const spec of [
 import.meta.resolve('@adaptivestone/framework/tests/setupVitest.js');
 console.log('  ✓ resolve @adaptivestone/framework/tests/setupVitest.js');
 
+// 2b. Config files are the extension surface: consumers import a framework
+//     default config and re-export an edited copy (see the example project's
+//     src/config/*). They MUST stay importable.
+await import('@adaptivestone/framework/config/http.js');
+console.log('  ✓ import @adaptivestone/framework/config/http.js');
+
 // 3. Internal subpaths must be blocked by the exports map.
 for (const spec of [
   '@adaptivestone/framework/codegen/astEmit.js',
   '@adaptivestone/framework/commands/CreateUser.js',
-  '@adaptivestone/framework/config/http.js',
 ]) {
   let blocked = false;
   try {
