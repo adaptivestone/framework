@@ -22,12 +22,6 @@ export default {
     // 'max-age=31536000; includeSubDomains' when the app is always behind TLS.
     'Strict-Transport-Security': null as string | null,
   },
-  // Route matching options. Defaults match Express's lenient behavior; flipping
-  // either to `true` is a deliberate, breaking choice for a v6-style strict app.
-  routing: {
-    caseSensitive: false, // `/Users` matches `/users`
-    strictTrailingSlash: false, // `/users/` matches `/users`
-  },
   // Limits for multipart/urlencoded request parsing (formidable). Conservative
   // defaults bound unauthenticated uploads (formidable's own defaults allow
   // ~200 MB/file with no cap). Copy this file into your app to raise them, or

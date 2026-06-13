@@ -25,15 +25,10 @@ export function createExpressAdapter(
   registry: RouteRegistry,
   app: IApp,
 ): ExpressAdapter {
-  // Read once at mount: case sensitivity / trailing-slash strictness from config.
-  const matchOptions = (app.getConfig('http').routing ?? {}) as {
-    caseSensitive?: boolean;
-    strictTrailingSlash?: boolean;
-  };
   return async function dispatch(req, res, next) {
     let result: MatchResult | null;
     try {
-      result = registry.match(req.method, req.path, matchOptions);
+      result = registry.match(req.method, req.path);
     } catch (err) {
       if (err instanceof MalformedPathError) {
         res.status(400).json({ message: 'Malformed URL' });
