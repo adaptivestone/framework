@@ -209,7 +209,7 @@ describe('auth', () => {
     });
   });
 
-  describe('isAuthWithVefificationFlow auth option', () => {
+  describe('isAuthWithVerificationFlow auth option', () => {
     it('can verify user', async () => {
       expect.assertions(2);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
@@ -443,7 +443,7 @@ describe('auth', () => {
       expect(status).toBe(400);
     });
 
-    it('can login with normal creds and NOT verifyed email if option isAuthWithVefificationFlow is set', async () => {
+    it('can login with normal creds and NOT verifyed email if option isAuthWithVerificationFlow is set', async () => {
       expect.assertions(4);
 
       const { status } = await fetch(getTestServerURL('/auth/register'), {
@@ -469,7 +469,7 @@ describe('auth', () => {
       });
 
       appInstance.updateConfig('auth', {
-        isAuthWithVefificationFlow: false,
+        isAuthWithVerificationFlow: false,
       });
 
       const response3 = await fetch(getTestServerURL('/auth/login'), {

@@ -35,7 +35,7 @@ const getPepper = () => {
   const { saltSecret } = appInstance.getConfig('auth') as typeof authConfig;
   if (!saltSecret) {
     throw new Error(
-      'saltSecret should be seted up. AUTH_SALT is not defined. You can "npm run cli generateRandomBytes" and use it',
+      'saltSecret should be set up. AUTH_SALT is not defined. You can "npm run cli generateRandomBytes" and use it',
     );
   }
   return saltSecret;

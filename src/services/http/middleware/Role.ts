@@ -21,9 +21,12 @@ class RoleMiddleware extends AbstractMiddleware {
       return res.status(401).json({ message: 'User should be provided' });
     }
 
+    // Guard against `Role` being mounted without a `roles` param: treat a
+    // missing list as "no role grants access" (fail closed) instead of throwing.
+    const allowedRoles = (this.params?.roles as Array<string>) ?? [];
     let hasRole = false;
     user.roles?.forEach((role: string) => {
-      if ((this.params?.roles as Array<string>).includes(role)) {
+      if (allowedRoles.includes(role)) {
         hasRole = true;
       }
     });

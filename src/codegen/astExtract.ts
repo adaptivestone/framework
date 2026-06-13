@@ -339,6 +339,7 @@ function extractRoutes(
   // mirroring JS object semantics at runtime (the registry would otherwise throw
   // on the duplicate). Insertion order is preserved by Map.
   const byKey = new Map<string, RouteInfo>();
+  const seenMethods = new Set<string>();
   for (const methodProp of obj.properties) {
     if (methodProp.type !== 'Property' || methodProp.computed) {
       return { ok: false, reason: 'non-literal/computed method entry' };
@@ -352,6 +353,15 @@ function extractRoutes(
     if (!ROUTE_VERBS.has(method.toUpperCase())) {
       return { ok: false, reason: `unknown HTTP verb "${method}"` };
     }
+    // A duplicate method key collapses last-wins at runtime (the earlier block's
+    // routes never reach the registry), but the AST retains both — we can't tell
+    // which path belongs to the surviving block. Fail loud rather than emit
+    // phantom request types for routes that don't exist.
+    const upperMethod = method.toUpperCase();
+    if (seenMethods.has(upperMethod)) {
+      return { ok: false, reason: `duplicate HTTP verb "${method}"` };
+    }
+    seenMethods.add(upperMethod);
     if (methodProp.value.type !== 'ObjectExpression') {
       return { ok: false, reason: `method '${method}' value not a literal` };
     }
@@ -447,9 +457,14 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
       if (key === 'handler' && prop.value.type === 'MemberExpression') {
         out.handler = prop.value.property?.name ?? null;
       } else if (key === 'request') {
-        // `request: null` is legal (runtime skips validation when `request` is
-        // nullish) — it is NOT a schema, so don't emit `InferOutput<null>`.
-        if (!(prop.value.type === 'Literal' && prop.value.value === null)) {
+        // `request: null`/`request: undefined` are legal (runtime skips
+        // validation when `request` is nullish, `obj.request != null`) — neither
+        // is a schema, so don't emit `InferOutput<null | undefined>`.
+        const isNullLiteral =
+          prop.value.type === 'Literal' && prop.value.value === null;
+        const isUndefinedIdent =
+          prop.value.type === 'Identifier' && prop.value.name === 'undefined';
+        if (!isNullLiteral && !isUndefinedIdent) {
           out.hasRequest = true; // the VALUE (defineSchema(...)) is never evaluated
           // A content-type map → its media-type keys (mirrors the runtime
           // `isContentTypeRequestMap`: a plain object whose keys all contain `/`).

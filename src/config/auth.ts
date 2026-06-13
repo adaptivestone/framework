@@ -8,7 +8,7 @@ export default {
   // messaging) — `startServer` asserts it at boot when the auth flow is active
   // and throws with the `generateRandomBytes` hint if it's missing.
   saltSecret: process.env.AUTH_SALT,
-  isAuthWithVefificationFlow: true,
+  isAuthWithVerificationFlow: true,
   // Password hashing cost for the v2 scrypt scheme. `ln` = log2(N). Raise over
   // time to harden — existing hashes upgrade to the new cost on next login.
   // Tests lower this for speed; scrypt is memory-hard, so the production value

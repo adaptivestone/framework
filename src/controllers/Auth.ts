@@ -40,6 +40,28 @@ const pushEmailIssues = (email: unknown, issues: StandardSchemaV1.Issue[]) => {
   }
 };
 
+// Back-compat: the auth config key was misspelled `isAuthWithVefificationFlow`
+// through 5.0.0-rc. The corrected key is `isAuthWithVerificationFlow`. The
+// default config now ships only the corrected key; an explicit old-spelling
+// override still wins (warned once) so existing configs keep working until v6.
+let warnedLegacyVerificationKey = false;
+const isVerificationFlowEnabled = (
+  authConfig: Record<string, unknown>,
+): boolean => {
+  if (authConfig.isAuthWithVefificationFlow !== undefined) {
+    if (!warnedLegacyVerificationKey) {
+      warnedLegacyVerificationKey = true;
+      process.emitWarning(
+        'auth config `isAuthWithVefificationFlow` is a deprecated misspelling; rename it to `isAuthWithVerificationFlow`. The old key still works but will be removed in v6.',
+        { type: 'DeprecationWarning', code: 'ASF_DEP_AUTH_VERIFICATION_KEY' },
+      );
+    }
+    return !!authConfig.isAuthWithVefificationFlow;
+  }
+  // Default-on: only an explicit `false` disables the verification flow.
+  return authConfig.isAuthWithVerificationFlow !== false;
+};
+
 class Auth extends AbstractController {
   get routes() {
     return {
@@ -222,8 +244,10 @@ class Auth extends AbstractController {
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
     const user = userResult;
-    const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
-    if (isAuthWithVefificationFlow && !user.isVerified) {
+    const isAuthWithVerificationFlow = isVerificationFlowEnabled(
+      this.app.getConfig('auth'),
+    );
+    if (isAuthWithVerificationFlow && !user.isVerified) {
       return res.status(400).json({
         message: req.appInfo.i18n?.t('email.notVerified'),
         notVerified: true,
@@ -270,8 +294,10 @@ class Auth extends AbstractController {
       },
     });
 
-    const { isAuthWithVefificationFlow } = this.app.getConfig('auth');
-    if (isAuthWithVefificationFlow) {
+    const isAuthWithVerificationFlow = isVerificationFlowEnabled(
+      this.app.getConfig('auth'),
+    );
+    if (isAuthWithVerificationFlow) {
       await (user as UserInstance)
         .sendVerificationEmail(req.appInfo.i18n)
         .catch((e: Error) => {
@@ -363,6 +389,10 @@ class Auth extends AbstractController {
 
     user.password = req.appInfo.request.password;
     user.isVerified = true;
+    // Revoke every existing session on reset: a recovery is often triggered
+    // precisely because the account is compromised, so any token issued before
+    // the reset must stop working.
+    user.sessionTokens = [] as typeof user.sessionTokens;
     await user.save();
     return res.status(200).json();
   }

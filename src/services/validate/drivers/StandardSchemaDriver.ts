@@ -27,10 +27,14 @@ export const standardSchemaDriver: ValidatorDriver = {
   async validate(body: unknown, data: unknown): Promise<unknown> {
     const std = (body as StandardSchemaV1)['~standard'];
     const result = await std.validate(data);
-    if (result.issues) {
+    // Per the Standard Schema spec, success is signalled by absent `issues`; a
+    // non-conformant validator returning an empty `issues: []` is not a failure,
+    // so don't reject a valid `value` with an empty ValidationError. (An empty
+    // `issues` array keeps `result` typed as a failure, hence the `value` read.)
+    if (result.issues && result.issues.length > 0) {
       throw new ValidationError(result.issues);
     }
-    return result.value;
+    return (result as { value?: unknown }).value;
   },
 
   toJsonSchema() {

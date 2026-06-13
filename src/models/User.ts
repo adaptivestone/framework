@@ -299,7 +299,7 @@ class User extends BaseModel {
         const timestamp = new Date();
         timestamp.setDate(timestamp.getDate() + 30);
         if (!this.email) {
-          throw new Error('Email is requiried');
+          throw new Error('Email is required');
         }
         const token = createRandomToken();
         if (!this.sessionTokens) {
@@ -444,7 +444,7 @@ export const userHelpers = {
       const date = new Date();
       date.setDate(date.getDate() + 14);
       if (!userMongoose.email) {
-        throw new Error('Email is requiried');
+        throw new Error('Email is required');
       }
       const token = createRandomToken();
 
