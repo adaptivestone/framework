@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.4] - 2026-06-14
+
+- **[FIX]** Route-type codegen no longer emits an untyped self-import for `.js`
+  controllers. A schema-bearing controller still written in JavaScript with no
+  sibling `.d.ts` produced a gen file that did `import type Ctrl from
+  './Ctrl.js'`, which fails with `TS7016` ("could not find a declaration file")
+  in a `strict` consumer build without `allowJs` — turning `rc.3`'s
+  now-succeeding `npm run gen` into a red typecheck. Such controllers now degrade
+  gracefully: the gen file skips the self-import and their inline request/query
+  schemas fall back to the base `Record<string, unknown>`. `.ts` controllers (and
+  `.js` with a sibling `.d.ts`) keep precise `InferOutput` types. Unblocks
+  incremental `.js` → `.ts` migration.
+
 ## [5.0.0-rc.3] - 2026-06-13
 
 - **[CHANGE]** Route-type codegen now skips controllers it can't statically

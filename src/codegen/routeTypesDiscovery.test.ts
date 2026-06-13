@@ -8,7 +8,14 @@
  * merged discovery, and conflict reporting.
  */
 
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -141,6 +148,31 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     const files = await readdir(dir);
     expect(files).toContain('Widget.routes.gen.ts');
     expect(files).not.toContain('Ghost.routes.gen.ts');
+  });
+
+  it('degrades a schema-bearing .js controller with no .d.ts (no untyped self-import)', async () => {
+    expect.assertions(5);
+    const withSchema = (name: string, route: string) =>
+      `class ${name} {\n  get routes() { return { post: { '${route}': { handler: this.h, request: {} } } }; }\n  h() {}\n}\nexport default ${name};\n`;
+    const dir = await makeControllers({
+      // Untyped .js controller — importing it would be TS7016 in a strict
+      // consumer build, so the gen file must NOT self-import it.
+      'Boat.js': withSchema('Boat', '/x'),
+      // .js WITH a sibling declaration → importable → keep precise navigation.
+      'Typed.js': withSchema('Typed', '/y'),
+      'Typed.d.ts':
+        'declare class Typed { get routes(): unknown; }\nexport default Typed;\n',
+    });
+    await generateRouteTypesViaAst(appFor(dir), noopLogger);
+    const boat = await readFile(path.join(dir, 'Boat.routes.gen.ts'), 'utf8');
+    const typed = await readFile(path.join(dir, 'Typed.routes.gen.ts'), 'utf8');
+    // Untyped .js → degraded: no self-import, no schema navigation, has the note.
+    expect(boat).not.toContain("from './Boat.js'");
+    expect(boat).not.toContain('InferOutput');
+    expect(boat).toMatch(/no type declaration/);
+    // .js with a sibling .d.ts → importable → precise navigation preserved.
+    expect(typed).toContain("from './Typed.js'");
+    expect(typed).toContain('InferOutput');
   });
 });
 

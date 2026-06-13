@@ -273,7 +273,27 @@ function renderResolved(
     urlPrefix,
     routes,
   };
-  return renderGenFile({ controller, srcPath, filteredChains, importMap });
+  // A `.js` controller has no inferable type unless a sibling `.d.ts` exists, so
+  // the gen file can't `import type` it without a `TS7016` in a strict consumer
+  // build (no `allowJs`). TS sources are always importable.
+  const ctrlExt = path.extname(srcPath);
+  const controllerTypeImportable =
+    ctrlExt === '.ts' ||
+    ctrlExt === '.mts' ||
+    ctrlExt === '.cts' ||
+    existsSync(
+      path.join(
+        path.dirname(srcPath),
+        `${path.basename(srcPath, ctrlExt)}.d.ts`,
+      ),
+    );
+  return renderGenFile({
+    controller,
+    srcPath,
+    filteredChains,
+    importMap,
+    controllerTypeImportable,
+  });
 }
 
 /** The deduped, importable middleware chain (binding names) for one flat route. */
