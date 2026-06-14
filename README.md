@@ -5,6 +5,7 @@ Mongoose models, a tree-based router with per-controller generated route/handler
 types, and batteries-included auth, rate limiting, i18n, and caching.
 
 📖 **Full documentation → https://framework.adaptivestone.com/**
+
 🤖 **LLM-ready docs (whole site as one file) → https://framework.adaptivestone.com/llm-context.md**
 
 ## Requirements
