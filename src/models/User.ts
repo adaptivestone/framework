@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { TFunction } from 'i18next';
-import type { Schema } from 'mongoose';
+import type { Model, Schema } from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import {
   burnPasswordVerify,
@@ -42,6 +42,49 @@ export type UserModelLite = GetModelTypeLiteFromSchema<
 
 export type TUser = GetModelTypeFromClass<typeof User>;
 
+/** A session-token sub-doc (`generateToken` / `getUserByToken`). */
+type SessionToken = { token?: string | null; valid?: Date | null };
+/** A verification / recovery sub-doc (carries an expiry, not a `valid` window). */
+type ExpiringToken = { token?: string | null; until?: Date | null };
+
+/**
+ * The document fields the framework's auth statics & instance methods actually
+ * read or write — typed **structurally**, not pinned to the framework's own
+ * schema. A project that replaces `User` (extra fields, an i18n `name`, a
+ * singular `role`, …) keeps the shipped auth logic callable on its model
+ * without casts, as long as it preserves these few fields. This is what lets
+ * `getModel('User').getUserByEmailAndPassword(…)` and friends type-check on a
+ * customized model instead of forcing a `this`-binding cast at every call site.
+ */
+export interface UserAuthDoc {
+  email?: string | null;
+  password?: string | null;
+  sessionTokens?: SessionToken[] | null;
+  verificationTokens?: ExpiringToken[] | null;
+  passwordRecoveryTokens?: ExpiringToken[] | null;
+}
+
+/** A hydrated {@link UserAuthDoc} the instance-side helpers bind to. */
+export type UserAuthInstance = UserAuthDoc & { save: () => Promise<unknown> };
+
+/** Any Mongoose `User` model the auth statics can bind to: one whose documents
+ * carry {@link UserAuthDoc}. The framework's own `User` and a project's
+ * replacement both satisfy it. */
+export type UserAuthModel = Model<UserAuthDoc>;
+
+/**
+ * The fields `getPublic` reads, as a plain object (a `Pick` of the framework
+ * document — NOT the Mongoose `Document` type, whose invariance would reject an
+ * additive project model). Binding `this` to this keeps `getPublic`'s return
+ * types PRECISE for every caller while still letting a project model that keeps
+ * these fields reuse it. A model that reshapes them (e.g. an i18n `name`)
+ * doesn't match and overrides `getPublic` with its own public shape.
+ */
+export type UserPublicDoc = Pick<
+  InstanceType<UserModelLite>,
+  'avatar' | 'name' | 'email' | 'id' | 'isVerified' | 'permissions' | 'locale'
+>;
+
 /**
  * Augmentation point so `req.appInfo.user` follows a project's OWN `User` model
  * when it replaces the framework's. `npm run gen` emits this automatically into
@@ -68,6 +111,37 @@ export type AppUser = AppModels extends { User: infer U }
   ? U
   : InstanceType<TUser>;
 
+/**
+ * The framework's default `User` model — and the intended customization point.
+ * Two supported ways to replace it with a project model (drop yours in the
+ * app's `models/` folder under the name `User`; codegen rebinds `getModel`,
+ * `req.appInfo.user`, and `AppModels` to it):
+ *
+ * 1. **Add fields** — `extends User`, spread the schema, append your own:
+ *    ```ts
+ *    class User extends FrameworkUser {
+ *      static get modelSchema() {
+ *        return { ...FrameworkUser.modelSchema, company: { type: String } } as const;
+ *      }
+ *    }
+ *    ```
+ *    The inherited auth statics & instance methods keep working as-is.
+ *
+ * 2. **Reshape fields** (e.g. an i18n `name`, a singular `role`) — TypeScript
+ *    can't express a field-type *replacement* through `extends` (the static-side
+ *    getter override is checked covariantly → TS2417), so **compose**: extend
+ *    {@link BaseModel} and reuse the auth logic by spreading it in.
+ *    ```ts
+ *    class User extends BaseModel {
+ *      static get modelSchema() { return { ...your reshaped schema } as const; }
+ *      static get modelStatics() { return { ...FrameworkUser.modelStatics } as const; }
+ *      static get modelInstanceMethods() { return { ...FrameworkUser.modelInstanceMethods } as const; }
+ *      static initHooks(schema: Schema) { FrameworkUser.initHooks(schema); }
+ *    }
+ *    ```
+ *    The spread statics/methods are typed structurally ({@link UserAuthDoc} /
+ *    {@link UserAuthModel}), so they stay callable on your model without casts.
+ */
 class User extends BaseModel {
   static initHooks(schema: Schema) {
     schema.pre(
@@ -134,7 +208,7 @@ class User extends BaseModel {
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
       getUserByEmailAndPassword: async function getUserByEmailAndPassword<
-        T extends UserModelLite,
+        T extends UserAuthModel,
       >(this: T, email: string, password: string) {
         const data = await this.findOne<InstanceType<T>>({
           email: String(email),
@@ -172,11 +246,11 @@ class User extends BaseModel {
        * @param {string}
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
-      getUserByToken: async function getUserByToken(
-        this: UserModelLite,
+      getUserByToken: async function getUserByToken<T extends UserAuthModel>(
+        this: T,
         token: string,
       ) {
-        const data = await this.findOne({
+        const data = await this.findOne<InstanceType<T>>({
           sessionTokens: {
             $elemMatch: {
               token: hashToken(String(token)),
@@ -191,11 +265,13 @@ class User extends BaseModel {
        * @param {string}
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
-      getUserByEmail: async function getUserByEmail(
-        this: UserModelLite,
+      getUserByEmail: async function getUserByEmail<T extends UserAuthModel>(
+        this: T,
         email: string,
       ) {
-        const data = await this.findOne({ email: String(email) });
+        const data = await this.findOne<InstanceType<T>>({
+          email: String(email),
+        });
         if (!data) {
           return false;
         }
@@ -207,12 +283,12 @@ class User extends BaseModel {
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
       getUserByPasswordRecoveryToken:
-        async function getUserByPasswordRecoveryToken(
-          this: UserModelLite,
+        async function getUserByPasswordRecoveryToken<T extends UserAuthModel>(
+          this: T,
           passwordRecoveryToken: string,
         ) {
           const hashed = hashToken(String(passwordRecoveryToken));
-          const data = await this.findOne({
+          const data = await this.findOne<InstanceType<T>>({
             passwordRecoveryTokens: {
               $elemMatch: {
                 token: hashed,
@@ -239,12 +315,11 @@ class User extends BaseModel {
        * @param {string} verificationToken
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
-      getUserByVerificationToken: async function getUserByVerificationToken(
-        this: UserModelLite,
-        verificationToken: string,
-      ) {
+      getUserByVerificationToken: async function getUserByVerificationToken<
+        T extends UserAuthModel,
+      >(this: T, verificationToken: string) {
         const hashed = hashToken(String(verificationToken));
-        const data = await this.findOne({
+        const data = await this.findOne<InstanceType<T>>({
           verificationTokens: {
             $elemMatch: {
               token: hashed,
@@ -270,8 +345,6 @@ class User extends BaseModel {
   }
 
   static get modelInstanceMethods() {
-    type UserInstanceType = InstanceType<UserModelLite>;
-
     return {
       /**
        * Generate token for user
@@ -314,7 +387,7 @@ class User extends BaseModel {
        * @returns {Promise<boolean>}
        */
       sendPasswordRecoveryEmail: async function (
-        this: UserInstanceType,
+        this: UserAuthInstance & { name?: { nick?: string | null } | null },
         i18n: { t: TFunction; language: string },
       ) {
         const passwordRecoveryToken =
@@ -349,7 +422,7 @@ class User extends BaseModel {
        * @returns {Promise<boolean>}
        */
       sendVerificationEmail: async function (
-        this: UserInstanceType,
+        this: UserAuthInstance & { name?: { nick?: string | null } | null },
         i18n: { t: TFunction; language: string },
       ) {
         const verificationToken =
@@ -379,7 +452,7 @@ class User extends BaseModel {
        * Get public user data
        * @returns {Object}
        */,
-      getPublic(this: UserInstanceType) {
+      getPublic(this: UserPublicDoc) {
         return {
           avatar: this.avatar,
           name: this.name,
@@ -401,7 +474,7 @@ export const userHelpers = {
    * @returns {Promise<{ token: string; until: number }>}
    */
   generateUserVerificationToken: async function generateUserVerificationToken(
-    userMongoose: InstanceType<UserModelLite>,
+    userMongoose: UserAuthInstance,
   ) {
     const date = new Date();
     date.setDate(date.getDate() + 14);
@@ -425,7 +498,7 @@ export const userHelpers = {
    */
   generateUserPasswordRecoveryToken:
     async function generateUserPasswordRecoveryToken(
-      userMongoose: InstanceType<UserModelLite>,
+      userMongoose: UserAuthInstance,
     ) {
       const date = new Date();
       date.setDate(date.getDate() + 14);

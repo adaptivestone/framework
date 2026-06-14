@@ -21,6 +21,7 @@
   "exclude": [
     "src/**/*.test.js",
     "src/**/*.test.ts",
-    "src/codegen/__fixtures__/**"
+    "src/codegen/__fixtures__/**",
+    "src/models/__fixtures__/**"
   ]
 }

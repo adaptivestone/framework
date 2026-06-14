@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TSequence } from './Sequence.ts';
 
@@ -44,5 +44,34 @@ describe('sequence model', () => {
     const summ2 = data.reduce((a, b) => a + b, 0);
 
     expect(summ2).toBe(summ);
+  });
+
+  it('retries once when two upserts race to an E11000, returning the retry value', async () => {
+    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const spy = vi
+      .spyOn(SequenceModel, 'findByIdAndUpdate')
+      .mockRejectedValueOnce({ code: 11000 } as never)
+      .mockResolvedValueOnce({ seq: 7 } as never);
+
+    const n = await SequenceModel.getSequence('raceType');
+
+    expect(n).toBe(7);
+    expect(spy).toHaveBeenCalledTimes(2);
+    spy.mockRestore();
+  });
+
+  it('rethrows a non-E11000 error without retrying', async () => {
+    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const spy = vi
+      .spyOn(SequenceModel, 'findByIdAndUpdate')
+      .mockRejectedValueOnce(
+        Object.assign(new Error('db exploded'), { code: 121 }) as never,
+      );
+
+    await expect(SequenceModel.getSequence('errType')).rejects.toThrow(
+      'db exploded',
+    );
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 });

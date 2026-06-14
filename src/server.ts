@@ -20,6 +20,10 @@ import type { I18n } from './services/i18n/I18n.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
+  /** Config name → contributing source file paths (default + NODE_ENV-specific).
+   * Read by codegen to recover env-only keys from source (`process.env.X` with
+   * no default) that the value-based pass can't see. */
+  configPaths: Map<string, string[]>;
   models: Map<string, AbstractModel['mongooseModel'] | TBaseModel>;
   modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
@@ -89,6 +93,7 @@ class Server {
 
   cache: AppCache = {
     configs: new Map<string, unknown>(),
+    configPaths: new Map<string, string[]>(),
     models: new Map<string, AbstractModel['mongooseModel'] | TBaseModel>(),
     modelConstructors: new Map<
       string,
@@ -477,16 +482,21 @@ class Server {
       configName: string,
       values: Record<string, string>,
     ) => {
-      const promises = [import(values.default)];
+      // The source files that contribute to this config, in merge order:
+      // base default first, then the NODE_ENV-specific override. Used both to
+      // import the values AND (by codegen) to recover env-only key types from
+      // source — deriving the list once keeps the two perfectly in sync.
+      const paths = [values.default];
       if (process.env.NODE_ENV && values[process.env.NODE_ENV]) {
-        promises.push(import(values[process.env.NODE_ENV]));
+        paths.push(values[process.env.NODE_ENV]);
       }
-      const result = await Promise.all(promises);
+      const result = await Promise.all(paths.map((p) => import(p)));
       return {
         name: configName,
         finalValue: merge(result[0].default, result[1]?.default || {}, {
           arrayMerge: (_destinationArray, sourceArray) => sourceArray,
         }),
+        paths: paths.filter((p): p is string => Boolean(p)),
       };
     };
 
@@ -500,6 +510,7 @@ class Server {
 
     for (const config of configs) {
       this.cache.configs.set(config.name, config.finalValue);
+      this.cache.configPaths.set(config.name, config.paths);
     }
     return true;
   }

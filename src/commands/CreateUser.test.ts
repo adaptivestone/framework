@@ -40,3 +40,39 @@ describe('CreateUser command (doc 20)', () => {
     expect(all).not.toContain('sessionTokens'); // whole document not serialized
   });
 });
+
+describe('CreateUser command — input validation guards', () => {
+  const run = (args: Record<string, unknown>) =>
+    new CreateUser(appInstance, {}, args).run();
+
+  it('fails when neither email nor id is given', async () => {
+    await expect(run({})).resolves.toBe(false);
+  });
+
+  it('fails to create a new user without a password', async () => {
+    await expect(run({ email: 'cu-nopass@example.com' })).resolves.toBe(false);
+  });
+
+  it('fails when looked up by a missing id with no email to create from', async () => {
+    await expect(
+      run({ id: '000000000000000000000000', password: 'x' }),
+    ).resolves.toBe(false);
+  });
+
+  it('refuses to overwrite an existing user without `update`', async () => {
+    const email = 'cu-existing@example.com';
+    await expect(run({ email, password: 'pw1', update: true })).resolves.toBe(
+      true,
+    ); // first run creates it
+    await expect(run({ email, password: 'pw2' })).resolves.toBe(false); // exists, no update
+  });
+
+  it('creates a user, splitting comma-separated roles', async () => {
+    const email = 'cu-roles@example.com';
+    await expect(
+      run({ email, password: 'pw', roles: 'user,admin' }),
+    ).resolves.toBe(true);
+    const user = await appInstance.getModel('User').findOne({ email });
+    expect(user?.roles).toEqual(['user', 'admin']);
+  });
+});

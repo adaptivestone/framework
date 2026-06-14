@@ -42,11 +42,51 @@ describe('appTypes — config type emission (shape-derived)', () => {
     expect(out).not.toContain(': "en"');
   });
 
-  it('drops keys whose value is undefined at gen time', async () => {
+  it('drops keys whose value is undefined at gen time (no source given)', async () => {
     const out = await get('mongo', { connectionString: undefined, pool: 5 });
     expect(out).toContain(
       `getConfig(configName: 'mongo'): { "pool": number };`,
     );
+  });
+
+  it('recovers env-only keys from source when config paths are supplied', async () => {
+    // `saltSecret: process.env.AUTH_SALT` is `undefined` at gen time, so the
+    // value pass drops it — but the source says it's an env read, so codegen
+    // recovers it as `string | undefined` instead of forcing an `as` cast.
+    const authSrc = fileURLToPath(
+      new URL('../config/auth.ts', import.meta.url),
+    );
+    const out = await getTemplate(
+      new Map<string, unknown>([
+        ['auth', { hashRounds: 64, saltSecret: undefined }],
+      ]),
+      [],
+      new Map<string, string[]>([['auth', [authSrc]]]),
+    );
+    expect(out).toContain('"saltSecret": string | undefined');
+    expect(out).toContain('"hashRounds": number');
+    // still a type, never the value
+    expect(out).not.toContain('AUTH_SALT');
+  });
+
+  it('types an env-only key deterministically even when set at gen time', async () => {
+    // The whole point of source-based recovery: a bare `process.env.X` is
+    // `string | undefined` regardless of whether the var happened to be set
+    // when codegen ran — otherwise the emitted type (and `--check`) would drift
+    // between machines. So even with a concrete value present, the source wins.
+    const authSrc = fileURLToPath(
+      new URL('../config/auth.ts', import.meta.url),
+    );
+    const out = await getTemplate(
+      new Map<string, unknown>([
+        ['auth', { hashRounds: 64, saltSecret: 'super-secret-from-env' }],
+      ]),
+      [],
+      new Map<string, string[]>([['auth', [authSrc]]]),
+    );
+    expect(out).toContain('"saltSecret": string | undefined');
+    // the concrete secret value is never serialized into the type
+    expect(out).not.toContain('super-secret-from-env');
   });
 
   it('emits no import() — the type is fully inline (compiler-robust)', async () => {
@@ -59,6 +99,24 @@ describe('appTypes — config type emission (shape-derived)', () => {
     const out = await get('misc', { empty: {}, list: [], when: new Date() });
     expect(out).toContain(
       `getConfig(configName: 'misc'): { "empty": {}; "list": unknown[]; "when": unknown };`,
+    );
+  });
+
+  it('renders the remaining scalar value kinds (null, bigint, function)', async () => {
+    const out = await get('kinds', {
+      n: null,
+      big: 10n,
+      fn: () => 1,
+    });
+    expect(out).toContain(
+      `getConfig(configName: 'kinds'): { "n": null; "big": bigint; "fn": ((...args: any[]) => any) };`,
+    );
+  });
+
+  it('keeps an `undefined` element inside a tuple (arrays are not filtered)', async () => {
+    const out = await get('tuple', { list: ['a', undefined, 1] });
+    expect(out).toContain(
+      `getConfig(configName: 'tuple'): { "list": [string, undefined, number] };`,
     );
   });
 });

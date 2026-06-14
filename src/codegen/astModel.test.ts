@@ -67,4 +67,46 @@ export default class Derived extends MyBase {}`,
     );
     expect(await isBaseModelSource(file)).toBe(true);
   });
+
+  it('serves a repeated lookup from the cache', async () => {
+    const file = await write(
+      'Cached.ts',
+      `import { BaseModel } from '../modules/BaseModel.ts';
+export default class Cached extends BaseModel {}`,
+    );
+    const cache = new Map<string, boolean>();
+    expect(await isBaseModelSource(file, 0, cache)).toBe(true);
+    expect(cache.get(file)).toBe(true);
+    // Second call short-circuits on the cached value (no re-read/parse).
+    expect(await isBaseModelSource(file, 0, cache)).toBe(true);
+  });
+
+  it('returns false for an unreadable / missing file', async () => {
+    expect(await isBaseModelSource(path.join(dir, 'no-such-model.ts'))).toBe(
+      false,
+    );
+  });
+
+  it('falls back to the binding name when the BaseModel import is unresolved', async () => {
+    // `extends BaseModel` with no matching import → match on the binding name.
+    const yes = await write(
+      'NoImport.ts',
+      `export default class X extends BaseModel {}`,
+    );
+    expect(await isBaseModelSource(yes)).toBe(true);
+    const no = await write(
+      'NoImportOther.ts',
+      `export default class Y extends SomethingElse {}`,
+    );
+    expect(await isBaseModelSource(no)).toBe(false);
+  });
+
+  it('returns false when a bare-package ancestor cannot be resolved', async () => {
+    const file = await write(
+      'BarePkg.ts',
+      `import SomeBase from 'totally-nonexistent-pkg-xyz';
+export default class X extends SomeBase {}`,
+    );
+    expect(await isBaseModelSource(file)).toBe(false);
+  });
 });

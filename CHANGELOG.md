@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.6] - 2026-06-14
+
+- **[FIX]** The `User` auth helpers are now reusable on a **customized** `User`
+  model without `this`-binding casts. The statics (`getUserByEmailAndPassword`,
+  `getUserBy{Token,Email,VerificationToken,PasswordRecoveryToken}`) and instance
+  methods (`generateToken`, `getPublic`, `send{Verification,PasswordRecovery}Email`)
+  were typed against the framework's own schema (`this: UserModelLite`), so on a
+  project model with a different shape every call site hit `TS2684` and needed a
+  cast. They're now typed against small structural contracts (`UserAuthDoc` /
+  `UserAuthInstance` / `UserAuthModel`, all newly exported) describing only the
+  fields each helper touches — the framework's `User` and a project's replacement
+  both satisfy them, and return types stay precise. This makes the supported
+  customization paths cast-free: `extends User` to **add** fields, or compose
+  (`extends BaseModel` + spread `User.modelStatics` / `modelInstanceMethods`) to
+  **reshape** them (an i18n `name`, a singular `role`, …) — a field-type
+  *replacement* can't go through `extends` (static-getter covariance, `TS2417`).
+  Both paths are documented on the `User` class. A `tsc`-gate test pins them.
+
+- **[FIX]** Config-type codegen no longer drops env-only keys. A config value
+  read straight from the environment with no default (`saltSecret:
+  process.env.AUTH_SALT`) is `undefined` at gen time, so the value-based pass
+  omitted it from `getConfig('…')`'s type and every read needed an `as` cast.
+  Codegen now reads the config **source** (via `oxc-parser`, no value import) and
+  types a bare `process.env.X` as `string | undefined` (and `process.env.X!` as
+  `string`) — from the source, so the result is the same whether or not the var
+  happened to be set during codegen (deterministic output, no `--check` drift).
+  Keys without an env read (literals, `process.env.X || default`) are still typed
+  from their value as before. Secrets are never serialized (types only). Nested
+  keys and `NODE_ENV`-specific config files are handled.
+
 ## [5.0.0-rc.5] - 2026-06-14
 
 - **[FIX]** Route-type codegen extends the rc.4 untyped-`.js` degradation to

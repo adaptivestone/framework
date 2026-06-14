@@ -1,3 +1,4 @@
+import { PersistentFile } from 'formidable';
 import { describe, expect, it } from 'vitest';
 import { YupFile } from './yup.ts';
 
@@ -25,5 +26,25 @@ describe('YupFile (deprecated)', () => {
     );
     expect(yupFileWarnings).toHaveLength(1);
     expect(yupFileWarnings[0]?.name).toBe('DeprecationWarning');
+  });
+
+  // The only real logic: the value must be an array of formidable
+  // `PersistentFile`s. Still shipped in v5, so guard it until v6 removes it.
+  describe('type check', () => {
+    // `instanceof PersistentFile` without invoking formidable's constructor.
+    const fakeFile = () =>
+      Object.create(PersistentFile.prototype) as PersistentFile;
+
+    it('accepts an array of PersistentFile instances', () => {
+      expect(new YupFile().isType([fakeFile(), fakeFile()])).toBe(true);
+    });
+
+    it('rejects an array containing a non-file', () => {
+      expect(new YupFile().isType([fakeFile(), 'not a file'])).toBe(false);
+    });
+
+    it('rejects a value that is not an array', () => {
+      expect(new YupFile().isType('nope')).toBe(false);
+    });
   });
 });

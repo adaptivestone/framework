@@ -55,6 +55,7 @@ export async function generateAll(
   const appTypesText = await getTemplate(
     app.internalFilesCache.configs,
     app.internalFilesCache.modelPaths,
+    app.internalFilesCache.configPaths,
   );
   const plan = await planRouteTypes(app, logger, { skipNonAnalyzable: true });
   if (plan.needsBoot.length > 0) {
