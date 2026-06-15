@@ -20,7 +20,10 @@
  *    methods, and array + complex field types: enum, ref arrays, subdoc arrays,
  *    Map, nested);
  *  - `liteModelType.ts` — `GetModelTypeLiteFromSchema` as the `this:` context in
- *    statics / instance methods / `initHooks`, and as `InstanceType<…>`.
+ *    statics / instance methods / `initHooks`, and as `InstanceType<…>`;
+ *  - `schemaInstance.ts` — a pre-built mongoose `Schema` instance reused as a
+ *    (sub-)doc def (`field: Sub` / `[Sub]`) stays opaque to the override scan
+ *    (rc.8 regression: it triggered a TS2615 circular mapped type).
  *
  * They must compile cleanly. A regression in the structural contracts re-pins a
  * helper or re-surfaces a narrow `this`, those calls fail with TS2684, and this

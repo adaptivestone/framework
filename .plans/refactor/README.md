@@ -55,6 +55,7 @@ Blocking: docs-sweep blocks llm-skills
 | [default-node-adapter](later/default-node-adapter.md) | P4 | NodeAdapter as default. |
 | [drop-express](later/drop-express.md) | P5 | Edge-compatible, Express gone. Blocked by P3+P4. |
 | [mongo-er-diagram](later/mongo-er-diagram.md) | Side | Issue #11. |
+| [select-projection-typing](later/select-projection-typing.md) | Side | Type `.select(...)` results to the projected fields (typing track). Object-form first; fixture-gated. |
 | [vitest-to-node-test](later/vitest-to-node-test.md) | Side | Replace vitest with `node:test`. Best slot: after v5.1. |
 
 ### done/

@@ -36,6 +36,9 @@ class Event extends BaseModel {
       startsAt: { type: Date }, // built-in instance → Date
       organizer: { name: intlString({ type: String }) }, // nested object
       schedule: [{ title: intlString({ type: String }) }], // subdoc array
+      // deepest combined path: marker in a nested object INSIDE a subdoc array
+      // (array → object → field) — exercises HasTsOverride's full recursion.
+      sessions: [{ room: { label: intlString({ type: String }) } }],
     } as const;
   }
 }
@@ -51,6 +54,9 @@ export async function check(M: EventModel) {
       doc.organizer?.name;
     const schedTitle: IntlSubDocValue<string> | null | undefined =
       doc.schedule?.[0]?.title;
+    const sessionLabel: IntlSubDocValue<string> | null | undefined =
+      doc.sessions?.[0]?.room?.label; // array → nested object → marker
+    void sessionLabel;
     // unmarked fields keep their inferred type
     const plain: string | null | undefined = doc.plain;
     const tag: string | null | undefined = doc.tags?.[0];

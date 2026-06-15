@@ -48,25 +48,33 @@ export interface TsTypeOverride<T> {
 }
 
 /**
- * A leaf field definition — a bare constructor (`String`, `ObjectId`) or a
+ * A leaf field definition — a bare constructor (`String`, `ObjectId`), a
  * `{ type: SomeConstructor, … }` form (String, Number, ObjectId, Date, Map,
- * Buffer, …). This mirrors how Mongoose itself decides "leaf field" vs "nested
- * schema", so {@link ApplyTsOverrides} recurses only into nested *schemas* (a
- * record of field defs) and leaves built-in instances (ObjectId, Date, Map)
- * untouched — instead of mapping over their internals, which only bloated the
- * displayed type and wasted compile work (it was always a structural no-op).
+ * Buffer, …), or a pre-built mongoose `Schema` instance reused as a (sub-)doc
+ * definition (`field: SubSchema` / `[SubSchema]`). This mirrors how Mongoose
+ * itself decides "leaf field" vs "nested schema", so {@link ApplyTsOverrides}
+ * and {@link HasTsOverride} recurse only into nested *schemas* (a record of
+ * field defs) and leave built-in instances (ObjectId, Date, Map) and `Schema`
+ * instances untouched. The `Schema` case is essential: a `Schema` instance's own
+ * type is deeply self-referential (`childSchemas`, `options`, …), so scanning
+ * into it triggers a TS2615 circular mapped-type error — and it can carry no
+ * `__tsType` marker anyway, so stopping there is always correct.
  */
-type IsLeafFieldDef<S> = S extends abstract new (
-  ...args: never
-) => unknown
+type IsLeafFieldDef<S> = S extends Schema
   ? true
-  : S extends { type: infer Tp }
-    ? Tp extends abstract new (
+  : S extends abstract new (
         ...args: never
       ) => unknown
-      ? true
-      : false
-    : false;
+    ? true
+    : S extends { type: infer Tp }
+      ? Tp extends Schema
+        ? true
+        : Tp extends abstract new (
+              ...args: never
+            ) => unknown
+          ? true
+          : false
+      : false;
 
 /**
  * Walk an inferred raw-doc type alongside its schema and replace each field

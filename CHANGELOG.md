@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.9] - 2026-06-15
+
+- **[FIX]** Regression in rc.8: a model whose `modelSchema` reuses a pre-built
+  mongoose `Schema` instance as a (sub-)document definition (`field: SubSchema`
+  or `[SubSchema]` — a standard Mongoose pattern) failed to type-check at every
+  `findOne(...)` call site with `TS2615` ("circularly references itself in mapped
+  type"). The rc.8 marker-scan (`HasTsOverride`) recursed over `keyof Schema`,
+  and a `Schema` instance isn't a constructor, so it wasn't treated as a leaf —
+  the scan descended into the instance's self-referential internals
+  (`childSchemas`, `options`, `session`, …). `IsLeafFieldDef` now treats a
+  `Schema` instance as a leaf (it can carry no `__tsType` marker anyway), so the
+  scan stops there. Type-only; a `tsc`-gate fixture pins it.
+
 ## [5.0.0-rc.8] - 2026-06-15
 
 - **[FIX]** Instance methods are now callable on the hydrated document without
