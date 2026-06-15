@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.7] - 2026-06-15
+
+- **[NEW]** Per-field compile-time type overrides for plugin-reshaped fields. A
+  schema field intersected with the new `TsTypeOverride<T>` marker is typed as
+  `T` on `getModel(...).findOne()` results and method `this`, instead of the type
+  Mongoose infers from `type:` — so a field a runtime plugin reshapes
+  (`mongoose-intl`, encrypted fields, custom getters) keeps its static and
+  runtime types in sync, removing the casts that previously bridged the gap. The
+  marker is a phantom (`__tsType`, never set at runtime); applied by a deep
+  mapped type (`ApplyTsOverrides`) that recurses into nested objects and
+  subdocument arrays. Opt-in and a strict **no-op** for any field without the
+  marker, so existing models are unchanged.
+
 ## [5.0.0-rc.6] - 2026-06-14
 
 - **[FIX]** The `User` auth helpers are now reusable on a **customized** `User`
