@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0-rc.8] - 2026-06-15
+
+- **[FIX]** Instance methods are now callable on the hydrated document without
+  `this`-binding casts. A method whose body needs a narrower shape can declare an
+  explicit `this: <bridge>` (a populated ref, a non-null plugin-reshaped field,
+  reassignable sibling methods); that bridge was carried verbatim onto the
+  document type, so a direct `doc.method(...)` call failed the this-context check
+  (`TS2684`) — the framework-computed hydrated doc is deliberately not assignable
+  to the narrower bridge — and every call site needed a
+  `(schema.methods.x as …).call(doc, …)` cast. The caller-facing projection now
+  strips the authored `this` (a method accessed on its own document always has
+  the right `this` at runtime), while method bodies stay type-checked against
+  their declared `this`. Purely a type change, no runtime impact; a `tsc`-gate
+  test pins it.
+
+- **[FIX]** A virtual now resolves to its getter's return type on the document
+  (e.g. `doc.fullName` is `string`) instead of the leaked raw definition
+  (`string & { get(): string; options: … }`). The virtuals slot fed to
+  Mongoose's inner document type was the raw `{ get, set, options }` object; it
+  is now the resolved `VirtualType<…>`, matching the override slot. Type-only.
+
+- **[FIX]** `createdAt` / `updatedAt` are now typed as a non-null `Date` on the
+  hydrated document instead of `Date | null | undefined`. Mongoose always sets
+  the timestamps, so the nullable type only forced a needless guard at every
+  read. Type-only change.
+
+- **[FIX]** Cleaner `TsTypeOverride` typing (rc.7 feature). The override mapping
+  no longer recurses into built-in instances (`ObjectId` refs, `Date`, `Map`) —
+  they showed as `ApplyTsOverrides<ObjectId, …>` in hovers though the recursion
+  was a no-op — and a marker-free schema (the common case) now skips the mapping
+  entirely, so its document type is the plain Mongoose inference with no wrapper
+  in hovers and no extra compile work. Type-only; no change to which types
+  resolve, only how cleanly.
+
 ## [5.0.0-rc.7] - 2026-06-15
 
 - **[NEW]** Per-field compile-time type overrides for plugin-reshaped fields. A
@@ -226,7 +260,7 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** Route-type codegen requires **statically analyzable controllers**. A controller whose `routes` / `static get middleware()` / `getHttpPath()` is built dynamically (loops, conditionals, computed values) can no longer be reflected — `npm run gen` now throws and names the controller instead of booting the app to read it. Make those getters return literal structures (the framework's own controllers and the audited consumer projects already do).
 
 ---
-## [5.0.0-beta.55]
+## [5.0.0-beta.55] - 2026-06-06
 
 - **[FIX]** Codegen no longer emits an empty middleware chain for a controller's root (`/`) route. `chainFor` keyed the flattened-route lookup with a trailing slash for a `/` route under a non-root prefix (e.g. `POST /` on a controller mounted at `/file` was looked up as `POST /file/` while `RouteRegistry.flatten()` emits `POST /file`), so the route's middleware came back empty and the generated `req.appInfo` lost every middleware-provided field. Path joining now mirrors the registry (segment join, no trailing slash).
 - **[FIX]** Codegen resolves middleware whose local import binding differs from its exported class name. The emit step matched chain entries against the controller's imports by class name, but the import map is keyed by the local binding — so a default export imported under another name (e.g. `import Auth from '.../Auth.js'` where the class is `AuthMiddleware`) was dropped from the generated type (and would otherwise have emitted an unbound `typeof AuthMiddleware`). The live class is now carried through and matched by module identity to recover the real binding (`Auth`). Affected the built-in `Auth` and `Role` middlewares.
@@ -239,12 +273,12 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** The built-in `Home` controller no longer registers `GetUserByToken` on a root-level `'/{*splat}'` scope. Because `Home` mounts at `/`, that middleware landed on the route-tree root and ran on **every request app-wide** — a hidden global default that couldn't be opted out of (a controller declaring empty middleware still ran it). `Home` now adds no middleware (it's a public route); controllers still parse the user token via their own/inherited `[GetUserByToken, Auth]`. **Impact:** if you relied on `req.appInfo.user` being populated on routes that don't themselves include `GetUserByToken` (e.g. ad-hoc `registerRoute` endpoints), add the middleware explicitly. Re-add `[GetUserByToken]` to your home controller for a token-aware home.
 
 ---
-## [5.0.0-beta.54]
+## [5.0.0-beta.54] - 2026-06-05
 
 - **[FIX]** `getConfig()` types in `genTypes.d.ts` are now inline **value-shape** types (value *types* like `string`, with arrays kept as **tuples**) instead of the `typeof import('./config/foo.ts').default` reference form introduced in beta.52. The reference form inferred array config elements as a union with `?: undefined` keys, which broke `Object.values()` over a config item (it widened to `any`) and could resolve to `any` outright on stricter/preview TypeScript (e.g. older `tsgo` builds) — a regression that surfaced only in CI for projects whose local type-checker differed. The value-shape form keeps `Object.values()` and per-element typing precise and is robust across compilers (it resolves no module), while still never serializing a literal config value into the generated file.
 
 ---
-## [5.0.0-beta.53]
+## [5.0.0-beta.53] - 2026-06-05
 
 - **[NEW]** Codegen reads controllers without running their constructors. `generatetypes` now introspects each controller via a prototype-only "ghost" (`Object.create(Class.prototype)`) instead of `new Controller(app, prefix)`, so config reads, client construction, and other constructor side effects no longer fire during type generation. Runtime is unchanged — handlers still bind to real instances.
 - **[DEPRECATED]** A controller whose `routes` getter reads **constructor-set state** is deprecated. Codegen transparently falls back to instantiating it (so nothing breaks) and emits a one-per-class `DeprecationWarning`, code `ASF_DEP_CTOR_ROUTES`. Make `routes` independent of constructor state; the instantiation fallback **will be removed in v6**.
@@ -252,7 +286,7 @@ Main feature of that release is full TypeScript support including mongoose model
 ---
 
 
-## [5.0.0-beta.52]
+## [5.0.0-beta.52] - 2026-06-04
 
 - **[NEW]** Middleware request/query schemas can be declared **statically** — `static get relatedRequestParameters()` / `static get relatedQueryParameters()`. The framework reads them without instantiating the middleware (avoids constructor side effects during route setup / codegen). Framework middlewares (`Pagination`) migrated.
 - **[DEPRECATED]** The **instance** form of those getters (`get relatedRequestParameters()` / `relatedQueryParameters` / `relatedReqParameters`) is deprecated and **will be removed in v6** — migrate to the static form. It still works (the framework detects the override, instantiates as a fallback, and emits a one-per-class `DeprecationWarning`, code `ASF_DEP_MW_INSTANCE_SCHEMA`).
@@ -261,7 +295,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 
 ---
-## [5.0.0-beta.51]
+## [5.0.0-beta.51] - 2026-05-31
 
 - **[NEW]** `KeyValue` model: a minimal persistent key/value store backed by MongoDB for lightweight caching, runtime config, and feature flags.
 - **[NEW]** `defineSchema<Output>(validate)` helper (`@adaptivestone/framework/services/validate/defineSchema.js`) — wrap a plain validate function into a zero-dependency Standard Schema. Codegen reads its `Output` generic for handler request types via `StandardSchemaV1.InferOutput`.
@@ -273,18 +307,18 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[DEPRECATED]** `YupFile` (`@adaptivestone/framework/helpers/yup.js`) — removed in v6. Validate files via the new `File` export + your validator's `instanceof` idiom instead.
 
 ---
-## [5.0.0-beta.50]
+## [5.0.0-beta.50] - 2026-05-25
 
 - **[FIX]** Tree-based router: different HTTP methods at the same param position can now use different `:name` segments. Previously, `PUT /:slug` and `POST /:event` on the same controller would either throw at boot ("conflicting param children") or silently use the first-registered name for all methods (`req.params.event` → `undefined`). Each `HandlerEntry` now carries its own `paramNames` array — the tree is structural only, param naming is per-handler.
 
 ---
-## [5.0.0-beta.49]
+## [5.0.0-beta.49] - 2026-05-18
 
 - **[FIX]** Codegen: fix router name resolution in generated route types.
 - **[UPDATE]** Codegen output improvements.
 
 ---
-## [5.0.0-beta.48]
+## [5.0.0-beta.48] - 2026-05-11
 
 - **[NEW]** Codegen emits route metadata (`methodName`, `controllerClass`, `sourceFile`) on `HandlerEntry.meta`.
 - **[NEW]** `Pagination` middleware declares `static get provides()` — routes with `Pagination` in their chain get `req.appInfo.pagination` typed automatically.
@@ -292,13 +326,13 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[NEW]** Codegen deduplicates identical union branches.
 
 ---
-## [5.0.0-beta.47]
+## [5.0.0-beta.47] - 2026-05-11
 
 - **[UPDATE]** Tree-based route type generation improvements.
 - **[UPDATE]** Dependencies update.
 
 ---
-## [5.0.0-beta.46]
+## [5.0.0-beta.46] - 2026-05-11
 
 - **[NEW]** Tree-based `RouteRegistry` replaces Express's hidden router internally. One global tree, walkable by codegen / OpenAPI / MCP emitters.
 - **[NEW]** Per-controller route type generation (`npm run gen` emits `<File>.routes.gen.ts`).
@@ -316,12 +350,12 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[BREAKING]** OpenAPI / documentation generation removed (will return later).
 
 ---
-## [5.0.0-beta.45]
+## [5.0.0-beta.45] - 2026-03-28
 - **[BREAKING]** rate-limiter-flexible v9->v10
 - **[BREAKING]** typecript v5->v6
 
 ---
-## [5.0.0-beta.44]
+## [5.0.0-beta.44] - 2026-02-22
 
 - **[NEW]** Logout method
 - **[Update]** set model typing
@@ -329,18 +363,18 @@ Main feature of that release is full TypeScript support including mongoose model
 
 
 ---
-## [5.0.0-beta.43] 
+## [5.0.0-beta.43] - 2026-01-24
 
 - **[FIX]** Fix typo in peerDeps
 
 
 ---
-## [5.0.0-beta.42] 
+## [5.0.0-beta.42] - 2026-01-24
 
 - **[BREAKING]** Mongoose v9. <https://mongoosejs.com/docs/migrating_to_9.html>.
 
 ---
-## [5.0.0-beta.41] 
+## [5.0.0-beta.41] - 2026-01-17
 
 - **[UPDATE]** Update deps
 - **[NEW]** Bearer scheme support
@@ -349,19 +383,19 @@ Main feature of that release is full TypeScript support including mongoose model
 
 
 ---
-## [5.0.0-beta.40]
+## [5.0.0-beta.40] - 2025-12-15
 
 - **[UPDATE]** Update `rate-limiter-flexible` to v9.
 - **[UPDATE]** Remove 'winston-transport-sentry' and implementcustom logic based on 'sentry' itself (from v9.14 sentry have native winston support)
 
 
-## [5.0.0-beta.39]
+## [5.0.0-beta.39] - 2025-10-25
 
 - **[UPDATE]**  rete limiter. Do not create index on mongo if we have "process.env.test === 'true'"
 
 ---
 
-## [5.0.0-beta.38]
+## [5.0.0-beta.38] - 2025-10-25
 
 - **[UPDATE]**  update dependencies
 - **[UPDATE]**  update rate limiter Mongo option to not create an index by default when NODE_ENV=test
@@ -370,69 +404,69 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.36]
+## [5.0.0-beta.36] - 2025-08-24
 
 - **[UPDATE]**  i18nService  update loading to avoid race conditions
 ---
 
-## [5.0.0-beta.36]
+## [5.0.0-beta.36] - 2025-08-24
 
 - **[UPDATE]**  i18nService  update method names
 
 ---
 
-## [5.0.0-beta.35]
+## [5.0.0-beta.35] - 2025-08-24
 
 - **[NEW]** Introduce i18nService (ability to user i18n not only inside middleware)
 
 ---
 
-## [5.0.0-beta.34]
+## [5.0.0-beta.34] - 2025-08-23
 
 - **[NEW]** I18nMiddlewareAppInfo type
 
 ---
 
-## [5.0.0-beta.33]
+## [5.0.0-beta.33] - 2025-08-21
 
 - **[NEW]** consumeResult changed to be more flexible
 
 ---
 
-## [5.0.0-beta.32]
+## [5.0.0-beta.32] - 2025-08-21
 
 - **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware 
 
 ---
 
-## [5.0.0-beta.31]
+## [5.0.0-beta.31] - 2025-08-21
 
 - **[NEW]** Rate limiter middleware - add consumeResult function to allow user middleware as a regular rate limiter
 
 
 ---
 
-## [5.0.0-beta.30]
+## [5.0.0-beta.30] - 2025-08-01
 
 - **[FIX]** Fix CLI mongo app name generation (64 symbols limit)
 
 
 ---
 
-## [5.0.0-beta.29]
+## [5.0.0-beta.29] - 2025-07-31
 
 - **[FIX]** Fix CLI mongo app name generation (128 symbols limit)
 
 ---
 
-## [5.0.0-beta.28]
+## [5.0.0-beta.28] - 2025-07-29
 
 - **[UPDATE]** Inside CLI allow to have a negative values 
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-beta.27]
+## [5.0.0-beta.27] - 2025-06-27
 
 - **[UPDATE]** Remove eslint, prettiver and move to biome
 - **[UPDATE]** Update types.
@@ -441,59 +475,59 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.26]
+## [5.0.0-beta.26] - 2025-06-19
 
 - **[UPDATE]** Update types.
 - **[UPDATE]** Update tests (more ts).
 
 ---
 
-## [5.0.0-beta.25]
+## [5.0.0-beta.25] - 2025-06-17
 
 - **[UPDATE]** Update types.
 
 ---
 
-## [5.0.0-beta.24]
+## [5.0.0-beta.24] - 2025-06-16
 
 - **[UPDATE]** Update types.
 
 ---
 
-## [5.0.0-beta.23]
+## [5.0.0-beta.23] - 2025-06-16
 
 - **[BREAKING]** No more global variables for testing and default user will not be created by default
 - **[NEW]** Test helpers getTestServerURL, serverInstance, setDefaultUser, setDefaultAuthToken and createDefaultTestUser.
 
 ---
 
-## [5.0.0-beta.22]
+## [5.0.0-beta.22] - 2025-06-10
 
 - **[UPDATE]** Update types.
 
 ---
 
-## [5.0.0-beta.21]
+## [5.0.0-beta.21] - 2025-06-09
 
 - **[FIX]** Fix bug with missed model options.
 
 ---
 
-## [5.0.0-beta.20]
+## [5.0.0-beta.20] - 2025-06-09
 
 - **[FIX]** Fix bug with `Lock` model index.
 - **[NEW]** `BaseModel` add `Virtuals`.
 
 ---
 
-## [5.0.0-beta.19]
+## [5.0.0-beta.19] - 2025-06-08
 
 - **[NEW]** Introducing new model type. `BaseModel`. Features - simplifie works with typescript. And based on statics.
 - **[BREAKING]** All models now should be extended from `BaseModel`. This is a potential breaking change specially for `User` model.
 
 ---
 
-## [5.0.0-beta.18]
+## [5.0.0-beta.18] - 2025-06-08
 
 - **[UPDATE]** Move away connection from `mongooseModels` to server itself (preparation for different model types).
 - **[BREAKING]** potential. We are removed callback from `mongooseModels` contrctuctor. It was not used in code.
@@ -501,13 +535,13 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.17]
+## [5.0.0-beta.17] - 2025-05-26
 
 - **[NEW]** Add `GenerateTypes` command.
 
 ---
 
-## [5.0.0-beta.16]
+## [5.0.0-beta.16] - 2025-05-26
 
 - **[UPDATE]** Update deps.
 - **[UPDATE]** New app getter `internalFilesCache`.
@@ -515,25 +549,25 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.15]
+## [5.0.0-beta.15] - 2025-04-24
 
 - **[FIX]** Fix missing folder `migrations` in `dist` folder (hope that will be finally).
 
 ---
 
-## [5.0.0-beta.14]
+## [5.0.0-beta.14] - 2025-04-24
 
 - **[FIX]** Fix missing folder `migrations` in `dist` folder.
 
 ---
 
-## [5.0.0-beta.13]
+## [5.0.0-beta.13] - 2025-04-23
 
 - **[UPDATE]** Only process `.ts` or `.js` files (not `.map` files).
 
 ---
 
-## [5.0.0-beta.12]
+## [5.0.0-beta.12] - 2025-04-23
 
 - **[BREAKING]** Remove jest support for testing.
 - **[NEW]** Initial move to typescript. potentially breaking.
@@ -541,7 +575,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.11]
+## [5.0.0-beta.11] - 2025-04-02
 
 - **[NEW]** Commands typing.
 - **[NEW]** Commands support TS files.
@@ -549,7 +583,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.9]
+## [5.0.0-beta.9] - 2025-02-19
 
 - **[BREAKING]** Move email module to separate package `@adaptivestone/framework-module-email`. Please use it if you want to send emails.
 - **[NEW]** App now contains `frameworkFolder` folder the framework located. Mostly for modules usage.
@@ -560,21 +594,21 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.8]
+## [5.0.0-beta.8] - 2025-02-16
 
 - **[UPDATE]** Update deps.
 - **[NEW]** `Lock` model for working locks via mongoDB.
 
 ---
 
-## [5.0.0-beta.7]
+## [5.0.0-beta.7] - 2025-02-09
 
 - **[UPDATE]** Update deps.
 - **[UPDATE]** Change `vitest` shutdown behavior as mongo driver v6.13 change befaviur that affect us (`MongoClient.close` now closes any outstanding cursors).
 
 ---
 
-## [5.0.0-beta.5]
+## [5.0.0-beta.5] - 2025-01-26
 
 - **[BREAKING]** Remove `minimist` CLI parsing and replace it by `commandArguments` parser.
 - **[UPDATE]** Migrated from `eslint-plugin-import` to `eslint-plugin-import-x`.
@@ -582,13 +616,13 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.4]
+## [5.0.0-beta.4] - 2025-01-26
 
 - **[NEW]** On shutdown event now after timeout we are forcing to shutdown.
 
 ---
 
-## [5.0.0-beta.2]
+## [5.0.0-beta.2] - 2025-01-26
 
 - **[UPDATE]** Update deps.
 - **[NEW]** Add ability to skip mongo model init in CLI env.
@@ -596,41 +630,41 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-beta.1]
+## [5.0.0-beta.1] - 2025-01-21
 
 - **[UPDATE]** Update deps.
 - **[BREAKING]** `vitest` v3 <https://vitest.dev/guide/migration.html>.
 
 ---
 
-## [5.0.0-alpha.26]
+## [5.0.0-alpha.26] - 2025-01-04
 
 - **[UPDATE]** Update deps.
 - **[UPDATE]** New commands view in CLI.
 
 ---
 
-## [5.0.0-alpha.24]
+## [5.0.0-alpha.24] - 2024-11-22
 
 - **[UPDATE]** Update deps.
 - **[BREAKING]** `i18next` v24 <https://www.i18next.com/misc/migration-guide#v23.x.x-to-v24.0.0>.
 
 ---
 
-## [5.0.0-alpha.23]
+## [5.0.0-alpha.23] - 2024-11-10
 
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-alpha.22]
+## [5.0.0-alpha.22] - 2024-10-29
 
 - **[UPDATE]** Update deps.
 - **[FIX]** Fix optional routing parameters.
 
 ---
 
-## [5.0.0-alpha.21]
+## [5.0.0-alpha.21] - 2024-10-27
 
 - **[BREAKING]** Possible breaking. Framework start using express 5 instead of express 4. Please follow express migration guide too <https://expressjs.com/en/guide/migrating-5.html>.
 - **[BREAKING]** As part of express 5 migration `_` in rotes (middlewares) should have perameter. please replace `_` to `*splat`.
@@ -639,54 +673,54 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-alpha.20]
+## [5.0.0-alpha.20] - 2024-10-26
 
 - **[UPDATE]** Update deps.
 - **[UPDATE]** `#realLogger` do not throw error in a scecific cases (`model.toJSON({virtual:true})`).
 
 ---
 
-## [5.0.0-alpha.19]
+## [5.0.0-alpha.19] - 2024-10-23
 
 - **[NEW]** Added `modelSchemaOptions` for models.
 
 ---
 
-## [5.0.0-alpha.18]
+## [5.0.0-alpha.18] - 2024-10-07
 
 - **[BREAKING]** Default auth response changed to be unified. `{token, user}` => `{data:{token, user}}`.
 - **[UPDATE]** `RateLimiter` updae key generation.
 
 ---
 
-## [5.0.0-alpha.17]
+## [5.0.0-alpha.17] - 2024-10-05
 
 - **[NEW]** `generateRandomBytes` command.
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-alpha.16]
+## [5.0.0-alpha.16] - 2024-10-02
 
 - **[UPDATE]** No warning of direct usage `body` and `query`.
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-alpha.15]
+## [5.0.0-alpha.15] - 2024-09-26
 
 - **[BUG]** Fix bug with pagination.
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-alpha.14]
+## [5.0.0-alpha.14] - 2024-09-23
 
 - **[NEW]** Add types for `Abstract` model (wip).
 
 ---
 
-## [5.0.0-alpha.13]
+## [5.0.0-alpha.13] - 2024-09-06
 
 - **[UPDATE]** Update deps.
 - **[UPDATE]** Update `i18n` internal implementation.
@@ -694,19 +728,19 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-alpha.12]
+## [5.0.0-alpha.12] - 2024-09-04
 
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-alpha.11]
+## [5.0.0-alpha.11] - 2024-08-08
 
 - **[UPDATE]** Update deps.
 
 ---
 
-## [5.0.0-alpha.10]
+## [5.0.0-alpha.10] - 2024-07-29
 
 - **[UPDATE]** Update deps.
 - **[NEW]** `IpDetector` middleware that support detecting proxy and `X-Forwarded-For` header.
@@ -714,7 +748,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-alpha.9]
+## [5.0.0-alpha.9] - 2024-07-15
 
 - **[UPDATE]** Update deps.
 - **[BREAKING]** Removing `staticFiles` middleware as it not used in projects anymore. Docs with nginx config will be provided.
@@ -723,7 +757,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-alpha.8]
+## [5.0.0-alpha.8] - 2024-05-10
 
 - **[UPDATE]** Replace `dotenv` with `loadEnvFile`.
 - **[UPDATE]** Replace `nodemon` with `node --watch` (dev only).
@@ -731,46 +765,46 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [5.0.0-alpha.7]
+## [5.0.0-alpha.7] - 2024-04-12
 
 - **[UPDATE]** Deps update.
 
 ---
 
-## [5.0.0-alpha.6]
+## [5.0.0-alpha.6] - 2024-03-03
 
 - **[UPDATE]** Update internal documentation (`jsdoc`, `d.ts`).
 
 ---
 
-## [5.0.0-alpha.5]
+## [5.0.0-alpha.5] - 2024-02-29
 
 - **[UPDATE]** More verbose errors for rapsing body request.
 - **[UPDATE]** Deps update.
 
 ---
 
-## [5.0.0-alpha.4]
+## [5.0.0-alpha.4] - 2024-02-17
 
 - **[UPDATE]** Update `rate-limiter-flexible` to v5.
 - **[CHANGE]** Cache update `redis.setEX` to `redis.set(..,..,{EX:xx})` as `setEX` deprecated.
 
 ---
 
-## [5.0.0-alpha.3]
+## [5.0.0-alpha.3] - 2024-02-14
 
 - **[UPDATE]** Deps update.
 - **[FIX]** `Migration` commands apply.
 
 ---
 
-## [5.0.0-alpha.2]
+## [5.0.0-alpha.2] - 2024-01-25
 
 - **[UPDATE]** Deps update.
 
 ---
 
-## [5.0.0-alpha.1]
+## [5.0.0-alpha.1] - 2023-12-04
 
 - **[BREAKING]** Vitest 1.0.0 <https://vitest.dev/guide/migration.html#migrating-from-vitest-0-34-6>.
 - **[BREAKING]** ESM only. No more commonJS. That help to fix a lot of bugs with tests and provides better development expirience.
@@ -778,1028 +812,11 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ---
 
-## [4.11.4]
+## Older versions
 
-- **[UPDATE]** Deps update.
+Release notes for previous major versions are archived in separate files:
 
----
-
-## [4.11.3]
-
-- **[UPDATE]** Deps update.
-
----
-
-## [4.11.2]
-
-- **[FIX]** `Cors` middleware return proper headers on multidomains.
-
----
-
-## [4.11.1]
-
-- **[FIX]** `Cors` middleware return proper status.
-
----
-
-## [4.11.0]
-
-- **[NEW]** `Cors` middleware.
-- **[BREAKING]** This is a potential breaking change as we switched from `cors` external package to internal middleware. From API nothing was changed. This is a potential breaking changes, but it should keep working as it.
-
----
-
-## [4.10.0]
-
-- **[UPDATE]** Deps update.
-- **[NEW]** Static file middleware.
-- **[BREAKING]** This is a potential breaking change as we switched from `express.static` to internal middleware that provide less features but faster. From API nothing was changed.
-
----
-
-## [4.9.2]
-
-- **[UPDATE]** Deps update.
-
----
-
-## [4.9.1]
-
-- **[UPDATE]** All responses from framework now happens in JSON. Previouls sometime aswers was in plan text.
-
----
-
-## [4.9.0]
-
-- **[BREAKING]** We are separated testsing to setyp and global setup. Global setup now care of mongo to make sure that only on mongodb memory server is spinned up. If you are using `vitest` please add `"globalSetup": "node_modules/@adaptivestone/framework/tests/globalSetupVitest"` to your vitest config.
-
----
-
-## [4.8.3]
-
-- **[UPDATE]** Fix problme with fat start and closing connections after.
-
----
-
-## [4.8.2]
-
-- **[UPDATE]** CLI - disable mongoose index creation.
-
----
-
-## [4.8.1]
-
-- **[UPDATE]** Model inited on server inited.
-- **[NEW]** New options to skip model init `isSkipModelInit`.
-- **[NEW]** New method server method `initAllModels()`.
-
----
-
-## [4.8.0]
-
-- **[BREAKING]** Minimum node js version id 18.17.0 now.
-- **[BREAKING]** Removed `getFileWithExtendingInhirence`. This was internal method and not suppose to use externally.
-- **[UPDATE]** Update `Base.getFilesPathWithInheritance` to use `fs.read` dir resursive option.
-- **[UPDATE]** Update cache (refactor+tets).
-- **[UPDATE]** Update config and model inits.
-
----
-
-## [4.7.0]
-
-- **[UPDATE]** Update logger init (refactor).
-- **[UPDATE]** Updated deps.
-
----
-
-## [4.6.0]
-
-- **[NEW]** Migrated from JEST to `vitest`.
-
----
-
-## [4.5.0]
-
-- **[NEW]** Now `getSuper()` available as a method on mongoose models.
-- **[UPDATE]** Update `rate-limiter-flexible` to v3.
-- **[UPDATE]** Update test runner to suport ESM. In case problem with test please copy `babel.config.js` from framework to your project directory.
-
----
-
-## [4.4.0]
-
-- **[NEW]** New method to grab url of server it testing enviroument `global.server.testingGetUrl("/some/endpoint")`.
-
----
-
-## [4.3.1]
-
-- **[UPDATE]** `Yup` file validator update. As formidable now return all fields as an array.
-
----
-
-## [4.3.0]
-
-- **[BREAKING]** Updated `formidable` with a new version + tests. Marked as breaking because of a new major version, but this is internal of framework and exernal still the same. Should break nothing.
-
----
-
-## [4.2.0]
-
-- **[UPDATE]** Updated deps.
-- **[NEW]** `CreateUser` cli command. Ability to update user by email or id.
-
----
-
-## [4.1.0]
-
-- **[UPDATE]** Updated deps.
-- **[NEW]** Email - Ability to render templae to string for future usage.
-
----
-
-## [4.0.0]
-
-- **[BREAKING]** Change `bcrypt` encryption with `scrypt`.
-- **[BREAKING]** Change internal express parser to `formidable` parser. Affect you if external `formidable` is used.
-- **[BREAKING]** Should not affect any user. Changed `email-templates` module to internal implementation. Idea to keep dependensy list smaller.
-- **[BREAKING]** Change `i18n` middleware to internal one. Nothing should be affected.
-- **[BREAKING]** Now validation of request splitted between `request` and `query`.
-- **[BREAKING]** `supportedLngs` option added to `i18n` config.
-- **[BREAKING]** Email inliner now looking for `src/services/messaging/email/resources` folder instead of `build` folder.
-- **[BREAKING]** Mongoose v7. <https://mongoosejs.com/docs/migrating_to_7.html>.
-- **[BREAKING]** `Yup` validation was updated to v1 <https://github.com/jquense/yup/issues/1906>.
-- **[DEPRECATED]** `getExpress` path is deprecated. Renamed to `getHttpPath`.
-- **[NEW]** Pagination middleware.
-- **[NEW]** `requestLogger` middleware. Migrated from core server to be an middleware.
-- **[NEW]** `CreateUser` command.
-- **[NEW]** Custom `yup` validator for validate File requests.
-- **[UPDATE]** Updated deps.
-- **[UPDATE]** `openApi` generator support files.
-- **[UPDATE]** Updated `18n` middleware. Introduced internal cachce. Speed up of request processing up to 100%.
-- **[UPDATE]** Cache drivers to JSON support `BigInt` numbers.
-
----
-
-## [3.4.3]
-
-- **[UPDATE]** Updated deps.
-- **[FIX]** Fix tests for redis.
-- **[FIX]** Support in tests `TEST_FOLDER_EMAILS`.
-
----
-
-## [3.4.2]
-
-- **[UPDATE]** Updated deps.
-- **[FIX]** Fix documentation generation.
-
----
-
-## [3.4.1]
-
-- **[FIX]** Fix documentation generation.
-
----
-
-## [3.4.0]
-
-- **[NEW]** Now we pass `req` to validation and casting as a second parameter. This done mostly for custom validators.
-
----
-
-## [3.3.0]
-
-- **[NEW]** New command `SyncIndexes` to sync indexes for mongodb <https://framework.adaptivestone.com/docs/cli#syncindexes>.
-- **[UPDATE]** Updated deps.
-- **[FIX]** Fix documentation generation.
-
----
-
-## [3.2.2]
-
-- **[UPDATE]** Add options for `i18n` to config.
-- **[CHANGE]** By default `i18n` not writing missed keys. Can be enabled via config.
-
----
-
-## [3.2.1]
-
-- **[UPDATE]** Updated deps.
-- **[FIX]** Fix documentation generation.
-
----
-
-## [3.2.0]
-
-- **[UPDATE]** Updated deps.
-- **[NEW]** `cache.removeKey(key)` - function to remove key from cache.
-
----
-
-## [3.1.1]
-
-- **[UPDATE]** Updated deps.
-- **[FIX]** Fix cache error handling.
-
----
-
-## [3.1.0]
-
-- **[NEW]** New comand to generate open API documentation (wip).
-- **[NEW]** Coverage report.
-- **[UPDATE]** Updated deps.
-
----
-
-## [3.0.23]
-
-- **[UPDATE]** Updated deps.
-- **[FIX]** Fix custom errors.
-
----
-
-## [3.0.22]
-
-- **[UPDATE]** Updated deps.
-- **[UPDATE]** Cast function now can be ASYNC too.
-
----
-
-## [3.0.21]
-
-- **[UPDATE]** Updated redis to v4.
-- **[NEW]** Updates tests to have own namespace on redis.
-
----
-
-## [3.0.20]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.19]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.18]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Change default branch to `main`.
-
----
-
-## [3.0.17]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.16]
-
-- **[UPDATE]** Update deps.
-- **[FIX]** Fix bug with route level middleware.
-
----
-
-## [3.0.15]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Minimum node version 16.
-
----
-
-## [3.0.14]
-
-- **[NEW]** Now possible to show all errors during validation (default one) by parameter `controllerValidationAbortEarly`.
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.13]
-
-- **[UPDATE]** Bug fix with "mergeParams".
-
----
-
-## [3.0.12]
-
-- **[NEW]** Ability to pass "mergeParams" options to express router.
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.11]
-
-- **[UPDATE]** More verbose email error.
-
----
-
-## [3.0.10]
-
-- **[UPDATE]** Update deps.
-- **[CHANGE]** Tests `afterAll` not using timeout anymore (conflict with jest 28-alpha).
-- **[NEW]** Config for mail now supports "EMAIL_TRANSPORT" env variable. SMTP by default (as was).
-
----
-
-## [3.0.9]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.8]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.7]
-
-- **[UPDATE]** Update deps.
-- **[CHANGE]** Change default `getConfig` method.
-
----
-
-## [3.0.6]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.5]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.4]
-
-- **[UPDATE]** Fix bug with app shutdown.
-
----
-
-## [3.0.3]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.2]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [3.0.1]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** `getUserByTokens` more logs.
-
----
-
-## [3.0.0]
-
-- **[BREAKING]** Mongoose v6. Than a lot of changes:[mongoDB drive changes](https://github.com/mongodb/node-mongodb-native/blob/4.0/docs/CHANGES_4.0.0.md), [Mongoose changes](https://mongoosejs.com/docs/migrating_to_6.html).
-  Notable changes from migration
-  Removed `execPopulate()`[link](https://mongoosejs.com/docs/migrating_to_6.html#removed-execpopulate)
-  ```js
-  // Document#populate() now returns a promise and is now no longer chainable.
-  //Replace
-  await doc.populate('path1').populate('path2').execPopulate();
-  // with
-  await doc.populate(['path1', 'path2']);
-  //Replace
-  await doc
-    .populate('path1', 'select1')
-    .populate('path2', 'select2')
-    .execPopulate();
-  // with
-  await doc.populate([
-    { path: 'path1', select: 'select1' },
-    { path: 'path2', select: 'select2' },
-  ]);
-  ```
-- **[REMOVED]** Removed deprecated router handler string not allowed anymore. Use functions by itself.
-- **[REMOVED]** Removed deprecated `someSecretSalt()` on user model (use `this.saltSecret` instead).
-- **[REMOVED]** Removed deprecated `validate()` on abstract controller and as result validator dependency. Use request validators instead.
-- **[REMOVED]** Removed deprecated `isUseControllerNameForRouting()` on abstract controller. Use `getExpressPath()` instead.
-- **[REMOVED]** Removed deprecated `Base.loadFilesWithInheritance` please use `getFilesPathWithInheritance` that produce almost the same output.
-- **[BREAKING]** Removed "success" field on Auth contreoller. Please use http status instead.
-- **[BREAKING]** Auth controller - "error" error response renamed to "message".
-  ```js
-  // Before
-  {
-    error: 'Some error';
-  }
-  // After
-  {
-    message: 'Some error';
-  }
-  ```
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Winston console transport now using timestapms.
-- **[UPDATE]** `PrepareAppInfo` middleware now a global one. Do not need to include it on every controller.
-- **[NEW]** Request also works with `req.query`, but `req.body` have bigger priority.
-
----
-
-## [2.18.0]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Replace `body-parser` with `express.json`.
-- **[NEW]** Role middleware.
-
----
-
-## [2.17.0]
-
-- **[UPDATE]** Update deps.
-- **[NEW]** New env variable `LOGGER_SENTRY_LEVEL` (default=`info`).
-- **[NEW]** New env variable `LOGGER_CONSOLE_ENABLE` (default=`true`).
-- **[BREAKING]** On translation we changed `i18next`. Please convert files if you have plurals inside it <https://i18next.github.io/i18next-v4-format-converter-web/>.
-
----
-
-## [2.16.0]
-
-- **[UPDATE]** Update deps.
-- **[NEW]** Begin adding type script definitions.
-
----
-
-## [2.15.4]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Update tests timeout.
-
----
-
-## [2.15.0]
-
-- **[UPDATE]** Update deps.
-- **[NEW]** Ability to configure Auth flow with `isAuthWithVefificationFlow` option.
-- **[BREAKING]** Register not return status 201 instead of 200.
-
----
-
-## [2.14.0]
-
-- **[NEW]** Add `Sequence`. It provide ability to easily generate sequences for given types. It save to use on distributed environments.
-  ```javascript
-  const SequenceModel = this.app.getModel('Sequence');
-  // will be 1
-  const someTypeSequence = await SequenceModel.getSequence('someType');
-  // will be 2
-  const someTypeSequence2 = await SequenceModel.getSequence('someType');
-  // will be 1 as type is another
-  const someAnotherTypeSequence =
-    await SequenceModel.getSequence('someAnotherType');
-  ```
-
----
-
-## [2.13.1]
-
-- **[FIX]** Fix documentation about not using `req.appInfo.request`, but using `req.body` for `RateLimiter`.
-
----
-
-## [2.13.0]
-
-- **[NEW]** Rate limited middleware - ability to include request components (`req.body`) for key generation. Please not that you have no access to `req.appInfo.request` on this stage.
-  ```javascript
-  static get middleware() {
-    return new Map([
-      ['POST/login', [
-        PrepareAppInfo,
-        GetUserByToken,
-        [RateLimiter,{consumeKeyComponents: { ip: false, request:['email','phone'] }}]
-      ]]
-    ]);
-  }
-  ```
-
----
-
-## [2.12.0]
-
-- **[UPDATE]** Update deps.
-- **[NEW]** Rate limited middleware.
-  As rate limited we using <https://github.com/animir/node-rate-limiter-flexible>
-  ```javascript
-  static get middleware() {
-    return new Map([
-      ['POST/login', [
-        PrepareAppInfo,
-        GetUserByToken,
-        RateLimiter
-      ]]
-    ]);
-  }
-  ```
-  Be default rate key generated based on Route, IP and userID. But you can adjust it vie config (global) or via middleware parameters (see v 2.10.0)
-  Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memory' backend activated
-  ```javascript
-  static get middleware() {
-    return new Map([
-      [
-        'POST/login',
-        [
-          PrepareAppInfo,
-          GetUserByToken,
-          [
-            RateLimiter,
-            {
-              consumeKeyComponents: { ip: false },
-              limiterOptions: { points: 5 },
-            },
-          ],
-        ],
-      ],
-    ]);
-  }
-  ```
-
----
-
-## [2.11.0]
-
-- **[NEW]** Added env variable `HTTP_HOST` for configure host to listen.
-
----
-
-## [2.10.0]
-
-- **[UPDATE]** Update deps.
-- **[NEW]** Ability to pass parameters to middleware.
-  ```javascript
-  static get middleware() {
-    return new Map([
-      ['POST/someUrl', [
-        PrepareAppInfo,
-        GetUserByToken,
-        [RoleMiddleware, { roles: ['admin'] ]}]
-      ]]
-    ]);
-  }
-  ```
-  All this params goes to constructor as a second paramater.
-
----
-
-## [2.9.2]
-
-- **[UPDATE]** Update deps.
-- **[FIX]** Fix auth nick.
-
----
-
-## [2.9.1]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [2.9.0]
-
-- **[BREAKING]** Auth controller update.
-
----
-
-## [2.8.3]
-
-- **[FIX]** Update recovery email template.
-
----
-
-## [2.8.2]
-
-- **[FIX]** Update AUTH controller.
-
----
-
-## [2.8.1]
-
-- **[UPDATE]** Update deps.
-- **[FIX]** Update AUTH controller.
-
----
-
-## [2.8.0]
-
-- **[UPDATE]** Change controllers to reflect latest changes.
-- **[UPDATE]** Add warning when using `req.body` directly.
-- **[BREAKING]** Possible breaking. `AsyncFunction` now required for router handler (it always was but without checking of code).
-- **[DEPRECATE]** Usage of `validator` of controllers.
-- **[DEPRECATE]** Usage of `isUseControllerNameForRouting` of controllers.
-
----
-
-## [2.7.4]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [2.7.3]
-
-- **[UPDATE]** Replace `i18next-node-fs-backend` to `i18next-fs-backend` (drop in replacement).
-
----
-
-## [2.7.2]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [2.7.1]
-
-- **[REMOVE]** Remove unused websocket.
-
----
-
-## [2.7.0]
-
-- **[UPDATE]** Change winston sentry transport.
-
----
-
-## [2.6.5]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Optimize deps.
-
----
-
-## [2.6.4]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [2.6.3]
-
-- **[UPDATE]** Update deps.
-- **[UPDATE]** Update handling exceptions loging.
-
----
-
-## [2.6.2]
-
-- **[UPDATE]** Normalize auth config.
-
----
-
-## [2.6.1]
-
-- **[FIX]** Fix error on cache system.
-- **[UPDATE]** `stripUnknown=true` by default on casting.
-
----
-
-## [2.6.0]
-
-- **[UPDATE]** Deps update.
-- **[NEW]** New cache system (alpha, subject of change).
-  ```javascript
-  const cacheTime = 60 * 5;
-  this.app.cache.getSetValue(
-    'someKey',
-    async () => {
-      // function that will execute in case cache value is missed
-    },
-    cacheTime,
-  );
-  ```
-
----
-
-## [2.5.1]
-
-- **[UPDATE]** Deps update.
-- **[FIX]** Fix error logging on unhadled rejection.
-
----
-
-## [2.5.0]
-
-- **[NEW]** New route handler format with request validations and casting (yup based).
-  ```javascript
-  get routes() {
-    return {
-      post: {
-        '/': {
-          handler: this.postSample,
-          request: yup.object().shape({
-            count: yup.number().max(100)required(),
-          })
-        }
-      }
-    }
-  }
-  // send request with data  {count: "5000"}
-  // will produce error with status 400 and {errors: {count:['Text error']}}
-  postSample(req,res) =>{
-    // on success validate we pass here.
-    // {count: "5000"}
-    console.log(req.appInfo.request)
-    // {count: 5000} -> casted to number
-  }
-  ```
-
----
-
-## [2.4.4]
-
-- **[UPDATE]** Deps update.
-- **[NEW]** Controller unhandled rejection now handled with default error.
-- **[NEW]** Handle error with wrong model name.
-
----
-
-## [2.4.3]
-
-- **[UPDATE]** Deps update.
-
----
-
-## [2.4.2]
-
-- **[FIX]** Abstract controlled middleware.
-- **[UPDATE]** Deps update.
-
----
-
-## [2.4.1]
-
-- **[FIX]** Updated test because of previous breaking changes.
-
----
-
-## [2.4.0]
-
-- **[BREAKING]** Possible that bug fix of middleware can affect your code. Previous route middleware was GLOBAL (`router.use`) now in router level only (`route.any`). Previous Home controller (`/` route be default) middleware affect ANY routes on app. Right now that fixed.
-- **[NEW]** Controller middleware now support methods. Previous only `ALL` was supported. Possible to start router with any method that supported by Express and middleware will be scoped by this method. If middleware route started from "/" then `ALL` method will be used (like previous bahaviour).
-  ```javascript
-  static get middleware() {
-    return new Map([['GET/*', [PrepareAppInfo, GetUserByToken]]]);
-  }
-  ```
-
----
-
-## [2.3.14]
-
-- **[FIX]** Fix validate controller method for non strings.
-
----
-
-## [2.3.13]
-
-- **[UPDATE]** Testing now with mongoDB Replica.
-- **[UPDATE]** Refactor CLI.
-
----
-
-## [2.3.12]
-
-- **[UPDATE]** Testing update.
-
----
-
-## [2.3.11]
-
-- **[UPDATE]** Refactor CLI for testing.
-
----
-
-## [2.3.10]
-
-- **[UPDATE]** Update user model indexes to allow null email and nick.
-- **[UPDATE]** Deps update.
-
----
-
-## [2.3.9]
-
-- **[FIX]** Test fix.
-
----
-
-## [2.3.8]
-
-- **[NEW]** Add `global.testSetup.beforeAll` `global.testSetup.afterAll` functions and `global.testSetup.disableUserCreate` flag for testing testing.
-
----
-
-## [2.3.7]
-
-- **[UPDATE]** Deps update.
-- **[NEW]** Add `global.testSetup.userCreate` function for testing.
-
----
-
-## [2.3.6]
-
-- **[UPDATE]** Deps update.
-- **[FIX]** Test fix.
-
----
-
-## [2.3.5]
-
-- **[NEW]** Add command `DropIndex`.
-- **[UPDATE]** Deps update.
-
----
-
-## [2.3.4]
-
-- **[NEW]** Add `webResources` option to email service.
-- **[UPDATE]** Deps update.
-
----
-
-## [2.3.3]
-
-- **[UPDATE]** Deps update.
-
----
-
-## [2.3.2]
-
-- **[FIX]** Fix controllers order to load.
-
----
-
-## [2.3.1]
-
-- **[FIX]** Fix parsing token.
-
----
-
-## [2.3.0]
-
-- **[NEW]** `Migration/create` `migration/migrate` commands.
-
----
-
-## [2.2.6]
-
-- **[NEW]** CLI command receiving parsed arguments.
-
----
-
-## [2.2.5]
-
-- **[FIX]** Fix disconnecting problems with replica set.
-
----
-
-## [2.2.4]
-
-- **[UPDATE]** Internal update for speed up cli init.
-
----
-
-## [2.2.3]
-
-- **[FIX]** Fix language detection.
-
----
-
-## [2.2.2]
-
-- **[FIX]** Fix test as part of docker image update. This just a `mongo-memory-server` problems.
-- **[NEW]** Add config to configure language detecting order and types.
-
----
-
-## [2.2.1]
-
-- **[UPDATE]** Deps update.
-
----
-
-## [2.2.0]
-
-- **[DEPRECATED]** `Base.loadFilesWithInheritance` please use `getFilesPathWithInheritance` that produce almost the same output.
-- **[UPDATE]** Deps update.
-- **[UPDATE]** Https logs now contains request time.
-- **[NEW]** Ability to put controllers into folders with path inheritance.
-- **[NEW]** Ability to replace `expressPath` on controller - `getExpressPath()` methos.
-- **[NEW]** Ability to put commands into folders with path inheritance.
-
----
-
-## [2.1.2]
-
-- **[UPDATE]** Disconnect of mongoose when command was finished.
-
----
-
-## [2.1.1]
-
-- **[UPDATE]** Deps update.
-
----
-
-## [2.1.0]
-
-- **[DEV]** Added codestyle checker.
-- **[NEW]** Initial CLI module.
-
----
-
-## [2.0.2]
-
-- **[UPDATE]** Socket.io v3.
-- **[UPDATE]** Deps update.
-
----
-
-## [2.0.1]
-
-- **[NEW]** Added config to websocket.
-
----
-
-## [2.0.0]
-
-- **[BREAKING]** Change config format of log config. Now configs can be only objects.
-
----
-
-## [1.5.0]
-
-- **[NEW]** Support for environment configs (`config.js` and `config.{NODE_ENV}.js`) with overwrite.
-- **[UPDATE]** Deps update.
-
----
-
-## [1.4.0]
-
-- **[NEW]** Ability to pass additional parameter to server that will be executed before adding page 404.
-
----
-
-## [1.3.0]
-
-- **[NEW]** Models now support optional callback that will executed on connection ready. If mongo already connected then callback will be executed immediately.
-
----
-
-## [1.2.9]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [1.2.8]
-
-- **[UPDATE]** Update deps.
-
----
-
-## [1.2.7]
-
-- **[NEW]** Add abilty to return error from custom validation functions.
-
----
-
-## [1.2.6]
-
-- **[UPDATE]** Validator documentation (jsdoc) update.
-- **[UPDATE]** Validator support pass parameters to validator.
-
----
-
-## [1.2.5]
-
-- **[FIX]** Fix problem with test (user should be global on tests).
-
----
-
-## [1.2.4]
-
-- **[NEW]** Add eslint.
-- **[UPDATE]** Code refactor.
-
----
-
-## [1.2.3]
-
-- **[NEW]** Add prettier.
-- **[UPDATE]** Code reformat.
-
----
-
-## [1.2.2]
-
-- **[UPDATE]** Update deps.
+- [v4.x](./CHANGELOG_V4.md)
+- [v3.x](./CHANGELOG_V3.md)
+- [v2.x](./CHANGELOG_V2.md)
+- [v1.x](./CHANGELOG_V1.md)

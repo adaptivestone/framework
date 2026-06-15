@@ -1,15 +1,30 @@
 /**
- * tsc-gate for the `User` auth helpers' structural typing.
+ * tsc-gate for the model-typing guarantees that keep a consuming project's
+ * call sites cast-free.
  *
  * Vitest strips types (never type-checks), and `check:types` excludes
  * `*.test.ts` — so a type-level guarantee can only be enforced by shelling out
- * to a real `tsc`. This compiles `__fixtures__/customUserModel.ts`, which calls
- * the framework's `getUserByEmailAndPassword` / `generateToken` / `getPublic` /
- * … on *customized* `User` models (additive `extends` + divergent compose).
+ * to a real `tsc`. This compiles the whole `__fixtures__` dir, each file
+ * pinning one fix:
+ *  - `customUserModel.ts`  — `User` auth statics/methods reused on *customized*
+ *    models (additive `extends` + divergent compose) with no `this` casts;
+ *  - `tsTypeOverride.ts`   — per-field `__tsType` overrides for plugin-reshaped
+ *    fields applied at every depth;
+ *  - `instanceMethodThis.ts` — instance methods with an authored narrow `this`
+ *    callable as `doc.method(...)` (caller-facing `this` stripped);
+ *  - `populatedRefOverride.ts` — the documented populate-ref pattern: a ref
+ *    marked `TsTypeOverride<ObjectId | PopulatedDoc>` resolves to that union and
+ *    narrows without a cast;
+ *  - `modelSurface.ts` — the full model surface (find/findOne/findById/lean/
+ *    create shapes, custom statics, virtuals as a clean getter return, instance
+ *    methods, and array + complex field types: enum, ref arrays, subdoc arrays,
+ *    Map, nested);
+ *  - `liteModelType.ts` — `GetModelTypeLiteFromSchema` as the `this:` context in
+ *    statics / instance methods / `initHooks`, and as `InstanceType<…>`.
  *
- * It must compile cleanly. If `UserAuthDoc` / `UserAuthModel` ever re-pin the
- * helpers to the framework's own schema, those calls fail with TS2684 and this
- * test goes red — guarding the fix for the migration's most-repeated cast.
+ * They must compile cleanly. A regression in the structural contracts re-pins a
+ * helper or re-surfaces a narrow `this`, those calls fail with TS2684, and this
+ * test goes red — guarding the migration's most-repeated casts.
  */
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';

@@ -9,11 +9,20 @@ import mongoose, { type Model } from 'mongoose';
 
 export type Merge<M, N> = Omit<M, keyof N> & N;
 
+/** The timestamp fields Mongoose adds when `timestamps` is on (the default).
+ * Typed `required: true` so `InferRawDocType` resolves them to a non-null `Date`
+ * on the hydrated doc — Mongoose always sets them, so a `| null | undefined`
+ * would force a needless guard at every read. */
+type Timestamps = {
+  createdAt: { type: DateConstructor; required: true };
+  updatedAt: { type: DateConstructor; required: true };
+};
+
 export type WithTimestamps<TOptions> = TOptions extends { timestamps: true }
-  ? { createdAt: Schema.Types.Date; updatedAt: Schema.Types.Date }
+  ? Timestamps
   : TOptions extends { timestamps: false }
     ? object
-    : { createdAt: Schema.Types.Date; updatedAt: Schema.Types.Date };
+    : Timestamps;
 
 export type ExtractProperty<
   T,
@@ -39,11 +48,33 @@ export interface TsTypeOverride<T> {
 }
 
 /**
+ * A leaf field definition — a bare constructor (`String`, `ObjectId`) or a
+ * `{ type: SomeConstructor, … }` form (String, Number, ObjectId, Date, Map,
+ * Buffer, …). This mirrors how Mongoose itself decides "leaf field" vs "nested
+ * schema", so {@link ApplyTsOverrides} recurses only into nested *schemas* (a
+ * record of field defs) and leaves built-in instances (ObjectId, Date, Map)
+ * untouched — instead of mapping over their internals, which only bloated the
+ * displayed type and wasted compile work (it was always a structural no-op).
+ */
+type IsLeafFieldDef<S> = S extends abstract new (
+  ...args: never
+) => unknown
+  ? true
+  : S extends { type: infer Tp }
+    ? Tp extends abstract new (
+        ...args: never
+      ) => unknown
+      ? true
+      : false
+    : false;
+
+/**
  * Walk an inferred raw-doc type alongside its schema and replace each field
  * marked with {@link TsTypeOverride} by the declared override type. Recurses
  * into nested objects and subdocument arrays (a reshaped field can appear at any
- * depth); leaves everything else — including arrays of primitives — untouched.
- * A schema with no markers maps to a structurally identical type, so existing
+ * depth); leaves everything else — including arrays of primitives and built-in
+ * instances (ObjectId/Date/Map, via {@link IsLeafFieldDef}) — untouched. A
+ * schema with no markers maps to a structurally identical type, so existing
  * models are unaffected. The marker is detected by the *presence* of the
  * `__tsType` key (not by `extends TsTypeOverride`, which an optional property
  * would match on every field).
@@ -57,18 +88,51 @@ export type ApplyTsOverrides<Doc, Schema> = {
       : NonNullable<Schema[K]> extends readonly (infer E)[]
         ? NonNullable<Doc[K]> extends readonly (infer D)[]
           ? D extends object
-            ? ApplyTsOverrides<D, E>[] | Exclude<Doc[K], readonly unknown[]>
+            ? IsLeafFieldDef<E> extends true
+              ? Doc[K]
+              : ApplyTsOverrides<D, E>[] | Exclude<Doc[K], readonly unknown[]>
             : Doc[K]
           : Doc[K]
         : NonNullable<Schema[K]> extends object
           ? NonNullable<Doc[K]> extends object
-            ?
-                | ApplyTsOverrides<NonNullable<Doc[K]>, NonNullable<Schema[K]>>
-                | Exclude<Doc[K], object>
+            ? IsLeafFieldDef<NonNullable<Schema[K]>> extends true
+              ? Doc[K]
+              :
+                  | ApplyTsOverrides<
+                      NonNullable<Doc[K]>,
+                      NonNullable<Schema[K]>
+                    >
+                  | Exclude<Doc[K], object>
             : Doc[K]
           : Doc[K]
     : Doc[K];
 };
+
+/**
+ * True when a schema carries at least one {@link TsTypeOverride} marker anywhere
+ * — at the top level, inside a nested object, or inside a subdocument array.
+ * Recurses with the same leaf/array/object shape as {@link ApplyTsOverrides}, so
+ * it cannot miss a marker the override pass would have applied. Used to skip the
+ * whole override mapping for the overwhelmingly common marker-free model, so its
+ * doc type is the plain Mongoose inference with no `ApplyTsOverrides<…>` wrapper
+ * in hovers and no extra compile work.
+ */
+type HasTsOverride<S> = S extends object
+  ? '__tsType' extends keyof S
+    ? true
+    : IsLeafFieldDef<S> extends true
+      ? false
+      : S extends readonly (infer E)[]
+        ? HasTsOverride<E>
+        : true extends { [K in keyof S]: HasTsOverride<S[K]> }[keyof S]
+          ? true
+          : false
+  : false;
+
+/** {@link ApplyTsOverrides} only when the schema actually has a marker;
+ * otherwise the inferred doc verbatim (a strict no-op, but without the wrapper). */
+type MaybeApplyOverrides<Doc, Schema> =
+  HasTsOverride<Schema> extends true ? ApplyTsOverrides<Doc, Schema> : Doc;
 
 /** The raw doc type Mongoose infers from a class's `modelSchema` + timestamps. */
 type InferredRawDoc<T extends typeof BaseModel> = InferRawDocType<
@@ -78,9 +142,9 @@ type InferredRawDoc<T extends typeof BaseModel> = InferRawDocType<
     >
 >;
 
-/** {@link InferredRawDoc} with any per-field `__tsType` overrides applied
- * (identical to it when the schema carries no markers). */
-type OverriddenRawDoc<T extends typeof BaseModel> = ApplyTsOverrides<
+/** {@link InferredRawDoc} with any per-field `__tsType` overrides applied —
+ * and, for a marker-free schema, exactly {@link InferredRawDoc} with no wrapper. */
+type OverriddenRawDoc<T extends typeof BaseModel> = MaybeApplyOverrides<
   InferredRawDoc<T>,
   ExtractProperty<T, 'modelSchema'>
 >;
@@ -105,18 +169,50 @@ export type VirtualType<T> = {
   [P in keyof T]: T[P] extends { get: () => infer R } ? R : never;
 };
 
+/**
+ * Caller-facing view of instance methods: drop the authored `this` constraint
+ * from each method when projecting them onto the document type. A method body
+ * may declare an explicit `this: <bridge>` (a narrower hand-written shape the
+ * body needs — e.g. a populated ref or a plugin-reshaped field); that bridge is
+ * deliberately not assignable-from the framework-computed hydrated doc, so a
+ * direct `doc.method(...)` call would otherwise fail the this-context check
+ * (TS2684) even though `this` is always correctly bound at runtime. Stripping it
+ * here fixes the false positive while leaving the authored definitions
+ * untouched, so method bodies stay type-checked against their declared `this`.
+ * `OmitThisParameter` returns non-function members (and methods with no explicit
+ * `this`) unchanged, so this is a strict no-op for ordinary instance methods.
+ *
+ * Known limitation: a method that is BOTH generic AND declares an explicit
+ * `this` loses its type parameters here (they collapse to their constraint) —
+ * `OmitThisParameter` rebuilds the signature via `infer`, which can't carry
+ * generics. This is rare (instance methods are seldom generic), and the
+ * alternative was worse: such a method was previously uncallable (TS2684). A
+ * generic method WITHOUT an explicit `this` is untouched (no-op) and keeps its
+ * generics; drop the `this` annotation if generic inference matters.
+ */
+export type DocFacingMethods<M> = {
+  [K in keyof M]: OmitThisParameter<M[K]>;
+};
+
 // this came from moongose. Look at the Model and Schema types.
 export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
   OverriddenRawDoc<T>, // TRawDocType
   object, // TQueryHelpers
-  ExtractProperty<T, 'modelInstanceMethods'>, // TInstanceMethods
+  DocFacingMethods<ExtractProperty<T, 'modelInstanceMethods'>>, // TInstanceMethods
   ExtractProperty<T, 'modelVirtuals'>, // TVirtuals
   HydratedDocument<
     OverriddenRawDoc<T>, // TRawDocType
     VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
-      ExtractProperty<T, 'modelInstanceMethods'> & { id: string }, // TVirtuals & TInstanceMethods
+      DocFacingMethods<ExtractProperty<T, 'modelInstanceMethods'>> & {
+        id: string;
+      }, // TVirtuals & TInstanceMethods (caller-facing `this` stripped)
     object, // TQueryHelpers
-    ExtractProperty<T, 'modelVirtuals'> // TVirtuals
+    // Resolve virtuals to their getter's return type here too (not the raw
+    // `{ get, set, options }` def): this slot feeds mongoose's inner
+    // `Document<…, TVirtuals, …>`, and a raw def would intersect with the
+    // resolved `VirtualType<…>` above to give an ugly `string & { get; … }`
+    // instead of a clean `string` on `doc.<virtual>`.
+    VirtualType<ExtractProperty<T, 'modelVirtuals'>> // TVirtuals
   >,
   GetModelSchemaTypeFromClass<T> // TSchema
 > &
@@ -126,8 +222,9 @@ export type GetModelTypeLiteFromSchema<
   T extends typeof BaseModel.modelSchema,
   TOptions = object,
 > = Model<
-  // TRawDocType, with any per-field `__tsType` overrides applied.
-  ApplyTsOverrides<
+  // TRawDocType, with any per-field `__tsType` overrides applied (and no wrapper
+  // when the schema carries no markers).
+  MaybeApplyOverrides<
     InferRawDocType<T & WithTimestamps<Merge<typeof defaultOptions, TOptions>>>,
     T
   >
