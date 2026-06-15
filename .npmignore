@@ -23,4 +23,5 @@ lefthook.yml
 /docs/*
 .env.example
 .npmignore
-CHANGELOG.md
+# Ship only the current changelog; drop the archived major-version histories.
+CHANGELOG_V*.md
