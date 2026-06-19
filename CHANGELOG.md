@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-06-19
+
+First stable release of the **v5** series — a major rewrite. v5 is
+TypeScript-first and ESM-only, replaces Express's hidden router with a
+framework-owned tree-based router, makes validation validator-agnostic via
+[Standard Schema](https://standardschema.dev/), and hardens auth and boot.
+
+This section is an upgrade-oriented summary. The granular per-change notes
+(every `[NEW]` / `[FIX]` / `[BREAKING]`) live in the `5.0.0-rc.1` … `5.0.0-rc.9`
+entries below; nothing changed in behavior between rc.9 and this release.
+
+### Highlights
+
+- **Full TypeScript support, including Mongoose models.** New `BaseModel`
+  statics-based model type; per-controller route/handler type generation
+  (`npm run gen` → `<File>.routes.gen.ts` + `genTypes.d.ts`) so handler
+  signatures, `req.appInfo`, `params`, and `query` are typed from the real
+  resolved middleware chain. Typed `getConfig` / `getModel`.
+- **Tree-based router.** A framework-owned `RouteRegistry` replaces Express's
+  internal router: structural specificity (static > param > splat), per-segment
+  URL decoding, `405` + `Allow`, `400` on malformed paths, HEAD→GET fallback,
+  and a boot-time route-tree log. Walkable by codegen / future emitters.
+- **Standard Schema validation.** Yup ≥1.7, Zod, Valibot, and ArkType work out
+  of the box; pluggable `ValidatorDriver` + `ValidateService.register()`;
+  framework-owned `ValidationError` with structured `.issues`.
+- **Security hardening.** Random, SHA-256-hashed session / recovery /
+  verification tokens with enforced expiry; per-user-salt versioned scrypt
+  password scheme; standard security headers on by default; account-enumeration
+  oracles closed; credentials no longer written to logs.
+- **Robust lifecycle.** Graceful shutdown on `SIGTERM`/`SIGINT` (drains
+  in-flight requests, tears down mongo/redis/logger); fail-fast boot (Mongo and
+  `AUTH_SALT` required); crash-loop protection for clustered workers.
+- **Runtime.** ESM-only, Node ≥ 24, runs `.ts` sources natively with no build
+  step. New helpers/models: `AppInstance`, `Lock`, `i18nService`, `IpDetector`,
+  and test helpers (`getTestServerURL`, `serverInstance`).
+
+### Breaking changes (v4 → v5)
+
+Read the `5.0.0-rc.1` entry below for the full text and migration notes; the
+condensed list:
+
+- **Runtime & deps:** Node ≥ 24, ESM-only (no CommonJS); Express 5, Mongoose 9,
+  Vitest 4, i18next 24, `@redis/client` v6 (RESP3 default). Jest support and
+  `minimist` CLI parsing removed.
+- **Validation:** Yup is now an **optional peer dependency** (validator-agnostic
+  Standard Schema). Legacy `{validate, cast}` validators, internal driver
+  classes, and Yup `req:` context in `.test()`/`.when()` removed; `ValidateService`
+  surface trimmed; `relatedRequest/QueryParameters` default to `null`.
+- **Routing:** path syntax narrowed to literals, `:name`, and `{*name}` splats —
+  Express 5 optional params (`{:name}`) and inline regex are unsupported; replace
+  bare `_` route params with `*splat`. Route-type codegen requires statically
+  analyzable controllers. OpenAPI/documentation generation removed (returns later
+  with per-vendor `toJsonSchema`).
+- **Models & auth:** all models must extend `BaseModel`. `AUTH_SALT` is required
+  (no default) and Mongo is required at boot. Default auth response changed to
+  `{ data: { token, user } }`. On upgrade, **all existing sessions and
+  recovery/verification links are invalidated** (token hardening); passwords
+  migrate silently on next login. `POST /auth/send-recovery-email` and
+  `/auth/send-verification` now return a uniform `200` (no account-existence
+  oracle) — update any frontend that branched on the old `400`. `RateLimiter`
+  now requires `IpDetector` earlier in the chain.
+- **Removed / moved:** the email module moved to
+  `@adaptivestone/framework-module-email`; `staticFiles` middleware, `VIEWS`
+  folders, and `nodemailer-sendmail-transport` removed. The package `exports` map
+  is scoped to the public surface — internal subpaths are no longer importable
+  (see "Public API & stability" in the README).
+
 ## [5.0.0-rc.9] - 2026-06-15
 
 - **[FIX]** Regression in rc.8: a model whose `modelSchema` reuses a pre-built
