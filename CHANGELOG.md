@@ -2,218 +2,78 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [5.0.0] - 2026-06-19
 
-First stable release of the **v5** series — a major rewrite. v5 is
-TypeScript-first and ESM-only, replaces Express's hidden router with a
-framework-owned tree-based router, makes validation validator-agnostic via
-[Standard Schema](https://standardschema.dev/), and hardens auth and boot.
+First stable release of the **v5** series — a major rewrite. v5 is TypeScript-first and ESM-only, replaces Express's hidden router with a framework-owned tree-based router, makes validation validator-agnostic via [Standard Schema](https://standardschema.dev/), and hardens auth and boot.
 
-This section is an upgrade-oriented summary. The granular per-change notes
-(every `[NEW]` / `[FIX]` / `[BREAKING]`) live in the `5.0.0-rc.1` … `5.0.0-rc.9`
-entries below; nothing changed in behavior between rc.9 and this release.
+This section is an upgrade-oriented summary. The granular per-change notes (every `[NEW]` / `[FIX]` / `[BREAKING]`) live in the `5.0.0-rc.1` … `5.0.0-rc.9` entries below; nothing changed in behavior between rc.9 and this release.
 
 ### Highlights
 
-- **Full TypeScript support, including Mongoose models.** New `BaseModel`
-  statics-based model type; per-controller route/handler type generation
-  (`npm run gen` → `<File>.routes.gen.ts` + `genTypes.d.ts`) so handler
-  signatures, `req.appInfo`, `params`, and `query` are typed from the real
-  resolved middleware chain. Typed `getConfig` / `getModel`.
-- **Tree-based router.** A framework-owned `RouteRegistry` replaces Express's
-  internal router: structural specificity (static > param > splat), per-segment
-  URL decoding, `405` + `Allow`, `400` on malformed paths, HEAD→GET fallback,
-  and a boot-time route-tree log. Walkable by codegen / future emitters.
-- **Standard Schema validation.** Yup ≥1.7, Zod, Valibot, and ArkType work out
-  of the box; pluggable `ValidatorDriver` + `ValidateService.register()`;
-  framework-owned `ValidationError` with structured `.issues`.
-- **Security hardening.** Random, SHA-256-hashed session / recovery /
-  verification tokens with enforced expiry; per-user-salt versioned scrypt
-  password scheme; standard security headers on by default; account-enumeration
-  oracles closed; credentials no longer written to logs.
-- **Robust lifecycle.** Graceful shutdown on `SIGTERM`/`SIGINT` (drains
-  in-flight requests, tears down mongo/redis/logger); fail-fast boot (Mongo and
-  `AUTH_SALT` required); crash-loop protection for clustered workers.
-- **Runtime.** ESM-only, Node ≥ 24, runs `.ts` sources natively with no build
-  step. New helpers/models: `AppInstance`, `Lock`, `i18nService`, `IpDetector`,
-  and test helpers (`getTestServerURL`, `serverInstance`).
+- **Full TypeScript support, including Mongoose models.** New `BaseModel` statics-based model type; per-controller route/handler type generation (`npm run gen` → `<File>.routes.gen.ts` + `genTypes.d.ts`) so handler signatures, `req.appInfo`, `params`, and `query` are typed from the real resolved middleware chain. Typed `getConfig` / `getModel`.
+- **Tree-based router.** A framework-owned `RouteRegistry` replaces Express's internal router: structural specificity (static > param > splat), per-segment URL decoding, `405` + `Allow`, `400` on malformed paths, HEAD→GET fallback, and a boot-time route-tree log. Walkable by codegen / future emitters.
+- **Standard Schema validation.** Yup ≥1.7, Zod, Valibot, and ArkType work out of the box; pluggable `ValidatorDriver` + `ValidateService.register()`; framework-owned `ValidationError` with structured `.issues`.
+- **Security hardening.** Random, SHA-256-hashed session / recovery / verification tokens with enforced expiry; per-user-salt versioned scrypt password scheme; standard security headers on by default; account-enumeration oracles closed; credentials no longer written to logs.
+- **Robust lifecycle.** Graceful shutdown on `SIGTERM`/`SIGINT` (drains in-flight requests, tears down mongo/redis/logger); fail-fast boot (Mongo and `AUTH_SALT` required); crash-loop protection for clustered workers.
+- **Runtime.** ESM-only, Node ≥ 24, runs `.ts` sources natively with no build step. New helpers/models: `AppInstance`, `Lock`, `i18nService`, `IpDetector`, and test helpers (`getTestServerURL`, `serverInstance`).
 
 ### Breaking changes (v4 → v5)
 
-Read the `5.0.0-rc.1` entry below for the full text and migration notes; the
-condensed list:
+Read the `5.0.0-rc.1` entry below for the full text and migration notes; the condensed list:
 
-- **Runtime & deps:** Node ≥ 24, ESM-only (no CommonJS); Express 5, Mongoose 9,
-  Vitest 4, i18next 24, `@redis/client` v6 (RESP3 default). Jest support and
-  `minimist` CLI parsing removed.
-- **Validation:** Yup is now an **optional peer dependency** (validator-agnostic
-  Standard Schema). Legacy `{validate, cast}` validators, internal driver
-  classes, and Yup `req:` context in `.test()`/`.when()` removed; `ValidateService`
-  surface trimmed; `relatedRequest/QueryParameters` default to `null`.
-- **Routing:** path syntax narrowed to literals, `:name`, and `{*name}` splats —
-  Express 5 optional params (`{:name}`) and inline regex are unsupported; replace
-  bare `_` route params with `*splat`. Route-type codegen requires statically
-  analyzable controllers. OpenAPI/documentation generation removed (returns later
-  with per-vendor `toJsonSchema`).
-- **Models & auth:** all models must extend `BaseModel`. `AUTH_SALT` is required
-  (no default) and Mongo is required at boot. Default auth response changed to
-  `{ data: { token, user } }`. On upgrade, **all existing sessions and
-  recovery/verification links are invalidated** (token hardening); passwords
-  migrate silently on next login. `POST /auth/send-recovery-email` and
-  `/auth/send-verification` now return a uniform `200` (no account-existence
-  oracle) — update any frontend that branched on the old `400`. `RateLimiter`
-  now requires `IpDetector` earlier in the chain.
-- **Removed / moved:** the email module moved to
-  `@adaptivestone/framework-module-email`; `staticFiles` middleware, `VIEWS`
-  folders, and `nodemailer-sendmail-transport` removed. The package `exports` map
-  is scoped to the public surface — internal subpaths are no longer importable
-  (see "Public API & stability" in the README).
+- **Runtime & deps:** Node ≥ 24, ESM-only (no CommonJS); Express 5, Mongoose 9, Vitest 4, i18next 24, `@redis/client` v6 (RESP3 default). Jest support and `minimist` CLI parsing removed.
+- **Validation:** Yup is now an **optional peer dependency** (validator-agnostic Standard Schema). Legacy `{validate, cast}` validators, internal driver classes, and Yup `req:` context in `.test()`/`.when()` removed; `ValidateService` surface trimmed; `relatedRequest/QueryParameters` default to `null`.
+- **Routing:** path syntax narrowed to literals, `:name`, and `{*name}` splats — Express 5 optional params (`{:name}`) and inline regex are unsupported; replace bare `_` route params with `*splat`. Route-type codegen requires statically analyzable controllers. OpenAPI/documentation generation removed (returns later with per-vendor `toJsonSchema`).
+- **Models & auth:** all models must extend `BaseModel`. `AUTH_SALT` is required (no default) and Mongo is required at boot. Default auth response changed to `{ data: { token, user } }`. On upgrade, **all existing sessions and recovery/verification links are invalidated** (token hardening); passwords migrate silently on next login. `POST /auth/send-recovery-email` and `/auth/send-verification` now return a uniform `200` (no account-existence oracle) — update any frontend that branched on the old `400`. `RateLimiter` now requires `IpDetector` earlier in the chain.
+- **Removed / moved:** the email module moved to `@adaptivestone/framework-module-email`; `staticFiles` middleware, `VIEWS` folders, and `nodemailer-sendmail-transport` removed. The package `exports` map is scoped to the public surface — internal subpaths are no longer importable (see "Public API & stability" in the README).
 
 ## [5.0.0-rc.9] - 2026-06-15
 
-- **[FIX]** Regression in rc.8: a model whose `modelSchema` reuses a pre-built
-  mongoose `Schema` instance as a (sub-)document definition (`field: SubSchema`
-  or `[SubSchema]` — a standard Mongoose pattern) failed to type-check at every
-  `findOne(...)` call site with `TS2615` ("circularly references itself in mapped
-  type"). The rc.8 marker-scan (`HasTsOverride`) recursed over `keyof Schema`,
-  and a `Schema` instance isn't a constructor, so it wasn't treated as a leaf —
-  the scan descended into the instance's self-referential internals
-  (`childSchemas`, `options`, `session`, …). `IsLeafFieldDef` now treats a
-  `Schema` instance as a leaf (it can carry no `__tsType` marker anyway), so the
-  scan stops there. Type-only; a `tsc`-gate fixture pins it.
+- **[FIX]** Regression in rc.8: a model whose `modelSchema` reuses a pre-built mongoose `Schema` instance as a (sub-)document definition (`field: SubSchema` or `[SubSchema]` — a standard Mongoose pattern) failed to type-check at every `findOne(...)` call site with `TS2615` ("circularly references itself in mapped type"). The rc.8 marker-scan (`HasTsOverride`) recursed over `keyof Schema`, and a `Schema` instance isn't a constructor, so it wasn't treated as a leaf — the scan descended into the instance's self-referential internals (`childSchemas`, `options`, `session`, …). `IsLeafFieldDef` now treats a `Schema` instance as a leaf (it can carry no `__tsType` marker anyway), so the scan stops there. Type-only; a `tsc`-gate fixture pins it.
 
 ## [5.0.0-rc.8] - 2026-06-15
 
-- **[FIX]** Instance methods are now callable on the hydrated document without
-  `this`-binding casts. A method whose body needs a narrower shape can declare an
-  explicit `this: <bridge>` (a populated ref, a non-null plugin-reshaped field,
-  reassignable sibling methods); that bridge was carried verbatim onto the
-  document type, so a direct `doc.method(...)` call failed the this-context check
-  (`TS2684`) — the framework-computed hydrated doc is deliberately not assignable
-  to the narrower bridge — and every call site needed a
-  `(schema.methods.x as …).call(doc, …)` cast. The caller-facing projection now
-  strips the authored `this` (a method accessed on its own document always has
-  the right `this` at runtime), while method bodies stay type-checked against
-  their declared `this`. Purely a type change, no runtime impact; a `tsc`-gate
-  test pins it.
+- **[FIX]** Instance methods are now callable on the hydrated document without `this`-binding casts. A method whose body needs a narrower shape can declare an explicit `this: <bridge>` (a populated ref, a non-null plugin-reshaped field, reassignable sibling methods); that bridge was carried verbatim onto the document type, so a direct `doc.method(...)` call failed the this-context check (`TS2684`) — the framework-computed hydrated doc is deliberately not assignable to the narrower bridge — and every call site needed a `(schema.methods.x as …).call(doc, …)` cast. The caller-facing projection now strips the authored `this` (a method accessed on its own document always has the right `this` at runtime), while method bodies stay type-checked against their declared `this`. Purely a type change, no runtime impact; a `tsc`-gate test pins it.
 
-- **[FIX]** A virtual now resolves to its getter's return type on the document
-  (e.g. `doc.fullName` is `string`) instead of the leaked raw definition
-  (`string & { get(): string; options: … }`). The virtuals slot fed to
-  Mongoose's inner document type was the raw `{ get, set, options }` object; it
-  is now the resolved `VirtualType<…>`, matching the override slot. Type-only.
+- **[FIX]** A virtual now resolves to its getter's return type on the document (e.g. `doc.fullName` is `string`) instead of the leaked raw definition (`string & { get(): string; options: … }`). The virtuals slot fed to Mongoose's inner document type was the raw `{ get, set, options }` object; it is now the resolved `VirtualType<…>`, matching the override slot. Type-only.
 
-- **[FIX]** `createdAt` / `updatedAt` are now typed as a non-null `Date` on the
-  hydrated document instead of `Date | null | undefined`. Mongoose always sets
-  the timestamps, so the nullable type only forced a needless guard at every
-  read. Type-only change.
+- **[FIX]** `createdAt` / `updatedAt` are now typed as a non-null `Date` on the hydrated document instead of `Date | null | undefined`. Mongoose always sets the timestamps, so the nullable type only forced a needless guard at every read. Type-only change.
 
-- **[FIX]** Cleaner `TsTypeOverride` typing (rc.7 feature). The override mapping
-  no longer recurses into built-in instances (`ObjectId` refs, `Date`, `Map`) —
-  they showed as `ApplyTsOverrides<ObjectId, …>` in hovers though the recursion
-  was a no-op — and a marker-free schema (the common case) now skips the mapping
-  entirely, so its document type is the plain Mongoose inference with no wrapper
-  in hovers and no extra compile work. Type-only; no change to which types
-  resolve, only how cleanly.
+- **[FIX]** Cleaner `TsTypeOverride` typing (rc.7 feature). The override mapping no longer recurses into built-in instances (`ObjectId` refs, `Date`, `Map`) — they showed as `ApplyTsOverrides<ObjectId, …>` in hovers though the recursion was a no-op — and a marker-free schema (the common case) now skips the mapping entirely, so its document type is the plain Mongoose inference with no wrapper in hovers and no extra compile work. Type-only; no change to which types resolve, only how cleanly.
 
 ## [5.0.0-rc.7] - 2026-06-15
 
-- **[NEW]** Per-field compile-time type overrides for plugin-reshaped fields. A
-  schema field intersected with the new `TsTypeOverride<T>` marker is typed as
-  `T` on `getModel(...).findOne()` results and method `this`, instead of the type
-  Mongoose infers from `type:` — so a field a runtime plugin reshapes
-  (`mongoose-intl`, encrypted fields, custom getters) keeps its static and
-  runtime types in sync, removing the casts that previously bridged the gap. The
-  marker is a phantom (`__tsType`, never set at runtime); applied by a deep
-  mapped type (`ApplyTsOverrides`) that recurses into nested objects and
-  subdocument arrays. Opt-in and a strict **no-op** for any field without the
-  marker, so existing models are unchanged.
+- **[NEW]** Per-field compile-time type overrides for plugin-reshaped fields. A schema field intersected with the new `TsTypeOverride<T>` marker is typed as `T` on `getModel(...).findOne()` results and method `this`, instead of the type Mongoose infers from `type:` — so a field a runtime plugin reshapes (`mongoose-intl`, encrypted fields, custom getters) keeps its static and runtime types in sync, removing the casts that previously bridged the gap. The marker is a phantom (`__tsType`, never set at runtime); applied by a deep mapped type (`ApplyTsOverrides`) that recurses into nested objects and subdocument arrays. Opt-in and a strict **no-op** for any field without the marker, so existing models are unchanged.
 
 ## [5.0.0-rc.6] - 2026-06-14
 
-- **[FIX]** The `User` auth helpers are now reusable on a **customized** `User`
-  model without `this`-binding casts. The statics (`getUserByEmailAndPassword`,
-  `getUserBy{Token,Email,VerificationToken,PasswordRecoveryToken}`) and instance
-  methods (`generateToken`, `getPublic`, `send{Verification,PasswordRecovery}Email`)
-  were typed against the framework's own schema (`this: UserModelLite`), so on a
-  project model with a different shape every call site hit `TS2684` and needed a
-  cast. They're now typed against small structural contracts (`UserAuthDoc` /
-  `UserAuthInstance` / `UserAuthModel`, all newly exported) describing only the
-  fields each helper touches — the framework's `User` and a project's replacement
-  both satisfy them, and return types stay precise. This makes the supported
-  customization paths cast-free: `extends User` to **add** fields, or compose
-  (`extends BaseModel` + spread `User.modelStatics` / `modelInstanceMethods`) to
-  **reshape** them (an i18n `name`, a singular `role`, …) — a field-type
-  *replacement* can't go through `extends` (static-getter covariance, `TS2417`).
-  Both paths are documented on the `User` class. A `tsc`-gate test pins them.
+- **[FIX]** The `User` auth helpers are now reusable on a **customized** `User` model without `this`-binding casts. The statics (`getUserByEmailAndPassword`, `getUserBy{Token,Email,VerificationToken,PasswordRecoveryToken}`) and instance methods (`generateToken`, `getPublic`, `send{Verification,PasswordRecovery}Email`) were typed against the framework's own schema (`this: UserModelLite`), so on a project model with a different shape every call site hit `TS2684` and needed a cast. They're now typed against small structural contracts (`UserAuthDoc` / `UserAuthInstance` / `UserAuthModel`, all newly exported) describing only the fields each helper touches — the framework's `User` and a project's replacement both satisfy them, and return types stay precise. This makes the supported customization paths cast-free: `extends User` to **add** fields, or compose (`extends BaseModel` + spread `User.modelStatics` / `modelInstanceMethods`) to **reshape** them (an i18n `name`, a singular `role`, …) — a field-type *replacement* can't go through `extends` (static-getter covariance, `TS2417`). Both paths are documented on the `User` class. A `tsc`-gate test pins them.
 
-- **[FIX]** Config-type codegen no longer drops env-only keys. A config value
-  read straight from the environment with no default (`saltSecret:
-  process.env.AUTH_SALT`) is `undefined` at gen time, so the value-based pass
-  omitted it from `getConfig('…')`'s type and every read needed an `as` cast.
-  Codegen now reads the config **source** (via `oxc-parser`, no value import) and
-  types a bare `process.env.X` as `string | undefined` (and `process.env.X!` as
-  `string`) — from the source, so the result is the same whether or not the var
-  happened to be set during codegen (deterministic output, no `--check` drift).
-  Keys without an env read (literals, `process.env.X || default`) are still typed
-  from their value as before. Secrets are never serialized (types only). Nested
-  keys and `NODE_ENV`-specific config files are handled.
+- **[FIX]** Config-type codegen no longer drops env-only keys. A config value read straight from the environment with no default (`saltSecret: process.env.AUTH_SALT`) is `undefined` at gen time, so the value-based pass omitted it from `getConfig('…')`'s type and every read needed an `as` cast. Codegen now reads the config **source** (via `oxc-parser`, no value import) and types a bare `process.env.X` as `string | undefined` (and `process.env.X!` as `string`) — from the source, so the result is the same whether or not the var happened to be set during codegen (deterministic output, no `--check` drift). Keys without an env read (literals, `process.env.X || default`) are still typed from their value as before. Secrets are never serialized (types only). Nested keys and `NODE_ENV`-specific config files are handled.
 
 ## [5.0.0-rc.5] - 2026-06-14
 
-- **[FIX]** Route-type codegen extends the rc.4 untyped-`.js` degradation to
-  middleware in the `appInfo` provides chain. A controller guarded by an untyped
-  `.js` middleware (no sibling `.d.ts`) produced a gen file that did `import type
-  Mw from './Mw.js'` to build its `UnionAppInfoProvides<…>` chain — a `TS7016` in
-  a strict consumer build with no `allowJs`. Such a middleware is now dropped
-  from both the import and the chain (it contributes nothing to `appInfo`)
-  instead of breaking the typecheck. Typed middleware — `.ts`, `.js` with a
-  sibling `.d.ts`, or the framework's own (bare specifiers ship declarations) —
-  keep their precise `appInfo` contributions. Same incremental `.js` → `.ts`
-  migration goal as rc.4, now covering middleware as well as controllers.
+- **[FIX]** Route-type codegen extends the rc.4 untyped-`.js` degradation to middleware in the `appInfo` provides chain. A controller guarded by an untyped `.js` middleware (no sibling `.d.ts`) produced a gen file that did `import type Mw from './Mw.js'` to build its `UnionAppInfoProvides<…>` chain — a `TS7016` in a strict consumer build with no `allowJs`. Such a middleware is now dropped from both the import and the chain (it contributes nothing to `appInfo`) instead of breaking the typecheck. Typed middleware — `.ts`, `.js` with a sibling `.d.ts`, or the framework's own (bare specifiers ship declarations) — keep their precise `appInfo` contributions. Same incremental `.js` → `.ts` migration goal as rc.4, now covering middleware as well as controllers.
 
 ## [5.0.0-rc.4] - 2026-06-14
 
-- **[FIX]** Route-type codegen no longer emits an untyped self-import for `.js`
-  controllers. A schema-bearing controller still written in JavaScript with no
-  sibling `.d.ts` produced a gen file that did `import type Ctrl from
-  './Ctrl.js'`, which fails with `TS7016` ("could not find a declaration file")
-  in a `strict` consumer build without `allowJs` — turning `rc.3`'s
-  now-succeeding `npm run gen` into a red typecheck. Such controllers now degrade
-  gracefully: the gen file skips the self-import and their inline request/query
-  schemas fall back to the base `Record<string, unknown>`. `.ts` controllers (and
-  `.js` with a sibling `.d.ts`) keep precise `InferOutput` types. Unblocks
-  incremental `.js` → `.ts` migration.
+- **[FIX]** Route-type codegen no longer emits an untyped self-import for `.js` controllers. A schema-bearing controller still written in JavaScript with no sibling `.d.ts` produced a gen file that did `import type Ctrl from './Ctrl.js'`, which fails with `TS7016` ("could not find a declaration file") in a `strict` consumer build without `allowJs` — turning `rc.3`'s now-succeeding `npm run gen` into a red typecheck. Such controllers now degrade gracefully: the gen file skips the self-import and their inline request/query schemas fall back to the base `Record<string, unknown>`. `.ts` controllers (and `.js` with a sibling `.d.ts`) keep precise `InferOutput` types. Unblocks incremental `.js` → `.ts` migration.
 
 ## [5.0.0-rc.3] - 2026-06-13
 
-- **[CHANGE]** Route-type codegen now skips controllers it can't statically
-  analyze instead of aborting the whole run. A controller whose `routes` /
-  `middleware` / `getHttpPath` uses a loop, conditional, computed value, or
-  `super` (e.g. one that extends another controller and merges `super.routes`) is
-  skipped with a warning; types are still generated for every other controller,
-  and the skipped one works at runtime (only its generated request types are
-  omitted). Previously a single such controller failed `npm run gen` for the
-  entire project.
+- **[CHANGE]** Route-type codegen now skips controllers it can't statically analyze instead of aborting the whole run. A controller whose `routes` / `middleware` / `getHttpPath` uses a loop, conditional, computed value, or `super` (e.g. one that extends another controller and merges `super.routes`) is skipped with a warning; types are still generated for every other controller, and the skipped one works at runtime (only its generated request types are omitted). Previously a single such controller failed `npm run gen` for the entire project.
 
 ## [5.0.0-rc.2] - 2026-06-13
 
 Patch over `rc.1`, fixing a regression for consumers that extend the framework.
 
-- **[FIX]** Restored `./config/*` to the package `exports` map (it was dropped in
-  `rc.1`). Extending a framework default config — `import http from
-  '@adaptivestone/framework/config/http.js'`, then re-exporting an edited copy
-  from your own `src/config/http.ts` — threw `ERR_PACKAGE_PATH_NOT_EXPORTED` and
-  broke app boot. `config/*` is the intended Tier-2 extension surface and is
-  importable again.
+- **[FIX]** Restored `./config/*` to the package `exports` map (it was dropped in `rc.1`). Extending a framework default config — `import http from '@adaptivestone/framework/config/http.js'`, then re-exporting an edited copy from your own `src/config/http.ts` — threw `ERR_PACKAGE_PATH_NOT_EXPORTED` and broke app boot. `config/*` is the intended Tier-2 extension surface and is importable again.
 
 ## [5.0.0-rc.1] - 2026-06-13
 
-This is a big release that contains a lot of new features and breaking changes.
-Main feature of that release is full TypeScript support including mongoose models.
+This is a big release that contains a lot of new features and breaking changes. Main feature of that release is full TypeScript support including mongoose models.
 
 ### New Features
 
@@ -230,7 +90,7 @@ Main feature of that release is full TypeScript support including mongoose model
 - **[NEW]** `IpDetector` middleware for detecting proxies and `X-Forwarded-For` headers.
 - **[NEW]** Test helpers getTestServerURL and serverInstance.
 - **[NEW]** Rate limiter middleware - add consumeResult function to allow user middleware as a regular rate limiter
-- **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware 
+- **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware
 - **[NEW]**  Introduce i18nService (ability to user i18n not only inside middleware)
 - **[NEW]** [Standard Schema](https://standardschema.dev/) validation. Yup ≥1.7, Zod, Valibot, ArkType supported.
 - **[NEW]** Pluggable `ValidatorDriver` + `ValidateService.register(driver)` for custom validators.
@@ -515,7 +375,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ## [5.0.0-beta.32] - 2025-08-21
 
-- **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware 
+- **[NEW]** Ip detector middleware - add getIpAdressFromIncomingMessage function to allow user middleware as a detector of id adresses without middleware
 
 ---
 
@@ -541,7 +401,7 @@ Main feature of that release is full TypeScript support including mongoose model
 
 ## [5.0.0-beta.28] - 2025-07-29
 
-- **[UPDATE]** Inside CLI allow to have a negative values 
+- **[UPDATE]** Inside CLI allow to have a negative values
 - **[UPDATE]** Update deps.
 
 ---
