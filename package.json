@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
@@ -63,7 +63,7 @@
     "i18next": "^26.0.1",
     "i18next-fs-backend": "^2.0.0",
     "mongoose": "^9.0.0",
-    "oxc-parser": "^0.135.0",
+    "oxc-parser": "^0.137.0",
     "rate-limiter-flexible": "^11.0.0",
     "winston": "^3.3.3",
     "winston-transport": "^4.9.0"
@@ -74,7 +74,7 @@
     "@sentry/node": "^10.34.0",
     "@types/express": "^5.0.1",
     "@types/formidable": "^3.4.5",
-    "@types/node": "^25.0.0",
+    "@types/node": "^26.0.0",
     "@typescript/native-preview": "^7.0.0-dev.20260604.1",
     "@vitest/coverage-v8": "^4.0.0",
     "lefthook": "^2.0.0",
@@ -85,7 +85,7 @@
     "zod": "^4.0.0"
   },
   "peerDependencies": {
-    "@adaptivestone/framework-module-email": "^1.0.0",
+    "@adaptivestone/framework-module-email": "^1.0.0 || ^2.0.0",
     "@sentry/core": "^10.34.0",
     "@sentry/node": "^10.34.0",
     "mongodb-memory-server": "^11.0.0",

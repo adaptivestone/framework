@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.1] - 2026-06-20
+
+### Changed
+
+- Widen the optional peer dependency range for `@adaptivestone/framework-module-email` to `^1.0.0 || ^2.0.0`. Email module v2 no longer bundles Pug — template engines are opt-in and registered by the consumer via `Mail.registerTemplateEngine` — so the framework now accepts both the v1 and v2 lines. The dependency remains optional; projects that don't send email are unaffected. See the [email module changelog](https://github.com/adaptivestone/framework-module-email/blob/main/CHANGELOG.md) for v2 migration notes.
+
 ## [5.0.0] - 2026-06-19
 
 First stable release of the **v5** series — a major rewrite. v5 is TypeScript-first and ESM-only, replaces Express's hidden router with a framework-owned tree-based router, makes validation validator-agnostic via [Standard Schema](https://standardschema.dev/), and hardens auth and boot.
