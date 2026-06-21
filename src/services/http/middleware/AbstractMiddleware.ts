@@ -4,6 +4,19 @@ import type { IApp } from '../../../server.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
+/**
+ * One security scheme a middleware contributes to the OpenAPI document
+ * (`components.securitySchemes`). Mirrors the OpenAPI Security Scheme Object:
+ * `type: 'apiKey'` uses `name` + `in`; `type: 'http'` uses `scheme`.
+ */
+export interface AuthParameter {
+  name: string;
+  type: string;
+  in?: string;
+  scheme?: string;
+  description: string;
+}
+
 class AbstractMiddleware extends Base {
   params?: Record<string, unknown>;
 
@@ -16,13 +29,22 @@ class AbstractMiddleware extends Base {
     return 'Middleware description. Please provide own';
   }
 
-  get usedAuthParameters(): Array<{
-    name: string;
-    type: string;
-    in?: string;
-    scheme?: string;
-    description: string;
-  }> {
+  /**
+   * Security schemes this middleware enforces, declared **statically** so the
+   * OpenAPI generator can read them off the class with zero instantiation.
+   * Default `[]` (the middleware contributes no auth requirement). Override on
+   * subclasses that gate requests (e.g. token/bearer auth).
+   */
+  static get usedAuthParameters(): AuthParameter[] {
+    return [];
+  }
+
+  /**
+   * @deprecated Since 5.0.0 — declare auth schemes **statically**
+   * (`static get usedAuthParameters()`). The instance form is read only as a
+   * fallback and will be removed in v6.
+   */
+  get usedAuthParameters(): AuthParameter[] {
     return [];
   }
 

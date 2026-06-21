@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - Unreleased
+
+### Added
+
+- **OpenAPI 3.1 generator.** New `openapi` CLI command (`node src/cli.ts openapi [--output <file>]`) emits an OpenAPI 3.1 document from your controllers — paths, path/query parameters, request bodies (single schema or content-type map), security schemes, and tags — all derived from the route definitions you already write. Runs cold: loads controllers without opening a database/network connection or binding a port, so it's safe in CI. See the OpenAPI documentation chapter.
+- **Vendor-neutral JSON Schema export on the validator driver seam.** `ValidatorDriver.toJsonSchema` is now implemented (and may return a `Promise`): Zod via native `z.toJSONSchema`, Yup via `.describe()`, ArkType (or any schema exposing a `.toJsonSchema()` method) via its native output. Validators with no introspection (`defineSchema`, custom `~standard` functions) degrade to a placeholder schema. The seam is reusable beyond OpenAPI (e.g. a future MCP surface).
+- **`AbstractMiddleware.usedAuthParameters` is now a `static` getter** — the OpenAPI generator reads it off the class to build `components.securitySchemes` with zero instantiation. The instance form is kept for back-compat (removed in v6). `GetUserByToken` declares its `Authorization` header + bearer schemes, so routes behind it are documented as secured automatically.
+- Route `description` now surfaces as the OpenAPI operation `summary`, and the controller class name becomes the operation's `tags`. (Internal: `HandlerEntry.meta` gained `description` / `controllerClass`; generated `.routes.gen.ts` output is byte-for-byte unchanged.)
+
+### Notes
+
+- Response bodies are not yet schema-documented — operations carry generic `200`/`400`/`401`/`404` responses without body schemas. A declared `response:` route field is planned.
+
 ## [5.0.1] - 2026-06-20
 
 ### Changed

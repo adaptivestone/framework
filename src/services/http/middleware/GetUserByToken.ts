@@ -24,7 +24,7 @@ class GetUserByToken extends AbstractMiddleware {
     return {} as { user?: AppUser };
   }
 
-  get usedAuthParameters() {
+  static get usedAuthParameters() {
     return [
       {
         name: 'Authorization',
@@ -39,6 +39,11 @@ class GetUserByToken extends AbstractMiddleware {
         description: GetUserByToken.description,
       },
     ];
+  }
+
+  // Back-compat for any runtime reader of the instance form (removed in v6).
+  get usedAuthParameters() {
+    return GetUserByToken.usedAuthParameters;
   }
 
   async middleware(

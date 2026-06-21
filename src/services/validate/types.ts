@@ -117,9 +117,11 @@ export interface ValidatorDriver {
   canHandle(body: unknown): boolean;
   /** Validate + cast. Returns the cast value on success; throws `ValidationError` on failure. */
   validate(body: unknown, data: unknown): Promise<unknown>;
-  /** Optional: emit JSON Schema. Returns null when introspection isn't supported. */
-  toJsonSchema?(
-    body: unknown,
-    opts?: { target?: 'openapi-3.0' | 'draft-07' | 'draft-2020-12' },
-  ): JsonSchema | null;
+  /**
+   * Optional: emit JSON Schema (draft 2020-12, for OpenAPI 3.1). Returns null
+   * when introspection isn't supported. May be async — vendor exporters (e.g.
+   * zod's `z.toJSONSchema`) are reached via a lazy `import()` so the lib stays
+   * an optional peer.
+   */
+  toJsonSchema?(body: unknown): JsonSchema | null | Promise<JsonSchema | null>;
 }

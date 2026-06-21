@@ -1,7 +1,7 @@
 # P2d — LLM/MCP surface
 
-**Status**: ⏸ deferred
-**Depends on**: P2a (OpenAPI generator), P1a-codegen
+**Status**: ⏸ deferred — but now **unblocked**: P2a's `toJsonSchema` driver seam + `RouteRegistry.flatten()` walk shipped with [openapi-generator](../done/openapi-generator.md) (2026-06-20). The MCP tool schemas reuse the same JSON-Schema introspection.
+**Depends on**: P2a OpenAPI ✅, P1a-codegen ✅
 **Unblocks**: nothing critical
 
 ## Goal (one-line)

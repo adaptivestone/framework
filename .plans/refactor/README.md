@@ -7,17 +7,16 @@ Status = directory. Move a file to change its status.
 ## Tracks & dependencies
 
 ```
-v5 (done/) ──→ ┬──→ codegen track ─────────────────→ v6 cutover (later/)
-               │    P1f bridge → ghost → lazy → skip
+v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]──→ v6 cutover (later/)
+               │    P1n AST replaced ghost+regex; v6 = drop skipWrap / boot-fallback
                │
                ├──→ docs / skill track ─────────────→ publish
-               │    docs-sweep → doc additions → generator
+               │    docs-sweep ✅ · doc additions ✅ · generator + llms.txt ← TODO
                │
                └──→ polish (independent) ───────────→ any order
-                    boot-log · rate-limiter · cache · test-helpers
+                    rate-limiter-lazy · cache-drivers (memory) · test-helpers
 
-Blocking: docs-sweep blocks llm-skills
-          P1f v5.x bridge (codegen-zero-init Phase 1) blocks Phases 2-4
+Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
           v6 cutover blocked by all v5.1 active + queued work
           node-adapter blocked by v6
           drop-express blocked by node-adapter
@@ -29,28 +28,27 @@ Blocking: docs-sweep blocks llm-skills
 
 | File | Ref | Summary |
 |---|---|---|
-| [codegen-zero-init](active/codegen-zero-init.md) | P1j | Kill controller/middleware/model `new` calls during `npm run gen`. Phase 0 ✅ (beta.49) · 1 ✅ (beta.52) · 2 ✅ (beta.53). Phases 3–4 v5.1; Phase 5 v6. ~1 d left. |
-| [llm-skills](active/llm-skills.md) | P1h | Generate Agent Skill from docs, ship via `npx skills add`. Cross-agent. Depends on docs-sweep. ~1.5 d. |
+| [docs-sweep](active/docs-sweep.md) | P1g | Audit `framework-documenation-github/docs/` against v5 behavior. Pass 1 ✅ (2026-06-06; recipes + anti-patterns chapters added). Re-sweep before publish; blocks llm-skills generator. ~½ d. |
+| [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). Depends on docs-sweep. ~1.5 d. |
 
 ### queued/
 
 | File | Ref | Summary |
 |---|---|---|
-| [docs-sweep](queued/docs-sweep.md) | P1g | Audit `framework-documenation-github/docs/` against v5 behavior. Blocks llm-skills. ~1 d. |
-| [rate-limiter-lazy](queued/rate-limiter-lazy.md) | P1b+ | Lazy-import RateLimiter. Small. |
-| [cache-drivers](queued/cache-drivers.md) | P1c | Cache driver abstraction. Small. |
-| [test-helpers](queued/test-helpers.md) | P1i | Framework test helpers usable from `node:test` + vitest. ~½ d. |
-| [codegen-incremental](queued/codegen-incremental.md) | P2a | File-based codegen cache + OpenAPI surface. TBD. |
-| [codegen-ast](queued/codegen-ast.md) | P1n | oxc AST codegen front-end — deletes `importResolution.ts`, drives the model scan too. Prototype ✅. **v5.1, non-breaking** (boot kept as fallback); fallback removal is v6. |
+| [rate-limiter-lazy](queued/rate-limiter-lazy.md) | P1b+ | Lazy-import RateLimiter — still top-level `mongoose`/`deepmerge`/redis imports. Not started. Small. |
+| [cache-drivers](queued/cache-drivers.md) | P1c | Cache driver abstraction + memory driver — `Cache.ts` is redis-only today (explicit TODO in code). Not started. Small. |
+| [test-helpers](queued/test-helpers.md) | P1i | 🟡 partial — `src/tests/testHelpers.ts` exists & exported (vitest/appInstance). Remaining = `node:test` interop. ~½ d. |
+| [openapi-responses](queued/openapi-responses.md) | P2a-resp | 🎨 **Design needed.** Document real OpenAPI response bodies/schemas (today's are generic stubs). Success body must be declared (can't be inferred); errors/envelopes derivable from structure. Builds on [openapi-generator](done/openapi-generator.md). |
+| [codegen-incremental](queued/codegen-incremental.md) | P2a | File-based codegen cache + testing utils. **OpenAPI shipped → [done](done/openapi-generator.md).** Cache largely obviated by the AST migration. TBD. |
 
 ### later/
 
 | File | Ref | Summary |
 |---|---|---|
-| [static-middleware-cutover](later/static-middleware-cutover.md) | P1f | v6: drop instance schema getters, remove `skipWrap`. v5.x bridge in P1j Phase 1. AST fallback removal (P1n Phase 7) rides here. |
+| [static-middleware-cutover](later/static-middleware-cutover.md) | P1f | v6: drop instance schema getters, remove `skipWrap` + `process.exit(0)` (= P1j Phase 5). v5.x bridge ✅ (P1j Phase 1). Note: the AST boot/ghost fallback was already deleted in v5.0.0 (P1n), so Phase 7 is partly done. |
 | [observability](later/observability.md) | P2b | OTel, Sentry, metrics, healthz. |
 | [performance](later/performance.md) | P2c | find-my-way, fast-json-stringify. |
-| [mcp-surface](later/mcp-surface.md) | P2d | Full MCP server (read + write). |
+| [mcp-surface](later/mcp-surface.md) | P2d | Full MCP server (read + write). Now unblocked — the `toJsonSchema` seam + registry walk shipped with [openapi-generator](done/openapi-generator.md). |
 | [node-adapter](later/node-adapter.md) | P3 | Drop Express router. Blocked by v6. |
 | [default-node-adapter](later/default-node-adapter.md) | P4 | NodeAdapter as default. |
 | [drop-express](later/drop-express.md) | P5 | Edge-compatible, Express gone. Blocked by P3+P4. |
@@ -71,6 +69,9 @@ Blocking: docs-sweep blocks llm-skills
 | [boot-route-tree-log](done/boot-route-tree-log.md) | P1e | Boot-time project-wide route tree log from `RouteRegistry` (`formatTree.ts`, verbose level). |
 | [yup-optional](done/yup-optional.md) | P1k | yup un-bundled: `defineSchema` + `File` export (optional peer); `YupFile` deprecated; content-type-keyed request schemas. beta.51. |
 | [config-schema-codegen](done/config-schema-codegen.md) | P1l | `getConfig()` emits inline value-**shape** types (no literals, no secrets, no `import()`; arrays stay tuples). beta.54. |
+| [codegen-ast](done/codegen-ast.md) | P1n | oxc AST codegen front-end — replaced ghost + regex (`importResolution.ts` + `ghostController.ts` **deleted**). Shipped v5.0.0; boot fallback removed → declarative controllers required. |
+| [codegen-zero-init](done/codegen-zero-init.md) | P1j | Zero-init `npm run gen` (no controller/middleware/model `new`). Delivered via the AST front-end (P1n); Phases 0–3 ✅, Phase 4 moot. **Phase 5 (drop `skipWrap` + `process.exit(0)`) → v6** under [static-middleware-cutover](later/static-middleware-cutover.md). |
+| [openapi-generator](done/openapi-generator.md) | P2a | OpenAPI 3.1 generator (`npm run openapi`) + vendor-neutral `toJsonSchema` driver seam (zod native, yup `describe()`, graceful placeholder). Runtime walk of `RouteRegistry.flatten()`. Unblocks MCP (P2d). 2026-06-20. |
 
 ## v5.1 extras (no phase doc — tracked as bullets)
 

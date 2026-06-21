@@ -71,6 +71,8 @@ export interface HandlerEntry {
     methodName?: string;
     controllerClass?: string;
     sourceFile?: string;
+    /** Author-supplied `RouteObject.description` — surfaced by the OpenAPI generator. */
+    description?: string;
   };
 }
 

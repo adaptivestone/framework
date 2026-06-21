@@ -249,6 +249,11 @@ class ControllerManager extends Base {
             }
             continue;
           }
+          // Tag the controller so the OpenAPI generator can derive tags +
+          // operationIds without re-deriving them from the path.
+          if (entry.meta) {
+            entry.meta.controllerClass ??= ctrlName;
+          }
           handlers.push({
             method: upperVerb as HttpMethod,
             path: convertPathSyntax(pathKey),
@@ -566,6 +571,7 @@ function buildHandlerEntry(
     query?: unknown;
     middleware?: ReadonlyArray<MiddlewareSpec>;
     bodyParsing?: 'parsed' | 'raw' | 'none';
+    description?: unknown;
   };
 
   if (typeof obj.handler !== 'function') {
@@ -576,7 +582,12 @@ function buildHandlerEntry(
   const entry: HandlerEntry = {
     // biome-ignore lint/complexity/noBannedTypes: handler is a user-provided callable
     handler: (obj.handler as Function).bind(controller),
-    meta: { methodName: handlerName || undefined },
+    meta: {
+      methodName: handlerName || undefined,
+      ...(typeof obj.description === 'string'
+        ? { description: obj.description }
+        : {}),
+    },
   };
   if (obj.request != null) {
     // biome-ignore lint/suspicious/noExplicitAny: Standard Schema validator passthrough

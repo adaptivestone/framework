@@ -1,4 +1,8 @@
-import type { StandardSchemaV1, ValidatorDriver } from '../types.ts';
+import type {
+  JsonSchema,
+  StandardSchemaV1,
+  ValidatorDriver,
+} from '../types.ts';
 import { ValidationError } from '../ValidationError.ts';
 
 /**
@@ -11,8 +15,11 @@ import { ValidationError } from '../ValidationError.ts';
  * Schema validate (zod, valibot, arktype). Yup is the outlier — see
  * `YupDriver.ts` for the strip-preserving fast path.
  *
- * `toJsonSchema` returns null here; per-vendor drivers can override
- * with their own native exporters when OpenAPI export is needed.
+ * `toJsonSchema` is vendor-generic: Standard Schema itself carries no shape, so
+ * conversion delegates to each lib's native exporter — a `.toJsonSchema()`
+ * method on the schema (arktype, …), else zod's `z.toJSONSchema` (lazy-imported
+ * so zod stays an optional peer). Vendors with no introspection return null and
+ * the caller (OpenAPI generator) degrades to a placeholder.
  */
 export const standardSchemaDriver: ValidatorDriver = {
   canHandle(body: unknown): boolean {
@@ -37,7 +44,35 @@ export const standardSchemaDriver: ValidatorDriver = {
     return (result as { value?: unknown }).value;
   },
 
-  toJsonSchema() {
+  async toJsonSchema(body: unknown): Promise<JsonSchema | null> {
+    // 1. A native instance method (arktype's `.toJsonSchema()`, and any future
+    //    lib that exposes one). Covers the general case without a per-vendor branch.
+    const native = (body as { toJsonSchema?: unknown }).toJsonSchema;
+    if (typeof native === 'function') {
+      return (native as () => JsonSchema).call(body);
+    }
+
+    // 2. zod (≥4) — converter lives on the `zod` module, not the schema. Lazy
+    //    import keeps zod an optional peer; only reached when a zod schema is used.
+    const vendor = (body as StandardSchemaV1)['~standard']?.vendor;
+    if (vendor === 'zod') {
+      const mod = (await import('zod')) as unknown as {
+        toJSONSchema?: ZodToJsonSchema;
+        z?: { toJSONSchema?: ZodToJsonSchema };
+      };
+      const toJSONSchema = mod.toJSONSchema ?? mod.z?.toJSONSchema;
+      if (typeof toJSONSchema === 'function') {
+        // draft-2020-12 is what OpenAPI 3.1 expects.
+        return toJSONSchema(body, { target: 'draft-2020-12' });
+      }
+    }
+
+    // 3. valibot / older zod / anything else with no introspection → degrade.
     return null;
   },
 };
+
+type ZodToJsonSchema = (
+  schema: unknown,
+  opts?: { target?: string },
+) => JsonSchema;

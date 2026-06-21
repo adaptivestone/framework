@@ -1,4 +1,5 @@
 import type {
+  JsonSchema,
   StandardSchemaV1,
   ValidationIssue,
   ValidatorDriver,
@@ -54,8 +55,18 @@ export const yupDriver: ValidatorDriver = {
     }
   },
 
-  toJsonSchema() {
-    return null;
+  toJsonSchema(body: unknown): JsonSchema | null {
+    const describe = (body as { describe?: () => YupDescription }).describe;
+    if (typeof describe !== 'function') {
+      return null;
+    }
+    try {
+      return describeToJsonSchema(describe.call(body));
+    } catch {
+      // A non-introspectable yup shape (custom test, exotic transform) should
+      // degrade to a placeholder upstream, never throw mid-generation.
+      return null;
+    }
   },
 };
 
@@ -110,4 +121,111 @@ function sanitizeParams(
   }
   const { value, originalValue, ...safe } = params;
   return safe;
+}
+
+// ── yup `describe()` → JSON Schema (draft 2020-12, for OpenAPI 3.1) ────────────
+// Standard Schema carries no shape, so the yup driver introspects via yup's own
+// `schema.describe()` (sync). Covers the common cases; un-mappable shapes fall
+// back to a permissive `{}` so generation never breaks.
+
+interface YupTest {
+  name?: string;
+  params?: Record<string, unknown>;
+}
+
+interface YupDescription {
+  type: string;
+  label?: string;
+  meta?: Record<string, unknown> | null;
+  oneOf?: unknown[];
+  nullable?: boolean;
+  optional?: boolean;
+  default?: unknown;
+  tests?: YupTest[];
+  fields?: Record<string, YupDescription>;
+  innerType?: YupDescription | YupDescription[];
+}
+
+function describeToJsonSchema(desc: YupDescription): JsonSchema {
+  const schema = mapYupType(desc);
+  if (Array.isArray(desc.oneOf) && desc.oneOf.length > 0) {
+    schema.enum = [...desc.oneOf];
+  }
+  // yup stamps every object with `default: {}` — an artifact, not author intent.
+  // Keep meaningful scalar/array defaults; drop the container noise.
+  if (desc.default !== undefined && desc.type !== 'object') {
+    schema.default = desc.default;
+  }
+  const description =
+    desc.meta && typeof desc.meta.description === 'string'
+      ? desc.meta.description
+      : desc.label;
+  if (description) {
+    schema.description = description;
+  }
+  return applyNullable(schema, desc);
+}
+
+function mapYupType(desc: YupDescription): JsonSchema {
+  switch (desc.type) {
+    case 'object': {
+      const properties: Record<string, JsonSchema> = {};
+      const required: string[] = [];
+      for (const [key, field] of Object.entries(desc.fields ?? {})) {
+        properties[key] = describeToJsonSchema(field);
+        if (isRequired(field)) {
+          required.push(key);
+        }
+      }
+      const out: JsonSchema = { type: 'object', properties };
+      if (required.length > 0) {
+        out.required = required;
+      }
+      return out;
+    }
+    case 'array': {
+      const inner = Array.isArray(desc.innerType)
+        ? desc.innerType[0]
+        : desc.innerType;
+      return {
+        type: 'array',
+        items: inner ? describeToJsonSchema(inner) : {},
+      };
+    }
+    case 'string':
+      return { type: 'string' };
+    case 'number':
+      return { type: hasTest(desc, 'integer') ? 'integer' : 'number' };
+    case 'boolean':
+      return { type: 'boolean' };
+    case 'date':
+      return { type: 'string', format: 'date-time' };
+    case 'file':
+      return { type: 'string', format: 'binary' };
+    default:
+      // 'mixed', 'lazy', 'tuple', or unknown → permissive (any).
+      return {};
+  }
+}
+
+function isRequired(desc: YupDescription): boolean {
+  if (desc.optional === false) {
+    return true;
+  }
+  return hasTest(desc, 'required') || hasTest(desc, 'defined');
+}
+
+function hasTest(desc: YupDescription, name: string): boolean {
+  return Array.isArray(desc.tests) && desc.tests.some((t) => t?.name === name);
+}
+
+// draft 2020-12: a nullable scalar becomes a `[type, 'null']` union.
+function applyNullable(schema: JsonSchema, desc: YupDescription): JsonSchema {
+  if (!desc.nullable) {
+    return schema;
+  }
+  if (typeof schema.type === 'string') {
+    return { ...schema, type: [schema.type, 'null'] };
+  }
+  return schema;
 }

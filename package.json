@@ -46,6 +46,7 @@
     "smoke": "./scripts/packaging-smoke-test.sh",
     "cli": "node cliCommand.ts",
     "gen": "node cliCommand.ts generatetypes",
+    "openapi": "node cliCommand.ts openapi",
     "dev:bench:realistic": "node ./benchmark/fixtures/realistic.ts",
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
     "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
