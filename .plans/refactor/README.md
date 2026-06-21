@@ -39,7 +39,6 @@ Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
 | [cache-drivers](queued/cache-drivers.md) | P1c | Cache driver abstraction + memory driver — `Cache.ts` is redis-only today (explicit TODO in code). Not started. Small. |
 | [test-helpers](queued/test-helpers.md) | P1i | 🟡 partial — `src/tests/testHelpers.ts` exists & exported (vitest/appInstance). Remaining = `node:test` interop. ~½ d. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | 🎨 **Design needed.** Document real OpenAPI response bodies/schemas (today's are generic stubs). Success body must be declared (can't be inferred); errors/envelopes derivable from structure. Builds on [openapi-generator](done/openapi-generator.md). |
-| [codegen-incremental](queued/codegen-incremental.md) | P2a | File-based codegen cache + testing utils. **OpenAPI shipped → [done](done/openapi-generator.md).** Cache largely obviated by the AST migration. TBD. |
 
 ### later/
 

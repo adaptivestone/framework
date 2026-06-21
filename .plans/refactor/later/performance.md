@@ -19,3 +19,7 @@ See `_archive/REFACTOR_PLAN_v1.md` §8.
 ## Out of scope until activated
 
 Skip until P1b's Pipeline is stable. May be skipped entirely if perf isn't near-term — `find-my-way` integration glue is partially throwaway when P3 lands `NodeAdapter`.
+
+## Parked idea — incremental codegen cache
+
+Forward/reverse dep graph + `.cache/routes.json` + chokidar watcher (design in `_archive/REFACTOR_PLAN_v1.md` §5). **Parked 2026-06-21** — obviated by the AST front-end (P1n): a full codegen pass is already near-instant, so the cache would add ~330 lines + a stale-cache bug surface for no real win, and nothing runs codegen on a per-keystroke loop (it's wired into `check:types`, on demand). Revisit *only* if a very large consumer project reports a watch-mode pain point. (Moved here when the standalone `codegen-incremental` card was retired; its testing-utils half went to [test-helpers](../queued/test-helpers.md).)

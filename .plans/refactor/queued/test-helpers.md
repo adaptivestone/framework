@@ -38,6 +38,17 @@ import '@adaptivestone/framework/tests/setupNodeTest';
 import { startTestServer, stopTestServer } from '@adaptivestone/framework/tests/setupFramework';
 ```
 
+## Isolated-test utilities (folded from P2a `codegen-incremental`, 2026-06-21)
+
+These were tracked on the now-retired `codegen-incremental` card but belong with the test
+surface. Same domain as the runner-agnostic work above; scope/priority TBD. Reference:
+`_archive/REFACTOR_PLAN_v1.md` §7b.
+
+- `createTestApp(opts)` — spin up an isolated app for a focused test (selected controllers,
+  config overrides) without a full HTTP/DB boot.
+- `routeRegistry.register(...)` — register routes ad-hoc inside a test.
+- `middleware.replace(...)` — stub/swap a middleware for a test.
+
 ## Out of scope
 
 - Migrating the framework's own tests — that's [`side-test-runner.md`](./side-test-runner.md), a separate decision.

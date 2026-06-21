@@ -79,7 +79,7 @@ Declarative-`routes`-only mandate; delete `ghostController.ts` + the app boot in
 
 ## Out of scope
 - Removing the boot/ghost fallback (v6, Phase 7).
-- Incremental codegen cache + OpenAPI ([[codegen-incremental]] / P2a).
+- Incremental codegen cache (parked → [[performance]]) + OpenAPI (shipped → [[openapi-generator]]).
 - Porting `flatten`/scope to Rust (reuse the JS resolver — see the doc).
 - Config-type generation (already import-free value-shapes).
 

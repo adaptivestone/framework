@@ -1,6 +1,6 @@
 # P2a (OpenAPI) — OpenAPI 3.1 generator
 
-**Status**: ✅ DONE (2026-06-20). Split out of [codegen-incremental](../queued/codegen-incremental.md) (P2a) — the OpenAPI piece shipped on its own; incremental-cache + testing-utils stay deferred there.
+**Status**: ✅ DONE (2026-06-20). The OpenAPI piece of the old P2a card — it shipped on its own. The rest of that card was retired 2026-06-21: the incremental cache is parked in [performance](../later/performance.md) (obviated by the AST migration) and the testing utils folded into [test-helpers](../queued/test-helpers.md).
 **Depends on**: P1a-runtime (driver seam) ✅, P1b (RouteRegistry) ✅
 **Unblocks**: [mcp-surface](../later/mcp-surface.md) (P2d) — the `toJsonSchema` driver seam it needs now exists.
 
@@ -47,7 +47,7 @@ OpenAPI reads it at runtime (cold, rare). The schema → JSON Schema projection 
 - Unit tests: `OpenApiGenerator.test.ts` (9), driver tests (10), `OpenApiGenerator.integration.test.ts`
   (1, real ControllerManager registry). Full suite green; tsc + biome clean; `gen --check` clean.
 
-## Out of scope (stays in P2a / [codegen-incremental](../queued/codegen-incremental.md))
-- Incremental codegen cache (largely obviated by the AST migration).
-- `createTestApp` / testing utilities (overlaps P1i).
+## Out of scope (re-homed when the P2a card was retired)
+- Incremental codegen cache — parked in [performance](../later/performance.md) (obviated by the AST migration).
+- `createTestApp` / testing utilities — folded into [test-helpers](../queued/test-helpers.md) (P1i).
 - Per-vendor valibot/arktype peers beyond the generic seam (added if/when needed).
