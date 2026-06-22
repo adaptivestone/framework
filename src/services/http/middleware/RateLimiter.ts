@@ -11,7 +11,6 @@ import {
   RateLimiterRedis,
 } from 'rate-limiter-flexible';
 import type rateLimiterConfig from '../../../config/rateLimiter.js';
-import { getRedisClientSync } from '../../../helpers/redis/redisConnection.ts';
 import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
@@ -24,6 +23,14 @@ class RateLimiter extends AbstractMiddleware {
 
   finalOptions: typeof rateLimiterConfig;
   limiter!: RateLimiterAbstract;
+
+  /**
+   * Resolves once the limiter is built. Only the redis driver is async (it
+   * lazy-loads `@redis/client`); memory/mongo build synchronously, so this stays
+   * an already-resolved promise for them. `middleware()` awaits it before the
+   * first request.
+   */
+  whenReady: Promise<void> = Promise.resolve();
 
   constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
@@ -39,7 +46,10 @@ class RateLimiter extends AbstractMiddleware {
         break;
 
       case 'redis':
-        this.limiter = this.initRedisLimiter();
+        // Defer: the redis path lazy-loads `@redis/client` so the package only
+        // loads when the redis driver is actually used. memory/mongo never reach
+        // here, so importing RateLimiter no longer forces redis into the graph.
+        this.whenReady = this.initRedisLimiter();
         break;
 
       case 'mongo':
@@ -62,18 +72,35 @@ class RateLimiter extends AbstractMiddleware {
     }
   }
 
-  initRedisLimiter() {
-    const redisClient = getRedisClientSync();
-
-    return new RateLimiterRedis({
-      storeClient: redisClient,
-      useRedisPackage: true,
-      // Memory fallback so a Redis outage doesn't drop limiting entirely; the
-      // library serves from this when the store errors, and doc-10's fail-open
-      // in `consumeResult` is the last resort.
-      insuranceLimiter: new RateLimiterMemory(this.finalOptions.limiterOptions),
-      ...this.finalOptions.limiterOptions,
-    });
+  async initRedisLimiter() {
+    try {
+      // Dynamic-import the helper so `@redis/client` only loads on the redis
+      // path. `getRedisClientSync` returns immediately (connect runs in the
+      // background) — like the old static import, so the limiter builds without
+      // blocking, and a down redis is absorbed by the memory insurance below
+      // rather than leaving `this.limiter` unbuilt.
+      const { getRedisClientSync } = await import(
+        '../../../helpers/redis/redisConnection.ts'
+      );
+      const redisClient = getRedisClientSync();
+      this.limiter = new RateLimiterRedis({
+        storeClient: redisClient,
+        useRedisPackage: true,
+        // Memory fallback so a Redis outage doesn't drop limiting entirely; the
+        // library serves from this when the store errors, and doc-10's fail-open
+        // in `consumeResult` is the last resort.
+        insuranceLimiter: new RateLimiterMemory(
+          this.finalOptions.limiterOptions,
+        ),
+        ...this.finalOptions.limiterOptions,
+      });
+    } catch (e) {
+      // Leave `this.limiter` undefined so `middleware()` returns 500 (same as an
+      // unknown driver) rather than crashing — e.g. `@redis/client` not installed.
+      this.logger?.error(
+        `RateLimiter redis init failed (is '@redis/client' installed?): ${e}`,
+      );
+    }
   }
 
   gerenateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
@@ -136,6 +163,9 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+    // No-op for memory/mongo (already resolved); awaits the lazy redis build on
+    // the first request only.
+    await this.whenReady;
     if (!this.limiter) {
       this.logger?.info(
         `RateLimiter not inited correclty! Please check init logs `,

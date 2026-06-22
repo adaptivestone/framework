@@ -41,6 +41,8 @@ describe('rate limiter methods', () => {
     const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
+    // The redis limiter builds lazily (it dynamic-imports `@redis/client`).
+    await redisRateLimiter.whenReady;
 
     expect(redisRateLimiter.limiter).toBeDefined();
   });
@@ -309,6 +311,7 @@ describe('rate limiter methods', () => {
     it('keeps limiting via the memory insurance when the redis store fails', async () => {
       expect.assertions(2);
       const rateLimiter = new RateLimiter(appInstance, { driver: 'redis' });
+      await rateLimiter.whenReady; // redis limiter builds lazily
       // Force every redis store write to fail so rate-limiter-flexible falls back
       // to the insurance limiter. `_upsert` is the library's store-write hook
       // (RateLimiterStoreAbstract) — if it ever renames, this test breaks loudly.

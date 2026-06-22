@@ -1,10 +1,20 @@
 # P1c — Cache drivers
 
-**Status**: ⏸ deferred to v5.1
+**Status**: ✅ shipped 2026-06-22 (v5.1, Unreleased)
 **Depends on**: P0
 **Unblocks**: P2a (caches `getUserByToken`)
 **Time**: 1 day
 **Parallelizable with**: P1a-runtime, P1a-codegen, P1b
+
+## Shipped
+
+- `CacheDriver` interface (`get`/`set`/`del` + optional `whenReady`) — `src/services/cache/CacheDriver.ts`.
+- `MemoryDriver` (default, Map + per-key `setTimeout` TTL, `.unref()`) and `RedisDriver` (lazy `import()` of `redisConnection`, so `@redis/client` only loads on the redis path) — `src/services/cache/drivers/`.
+- `Cache.ts` is now an orchestrator: `resolveDriver(config('cache').driver)` (a `CacheDriver` instance may be injected); keeps namespacing, `promiseMapping` dedup, JSON/bigint, fail-soft. Static `@redis/client` import dropped.
+- New `config/cache.ts` = `{ driver: 'memory' | 'redis' }` (`CACHE_DRIVER` env). **Decision:** namespace stayed in `config/redis.ts` (shared with the rate limiter — moving it would couple the rate-limiter to cache config and break `setTestRedisNamespace`).
+- Zero-TTL short-circuit (#10): `getSetValue(k, fn, 0)` → recompute, never write.
+- `@redis/client` → optional peer + devDependency (shared flip with [rate-limiter-lazy](./rate-limiter-lazy.md)).
+- Tests: `MemoryDriver.test.ts`, `RedisDriver.test.ts` (round-trip), `Cache.test.ts` retargeted to `cache.driver` + zero-TTL + default-driver assertion. Smoke test asserts `@redis/client` absent in a default install. 489/489 green; tsc + biome clean.
 
 ## Goal
 

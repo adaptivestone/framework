@@ -1,9 +1,17 @@
 # P1b-extras — RateLimiter: lazy redis (make redis optional)
 
-**Status**: ⏸ queued (v5.1)
+**Status**: ✅ shipped 2026-06-22 (v5.1, Unreleased) — landed together with [cache-drivers](./cache-drivers.md)
 **Depends on**: P1b ✅
 **Coordinates with**: [cache-drivers](./cache-drivers.md) (P1c) — the `@redis/client` → optional-peer flip is **shared** and can only land once both this and P1c lazy-load redis.
 **Decision (2026-06-21)**: redis must **not** be a required dependency. The RateLimiter half: only the redis *driver* may touch `@redis/client`; the memory (default) and mongo drivers must not.
+
+## Shipped
+
+- `RateLimiter.ts` dropped the top-level `getRedisClientSync` import. The `redis` branch now `await import('redisConnection')` inside an async `initRedisLimiter()` and assigns `this.limiter`; the limiter build is deferred behind a new `whenReady` promise (already-resolved for memory/mongo). `middleware()` `await this.whenReady` before its `!this.limiter` check.
+- **Non-blocking by design:** the redis path uses `getRedisClientSync()` (returns immediately, connects in the background) — NOT `await getRedisClient()`, which hangs when redis is down (node-redis retries with backoff). A down redis is absorbed by the existing memory `insuranceLimiter`; an init failure (e.g. `@redis/client` not installed) leaves `this.limiter` undefined → 500, same as an unknown driver.
+- `@redis/client` → optional peer + devDependency (shared flip with cache-drivers).
+- `setupFramework.ts` made its `createClient` import lazy too (dynamic in `clearTestRedisNamespace`), so a memory-only consumer using the shipped test setup never loads redis.
+- Tests: `RateLimiter.test.ts` redis cases `await whenReady` before touching `.limiter`; all three drivers + store-failure paths green.
 
 ## Goal
 

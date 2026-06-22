@@ -1,9 +1,32 @@
 import { setTimeout } from 'node:timers/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../helpers/appInstance.ts';
+import MemoryDriver from './drivers/MemoryDriver.ts';
 
 describe('cache', () => {
   const time = Date.now();
+
+  it('defaults to the in-memory driver (redis is optional)', () => {
+    expect.assertions(1);
+    expect(appInstance.cache.driver).toBeInstanceOf(MemoryDriver);
+  });
+
+  it('a zero storeTime skips the cache and recomputes every call (issue #10)', async () => {
+    expect.assertions(3);
+    const { cache } = appInstance;
+    let counter = 0;
+    const compute = async () => {
+      counter += 1;
+      return counter;
+    };
+
+    const first = await cache.getSetValue('ZERO_TTL', compute, 0);
+    const second = await cache.getSetValue('ZERO_TTL', compute, 0);
+
+    expect(first).toBe(1);
+    expect(second).toBe(2); // not served from cache
+    expect(counter).toBe(2);
+  });
 
   it('can get set values', async () => {
     expect.assertions(2);
@@ -91,12 +114,12 @@ describe('cache', () => {
   });
 
   describe('failure paths (doc 09)', () => {
-    it('falls back to onNotFound on a redis read failure, without deadlocking the key', async () => {
+    it('falls back to onNotFound on a driver read failure, without deadlocking the key', async () => {
       expect.assertions(2);
       const { cache } = appInstance;
       const spy = vi
-        .spyOn(cache.redisClient, 'get')
-        .mockRejectedValueOnce(new Error('redis down'));
+        .spyOn(cache.driver, 'get')
+        .mockRejectedValueOnce(new Error('cache down'));
 
       // Cache outage degrades to computing the value, not failing the request.
       const first = await cache.getSetValue('DEADLOCK', async () => 'computed');
@@ -128,7 +151,7 @@ describe('cache', () => {
       expect.assertions(1);
       const { cache } = appInstance;
       const spy = vi
-        .spyOn(cache.redisClient, 'set')
+        .spyOn(cache.driver, 'set')
         .mockRejectedValueOnce(new Error('set down'));
 
       const res = await cache.getSetValue('SET_FAIL', async () => 'computed');

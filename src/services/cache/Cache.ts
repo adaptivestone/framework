@@ -1,32 +1,45 @@
-import type { RedisClientType } from '@redis/client';
+import type cacheConfig from '../../config/cache.ts';
 import type redisConfig from '../../config/redis.ts';
-import { getRedisClient } from '../../helpers/redis/redisConnection.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
+import type { CacheDriver } from './CacheDriver.ts';
+import MemoryDriver from './drivers/MemoryDriver.ts';
+import RedisDriver from './drivers/RedisDriver.ts';
+
+/**
+ * Resolve the configured driver. A `CacheDriver` instance may be injected
+ * directly (escape hatch / tests); `'redis'` constructs the lazy redis driver
+ * (the only path that loads `@redis/client`); anything else → memory default.
+ */
+function resolveDriver(driver: unknown): CacheDriver {
+  if (driver && typeof driver === 'object') {
+    return driver as CacheDriver;
+  }
+  if (driver === 'redis') {
+    return new RedisDriver();
+  }
+  return new MemoryDriver();
+}
 
 class Cache extends Base {
   whenReady: Promise<void>;
 
-  redisClient!: RedisClientType;
+  driver: CacheDriver;
 
-  redisNamespace: string = '';
+  namespace = '';
 
   promiseMapping = new Map();
 
   constructor(app: IApp) {
     super(app);
-    this.whenReady = this.#init();
-  }
-
-  async #init() {
-    // todo for now only redis. refactor for drives support in future
-    // at least memory and redis drivers should be presented
-    // memory drives should works on master process level
-    // we should support multiple cashe same time
+    const { driver } = this.app.getConfig('cache') as typeof cacheConfig;
+    // The namespace stays in `config('redis')`: it prefixes every cache AND
+    // rate-limiter key regardless of driver, so the two services share one knob
+    // (the test helpers' `setTestRedisNamespace` flips both at once).
     const { namespace } = this.app.getConfig('redis') as typeof redisConfig;
-    this.redisClient = await getRedisClient();
-
-    this.redisNamespace = namespace;
+    this.namespace = namespace;
+    this.driver = resolveDriver(driver);
+    this.whenReady = this.driver.whenReady ?? Promise.resolve();
   }
 
   /**
@@ -35,7 +48,7 @@ class Cache extends Base {
    * @param key key to add namespace
    */
   getKeyWithNameSpace(key: string) {
-    return `${this.redisNamespace}-${key}`;
+    return `${this.namespace}-${key}`;
   }
 
   /**
@@ -49,6 +62,12 @@ class Cache extends Base {
     onNotFound: () => Promise<T>,
     storeTime = 60 * 5,
   ) {
+    // A zero TTL means "don't cache" (issue #10): recompute every call. Short
+    // circuit before touching the driver or the in-flight map so a `0` can never
+    // write a never-expiring entry.
+    if (storeTime === 0) {
+      return onNotFound();
+    }
     await this.whenReady;
     const key = this.getKeyWithNameSpace(keyValue);
     // 5 mins default
@@ -67,27 +86,19 @@ class Cache extends Base {
     inflight.catch(() => {});
     this.promiseMapping.set(key, inflight);
 
-    // One try/finally so the mapping entry ALWAYS settles and clears — a redis
+    // One try/finally so the mapping entry ALWAYS settles and clears — a driver
     // failure mid-flight must not leave a forever-pending entry (per-key deadlock
-    // that would survive redis recovery).
+    // that would survive a backend recovery).
     try {
       let parsedResult: T | undefined;
 
-      // A cache outage is NOT a request outage: if redis is unreachable, degrade
-      // to computing the value via `onNotFound` every call (slow, not broken)
-      // rather than failing. Only `onNotFound`'s own errors propagate.
+      // A cache outage is NOT a request outage: if the driver read throws,
+      // degrade to computing the value via `onNotFound` every call (slow, not
+      // broken) rather than failing. Only `onNotFound`'s own errors propagate.
       let cached: string | null = null;
       let cacheUsable = true;
-      let client: RedisClientType | undefined;
       try {
-        // Resolve the live client through the shared helper every time rather
-        // than reusing `this.redisClient`: after a shutdown/reconnect the module
-        // rebuilds the client, and the helper's single-flight connect avoids the
-        // "Socket already opened" throw two concurrent callers hit when each
-        // calls `connect()` itself.
-        client = await getRedisClient();
-        this.redisClient = client;
-        cached = await client.get(key);
+        cached = await this.driver.get(key);
       } catch (e) {
         cacheUsable = false;
         this.logger?.error(
@@ -132,9 +143,9 @@ class Cache extends Base {
         // to `undefined` (which the redis client rejects). The write is
         // best-effort: the value is already computed, so a failed write — like a
         // failed read — must not fail the call.
-        if (cacheUsable && serialized !== undefined && client) {
-          await client
-            .set(key, serialized, { EX: storeTime })
+        if (cacheUsable && serialized !== undefined) {
+          await this.driver
+            .set(key, serialized, storeTime)
             .catch((e) =>
               this.logger?.error(`Cache set failed for key '${key}': ${e}`),
             );
@@ -160,12 +171,10 @@ class Cache extends Base {
     await this.whenReady;
 
     const key = this.getKeyWithNameSpace(keyValue);
-    // Fail-soft like the read/write paths: a redis blip during invalidation
+    // Fail-soft like the read/write paths: a backend blip during invalidation
     // must not throw into business logic.
     try {
-      const client = await getRedisClient();
-      this.redisClient = client;
-      return await client.del(key);
+      return await this.driver.del(key);
     } catch (e) {
       this.logger?.error(`Cache removeKey failed for key '${key}': ${e}`);
       return 0;

@@ -59,7 +59,6 @@
   "author": "Andrei Lahunou",
   "license": "MIT",
   "dependencies": {
-    "@redis/client": "^6.0.0",
     "deepmerge": "^4.2.2",
     "express": "^5.0.1",
     "formidable": "^3.5.1",
@@ -73,6 +72,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.6",
+    "@redis/client": "^6.0.0",
     "@sentry/core": "^10.34.0",
     "@sentry/node": "^10.34.0",
     "@types/express": "^5.0.1",
@@ -89,6 +89,7 @@
   },
   "peerDependencies": {
     "@adaptivestone/framework-module-email": "^1.0.0 || ^2.0.0",
+    "@redis/client": "^6.0.0",
     "@sentry/core": "^10.34.0",
     "@sentry/node": "^10.34.0",
     "mongodb-memory-server": "^11.0.0",
@@ -98,6 +99,9 @@
   },
   "peerDependenciesMeta": {
     "@adaptivestone/framework-module-email": {
+      "optional": true
+    },
+    "@redis/client": {
       "optional": true
     },
     "@sentry/core": {

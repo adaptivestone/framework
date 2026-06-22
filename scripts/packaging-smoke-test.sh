@@ -82,6 +82,25 @@ for (const spec of [
 // 4. Construct a Server from the published dist (no DB boot).
 const { default: Server } = await import('@adaptivestone/framework/server.js');
 const require = createRequire(import.meta.url);
+
+// 4a. redis-optional guarantee: `@redis/client` is an OPTIONAL peer, so a default
+//     install must NOT pull it in, and the always-loaded import graph above
+//     (server.js → Cache → drivers, GetUserByToken, RateLimiter) must not have
+//     required it. If it resolves here, it crept back into `dependencies` and
+//     redis is no longer optional.
+let redisAbsent = false;
+try {
+  require.resolve('@redis/client');
+} catch (e) {
+  redisAbsent = e.code === 'MODULE_NOT_FOUND';
+}
+if (!redisAbsent) {
+  throw new Error(
+    '@redis/client resolved in a default install — it must stay an optional peer',
+  );
+}
+console.log('  ✓ @redis/client absent (redis stays optional)');
+
 const pkgRoot = path.dirname(
   require.resolve('@adaptivestone/framework/package.json'),
 );

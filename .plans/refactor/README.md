@@ -14,7 +14,7 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
                │    docs-sweep ✅ · doc additions ✅ · generator + llms.txt ← TODO
                │
                └──→ polish (independent) ───────────→ any order
-                    rate-limiter-lazy · cache-drivers (memory)   [test-helpers ✅]
+                    [rate-limiter-lazy ✅] [cache-drivers ✅] [test-helpers ✅]
 
 Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
           v6 cutover blocked by all v5.1 active + queued work
@@ -35,8 +35,6 @@ Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
 
 | File | Ref | Summary |
 |---|---|---|
-| [cache-drivers](queued/cache-drivers.md) | P1c | **Make redis optional (cache half).** Memory-default driver + lazy redis driver — today `Cache` eager-connects to redis at boot, which is what makes redis required. Resolves #13, #10. Not started. |
-| [rate-limiter-lazy](queued/rate-limiter-lazy.md) | P1b+ | **Make redis optional (rate-limiter half).** Lazy-load `@redis/client` in RateLimiter's redis driver only (memory/mongo never touch it). Coordinated with cache-drivers — the `@redis/client` optional-peer flip lands together. Not started. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | 🎨 **Design needed.** Document real OpenAPI response bodies/schemas (today's are generic stubs). Success body must be declared (can't be inferred); errors/envelopes derivable from structure. Builds on [openapi-generator](done/openapi-generator.md). |
 
 ### later/
@@ -71,6 +69,8 @@ Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
 | [codegen-zero-init](done/codegen-zero-init.md) | P1j | Zero-init `npm run gen` (no controller/middleware/model `new`). Delivered via the AST front-end (P1n); Phases 0–3 ✅, Phase 4 moot. **Phase 5 (drop `skipWrap` + `process.exit(0)`) → v6** under [static-middleware-cutover](later/static-middleware-cutover.md). |
 | [openapi-generator](done/openapi-generator.md) | P2a | OpenAPI 3.1 generator (`npm run openapi`) + vendor-neutral `toJsonSchema` driver seam (zod native, yup `describe()`, graceful placeholder). Runtime walk of `RouteRegistry.flatten()`. Unblocks MCP (P2d). 2026-06-20. |
 | [test-helpers](done/test-helpers.md) | P1i | Runner-agnostic test setup (`setupFramework`); `setupVitest`/`globalSetupVitest` thin wrappers + new `setupNodeTest` → consumers can use `node:test`. vitest optional peer. Folded-in `createTestApp` utils NOT built. 2026-06-21. |
+| [cache-drivers](done/cache-drivers.md) | P1c | **Make redis optional (cache half).** `CacheDriver` interface + memory-default driver + lazy redis driver; `config/cache.ts`; zero-TTL skip (#10, #13). Default cache backend is now in-memory. 2026-06-22. |
+| [rate-limiter-lazy](done/rate-limiter-lazy.md) | P1b+ | **Make redis optional (rate-limiter half).** RateLimiter redis driver lazy-`import()`s `@redis/client` (deferred `whenReady`, non-blocking sync client); memory/mongo never touch it. `@redis/client` flipped to an optional peer with cache-drivers. 2026-06-22. |
 
 ## v5.1 extras (no phase doc — tracked as bullets)
 

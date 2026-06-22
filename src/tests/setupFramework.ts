@@ -17,7 +17,6 @@
 
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { createClient } from '@redis/client';
 import mongoose from 'mongoose'; // we do not need create indexes on tests
 import type redisConfig from '../config/redis.ts';
 import { clearNamespace } from '../helpers/redis/clearNamespace.ts';
@@ -145,8 +144,11 @@ export async function clearTestRedisNamespace(): Promise<void> {
   const { url, namespace } = serverInstance.getConfig(
     'redis',
   ) as typeof redisConfig;
-  const redisClient = createClient({ url });
   try {
+    // Lazy-import `@redis/client` so a memory-only consumer that uses this test
+    // setup never loads the (optional) redis package.
+    const { createClient } = await import('@redis/client');
+    const redisClient = createClient({ url });
     await redisClient.connect();
     await clearNamespace(redisClient, namespace);
     await redisClient.destroy();
