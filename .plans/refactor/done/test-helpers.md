@@ -1,9 +1,9 @@
 # P1i — Runner-agnostic test helpers (support `node:test` for consumers)
 
-**Status**: ⏸ deferred to v5.1
+**Status**: ✅ DONE (2026-06-21; node:test entry point added 2026-06-22) — runner-agnostic `setupFramework.ts` extracted; `setupVitest`/`globalSetupVitest` are thin wrappers; new `setupNodeTest.ts` (per-file glue) + `globalSetupNodeTest.ts` (run-once entry, wired via node:test's native `--test-global-setup`, the analog of vitest's `globalSetup`). Worked example: `nodeRunner.node-test.ts` + `nodeRunnerShared.node-test.ts` (two suites sharing one Mongo) run by `npm run test:node`; the `.node-test.ts` suffix keeps them out of vitest's glob. Docs `09-testsing.md` "Using with `node:test`" section teaches the `--test-global-setup` entry point. `vitest`/`mongodb-memory-server` were already optional peers. 480/480 vitest tests + 6/6 node:test still green. The folded-in **isolated-test utilities** (`createTestApp` etc.) were **NOT** built — see that section below (future follow-up).
 **Depends on**: nothing critical — can ship anytime
 **Time**: ~½ day
-**Origin**: framework currently ships test helpers (`getTestServerURL`, `serverInstance`, etc.) that lean on vitest's globals and lifecycle hooks. Consumers who'd rather use Node's built-in `node:test` (smaller dep tree, native TypeScript, runtime alignment) can't use them directly. Different scope from [`side-test-runner.md`](./side-test-runner.md), which is about migrating the framework's *own* tests.
+**Origin**: framework currently ships test helpers (`getTestServerURL`, `serverInstance`, etc.) that lean on vitest's globals and lifecycle hooks. Consumers who'd rather use Node's built-in `node:test` (smaller dep tree, native TypeScript, runtime alignment) can't use them directly. Different scope from [vitest-to-node-test](../later/vitest-to-node-test.md), which is about migrating the framework's *own* tests.
 
 ## Goal
 
@@ -38,11 +38,11 @@ import '@adaptivestone/framework/tests/setupNodeTest';
 import { startTestServer, stopTestServer } from '@adaptivestone/framework/tests/setupFramework';
 ```
 
-## Isolated-test utilities (folded from P2a `codegen-incremental`, 2026-06-21)
+## Isolated-test utilities — NOT built (future follow-up)
 
-These were tracked on the now-retired `codegen-incremental` card but belong with the test
-surface. Same domain as the runner-agnostic work above; scope/priority TBD. Reference:
-`_archive/REFACTOR_PLAN_v1.md` §7b.
+Folded from the retired `codegen-incremental` card; these belong with the test surface but
+were **not** part of the P1i runner-agnostic work and remain unbuilt. Scope/priority TBD.
+Reference: `_archive/REFACTOR_PLAN_v1.md` §7b.
 
 - `createTestApp(opts)` — spin up an isolated app for a focused test (selected controllers,
   config overrides) without a full HTTP/DB boot.
@@ -51,7 +51,7 @@ surface. Same domain as the runner-agnostic work above; scope/priority TBD. Refe
 
 ## Out of scope
 
-- Migrating the framework's own tests — that's [`side-test-runner.md`](./side-test-runner.md), a separate decision.
+- Migrating the framework's own tests — that's [vitest-to-node-test](../later/vitest-to-node-test.md), a separate decision.
 - Building a custom test runner.
 - `expect()` polyfill for node:test. Users adapt to `node:assert/strict`; we don't paper over the difference.
 

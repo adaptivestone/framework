@@ -8,7 +8,9 @@
 
 ## Goal
 
-Split `Cache.ts` into a driver interface + first-party Memory and Redis drivers. Redis becomes optional. Resolves issues #13 and #10 (zero TTL skip).
+Split `Cache.ts` into a driver interface + first-party Memory and Redis drivers, with **Memory as the default** so redis becomes optional. Resolves issues #13 and #10 (zero TTL skip).
+
+**Decision (2026-06-21): redis must not be a required dependency.** Today `Cache.#init()` eagerly `await getRedisClient()` in its constructor, so an app **connects to redis at boot** whether or not it uses cache — that's what makes redis "required." A Memory-default driver removes that eager connection; the redis driver connects lazily, only when configured.
 
 ## Files touched
 
@@ -17,9 +19,9 @@ Split `Cache.ts` into a driver interface + first-party Memory and Redis drivers.
 - `src/services/cache/drivers/RedisDriver.ts` (new) — lazy-imports `@redis/client` only when constructed.
 - `src/services/cache/Cache.ts` — orchestrator; namespace handling; `promiseMapping` dedup; JSON-with-bigint serialization. Driver injected via constructor or config.
 - `src/config/cache.ts` (new) — `{ driver: 'memory' | 'redis' | CacheDriver, namespace: string, defaultTtlSeconds: number }`. Currently `Cache.ts` reads from `config('redis')` for namespace; that moves here.
-- `src/helpers/redis/redisConnection.ts` — kept; `RedisDriver` calls into it.
+- `src/helpers/redis/redisConnection.ts` — kept, but reached **only** via dynamic import from `RedisDriver` (no static importer, so `@redis/client` loads only on the redis path). `Cache.ts` must drop its current static `import { getRedisClient }`.
 - `src/config/redis.ts` — kept; only consumed by `RedisDriver`.
-- `package.json` — `@redis/client` from `dependencies` to `peerDependenciesMeta` as optional.
+- `package.json` — `@redis/client` from `dependencies` to `peerDependenciesMeta` as optional. **Shared flip with [rate-limiter-lazy](./rate-limiter-lazy.md)** — only land it once RateLimiter also lazy-loads redis, otherwise importing RateLimiter still forces the package.
 
 ## API change
 
@@ -71,3 +73,4 @@ Both drivers pass parity tests; zero-TTL test passes; redis is optional.
 
 - `MemoryDriver` is per-process — fine for development and single-node deployments. Multi-node setups need redis.
 - The `promiseMapping` dedup logic stays in `Cache.ts` (orchestrator), not in drivers — it's a cross-driver concern.
+- The `@redis/client` optional-peer goal is shared with [rate-limiter-lazy](./rate-limiter-lazy.md); both must lazy-load redis before the `package.json` flip is safe. `clearNamespace.ts` and `setupVitest.ts` use redis directly but are test-only — redis can stay a `devDependency`.

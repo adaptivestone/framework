@@ -36,6 +36,7 @@
     "prod": "node --watch ./src/cluster.ts",
     "test": "vitest run",
     "t": "vitest --coverage=false --reporter=default",
+    "test:node": "node --test --test-global-setup=./src/tests/globalSetupNodeTest.ts 'src/tests/**/*.node-test.ts'",
     "format": "biome format",
     "format:fix": "biome format --write",
     "lint": "biome lint",

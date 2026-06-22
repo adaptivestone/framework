@@ -1,6 +1,6 @@
 # P2a (OpenAPI) — OpenAPI 3.1 generator
 
-**Status**: ✅ DONE (2026-06-20). The OpenAPI piece of the old P2a card — it shipped on its own. The rest of that card was retired 2026-06-21: the incremental cache is parked in [performance](../later/performance.md) (obviated by the AST migration) and the testing utils folded into [test-helpers](../queued/test-helpers.md).
+**Status**: ✅ DONE (2026-06-20). The OpenAPI piece of the old P2a card — it shipped on its own. The rest of that card was retired 2026-06-21: the incremental cache is parked in [performance](../later/performance.md) (obviated by the AST migration) and the testing utils folded into [test-helpers](./test-helpers.md).
 **Depends on**: P1a-runtime (driver seam) ✅, P1b (RouteRegistry) ✅
 **Unblocks**: [mcp-surface](../later/mcp-surface.md) (P2d) — the `toJsonSchema` driver seam it needs now exists.
 
@@ -49,5 +49,5 @@ OpenAPI reads it at runtime (cold, rare). The schema → JSON Schema projection 
 
 ## Out of scope (re-homed when the P2a card was retired)
 - Incremental codegen cache — parked in [performance](../later/performance.md) (obviated by the AST migration).
-- `createTestApp` / testing utilities — folded into [test-helpers](../queued/test-helpers.md) (P1i).
+- `createTestApp` / testing utilities — folded into [test-helpers](./test-helpers.md) (P1i).
 - Per-vendor valibot/arktype peers beyond the generic seam (added if/when needed).
