@@ -50,6 +50,27 @@ export interface IApp {
   internalFilesCache: AppCache;
 }
 
+/**
+ * Project HTTP boot hook. Passed to the {@link Server} constructor as the
+ * `bootHttp` option; called with the live `app` during `startServer`, after
+ * controllers are registered but before the adapter mounts — the seam for
+ * app-wide HTTP wiring that doesn't fit a controller (ad-hoc routes via
+ * `app.httpServer.routeRegistry.registerRoute(...)`, Express-level middleware,
+ * boot setup). HTTP-specific: it needs `httpServer`, which only exists once the
+ * server boots (CLI/worker processes never run it). Wired explicitly, not
+ * file-discovered — the framework's discovery is folder-based and every folder
+ * is already owned (config merges its files, controllers auto-loads its files).
+ */
+export type BootHttpHook = (app: IApp) => void | Promise<void>;
+
+/** Options accepted by the {@link Server} constructor. */
+export interface ServerOptions extends TFolderConfig {
+  /**
+   * Project HTTP boot hook — see {@link BootHttpHook}.
+   */
+  bootHttp?: BootHttpHook;
+}
+
 try {
   loadEnvFile();
 } catch {
@@ -104,6 +125,9 @@ class Server {
 
   cacheService: null | Cache = null;
 
+  /** Project HTTP boot hook from the constructor options (run in `startServer`). */
+  #bootHttp?: BootHttpHook;
+
   app: IApp;
 
   /**
@@ -118,8 +142,9 @@ class Server {
    * @param {String} config.folders.commands path to folder with commands files
    * @param {String} config.folders.migrations path to folder with migrations files
    */
-  constructor(config: TFolderConfig) {
+  constructor(config: ServerOptions) {
     this.config = config;
+    this.#bootHttp = config.bootHttp;
     const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),
@@ -171,6 +196,13 @@ class Server {
     this.app.controllerManager = new ControllerManager(this.app);
 
     await this.app.controllerManager.initControllers();
+    // Project HTTP boot hook (constructor `bootHttp` option): app-wide HTTP
+    // wiring (ad-hoc routes, Express middleware, boot setup). Runs before the
+    // adapter mounts.
+    if (this.#bootHttp) {
+      this.app.logger.verbose('bootHttp: running project HTTP boot hook');
+      await this.#bootHttp(this.app);
+    }
     this.app.httpServer.mountAdapter();
     await callbackBefore404();
     this.app.httpServer.add404Page();
