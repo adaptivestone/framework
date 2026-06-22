@@ -78,7 +78,7 @@ Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
 - `File` type export — ✅ shipped (beta.51)
 - **Route-level multipart single-element extraction** — let a route declare which multipart fields are scalar; the router unwraps their single-element arrays **before** validation, so the schema stays the clean logical shape (`avatar: z.instanceof(File)`) and codegen reads that output type directly. Chosen over a schema-side `multipartScalar` helper (that wrapper was prototyped and dropped — it pushed a parser concern into the schema/types). Interim: validator-native `.array().length(1).transform(...)`. Revisits the parser-side `getFieldShape` idea from `decisions.md` → "Multipart parser is always-array" as an opt-in route convenience. Not scheduled.
 - Project-side boot hook (`bootHttp(app)` for ad-hoc routes / globals)
-- `npm run cli routes` (registry walker for "what's mounted in my app")
+- ✅ **`routes` CLI command** — shipped 2026-06-22. `node src/cli.ts routes` / `npm run routes` prints the route tree via `formatRouteTree` over a `skipWrap` registry build (the `openapi` command's pattern). `formatTree.ts` got its first unit test (0→96%).
 
 ## v6 breaking defaults (no phase doc — tracked as bullets)
 
