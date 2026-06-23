@@ -1,9 +1,29 @@
 # P1g — Docs sweep after v5 ships
 
-**Status**: ⏳ in flight — first full pass done 2026-06-06 (every chapter reviewed once; build green). Re-sweep before publish.
+**Status**: ✅ complete — Pass 1 (2026-06-06) + Pass 2 re-sweep (2026-06-22, post-v5.1-features). Build green (`onBrokenLinks: throw` → all anchors resolve). Unblocks llm-skills.
 **Depends on**: v5.0.0 stable release
 **Time**: ~1 day
 **Origin**: incremental docs updates during the refactor only touched the chapters most relevant to a given change. After v5 stabilizes, do a full sweep to bring every chapter in `framework-documenation-github/docs/` in line with current behavior.
+
+## Pass 2 — 2026-06-22 (re-sweep, all 18 chapters incl. new 15/16/17)
+
+5 parallel audit agents (1 per chapter group) compared every chapter against current v5.1 source; fixes applied by hand. Corrections:
+
+- **06-Controllers/02-routes.md** — rewrote the stale codegen "ghost"/`ASF_DEP_CTOR_ROUTES` subsection (codegen is **AST-only**: non-literal `routes` → run FAILS, no constructor fallback); fixed the boot route-tree example to match `formatTree.ts` real output (`METHOD <full-path> [flags]` + `Registered routes:` header + summary footer + `pmw:` inherited mw — NOT `→ handlerName`); `description: yup.string()` → plain string (it's the OpenAPI summary); `node cliCommand.ts` → `node src/cli.ts` (consumer form).
+- **16-anti-patterns.md** — same codegen-ghost rewrite (AST-only, run fails) + fixed cross-anchor.
+- **06-Controllers/03-middleware.md** — global-middleware list reordered to match `HttpServer.ts` (RequestLogger → PrepareAppInfo → IpDetector → I18n → Cors → RequestParser; security headers first).
+- **06-Controllers/01-intro.md** — `app.express` → `app.httpServer.express` (no `app.express` exists).
+- **05-models.md** — `UserModel.hashPassword` → `hashPassword` helper (crypto.ts); `UserModel.generateUser*Token` → `userHelpers.*` (not statics); added missing `import mongoose`.
+- **05-modelsOld.md** (legacy) — removed nonexistent `removeVerificationToken` call, `awaitUserModel`→`await UserModel`, `constructoror`→`constructor`, ~6 spelling typos.
+- **02-configs.md** — `getConfig`/`updateConfig` signature `{}` → `Record<string, unknown>`.
+- **03-files-inheritance.md** — `InstanceType<UserModel>` → `InstanceType<UserModelLite>` + added missing `BaseModel` type import.
+- **07-logging.md** — clarified Sentry transport reuses the app's own `Sentry.init` (framework reads no DSN); `config/log.js`→`.ts`.
+- **08-i18n.md** — `config/i18n.js`→`.ts`; fixed "requuest"/grammar.
+- **09-testsing.md** — prose `setupFramework` module paths → `.js`.
+- **10-cli.md** — `getMongoConnectionName` param name aligned to body.
+- **01-intro.md** — "moder"→"modern".
+
+Verified clean (no change): 04-base, 11-cache (just rewritten for redis-optional), 12-email, 13-deploy, 14-helpers, 15-recipes, 17-openapi. **Decision:** `defineSchema` confirmed PUBLIC (its JSDoc invites consumer use; in exports map; documented in 14-helpers) — the agent's suggestion to purge it from 15-recipes was based on a wrong premise in the brief and was NOT applied.
 
 ## Pass 1 — 2026-06-06 (grep-driven + per-chapter audit)
 

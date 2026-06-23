@@ -11,12 +11,12 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
                │    P1n AST replaced ghost+regex; v6 = drop skipWrap / boot-fallback
                │
                ├──→ docs / skill track ─────────────→ publish
-               │    docs-sweep ✅ · doc additions ✅ · generator + llms.txt ← TODO
+               │    docs-sweep ✅ (re-swept 06-22) · doc additions ✅ · generator + llms.txt ← TODO
                │
                └──→ polish (independent) ───────────→ any order
                     [rate-limiter-lazy ✅] [cache-drivers ✅] [test-helpers ✅]
 
-Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
+Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           v6 cutover blocked by all v5.1 active + queued work
           node-adapter blocked by v6
           drop-express blocked by node-adapter
@@ -28,8 +28,7 @@ Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
 
 | File | Ref | Summary |
 |---|---|---|
-| [docs-sweep](active/docs-sweep.md) | P1g | Audit `framework-documenation-github/docs/` against v5 behavior. Pass 1 ✅ (2026-06-06; recipes + anti-patterns chapters added). Re-sweep before publish; blocks llm-skills generator. ~½ d. |
-| [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). Depends on docs-sweep. ~1.5 d. |
+| [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
 
 ### queued/
 
@@ -71,6 +70,7 @@ Blocking: docs-sweep (re-sweep) blocks the llm-skills generator
 | [test-helpers](done/test-helpers.md) | P1i | Runner-agnostic test setup (`setupFramework`); `setupVitest`/`globalSetupVitest` thin wrappers + new `setupNodeTest` → consumers can use `node:test`. vitest optional peer. Folded-in `createTestApp` utils NOT built. 2026-06-21. |
 | [cache-drivers](done/cache-drivers.md) | P1c | **Make redis optional (cache half).** `CacheDriver` interface + memory-default driver + lazy redis driver; `config/cache.ts`; zero-TTL skip (#10, #13). Default cache backend is now in-memory. 2026-06-22. |
 | [rate-limiter-lazy](done/rate-limiter-lazy.md) | P1b+ | **Make redis optional (rate-limiter half).** RateLimiter redis driver lazy-`import()`s `@redis/client` (deferred `whenReady`, non-blocking sync client); memory/mongo never touch it. `@redis/client` flipped to an optional peer with cache-drivers. 2026-06-22. |
+| [docs-sweep](done/docs-sweep.md) | P1g | Audit `framework-documenation-github/docs/` against v5 behavior. Pass 1 ✅ (2026-06-06) + Pass 2 re-sweep ✅ (2026-06-22, 18 chapters, 5 audit agents). Build green (`onBrokenLinks: throw`). Unblocks llm-skills. |
 
 ## v5.1 extras (no phase doc — tracked as bullets)
 
