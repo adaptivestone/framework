@@ -34,6 +34,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 
 | File | Ref | Summary |
 |---|---|---|
+| [params-validation](queued/params-validation.md) | P1b+ | **Route `params:` schema.** Validate + coerce path params (`:id`) like `request:`/`query:`, typed on `req.appInfo.params`; malformed param → 400 (today: raw string → Mongoose `CastError` → 500). Additive, reuses the validation runtime; codegen typing is the only new work. Interim docs recipe shipped 2026-06-23. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | 🎨 **Design needed.** Document real OpenAPI response bodies/schemas (today's are generic stubs). Success body must be declared (can't be inferred); errors/envelopes derivable from structure. Builds on [openapi-generator](done/openapi-generator.md). |
 
 ### later/
