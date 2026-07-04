@@ -42,6 +42,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [static-middleware-cutover](later/static-middleware-cutover.md) | P1f | v6: drop instance schema getters, remove `skipWrap` + `process.exit(0)` (= P1j Phase 5). v5.x bridge ✅ (P1j Phase 1). Note: the AST boot/ghost fallback was already deleted in v5.0.0 (P1n), so Phase 7 is partly done. |
+| [async-middleware](later/async-middleware.md) | P1m | v6: **async/await middleware contract.** Drop Express's `next` callback — return → continue, `throw` → error, send response → stop. Collapses the adapter's Promise-bridge. Design call open (linear drop-`next` vs awaitable-`next` onion; A recommended). Best landed with static-middleware-cutover. |
 | [observability](later/observability.md) | P2b | OTel, Sentry, metrics, healthz. |
 | [performance](later/performance.md) | P2c | find-my-way, fast-json-stringify. |
 | [mcp-surface](later/mcp-surface.md) | P2d | Full MCP server (read + write). Now unblocked — the `toJsonSchema` seam + registry walk shipped with [openapi-generator](done/openapi-generator.md). |
@@ -85,8 +86,9 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 
 - Strict Content-Type by default
 - Case-sensitive + strict trailing-slash by default
-- Awaitable `next()` middleware contract
 - `YupFile.check` single-file semantics
+
+(Async/await middleware contract — formerly a bullet here — now has its own card: [async-middleware](later/async-middleware.md), P1m.)
 
 ## Conventions
 
