@@ -1,6 +1,6 @@
 # P1o — Mongoose validation safety net (escaped model errors → 400 when provably client data)
 
-**Status**: ⏸ queued (v5.1 — behavior change: a class of 500s becomes 400s; changelog must flag it)
+**Status**: ✅ done — shipped 2026-07-05 (commit 905b217; v5.1 behavior change, flagged in CHANGELOG Unreleased)
 **Depends on**: nothing hard. Complements [params-validation](params-validation.md) (P1b+) — that one is *query-side* CastError, this one is *save-side* ValidationError.
 **Origin**: 2026-07-05. Route validates `request:`/`query:` → 400 with field errors. But when a route schema doesn't mirror a model constraint (e.g. `name` with `maxLength: 50`, client sends 100 chars), the value passes route validation and `doc.save()` throws a Mongoose `ValidationError`, which falls into the wrapped handler's generic catch (`src/controllers/index.ts` ~458) → blanket **500 "Platform error"**. The client did nothing "server-error" worthy, but gets a 500 and no clue what to fix.
 

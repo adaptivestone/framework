@@ -35,7 +35,6 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [params-validation](queued/params-validation.md) | P1b+ | **Route `params:` schema.** Validate + coerce path params (`:id`) like `request:`/`query:`, typed on `req.appInfo.params`; malformed param → 400 (today: raw string → Mongoose `CastError` → 500). Additive, reuses the validation runtime; codegen typing is the only new work. Interim docs recipe shipped 2026-06-23. |
-| [mongoose-validation-safety-net](queued/mongoose-validation-safety-net.md) | P1o | **Escaped Mongoose `ValidationError` → 400.** When a route schema doesn't mirror a model constraint (`maxLength` etc.), `save()` throws and today → blanket 500. New: match failing model paths against `req.appInfo.request`/`query` keys — ALL match → 400 with per-field detail (route-validation shape) + warn; any renamed/internal path → 500 stays (never leak model paths). Behavior change, v5.1. Save-side sibling of P1b+. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | 🎨 **Design needed.** Document real OpenAPI response bodies/schemas (today's are generic stubs). Success body must be declared (can't be inferred); errors/envelopes derivable from structure. Builds on [openapi-generator](done/openapi-generator.md). |
 
 ### later/
@@ -66,6 +65,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | [controller-migration](done/controller-migration.md) | P1d | Home + SomeController translated through the registry. |
 | [boot-route-tree-log](done/boot-route-tree-log.md) | P1e | Boot-time project-wide route tree log from `RouteRegistry` (`formatTree.ts`, verbose level). |
 | [yup-optional](done/yup-optional.md) | P1k | yup un-bundled: `defineSchema` + `File` export (optional peer); `YupFile` deprecated; content-type-keyed request schemas. beta.51. |
+| [mongoose-validation-safety-net](done/mongoose-validation-safety-net.md) | P1o | **Escaped Mongoose `ValidationError` → 400** when ALL failing model paths match `req.appInfo.request`/`query` keys (first segment, minus `contentType`); any renamed/internal path → 500 stays (never leak model paths); warn/error log split. Shipped 2026-07-05 (905b217), v5.1 behavior change. |
 | [config-schema-codegen](done/config-schema-codegen.md) | P1l | `getConfig()` emits inline value-**shape** types (no literals, no secrets, no `import()`; arrays stay tuples). beta.54. |
 | [codegen-ast](done/codegen-ast.md) | P1n | oxc AST codegen front-end — replaced ghost + regex (`importResolution.ts` + `ghostController.ts` **deleted**). Shipped v5.0.0; boot fallback removed → declarative controllers required. |
 | [codegen-zero-init](done/codegen-zero-init.md) | P1j | Zero-init `npm run gen` (no controller/middleware/model `new`). Delivered via the AST front-end (P1n); Phases 0–3 ✅, Phase 4 moot. **Phase 5 (drop `skipWrap` + `process.exit(0)`) → v6** under [static-middleware-cutover](later/static-middleware-cutover.md). |
