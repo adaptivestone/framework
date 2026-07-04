@@ -35,6 +35,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [params-validation](queued/params-validation.md) | P1b+ | **Route `params:` schema.** Validate + coerce path params (`:id`) like `request:`/`query:`, typed on `req.appInfo.params`; malformed param → 400 (today: raw string → Mongoose `CastError` → 500). Additive, reuses the validation runtime; codegen typing is the only new work. Interim docs recipe shipped 2026-06-23. |
+| [mongoose-validation-safety-net](queued/mongoose-validation-safety-net.md) | P1o | **Escaped Mongoose `ValidationError` → 400.** When a route schema doesn't mirror a model constraint (`maxLength` etc.), `save()` throws and today → blanket 500. New: match failing model paths against `req.appInfo.request`/`query` keys — ALL match → 400 with per-field detail (route-validation shape) + warn; any renamed/internal path → 500 stays (never leak model paths). Behavior change, v5.1. Save-side sibling of P1b+. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | 🎨 **Design needed.** Document real OpenAPI response bodies/schemas (today's are generic stubs). Success body must be declared (can't be inferred); errors/envelopes derivable from structure. Builds on [openapi-generator](done/openapi-generator.md). |
 
 ### later/
