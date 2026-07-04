@@ -411,7 +411,9 @@ class Server {
     }
 
     if (this.app.getConfig('mongo').connectionString) {
-      const { BaseModel } = await import('./modules/BaseModel.ts');
+      const { BaseModel, isBaseModelSubclassShape } = await import(
+        './modules/BaseModel.ts'
+      );
       // Kick the connection off once (shared promise). Not awaited here — model
       // schema registration below works against an unconnected mongoose.
       if (!this.#mongooseConnectionPromise) {
@@ -423,6 +425,20 @@ class Server {
           if (ModelConstructor.prototype instanceof BaseModel) {
             const model = (ModelConstructor as typeof BaseModel).initialize();
             this.cache.models.set(modelName, model);
+          } else if (isBaseModelSubclassShape(ModelConstructor)) {
+            // BaseModel-shaped but not `instanceof` this copy's BaseModel →
+            // duplicate framework install. Fail loudly instead of misrouting it
+            // into the legacy branch below.
+            throw new Error(
+              `Model '${modelName}' extends BaseModel from a DIFFERENT copy of ` +
+                '@adaptivestone/framework than the one loading models, so ' +
+                '`instanceof BaseModel` is false and it cannot be initialized. ' +
+                'This means @adaptivestone/framework is installed more than once ' +
+                '(a duplicate/undeduped install). Fix the duplication so a single ' +
+                'copy is shared: run `npm ls @adaptivestone/framework` to find the ' +
+                'extra copy, then dedupe (align versions, delete node_modules and ' +
+                'reinstall, and check your lockfile).',
+            );
           } else {
             this.app.logger.warn(
               `Model ${modelName} is old type model. Please update it to BaseModel`,

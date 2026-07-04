@@ -287,3 +287,28 @@ export class BaseModel {
     return mongooseModel;
   }
 }
+
+/**
+ * Structural "is a BaseModel subclass" check by static shape (`initialize` +
+ * `modelSchema`), not `instanceof`. The model loader uses it to catch a subclass
+ * extending BaseModel from a *different installed copy* of
+ * `@adaptivestone/framework` (duplicate/undeduped install): `instanceof`
+ * compares prototype identity, so it's false across the copy boundary. Requiring
+ * both markers means a legacy AbstractModel-based model can never match — its
+ * `modelSchema` is an instance getter and it has no static `initialize`.
+ */
+export function isBaseModelSubclassShape(candidate: unknown): boolean {
+  if (typeof candidate !== 'function') {
+    return false;
+  }
+  const ctor = candidate as { initialize?: unknown; modelSchema?: unknown };
+  if (typeof ctor.initialize !== 'function') {
+    return false;
+  }
+  try {
+    return ctor.modelSchema !== undefined;
+  } catch {
+    // A throwing static getter still means the static slot exists.
+    return true;
+  }
+}

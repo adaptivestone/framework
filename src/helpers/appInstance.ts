@@ -14,14 +14,9 @@ export const setAppInstance = (app: IApp) => {
 };
 
 /**
- * Read the app-instance singleton, throwing a guided error when it isn't set.
- *
- * Prefer this over importing the raw `appInstance` binding. A consumer that reads
- * the binding before any `Server` has been constructed gets the singleton's
- * `undefined` value, so the first property access fails with an opaque
- * `TypeError: cannot read properties of undefined (reading '…')` that gives no
- * hint about *why* it's undefined. This helper surfaces the real cause (and the
- * fix) at the point of use instead.
+ * Read the app-instance singleton, throwing a guided error when it isn't set —
+ * consumers reading the raw `appInstance` binding too early fail later with an
+ * opaque `TypeError: cannot read properties of undefined` and no hint at the cause.
  */
 export const getAppInstance = (): IApp => {
   if (!appInstance) {

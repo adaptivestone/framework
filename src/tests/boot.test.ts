@@ -68,4 +68,15 @@ describe('boot policy (docs 25 + 26)', () => {
     expect(code).toBe(1);
     expect(out).toMatch(/Failed to initialize model 'BrokenModel'/);
   }, 40000);
+
+  it('fails boot with a dedupe diagnostic when a model extends BaseModel from a different framework copy', async () => {
+    const env = baseEnv();
+    env.BOOT_MONGO = '1';
+    env.BOOT_DUP_COPY = '1';
+    env.AUTH_SALT = 'set-so-the-salt-check-passes';
+    const { code, out } = await runBoot(env);
+    expect(code).toBe(1);
+    expect(out).toMatch(/DIFFERENT copy of @adaptivestone\/framework/);
+    expect(out).toMatch(/npm ls @adaptivestone\/framework/);
+  }, 40000);
 });
