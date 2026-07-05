@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.1.0",
+  "version": "5.1.1",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
