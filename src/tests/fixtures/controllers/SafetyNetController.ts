@@ -14,10 +14,20 @@ import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
 //   - `name`     — public field name (a route input key) → matched path
 //   - `userName` — renamed target the client never sends under that name
 //   - `secret`   — internal required field the client never sees
+//   - `age`      — Number, so a non-numeric client string → `CastError`
+//   - `role`     — enum, exercises the `enum` kind
+//   - `nickname` — a model-defined CUSTOM message that embeds the value; must
+//                  still be rebuilt generically (never echoed)
 const safetyNetSchema = new mongoose.Schema({
   name: { type: String, maxlength: 5 },
   userName: { type: String, maxlength: 5 },
   secret: { type: String, required: true },
+  age: { type: Number },
+  role: { type: String, enum: ['admin', 'user'] },
+  nickname: {
+    type: String,
+    maxlength: [5, 'The nickname {VALUE} is far too long, shorten it'],
+  },
 });
 const SafetyNetModel =
   mongoose.models.SafetyNetFixture ??
@@ -58,6 +68,23 @@ class SafetyNetController extends AbstractController {
         '/queryMatched': {
           handler: this.saveNameFromQuery,
           query: object().shape({ name: string() }),
+        },
+        // Non-numeric string into a Number path → Mongoose `CastError`; path
+        // `age` is a route input key → 400. Rebuilt message must not echo it.
+        '/cast': {
+          handler: this.saveCast,
+          request: object().shape({ age: string() }),
+        },
+        // Out-of-enum value → `enum` kind; path `role` matched → 400.
+        '/enum': {
+          handler: this.saveEnum,
+          request: object().shape({ role: string() }),
+        },
+        // Model-defined CUSTOM maxlength message that embeds `{VALUE}`; must be
+        // rebuilt generically, never passed through. Path `nickname` matched.
+        '/custom': {
+          handler: this.saveCustom,
+          request: object().shape({ nickname: string() }),
         },
         // Responds 200 first, then `save()` throws — the `headersSent` guard
         // must win over the safety net; the client keeps its 200.
@@ -114,6 +141,34 @@ class SafetyNetController extends AbstractController {
   async saveNameFromQuery(req: FrameworkRequest, res: Response) {
     const doc = new SafetyNetModel({
       name: String(req.appInfo.query.name),
+      secret: 'ok',
+    });
+    await doc.save();
+    return res.status(200).json({ data: { saved: true } });
+  }
+
+  async saveCast(req: FrameworkRequest, res: Response) {
+    // A non-numeric string into the Number `age` path → CastError on save.
+    const doc = new SafetyNetModel({
+      age: req.appInfo.request.age,
+      secret: 'ok',
+    });
+    await doc.save();
+    return res.status(200).json({ data: { saved: true } });
+  }
+
+  async saveEnum(req: FrameworkRequest, res: Response) {
+    const doc = new SafetyNetModel({
+      role: String(req.appInfo.request.role),
+      secret: 'ok',
+    });
+    await doc.save();
+    return res.status(200).json({ data: { saved: true } });
+  }
+
+  async saveCustom(req: FrameworkRequest, res: Response) {
+    const doc = new SafetyNetModel({
+      nickname: String(req.appInfo.request.nickname),
       secret: 'ok',
     });
     await doc.save();

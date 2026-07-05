@@ -572,11 +572,78 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    // Only the public, client-sent path appears — value is the Mongoose message.
+    // Only the public, client-sent path appears.
     expect(Object.keys(body.errors)).toEqual(['name']);
-    expect(typeof body.errors.name).toBe('string');
+    // Message is rebuilt from the `maxlength` kind + bound, NOT the raw Mongoose
+    // template — so it carries the constant (5) but never the submission.
+    expect(body.errors.name).toBe('Must be at most 5 characters');
+    expect(body.errors.name).not.toContain('toolong');
     // Handled → warn, not error.
     expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+  });
+
+  it('maxlength overflow → message carries the bound, never the value', async () => {
+    const overflow = 'S3cr3t-PII-do-not-log';
+    const res = await post('/matched', { name: overflow });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.errors.name).toBe('Must be at most 5 characters');
+    // The value must not appear anywhere in the serialized 400 body…
+    expect(JSON.stringify(body)).not.toContain(overflow);
+    // …nor in the warn log line (the Sentry/retention vector): the logged
+    // error is rebuilt with the same kind-based texts (`toLoggableError`).
+    const [entry] = netLogs();
+    expect(entry?.level).toBe('warn');
+    expect(entry?.message).toContain('Must be at most 5 characters');
+    expect(entry?.message).not.toContain(overflow);
+  });
+
+  it('cast failure (string → Number) → typed message, value not echoed', async () => {
+    const res = await post('/cast', { age: '+7 (900) 123-45-67' });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(Object.keys(body.errors)).toEqual(['age']);
+    expect(body.errors.age).toBe('Must be a number');
+    expect(JSON.stringify(body)).not.toContain('900');
+    expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+    // The CastError template ("Cast to Number failed for value …") embeds the
+    // PII — the sanitized log line must not.
+    for (const r of netLogs()) {
+      expect(r.message).not.toContain('900');
+    }
+  });
+
+  it('enum violation → lists the allowed set, never the rejected value', async () => {
+    const res = await post('/enum', { role: 'superhacker' });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(Object.keys(body.errors)).toEqual(['role']);
+    expect(body.errors.role).toBe('Must be one of: admin, user');
+    expect(JSON.stringify(body)).not.toContain('superhacker');
+  });
+
+  it('custom model message embedding {VALUE} is rebuilt generically', async () => {
+    const secret = 'hunter2-leak-me';
+    const res = await post('/custom', { nickname: secret });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(Object.keys(body.errors)).toEqual(['nickname']);
+    // The model's custom string ("The nickname {VALUE} is far too long…") is
+    // NOT passed through — rebuilt from the kind + bound instead.
+    expect(body.errors.nickname).toBe('Must be at most 5 characters');
+    expect(body.errors.nickname).not.toContain('far too long');
+    expect(JSON.stringify(body)).not.toContain(secret);
+    // The warn log line is sanitized too — neither the value nor the custom
+    // template survives into it.
+    expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+    for (const r of netLogs()) {
+      expect(r.message).not.toContain(secret);
+      expect(r.message).not.toContain('far too long');
+    }
   });
 
   it('matched via a query-sourced key → 400 (request ∪ query union)', async () => {
@@ -611,6 +678,10 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     expect(entry?.level).toBe('error');
     expect(entry?.message).toContain('name');
     expect(entry?.message).toContain('secret');
+    // The unresolved 500 path deliberately logs the ORIGINAL error — raw
+    // Mongoose message, submitted value included — sanitization applies only
+    // to the handled (400) branch.
+    expect(entry?.message).toContain('toolong');
   });
 
   it('no route schema → no input keys → nothing matches → 500', async () => {
@@ -706,9 +777,16 @@ describe('HttpServer.resolveError — registry resolution', () => {
 
   it('built-in mongoose entry delegates to the safety-net matching (warn level)', async () => {
     const vErr = new mongoose.Error.ValidationError();
+    // A raw maxlength template that echoes the value — the safety net must
+    // rebuild from `kind` + `maxlength`, never pass `message` through.
     vErr.addError(
       'name',
-      new mongoose.Error.ValidatorError({ message: 'too long', path: 'name' }),
+      new mongoose.Error.ValidatorError({
+        message: 'Path `name` (`SUPERSECRET`) is longer than 5',
+        type: 'maxlength',
+        path: 'name',
+        maxlength: 5,
+      } as ConstructorParameters<typeof mongoose.Error.ValidatorError>[0]),
     );
     const matched = await httpServer().resolveError(
       vErr,
@@ -716,9 +794,10 @@ describe('HttpServer.resolveError — registry resolution', () => {
     );
     expect(matched).toEqual({
       status: 400,
-      body: { errors: { name: 'too long' } },
+      body: { errors: { name: 'Must be at most 5 characters' } },
       logLevel: 'warn',
     });
+    expect(JSON.stringify(matched)).not.toContain('SUPERSECRET');
     // Same error, no matching client key → null (caller keeps the 500).
     expect(await httpServer().resolveError(vErr, fakeReq())).toBeNull();
   });

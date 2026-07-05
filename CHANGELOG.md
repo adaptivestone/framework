@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.1] - Unreleased
+
+### Security
+
+- **Mongoose validation safety net no longer echoes submitted input.** The safety net (added in 5.1.0) mapped an escaped Mongoose `ValidationError` to `400 { errors: { <path>: message } }` using the **raw** Mongoose message. Those default templates interpolate the rejected value (`Path \`title\` (\`<the whole 300-char submission>\`) is longer than …`, `Cast to Number failed for value "<PII>" …`), so the offending input — a phone number, a password pasted into the wrong field, any oversized string — rode into both the `400` response body and the `warn`-level log (and thus Sentry). Each per-path message is now **rebuilt from the validation `kind` + the schema constraint only** (`maxlength: 255` → "Must be at most 255 characters", a `Number` cast failure → "Must be a number", an `enum` violation → "Must be one of: …"), and the submitted value is never included, under any kind. The `warn`-level log line for a safety-net-handled error is sanitized the same way — the logged error is rebuilt with those kind-based messages and a fresh, input-free stack — while an error that stays a **500** (internal/renamed paths, or no registry match) still logs the original in full, since that branch is a server-side defect the developer needs complete detail on. This matches the `YupDriver`, which already strips `value`/`originalValue` from route-validation errors. Messages are plain English, not i18n (the route validator owns user-facing wording; this is a last-resort fallback for a route schema that failed to mirror a model constraint). **Trade-off:** a model-defined *custom* message (`maxlength: [50, 'Name too long']`) is indistinguishable from a templated default that embedded the value, so **all** messages are rebuilt generically — a custom message set on the model is not passed through the safety net. Set user-facing wording on the route `request:`/`query:` schema instead. The `400`/`500` split, the "client actually sent this field" gate, the log levels, and the `{ errors: { path } }` response shape are unchanged.
+
 ## [5.1.0] - 2026-07-05
 
 ### Added

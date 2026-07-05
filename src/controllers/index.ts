@@ -5,6 +5,7 @@ import { makeOncePerClassWarner } from '../helpers/deprecation.ts';
 import type AbstractController from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
+import { toLoggableError } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import {
@@ -472,7 +473,12 @@ class ControllerManager extends Base {
           ? await app.httpServer.resolveError(err, req)
           : null;
         if (resolved) {
-          logger?.[resolved.logLevel](err);
+          // Handled → the log line rides into log shippers (Sentry,
+          // retention), so a mongoose ValidationError is rebuilt value-free
+          // before logging; everything else logs as-is. The unresolved 500
+          // below keeps the full original error — a server-side defect the
+          // developer needs in complete detail.
+          logger?.[resolved.logLevel](toLoggableError(err));
           return res.status(resolved.status).json(resolved.body);
         }
         logger?.error(err);
