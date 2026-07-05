@@ -18,7 +18,7 @@ import { specFromExtracted } from './astSpec.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const controllersDir = path.join(here, '__fixtures__/controllers');
-const FIXTURES = ['File', 'Inherited', 'Schemas', 'Advanced'];
+const FIXTURES = ['File', 'Inherited', 'Schemas', 'Advanced', 'ParamSiblings'];
 
 describe('astEmit', () => {
   it.each(

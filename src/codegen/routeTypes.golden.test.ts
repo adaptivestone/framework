@@ -75,6 +75,24 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       expect(gen).not.toContain('AuthMiddleware');
     }
 
+    // Param-sibling name collision: `PUT /:slug`, `POST /:event`, and
+    // `GET /:event/get-yachts` collapse onto one param trie node named `:slug`,
+    // so the `:event` siblings' chain lookup used to miss and emit an EMPTY
+    // `readonly []`. All three must carry the inherited `[GetUserByToken, Auth]`
+    // chain — assert no empty tuple survives AND every route type is populated.
+    const paramSiblingsGen = await readFile(
+      path.join(controllersDir, 'ParamSiblings.routes.gen.ts'),
+      'utf8',
+    );
+    expect(paramSiblingsGen).not.toContain('UnionAppInfoProvides<readonly []>');
+    for (const t of ['DuplicateRequest', 'UpdateRequest', 'YachtsRequest']) {
+      expect(paramSiblingsGen).toMatch(
+        new RegExp(
+          `${t} =[^;]*UnionAppInfoProvides<readonly \\[typeof GetUserByToken, typeof Auth\\]>`,
+        ),
+      );
+    }
+
     // The real gate: the handlers read `req.appInfo.user` with no guard, so a
     // regression in any of the bugs above makes this `tsc` run fail.
     const result = runTsc();

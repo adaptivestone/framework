@@ -204,6 +204,39 @@ describe('RouteRegistry — registerSubtree', () => {
     expect(postMatch?.params).toEqual({ event: 'my-value' });
   });
 
+  it('flatten gives BOTH differently-named param siblings the accumulated chain', () => {
+    // The runtime contract the route-type codegen depends on: two same-depth
+    // param siblings with DIFFERENT names collapse onto one node (first name
+    // wins), but `flatten()` must still attach the controller-wide chain to
+    // BOTH leaves. If the collapsed sibling (`POST`, whose `:event` reused the
+    // `:slug` node) lost its chain here, codegen would emit an empty middleware
+    // chain for it. Controller-wide `/{*splat}` middleware lands on the mount
+    // node (method ALL), so it accumulates root → leaf to every descendant.
+    const r = new RouteRegistry();
+    const subtree: RouteNode = {
+      segment: '',
+      middlewares: [mw('GetUserByToken'), mw('Auth')],
+      children: new Map(),
+      paramChild: {
+        segment: ':slug',
+        middlewares: [],
+        children: new Map(),
+        methods: { PUT: { handler: noop } },
+      },
+    };
+    r.registerSubtree('/', subtree);
+    // A differently-named sibling method collapses onto the same `:slug` node.
+    r.registerRoute('POST', '/:event', { handler: noop });
+
+    const byMethod = Object.fromEntries(
+      r
+        .flatten()
+        .map((f) => [f.method, f.middlewares.map((m) => m.Class.name)]),
+    );
+    expect(byMethod.PUT).toEqual(['GetUserByToken', 'Auth']);
+    expect(byMethod.POST).toEqual(['GetUserByToken', 'Auth']);
+  });
+
   it('different param names at multiple depths', () => {
     const r = new RouteRegistry();
     r.registerRoute('PUT', '/:model/:slug', {

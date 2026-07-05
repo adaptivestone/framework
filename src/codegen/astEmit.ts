@@ -325,6 +325,21 @@ function specifierTypeImportable(specifier: string, fromDir: string): boolean {
   return moduleTypeImportable(path.resolve(fromDir, specifier));
 }
 
+/**
+ * Canonicalize param/splat segment NAMES so paths that are structurally the same
+ * but differ only in param names resolve to one key. The router keeps a single
+ * `paramChild` per node, so same-depth param siblings (`/:slug`, `/:event`)
+ * collapse onto ONE trie node named by whichever registered first — meaning
+ * `flatten()` reconstructs every sibling's path with that one name, while codegen
+ * looks each route up by its own SOURCE name. Names never affect which node a
+ * path resolves to at runtime, so erase them from the lookup key on both sides
+ * (`indexFlat` build + `chainAt` lookup). Without this the sibling whose name
+ * lost the race misses the lookup and emits an empty middleware chain.
+ */
+function canonicalizeParams(routePath: string): string {
+  return routePath.replace(/:[^/]+/g, ':*').replace(/\*[^/]+/g, '*');
+}
+
 /** The deduped, importable middleware chain (binding names) for one flat route. */
 function chainAt(
   flatByKey: Map<string, FlatRoute>,
@@ -332,7 +347,7 @@ function chainAt(
   absPath: string,
   importable: Set<string>,
 ): MiddlewareRef[] {
-  const fr = flatByKey.get(`${method} ${absPath}`);
+  const fr = flatByKey.get(`${method} ${canonicalizeParams(absPath)}`);
   if (!fr) {
     return [];
   }
@@ -351,7 +366,7 @@ function chainAt(
 function indexFlat(flat: FlatRoute[]): Map<string, FlatRoute> {
   const out = new Map<string, FlatRoute>();
   for (const fr of flat) {
-    out.set(`${fr.method} ${fr.path}`, fr);
+    out.set(`${fr.method} ${canonicalizeParams(fr.path)}`, fr);
   }
   return out;
 }

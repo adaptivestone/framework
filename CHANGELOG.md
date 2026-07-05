@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.1.1] - Unreleased
+## [5.1.2] - Unreleased
+
+### Fixed
+
+- **Route-type codegen emitted an empty middleware chain for sibling param routes with different names.** When two routes on the same controller sat at the same position in the route tree but used param segments with **different** names (e.g. `PUT /:slug` and `POST /:event`), the generated `*.routes.gen.ts` gave the sibling whose param name was *not* registered first an empty `UnionAppInfoProvides<readonly []>` — dropping `req.appInfo.user` (and every other middleware-provided field) from its request type, even though that route runs the controller's full middleware chain at runtime. Root cause: the router keeps a single param child per tree node, so same-depth param siblings collapse onto one node named after the first-registered segment (`:slug`); `flatten()` then reconstructs every sibling's path with that name, while codegen looked each route's chain up by its own **source** path (`:event`) and missed. The middleware-chain lookup is now param-name-insensitive (segment names never affect which node a path resolves to), so all siblings resolve their real chain. **Types-only fix — runtime routing, `req.params` extraction, and middleware execution are unchanged** (they were already correct; only the generated types were wrong).
+
+## [5.1.1] - 2026-07-05
 
 ### Security
 
