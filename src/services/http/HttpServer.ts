@@ -12,6 +12,13 @@ import type { TFunction } from 'i18next';
 import type ThttpConfig from '../../config/http.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
+import {
+  builtInErrorHandlers,
+  type ErrorHandlerFn,
+  type ErrorHandlerResult,
+  type ErrorLogLevel,
+  type RegisteredErrorHandler,
+} from './builtinErrorHandlers.ts';
 import Cors from './middleware/Cors.ts';
 import I18nMiddleware from './middleware/I18n.ts';
 import IpDetector from './middleware/IpDetector.ts';
@@ -43,6 +50,11 @@ class HttpServer extends Base {
   httpServer: Server;
 
   routeRegistry: RouteRegistry;
+
+  /** Consumer-registered error handlers — checked before the built-ins. */
+  #errorHandlers: RegisteredErrorHandler[] = [];
+
+  #builtInHandlers: RegisteredErrorHandler[] = builtInErrorHandlers();
 
   constructor(app: IApp) {
     super(app);
@@ -124,6 +136,71 @@ class HttpServer extends Base {
   /** Mount the route adapter — single entry to the registry. */
   mountAdapter() {
     this.express.use(createExpressAdapter(this.routeRegistry, this.app));
+  }
+
+  /**
+   * Register a handler mapping a thrown error class to an HTTP response.
+   * Consumer handlers are checked before the built-ins (`HttpError` mapper,
+   * mongoose validation safety net) in registration order — the first
+   * `instanceof` match whose handler returns non-null wins; return `null` to
+   * pass to the next entry. Typical registration point is the project's
+   * `bootHttp` hook. Returns an unregister function.
+   */
+  registerErrorHandler<E extends Error>(
+    errorClass: abstract new (...args: never[]) => E,
+    handler: ErrorHandlerFn<E>,
+    opts?: { logLevel?: ErrorLogLevel },
+  ): () => void {
+    const entry: RegisteredErrorHandler = {
+      errorClass,
+      // Stored type-erased; `resolveError` guarantees `instanceof errorClass`
+      // before the call, so the narrower parameter type is safe.
+      handler: handler as ErrorHandlerFn,
+      logLevel: opts?.logLevel ?? 'warn',
+    };
+    this.#errorHandlers.push(entry);
+    return () => {
+      const i = this.#errorHandlers.indexOf(entry);
+      if (i !== -1) {
+        this.#errorHandlers.splice(i, 1);
+      }
+    };
+  }
+
+  /**
+   * Resolve a handler-thrown error through the registry: consumer tier first,
+   * then built-ins; first `instanceof` match returning non-null wins. A
+   * handler that itself throws aborts the walk (logged here at `error`; the
+   * caller falls through to its 500) — never a crash loop. Returns null when
+   * no entry produced a response.
+   */
+  async resolveError(
+    err: unknown,
+    req: FrameworkRequest,
+  ): Promise<(ErrorHandlerResult & { logLevel: ErrorLogLevel }) | null> {
+    for (const entry of [...this.#errorHandlers, ...this.#builtInHandlers]) {
+      if (err instanceof entry.errorClass) {
+        let result: ErrorHandlerResult | null | undefined;
+        try {
+          result = await entry.handler(err, req);
+        } catch (handlerErr) {
+          // Keep the stack — a broken consumer handler is exactly the case
+          // where `${err}` (message-only) isn't enough to debug.
+          this.logger?.error(
+            `Error handler for ${entry.errorClass.name} threw: ${
+              handlerErr instanceof Error
+                ? (handlerErr.stack ?? handlerErr.message)
+                : handlerErr
+            }`,
+          );
+          return null;
+        }
+        if (result != null) {
+          return { ...result, logLevel: entry.logLevel };
+        }
+      }
+    }
+    return null;
   }
 
   /**

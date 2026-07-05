@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
@@ -65,7 +65,7 @@
     "i18next": "^26.0.1",
     "i18next-fs-backend": "^2.0.0",
     "mongoose": "^9.0.0",
-    "oxc-parser": "^0.137.0",
+    "oxc-parser": "^0.138.0",
     "rate-limiter-flexible": "^11.0.0",
     "winston": "^3.3.3",
     "winston-transport": "^4.9.0"

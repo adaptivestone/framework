@@ -46,6 +46,7 @@ for (const spec of [
   '@adaptivestone/framework/modules/AbstractController.js',
   '@adaptivestone/framework/models/User.js',
   '@adaptivestone/framework/services/http/middleware/GetUserByToken.js',
+  '@adaptivestone/framework/services/http/httpErrors.js',
   '@adaptivestone/framework/helpers/crypto.js',
 ]) {
   await import(spec);

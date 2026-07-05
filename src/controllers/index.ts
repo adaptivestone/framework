@@ -1,7 +1,6 @@
 import path from 'node:path';
 import * as url from 'node:url';
 import type { NextFunction, Response } from 'express';
-import mongoose from 'mongoose';
 import { makeOncePerClassWarner } from '../helpers/deprecation.ts';
 import type AbstractController from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
@@ -457,28 +456,26 @@ class ControllerManager extends Base {
       try {
         return await Promise.resolve(original(req, res, next));
       } catch (err) {
-        // Safety net: an escaped Mongoose `ValidationError` becomes a 400 with
-        // per-field detail ONLY when every failing model path is a field the
-        // client actually sent (a real `instanceof` — NOT the framework's own
-        // route-level `ValidationError`, which never reaches here). A
-        // renamed/internal/mixed failure includes a server-side gap, so it
-        // stays an honest 500 and never leaks a non-public field name. The
-        // `headersSent` guard wins first (`!res.headersSent`), unchanged.
-        if (!res.headersSent && err instanceof mongoose.Error.ValidationError) {
-          const clientErrors = matchedClientValidationErrors(err, req);
-          if (clientErrors) {
-            // Handled, but the route `request:`/`query:` schema is missing a
-            // constraint the model enforces — the developer should mirror it.
-            logger?.warn(err);
-            return res.status(400).json({ errors: clientErrors });
-          }
-        }
-        logger?.error(err);
-        // A handler that already streamed can't be sent a 500 — hand off to the
-        // error finalizer instead of crashing with ERR_HTTP_HEADERS_SENT.
+        // A handler that already streamed can't be sent anything — hand off to
+        // the error finalizer instead of crashing with ERR_HTTP_HEADERS_SENT.
         if (res.headersSent) {
+          logger?.error(err);
           return next(err);
         }
+        // Error-handler registry: consumer-registered handlers first, then the
+        // built-ins (`HttpError` mapper, mongoose validation safety net) —
+        // first `instanceof` match returning non-null wins. Each entry carries
+        // its own log level: `verbose` for deliberate HttpError control flow,
+        // `warn` for the safety net's schema-gap signal, `warn` default for
+        // consumer entries.
+        const resolved = app.httpServer
+          ? await app.httpServer.resolveError(err, req)
+          : null;
+        if (resolved) {
+          logger?.[resolved.logLevel](err);
+          return res.status(resolved.status).json(resolved.body);
+        }
+        logger?.error(err);
         return res.status(500).json({
           message: 'Platform error. Please check later or contact support',
         });
@@ -533,44 +530,6 @@ export function buildSubtreeFromSpec(spec: ControllerSubtreeSpec): RouteNode {
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────
-
-/**
- * Safety net for an escaped Mongoose `ValidationError`: returns a per-field
- * `{ <path>: message }` map ONLY when every failing model path is a field the
- * client actually sent — the keys of the validated `request` ∪ `query`, minus
- * the framework-injected `contentType` discriminant (see `#wrapHandlerEntry`).
- * A nested path (`profile.name`) matches on its first segment and is reported
- * under the full path (the client owns that subtree). Any renamed/internal path
- * → `null`, so the caller keeps the honest 500 and never leaks a non-public
- * field name.
- */
-function matchedClientValidationErrors(
-  err: mongoose.Error.ValidationError,
-  req: FrameworkRequest,
-): Record<string, string> | null {
-  const failingPaths = Object.keys(err.errors);
-  if (failingPaths.length === 0) {
-    return null;
-  }
-  const inputKeys = new Set<string>();
-  for (const source of [req.appInfo.request, req.appInfo.query]) {
-    if (source) {
-      for (const key of Object.keys(source)) {
-        inputKeys.add(key);
-      }
-    }
-  }
-  inputKeys.delete('contentType');
-
-  const errors: Record<string, string> = {};
-  for (const failingPath of failingPaths) {
-    if (!inputKeys.has(failingPath.split('.')[0])) {
-      return null;
-    }
-    errors[failingPath] = err.errors[failingPath].message;
-  }
-  return errors;
-}
 
 /**
  * `'POST/login'` → method=POST,path=/login · `'/login'` → method=ALL,path=/login

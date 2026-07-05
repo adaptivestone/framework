@@ -1,6 +1,6 @@
 # P1p — Extensible handler-error registry (typed HTTP errors + error-class → response mapping)
 
-**Status**: ⏸ queued (v5.1 — additive; P1o's behavior-change entry stays separate)
+**Status**: ✅ implemented 2026-07-05 — code in working tree, awaiting user review + commit (v5.1 additive; P1o's behavior-change entry stays separate).
 **Depends on**: P1o ✅ (mongoose safety net — becomes a built-in registry entry), bootHttp hook ✅ (the consumer registration point)
 **Origin**: 2026-07-05. The wrapped-handler catch (`src/controllers/index.ts`) turns every thrown error into a blanket 500 except the P1o mongoose branch. Consumers have no way to (a) deliberately produce an HTTP status from deep business logic without threading `res`, or (b) map third-party error types they don't own (Mongo driver, SDKs) to proper responses. User wants both, with the mongoose safety net folded into the same extensible mechanism rather than staying hardcoded.
 
@@ -24,7 +24,7 @@ New `src/services/http/httpErrors.ts`:
 `app.httpServer.registerErrorHandler(ErrorClass, handler, opts?)` on `HttpServer`:
 
 - Signature (indicative): `<C extends new (...args: never[]) => Error>(errorClass: C, handler: (err: InstanceType<C>, req) => MaybePromise<{ status: number; body: unknown } | null | undefined>, opts?: { logLevel?: string })` — `err` auto-typed from the registered class. Exact constructor-type constraint is the implementer's call, but it must also accept abstract base classes (`abstract new`-compatible).
-- Called from the project's `bootHttp` hook (or anywhere before/while serving; registration is just an array push).
+- Called from the project's `bootHttp` hook (or anywhere before/while serving; registration is just an array push). Returns an **unregister function** (test isolation, feature flags).
 - Returning `null`/`undefined` = "not mine after all" → matching continues to the next entry.
 - Async handlers awaited. A handler that throws/rejects → `logger.error` + 500 fallback (never crashes the wrapper, never re-enters the registry).
 
@@ -86,10 +86,10 @@ app.httpServer.registerErrorHandler(mongoose.Error.ValidationError, () =>
 );
 ```
 
-## Open questions
+## Open questions (resolved)
 
-- Method name: `registerErrorHandler` (recommended, matches imperative boot-API framing) vs `addErrorHandler`.
-- Should `HttpError` also carry an optional `code` field for machine-readable error codes? Lean NO for v1 (body override covers it).
+- Method name: **`registerErrorHandler`** — settled by collision: `HttpServer` already has an `addErrorHandler()` (the Express 4-arg error sink, `HttpServer.ts:143`).
+- `code` field on `HttpError`: NO for v1 (the `body` override covers machine-readable codes).
 
 ## Out of scope
 

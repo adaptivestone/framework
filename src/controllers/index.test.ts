@@ -4,17 +4,32 @@
  * earlier unit tests against a free `translateController` function.
  */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import mongoose from 'mongoose';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from 'vitest';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import AbstractController from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
+import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
 import type { MiddlewareSpec } from '../services/http/routing/middlewareNormalization.ts';
 import type {
   HttpMethod,
   RouteNode,
 } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
+import ErrorRegistryController, {
+  FakeDriverError,
+  HandlerCrashError,
+} from '../tests/fixtures/controllers/ErrorRegistryController.ts';
 import SafetyNetController from '../tests/fixtures/controllers/SafetyNetController.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
 import ControllerManager from './index.ts';
@@ -67,6 +82,23 @@ const findNode = (
   }
   return n ?? null;
 };
+
+// A capturing winston transport used by the HTTP-level describes below to
+// assert which level a handled error is logged at, without mocking the code
+// under test: it records real log records off the shared root logger (child
+// loggers funnel into it) while the console transports are silenced so the
+// intentional errors don't clutter test output.
+interface LogRecord {
+  level: string;
+  message: string;
+}
+class CaptureTransport extends Transport {
+  records: LogRecord[] = [];
+  override log(info: LogRecord, next: () => void) {
+    this.records.push({ level: info.level, message: String(info.message) });
+    next();
+  }
+}
 
 // ─── routes ──────────────────────────────────────────────────────────
 
@@ -502,18 +534,6 @@ describe('ControllerManager — Mongoose validation safety net', () => {
   // test: a capturing transport on the root logger records real log records
   // (child loggers funnel into it), while the existing (console) transports are
   // silenced so the intentional errors below don't clutter test output.
-  interface LogRecord {
-    level: string;
-    message: string;
-  }
-  class CaptureTransport extends Transport {
-    records: LogRecord[] = [];
-    override log(info: LogRecord, next: () => void) {
-      this.records.push({ level: info.level, message: String(info.message) });
-      next();
-    }
-  }
-
   let capture: CaptureTransport;
   let silenced: Transport[] = [];
   // The Mongoose error for the fixture model — how safety-net logs are picked
@@ -618,5 +638,299 @@ describe('ControllerManager — Mongoose validation safety net', () => {
 
     expect(res.status).toBe(200);
     expect(body.data.saved).toBe('already');
+  });
+});
+
+// ─── Error-handler registry (P1p) — resolveError unit level ─────────
+
+describe('HttpServer.resolveError — registry resolution', () => {
+  const httpServer = () => {
+    if (!appInstance.httpServer) {
+      throw new Error('test server not booted');
+    }
+    return appInstance.httpServer;
+  };
+  const fakeReq = (request: Record<string, unknown> = {}) =>
+    ({ appInfo: { request, query: {} } }) as unknown as FrameworkRequest;
+
+  // Silence the console transports: the throwing-handler test drives a real
+  // `logger.error(...)` line inside `resolveError`. The capture transport keeps
+  // the root logger's `log` contract satisfied while nothing here asserts on it.
+  let capture: CaptureTransport;
+  let silenced: Transport[] = [];
+  beforeAll(() => {
+    capture = new CaptureTransport();
+    appInstance.logger.add(capture);
+    silenced = appInstance.logger.transports.filter((t) => t !== capture);
+    for (const t of silenced) {
+      t.silent = true;
+    }
+  });
+  afterAll(() => {
+    for (const t of silenced) {
+      t.silent = false;
+    }
+    appInstance.logger.remove(capture);
+  });
+
+  const unregisters: Array<() => void> = [];
+  afterEach(() => {
+    for (const u of unregisters.splice(0)) {
+      u();
+    }
+  });
+
+  it('built-in HttpError mapper: status + { message } default body, verbose level', async () => {
+    const resolved = await httpServer().resolveError(
+      new NotFoundError('Boat not found'),
+      fakeReq(),
+    );
+    expect(resolved).toEqual({
+      status: 404,
+      body: { message: 'Boat not found' },
+      logLevel: 'verbose',
+    });
+  });
+
+  it('built-in HttpError mapper: explicit body wins over { message }', async () => {
+    const resolved = await httpServer().resolveError(
+      new HttpError(422, 'Unprocessable', { errors: { csv: 'bad' } }),
+      fakeReq(),
+    );
+    expect(resolved).toEqual({
+      status: 422,
+      body: { errors: { csv: 'bad' } },
+      logLevel: 'verbose',
+    });
+  });
+
+  it('built-in mongoose entry delegates to the safety-net matching (warn level)', async () => {
+    const vErr = new mongoose.Error.ValidationError();
+    vErr.addError(
+      'name',
+      new mongoose.Error.ValidatorError({ message: 'too long', path: 'name' }),
+    );
+    const matched = await httpServer().resolveError(
+      vErr,
+      fakeReq({ name: 'x' }),
+    );
+    expect(matched).toEqual({
+      status: 400,
+      body: { errors: { name: 'too long' } },
+      logLevel: 'warn',
+    });
+    // Same error, no matching client key → null (caller keeps the 500).
+    expect(await httpServer().resolveError(vErr, fakeReq())).toBeNull();
+  });
+
+  it('unmatched error class → null', async () => {
+    expect(
+      await httpServer().resolveError(new Error('x'), fakeReq()),
+    ).toBeNull();
+  });
+
+  it('consumer handler wins over built-ins and unregister restores them', async () => {
+    const unregister = httpServer().registerErrorHandler(HttpError, () => ({
+      status: 418,
+      body: { message: 'teapot' },
+    }));
+    unregisters.push(unregister);
+    const overridden = await httpServer().resolveError(
+      new NotFoundError('x'),
+      fakeReq(),
+    );
+    expect(overridden?.status).toBe(418);
+    expect(overridden?.logLevel).toBe('warn'); // consumer default
+    unregister();
+    const restored = await httpServer().resolveError(
+      new NotFoundError('x'),
+      fakeReq(),
+    );
+    expect(restored?.status).toBe(404);
+  });
+
+  it('null return falls through to the next entry (consumer → built-in)', async () => {
+    unregisters.push(httpServer().registerErrorHandler(HttpError, () => null));
+    const resolved = await httpServer().resolveError(
+      new NotFoundError('x'),
+      fakeReq(),
+    );
+    expect(resolved?.status).toBe(404); // built-in still reached
+  });
+
+  it('consumer tier respects registration order', async () => {
+    class OrderedError extends Error {}
+    unregisters.push(
+      httpServer().registerErrorHandler(OrderedError, () => null),
+      httpServer().registerErrorHandler(OrderedError, () => ({
+        status: 410,
+        body: { message: 'second' },
+      })),
+    );
+    const resolved = await httpServer().resolveError(
+      new OrderedError(),
+      fakeReq(),
+    );
+    expect(resolved).toEqual({
+      status: 410,
+      body: { message: 'second' },
+      logLevel: 'warn',
+    });
+  });
+
+  it('async handler result is awaited; opts.logLevel overrides the default', async () => {
+    class AsyncMapped extends Error {}
+    unregisters.push(
+      httpServer().registerErrorHandler(
+        AsyncMapped,
+        async () => ({ status: 402, body: { message: 'later' } }),
+        { logLevel: 'info' },
+      ),
+    );
+    const resolved = await httpServer().resolveError(
+      new AsyncMapped(),
+      fakeReq(),
+    );
+    expect(resolved).toEqual({
+      status: 402,
+      body: { message: 'later' },
+      logLevel: 'info',
+    });
+  });
+
+  it('a throwing handler aborts the walk → null (500 at the caller)', async () => {
+    class Crashy extends Error {}
+    unregisters.push(
+      httpServer().registerErrorHandler(Crashy, () => {
+        throw new Error('handler exploded');
+      }),
+      // Would match if the walk continued — it must not.
+      httpServer().registerErrorHandler(Crashy, () => ({
+        status: 400,
+        body: { message: 'unreachable' },
+      })),
+    );
+    expect(await httpServer().resolveError(new Crashy(), fakeReq())).toBeNull();
+  });
+});
+
+// ─── Error-handler registry (P1p) — over HTTP ────────────────────────
+
+describe('Error-handler registry over HTTP', () => {
+  const base = '/test/errorregistrycontroller';
+  const get = (path: string) => fetch(getTestServerURL(`${base}${path}`));
+
+  let capture: CaptureTransport;
+  let silenced: Transport[] = [];
+  const unregisters: Array<() => void> = [];
+  const logsMatching = (re: RegExp) =>
+    capture.records.filter((r) => re.test(r.message));
+
+  beforeAll(() => {
+    appInstance.controllerManager?.registerController(
+      ErrorRegistryController,
+      'test',
+    );
+    if (!appInstance.httpServer) {
+      throw new Error('test server not booted');
+    }
+    unregisters.push(
+      appInstance.httpServer.registerErrorHandler(FakeDriverError, (err) =>
+        err.code === 11000
+          ? { status: 409, body: { message: 'Already exists' } }
+          : null,
+      ),
+      appInstance.httpServer.registerErrorHandler(HandlerCrashError, () => {
+        throw new Error('handler exploded');
+      }),
+    );
+    capture = new CaptureTransport();
+    appInstance.logger.add(capture);
+    silenced = appInstance.logger.transports.filter((t) => t !== capture);
+    for (const t of silenced) {
+      t.silent = true;
+    }
+  });
+
+  afterAll(() => {
+    for (const u of unregisters.splice(0)) {
+      u();
+    }
+    for (const t of silenced) {
+      t.silent = false;
+    }
+    appInstance.logger.remove(capture);
+  });
+
+  beforeEach(() => {
+    capture.records.length = 0;
+  });
+
+  it('thrown NotFoundError → 404 { message }, verbose log', async () => {
+    const res = await get('/notFound');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ message: 'Boat not found' });
+    expect(logsMatching(/Boat not found/).map((r) => r.level)).toEqual([
+      'verbose',
+    ]);
+  });
+
+  it('HttpError base with custom body → status + body override', async () => {
+    const res = await get('/customBase');
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ errors: { csv: 'row 17 malformed' } });
+  });
+
+  it('registered unowned error, matching branch → mapped 409, warn log', async () => {
+    const res = await get('/unowned');
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ message: 'Already exists' });
+    expect(
+      logsMatching(/driver failed with code 11000/).map((r) => r.level),
+    ).toEqual(['warn']);
+  });
+
+  it('registered handler returns null → falls through to 500, error log', async () => {
+    const res = await get('/unownedPass');
+    expect(res.status).toBe(500);
+    expect(
+      logsMatching(/driver failed with code 42/).map((r) => r.level),
+    ).toEqual(['error']);
+  });
+
+  it('a throwing consumer handler → 500, both errors logged at error', async () => {
+    const res = await get('/handlerCrash');
+    expect(res.status).toBe(500);
+    expect(
+      logsMatching(/handler exploded|HandlerCrashError/).length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(logsMatching(/boom/).map((r) => r.level)).toEqual(['error']);
+  });
+
+  it('plain Error stays a 500 with error log (unchanged fallback)', async () => {
+    const res = await get('/plain');
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({
+      message: 'Platform error. Please check later or contact support',
+    });
+    expect(logsMatching(/unmapped plain error/).map((r) => r.level)).toEqual([
+      'error',
+    ]);
+  });
+
+  it('consumer override of a built-in wins end-to-end', async () => {
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      NotFoundError,
+      () => ({ status: 418, body: { message: 'teapot' } }),
+    );
+    try {
+      const res = await get('/notFound');
+      expect(res.status).toBe(418);
+      expect(await res.json()).toEqual({ message: 'teapot' });
+    } finally {
+      unregister?.();
+    }
+    const restored = await get('/notFound');
+    expect(restored.status).toBe(404);
   });
 });

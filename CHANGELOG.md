@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.1.0] - Unreleased
+## [5.1.0] - 2026-07-05
 
 ### Added
 
@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Zero-TTL means "don't cache" (issue #10).** `cache.getSetValue(key, fn, 0)` now skips the cache entirely and recomputes every call, instead of writing a never-expiring entry.
 - **`getAppInstance()` helper.** `helpers/appInstance` now exports a throwing getter alongside the raw `appInstance` binding: it returns the app singleton, or throws a guided error ("construct the Server first"; tests can use `setAppInstance()`/`resetAppInstance()`) when nothing is set. Prefer it in code that may run before the `Server` is constructed (module scope, lazy imports, external modules) — reading the raw binding there fails later with an opaque `TypeError: cannot read properties of undefined` that gives no hint at the cause.
 - **Duplicate-framework-copy diagnostic in the model loader.** When npm fails to dedupe and a model class extends `BaseModel` from a *different* installed copy of `@adaptivestone/framework`, `instanceof BaseModel` is false, so the loader used to silently misroute the class into the legacy (`AbstractModel`) branch — surfacing only as a confusing downstream failure. Boot now recognizes the shape (BaseModel's static `initialize` + `modelSchema` surface without the `instanceof`, via the new `isBaseModelSubclassShape` export) and fails with an error naming the model, the cause (duplicate/undeduped install), and the fix (`npm ls @adaptivestone/framework`, then dedupe). Genuinely legacy models still route to the legacy branch unchanged.
+- **Error-handler registry + typed HTTP errors.** Throw `NotFoundError` / `new HttpError(status, message, body?)` (from `services/http/httpErrors.js`) inside a route handler to produce that status (built-in mapper, logged `verbose`), or map error classes you don't own via `app.httpServer.registerErrorHandler(ErrorClass, handler, { logLevel? })` (returns an unregister function) — e.g. from the `bootHttp` hook. Consumer handlers are checked before built-ins; a handler returning `null` passes to the next entry; unmatched errors keep the 500. The Mongoose validation safety net is now a built-in registry entry (semantics unchanged).
 
 ### Changed
 
