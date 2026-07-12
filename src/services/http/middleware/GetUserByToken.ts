@@ -46,6 +46,26 @@ class GetUserByToken extends AbstractMiddleware {
     return GetUserByToken.usedAuthParameters;
   }
 
+  /**
+   * Resolve the bearer token a request presents, applying the auth precedence:
+   * body `token` first, then the `Authorization` header. A literal `'null'`
+   * header value counts as absent. The `Bearer` prefix is stripped and the
+   * result trimmed. Returns `undefined` when no token is present. Shared with
+   * `postLogout` so both revoke the exact session the request authenticated with.
+   */
+  static resolveToken(req: FrameworkRequest): string | undefined {
+    let token = (req.body as { token?: string } | undefined)?.token;
+    if (!token) {
+      token = req.get('Authorization');
+      // Some clients serialize a missing token as the literal string "null"
+      // (e.g. `Authorization: null`) — treat that as absent, not a real token.
+      if (!token || token === 'null') {
+        return undefined;
+      }
+    }
+    return token.replace(/^Bearer\s+/i, '').trim();
+  }
+
   async middleware(
     req: FrameworkRequest & GetUserByTokenAppInfo,
     _res: Response,
@@ -55,7 +75,7 @@ class GetUserByToken extends AbstractMiddleware {
       this.logger?.warn('You call GetUserByToken more then once');
       return next();
     }
-    let { token } = req.body || {};
+    const { token } = req.body || {};
     // Log presence only — never the token value or the Authorization header
     // (they are live bearer credentials).
     this.logger?.verbose(
@@ -63,19 +83,13 @@ class GetUserByToken extends AbstractMiddleware {
         token ? 'present' : 'absent'
       }, Authorization header ${req.get('Authorization') ? 'present' : 'absent'}`,
     );
-    if (!token) {
-      token = req.get('Authorization');
-      // Some clients serialize a missing token as the literal string "null"
-      // (e.g. `Authorization: null`) — treat that as absent, not a real token.
-      if (!token || token === 'null') {
-        return next();
-      }
+    const rawToken = GetUserByToken.resolveToken(req);
+    if (!rawToken) {
+      return next();
     }
-    // token cleanup
-    token = token.replace(/^Bearer\s+/i, '').trim();
     const User = this.app.getModel('User') as unknown as TUser;
     const user = (await User.getUserByToken(
-      token,
+      rawToken,
     )) as unknown as InstanceType<TUser>;
     if (user) {
       req.appInfo.user = user;

@@ -13,6 +13,7 @@ import {
   describe,
   expect,
   it,
+  vi,
 } from 'vitest';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
@@ -511,6 +512,95 @@ describe('ControllerManager — cross-controller middleware', () => {
       'FakeMw',
       'OtherMw',
     ]);
+  });
+});
+
+// ─── mixed-case path segments ────────────────────────────────────────
+//
+// The subtree assembler must key static children exactly as `RouteRegistry`
+// and the matcher do (lowercase), or nested mixed-case routes become
+// unreachable and method-scoped middleware silently misses its handler.
+
+describe('ControllerManager — mixed-case path segments', () => {
+  it('a deep mixed-case route matches both case variants', () => {
+    class C extends AbstractController {
+      get routes() {
+        return { get: { '/user/Profile': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { registry, cm } = setup();
+    cm.registerController(C);
+
+    // Matching is case-insensitive by design; both variants must resolve to
+    // the same handler at depth ≥ 2 (mounted under `/c`).
+    expect(
+      registry.match('GET', '/c/user/Profile')?.entry?.handler,
+    ).toBeDefined();
+    expect(
+      registry.match('GET', '/c/user/profile')?.entry?.handler,
+    ).toBeDefined();
+  });
+
+  it("a case-variant method-scoped key ('POST/Login' vs /login) attaches", () => {
+    class C extends AbstractController {
+      get routes() {
+        return { post: { '/login': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map([['POST/Login', [FakeMw as unknown as MiddlewareSpec]]]);
+      }
+    }
+    const { registry, cm } = setup();
+    cm.registerController(C);
+
+    const node = findNode(registry, 'C', ['login']);
+    expect(node?.methods?.POST?.middlewares?.[0]?.Class).toBe(FakeMw);
+  });
+
+  it('a nested case-variant method-scoped key attaches at depth', () => {
+    class C extends AbstractController {
+      get routes() {
+        return { get: { '/user/Profile': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map([
+          ['GET/User/profile', [FakeMw as unknown as MiddlewareSpec]],
+        ]);
+      }
+    }
+    const { registry, cm } = setup();
+    cm.registerController(C);
+
+    const node = findNode(registry, 'C', ['user', 'profile']);
+    expect(node?.methods?.GET?.middlewares?.[0]?.Class).toBe(FakeMw);
+  });
+
+  it('warns when a method-scoped key targets a nonexistent route', () => {
+    const registry = new RouteRegistry();
+    const warn = vi.fn();
+    const app = {
+      httpServer: { routeRegistry: registry },
+      logger: { child: () => ({ warn, verbose() {}, error() {} }) },
+    } as unknown as IApp;
+    const cm = new ControllerManager(app);
+
+    class GhostRouteController extends AbstractController {
+      get routes() {
+        return { post: { '/login': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map([['GET/ghost', [FakeMw as unknown as MiddlewareSpec]]]);
+      }
+    }
+    cm.registerController(GhostRouteController);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    const msg = warn.mock.calls[0]?.[0] as string;
+    expect(msg).toContain('GhostRouteController');
+    expect(msg).toContain('GET/ghost');
   });
 });
 

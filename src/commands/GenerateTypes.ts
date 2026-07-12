@@ -24,10 +24,10 @@ class GenerateTypes extends AbstractCommand {
       await generateAll(this.app, this.logger, { check });
     } catch (e) {
       if (check) {
-        // CI drift guard: the framework CLI logs thrown command errors but
-        // still exits 0, so force a non-zero exit explicitly for `--check`.
+        // CI drift guard: report just the mismatch (not a full stack) and fail
+        // the command — a `false` result makes the CLI exit non-zero.
         this.logger?.error((e as Error).message);
-        process.exit(1);
+        return false;
       }
       throw e;
     }

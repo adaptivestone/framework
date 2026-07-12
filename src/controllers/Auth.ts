@@ -310,7 +310,10 @@ class Auth extends AbstractController {
   async postLogout(req: PostLogoutRequest, res: Response) {
     const user = req.appInfo.user;
     if (user) {
-      const rawToken = req.headers.authorization?.replace(/^Bearer\s+/i, '');
+      // Revoke the exact session the request authenticated with: resolve the
+      // token with the same precedence/normalization as GetUserByToken (body
+      // token first, then Authorization header).
+      const rawToken = GetUserByToken.resolveToken(req);
       if (rawToken) {
         const UserModel = this.app.getModel('User') as unknown as TUser;
         // Tokens are stored hashed, so match by hash.

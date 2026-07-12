@@ -120,7 +120,16 @@ function joinPath(prefix: string, segment: string): string {
 
 // ─── tree mutation ───────────────────────────────────────────────────
 
-function ensureChildBySegment(node: RouteNode, segment: string): RouteNode {
+/**
+ * Descend one segment, creating the child if absent. The single source of the
+ * segment-keying scheme (lowercase static keys, `:`/`*` folded onto the
+ * param/splat child). Shared with the controller subtree assembler so producers
+ * key children exactly as the matcher looks them up.
+ */
+export function ensureChildBySegment(
+  node: RouteNode,
+  segment: string,
+): RouteNode {
   if (node.segment.startsWith('*')) {
     throw new Error(
       `RouteRegistry: cannot register a child segment "${segment}" under a splat segment "${node.segment}" — splat consumes the rest of the path, so this child would be unreachable`,

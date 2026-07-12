@@ -197,9 +197,12 @@ class Cli extends Base {
 
     const c = new Command(this.app, this.commands, parsedArgs.values);
 
+    // A thrown command is one more `false` path (like not-found / bad-args) so
+    // the entry can exit non-zero. Don't rethrow: the entry's `.catch` is
+    // reserved for boot/infra failures, not command failures.
     const result = await c.run().catch((e: { stack: unknown }) => {
       this.logger?.error(e.stack);
-      return undefined;
+      return false;
     });
 
     return result;

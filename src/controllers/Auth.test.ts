@@ -577,6 +577,78 @@ describe('auth', () => {
       expect(hasTokenAfter).toBeFalsy();
     });
 
+    it('can logout with token in the body', async () => {
+      expect.assertions(3);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+
+      const user = await UserModel.create({
+        email: 'logout-body@test.com',
+        password: 'password123',
+        name: { nick: 'logoutBodyNick' },
+        isVerified: true,
+      });
+      // Mint a session token directly (raw returned, hash persisted) — the same
+      // 30-day token a body-token client authenticates with.
+      const { token } = await user.generateToken();
+
+      let userInDb = await UserModel.findOne({ email: 'logout-body@test.com' });
+      const hasToken = userInDb?.sessionTokens?.some(
+        (t) => t.token === hashToken(token),
+      );
+      expect(hasToken).toBeTruthy();
+
+      const logoutResponse = await fetch(getTestServerURL('/auth/logout'), {
+        method: 'POST',
+        headers: { 'Content-type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      expect(logoutResponse.status).toBe(200);
+
+      userInDb = await UserModel.findOne({ email: 'logout-body@test.com' });
+      const hasTokenAfter = userInDb?.sessionTokens?.some(
+        (t) => t.token === hashToken(token),
+      );
+      expect(hasTokenAfter).toBeFalsy();
+    });
+
+    it('revokes the body (authenticated) token when both body and header tokens are present', async () => {
+      expect.assertions(3);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+
+      const user = await UserModel.create({
+        email: 'logout-both@test.com',
+        password: 'password123',
+        name: { nick: 'logoutBothNick' },
+        isVerified: true,
+      });
+      // The middleware authenticates with the body token, so that is the
+      // session logout must revoke; the header token's session must survive.
+      const { token: bodyToken } = await user.generateToken();
+      const { token: headerToken } = await user.generateToken();
+
+      const logoutResponse = await fetch(getTestServerURL('/auth/logout'), {
+        method: 'POST',
+        headers: {
+          'Content-type': 'application/json',
+          Authorization: `Bearer ${headerToken}`,
+        },
+        body: JSON.stringify({ token: bodyToken }),
+      });
+      expect(logoutResponse.status).toBe(200);
+
+      const userInDb = await UserModel.findOne({
+        email: 'logout-both@test.com',
+      });
+      expect(
+        userInDb?.sessionTokens?.some((t) => t.token === hashToken(bodyToken)),
+      ).toBeFalsy();
+      expect(
+        userInDb?.sessionTokens?.some(
+          (t) => t.token === hashToken(headerToken),
+        ),
+      ).toBeTruthy();
+    });
+
     it('can logout without token', async () => {
       expect.assertions(1);
       const response = await fetch(getTestServerURL('/auth/logout'), {

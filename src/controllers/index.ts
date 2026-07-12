@@ -19,7 +19,10 @@ import type {
   RouteNode,
 } from '../services/http/routing/RouteNode.ts';
 import { HTTP_METHODS } from '../services/http/routing/RouteNode.ts';
-import { createNode } from '../services/http/routing/RouteRegistry.ts';
+import {
+  createNode,
+  ensureChildBySegment,
+} from '../services/http/routing/RouteRegistry.ts';
 import {
   isContentTypeRequestMap,
   normalizeContentType,
@@ -198,7 +201,9 @@ class ControllerManager extends Base {
    * semantics live entirely in the assembler — there is no parallel builder.
    */
   #buildSubtree(controller: AbstractController): RouteNode {
-    return buildSubtreeFromSpec(this.#specFromInstance(controller));
+    return buildSubtreeFromSpec(this.#specFromInstance(controller), (msg) =>
+      this.logger?.warn(msg),
+    );
   }
 
   /**
@@ -524,13 +529,17 @@ export interface ControllerSubtreeSpec {
  * attachments find them). This is the single home of tree/scope semantics —
  * runtime and codegen both reach it through here.
  */
-export function buildSubtreeFromSpec(spec: ControllerSubtreeSpec): RouteNode {
+export function buildSubtreeFromSpec(
+  spec: ControllerSubtreeSpec,
+  onWarn?: (msg: string) => void,
+): RouteNode {
   const subtree = createNode('');
   for (const h of spec.handlers) {
     attachHandler(subtree, h.method, h.path, h.entry);
   }
+  const ctx = { ctrlName: spec.ctrlName, onWarn };
   for (const m of spec.middleware) {
-    attachMiddlewares(subtree, m.method, m.path, m.entries);
+    attachMiddlewares(subtree, m.method, m.path, m.entries, ctx);
   }
   return subtree;
 }
@@ -669,6 +678,7 @@ function attachMiddlewares(
   method: HttpMethod | 'ALL',
   pathStr: string,
   entries: MiddlewareEntry[],
+  ctx?: { ctrlName: string; onWarn?: (msg: string) => void },
 ): void {
   const segments = pathStr.split('/').filter((s) => s.length > 0);
 
@@ -680,7 +690,7 @@ function attachMiddlewares(
 
   let target = subtree;
   for (const seg of segments) {
-    target = ensureChildSegment(target, seg);
+    target = ensureChildBySegment(target, seg);
   }
 
   if (method === 'ALL') {
@@ -699,7 +709,13 @@ function attachMiddlewares(
       ...entries,
       ...(existingHandler.middlewares ?? []),
     ];
+    return;
   }
+  // No handler for this method at the walked node: the scope key targets a
+  // route that doesn't exist, so its middleware would attach to nothing.
+  ctx?.onWarn?.(
+    `Controller ${ctx.ctrlName}: middleware scope '${method}${pathStr}' targets a route with no ${method} handler. Middleware not attached.`,
+  );
 }
 
 /** Walk a subtree, attaching mws to every handler that matches `method`. */
@@ -727,30 +743,9 @@ function walkToNode(subtree: RouteNode, pathStr: string): RouteNode {
   const segments = pathStr.split('/').filter((s) => s.length > 0);
   let target = subtree;
   for (const seg of segments) {
-    target = ensureChildSegment(target, seg);
+    target = ensureChildBySegment(target, seg);
   }
   return target;
-}
-
-function ensureChildSegment(node: RouteNode, segment: string): RouteNode {
-  if (segment.startsWith(':')) {
-    if (!node.paramChild) {
-      node.paramChild = createNode(segment);
-    }
-    return node.paramChild;
-  }
-  if (segment.startsWith('*')) {
-    if (!node.splatChild) {
-      node.splatChild = createNode(segment);
-    }
-    return node.splatChild;
-  }
-  let child = node.children.get(segment);
-  if (!child) {
-    child = createNode(segment);
-    node.children.set(segment, child);
-  }
-  return child;
 }
 
 export default ControllerManager;
