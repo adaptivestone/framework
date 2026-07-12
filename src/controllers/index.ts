@@ -29,6 +29,7 @@ import {
 } from '../services/validate/contentType.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import ValidateService from '../services/validate/ValidateService.ts';
+import { ValidationError } from '../services/validate/ValidationError.ts';
 
 /** HTTP methods valid in a controller's `routes` getter (no `'ALL'`). */
 const ROUTE_HTTP_METHODS: ReadonlySet<string> = new Set(HTTP_METHODS);
@@ -454,8 +455,25 @@ class ControllerManager extends Base {
         if (res.headersSent) {
           return next(err);
         }
-        return res.status(400).json({
-          errors: err instanceof Error ? err.message : String(err),
+        // Only a framework `ValidationError` is a client 400 — its widened
+        // `.message` is the per-field payload. Anything else thrown while
+        // validating is a server-side defect (a validator that threw; a schema
+        // no driver matches): route it through the error-handler registry, same
+        // as the handler catch below, so consumer handlers apply consistently;
+        // otherwise a generic 500 with the detail LOGGED, never echoed.
+        if (ValidationError.isValidationError(err)) {
+          return res.status(400).json({ errors: err.message });
+        }
+        const resolved = app.httpServer
+          ? await app.httpServer.resolveError(err, req)
+          : null;
+        if (resolved) {
+          logger?.[resolved.logLevel](toLoggableError(err));
+          return res.status(resolved.status).json(resolved.body);
+        }
+        logger?.error(err);
+        return res.status(500).json({
+          message: 'Platform error. Please check later or contact support',
         });
       }
 

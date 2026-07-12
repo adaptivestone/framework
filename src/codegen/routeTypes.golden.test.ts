@@ -93,6 +93,23 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       );
     }
 
+    // Named-export middleware (finding #6): `NamedGuards` imports `NamedGuard`
+    // by name and `RoleGuard` under the alias `Guard`. The gen file must emit
+    // the NAMED `import type { … }` form (a default form is a `TS2613` against
+    // the no-default `Guards.ts`), including the `Orig as Local` shape for the
+    // alias. The tsc gate below then proves the bindings resolve to the right
+    // types (the handler reads `req.appInfo.tenant` / `.role`).
+    const namedGuardsGen = await readFile(
+      path.join(controllersDir, 'NamedGuards.routes.gen.ts'),
+      'utf8',
+    );
+    expect(namedGuardsGen).toContain(
+      "import type { NamedGuard } from '../middleware/Guards.ts';",
+    );
+    expect(namedGuardsGen).toContain(
+      "import type { RoleGuard as Guard } from '../middleware/Guards.ts';",
+    );
+
     // The real gate: the handlers read `req.appInfo.user` with no guard, so a
     // regression in any of the bugs above makes this `tsc` run fail.
     const result = runTsc();

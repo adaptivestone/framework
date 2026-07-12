@@ -54,7 +54,11 @@ class GetUserByToken extends AbstractMiddleware {
    * `postLogout` so both revoke the exact session the request authenticated with.
    */
   static resolveToken(req: FrameworkRequest): string | undefined {
-    let token = (req.body as { token?: string } | undefined)?.token;
+    const bodyToken = (req.body as { token?: unknown } | undefined)?.token;
+    // A JSON `{"token": 123}` or a repeated form field (parsed as an array)
+    // reaches here before schema validation — a non-string body token is
+    // treated as absent, never passed to a string method.
+    let token = typeof bodyToken === 'string' ? bodyToken : undefined;
     if (!token) {
       token = req.get('Authorization');
       // Some clients serialize a missing token as the literal string "null"

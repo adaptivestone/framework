@@ -143,14 +143,38 @@ describe('Lock Model', () => {
       expect(unlocked).toBe(true);
     }, 1000); // Increase timeout if needed
 
-    it('resolves for a lock deleted just before the call (stream-first ordering)', async () => {
-      const name = 'delete-race-lock';
+    it('resolves via the post-live re-check when the lock is already gone', async () => {
+      const name = 'delete-recheck-lock';
       await Lock.acquireLock(name);
       await Lock.releaseLock(name);
-      // The doc is already gone; the stream is registered before the existence
-      // re-check, so this resolves rather than hanging.
+      // The doc is already gone before the stream goes live. The existence
+      // re-check runs only once the stream is confirmed live and resolves,
+      // rather than waiting on a delete that has already happened.
       await expect(Lock.waitForUnlock(name)).resolves.toBeUndefined();
     });
+
+    it('observes a delete landing in the existence-check → stream-open window', async () => {
+      const name = 'delete-race-lock';
+      await Lock.acquireLock(name);
+
+      // Force the delete to commit exactly when the existence read resolves,
+      // i.e. inside the historical race window. With the pre-fix ordering
+      // (findOne first, THEN attach the listener) the cursor's start point
+      // lands after the delete, the 'change' never arrives, and the no-timeout
+      // promise hangs — this test then fails via its own timeout. The fix runs
+      // the existence check only after the stream is live, so the delete is
+      // observed and the promise resolves.
+      const spy = vi
+        .spyOn(Lock, 'findOne')
+        .mockImplementationOnce((() =>
+          Lock.releaseLock(name).then(() => ({ _id: name }))) as never);
+
+      try {
+        await expect(Lock.waitForUnlock(name)).resolves.toBe(true);
+      } finally {
+        spy.mockRestore();
+      }
+    }, 3000);
 
     it('rejects after timeoutMs while a lock is still held', async () => {
       const name = 'timeout-lock';

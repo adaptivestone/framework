@@ -61,12 +61,14 @@ describe('Migrate command (doc 15)', () => {
     expect(migrationRunLog).toEqual(['100_a.ts', '200_b.ts']);
   });
 
-  it('skips (returns false) when another run holds the migrations lock', async () => {
+  it('skips (returns true) when another run holds the migrations lock', async () => {
+    // Lock contention is not a failure: the other instance is doing the work,
+    // so the losing replica must exit successfully rather than fail its deploy.
     await Lock.acquireLock('migrations', 600);
 
     const result = await runMigrate();
 
-    expect(result).toBe(false);
+    expect(result).toBe(true);
     expect(migrationRunLog).toEqual([]);
 
     await Lock.releaseLock('migrations');

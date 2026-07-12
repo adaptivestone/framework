@@ -51,6 +51,7 @@ export async function generateOpenApi(
   const paths: Obj = {};
   const securitySchemes: Obj = {};
   const tagNames = new Set<string>();
+  const usedIds = new Set<string>();
 
   for (const route of routes) {
     const { path, params: pathParams, hadSplat } = convertPath(route.path);
@@ -75,7 +76,7 @@ export async function generateOpenApi(
     parameters.push(...(await buildQueryParameters(route, warn, ctx)));
 
     const operation: Obj = {
-      operationId: operationId(route, path),
+      operationId: operationId(route, tag, path, usedIds),
       tags: [tag],
       responses: defaultResponses(),
     };
@@ -147,10 +148,44 @@ function convertPath(internalPath: string): {
   return { path: out || '/', params, hadSplat };
 }
 
-function operationId(route: FlatRoute, path: string): string {
+/**
+ * Controller-namespaced, document-unique operationId. `controllerName` is the
+ * same value `tags` uses, so the two stay consistent. On residual collision
+ * (one handler wired to multiple verbs/paths) disambiguate deterministically:
+ * append the lowercased HTTP verb, then a numeric suffix. `usedIds` accumulates
+ * across the document and is mutated with the chosen id.
+ */
+function operationId(
+  route: FlatRoute,
+  controllerName: string,
+  path: string,
+  usedIds: Set<string>,
+): string {
+  const base = baseOperationId(route, controllerName, path);
+  let candidate = base;
+  if (usedIds.has(candidate)) {
+    candidate = `${base}_${route.method.toLowerCase()}`;
+  }
+  if (usedIds.has(candidate)) {
+    const stem = candidate;
+    let n = 2;
+    while (usedIds.has(`${stem}_${n}`)) {
+      n += 1;
+    }
+    candidate = `${stem}_${n}`;
+  }
+  usedIds.add(candidate);
+  return candidate;
+}
+
+function baseOperationId(
+  route: FlatRoute,
+  controllerName: string,
+  path: string,
+): string {
   const name = route.entry.meta?.methodName;
   if (name) {
-    return name;
+    return `${controllerName}_${name}`;
   }
   const slug = path.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
   return `${route.method.toLowerCase()}_${slug || 'root'}`;

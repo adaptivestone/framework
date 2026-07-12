@@ -253,7 +253,14 @@ function renderResolved(
   }));
   const ctrlDir = path.dirname(srcPath);
   const importMap = new Map(
-    resolved.imports.map((i) => [i.binding, i.specifier]),
+    resolved.imports.map((i) => [
+      i.binding,
+      {
+        specifier: i.specifier,
+        kind: i.kind,
+        ...(i.orig ? { orig: i.orig } : {}),
+      },
+    ]),
   );
   // Drop any middleware whose `import type` wouldn't type-check: an untyped `.js`
   // middleware with no sibling `.d.ts` would be a `TS7016` in a strict consumer
@@ -262,8 +269,8 @@ function renderResolved(
   // filter below), so it degrades to "provides nothing" rather than breaking the
   // consumer's typecheck. Same rule as the controller self-import; framework
   // middleware come in as bare specifiers (which ship `.d.ts`) and are kept.
-  for (const [binding, specifier] of [...importMap]) {
-    if (!specifierTypeImportable(specifier, ctrlDir)) {
+  for (const [binding, info] of [...importMap]) {
+    if (!specifierTypeImportable(info.specifier, ctrlDir)) {
       importMap.delete(binding);
     }
   }

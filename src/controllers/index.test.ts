@@ -32,6 +32,9 @@ import ErrorRegistryController, {
   HandlerCrashError,
 } from '../tests/fixtures/controllers/ErrorRegistryController.ts';
 import SafetyNetController from '../tests/fixtures/controllers/SafetyNetController.ts';
+import ValidationLeakController, {
+  LEAK_SECRET,
+} from '../tests/fixtures/controllers/ValidationLeakController.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
 import ControllerManager from './index.ts';
 
@@ -1101,5 +1104,84 @@ describe('Error-handler registry over HTTP', () => {
     }
     const restored = await get('/notFound');
     expect(restored.status).toBe(404);
+  });
+});
+
+// ─── Validation-phase error leak (finding #3) ────────────────────────
+//
+// The pre-handler validation catch must echo ONLY a framework `ValidationError`
+// (per-field 400). Any other error thrown while validating — a validator that
+// throws (YupDriver rethrows non-yup errors raw), or a schema no driver matches
+// (ValidateService constructor throws its developer message) — is a server-side
+// defect: it must become a generic 500 with the detail LOGGED, never echoed.
+
+describe('ControllerManager — validation-phase error leak', () => {
+  const base = '/test/validationleakcontroller';
+  const post = (path: string, body?: unknown) =>
+    fetch(getTestServerURL(`${base}${path}`), {
+      method: 'POST',
+      headers: { 'Content-type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+
+  // Capture real log records off the shared root logger (child loggers funnel
+  // in) while silencing the console transports so the intentional server errors
+  // below don't clutter output.
+  let capture: CaptureTransport;
+  let silenced: Transport[] = [];
+  const logsMatching = (re: RegExp) =>
+    capture.records.filter((r) => re.test(r.message));
+
+  beforeAll(() => {
+    appInstance.controllerManager?.registerController(
+      ValidationLeakController,
+      'test',
+    );
+    capture = new CaptureTransport();
+    appInstance.logger.add(capture);
+    silenced = appInstance.logger.transports.filter((t) => t !== capture);
+    for (const t of silenced) {
+      t.silent = true;
+    }
+  });
+
+  afterAll(() => {
+    for (const t of silenced) {
+      t.silent = false;
+    }
+    appInstance.logger.remove(capture);
+  });
+
+  beforeEach(() => {
+    capture.records.length = 0;
+  });
+
+  it('a validator throwing a generic Error → 500, detail logged not echoed', async () => {
+    const res = await post('/throwingValidator', { field: 'x' });
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    // The internal detail (a leaked DB URI in the repro) must not reach the wire.
+    expect(JSON.stringify(body)).not.toContain(LEAK_SECRET);
+    expect(JSON.stringify(body)).not.toContain('s3cret');
+    // Generic 500 body, consistent with the framework's other 500 sink.
+    expect(body).toEqual({
+      message: 'Platform error. Please check later or contact support',
+    });
+    // The server-side defect IS logged at error, in full, for the developer.
+    expect(logsMatching(new RegExp(LEAK_SECRET)).map((r) => r.level)).toEqual([
+      'error',
+    ]);
+  });
+
+  it('a schema no driver matches → 500 (not 400), migration message not echoed', async () => {
+    const res = await post('/noDriver', { anything: 1 });
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(JSON.stringify(body)).not.toContain('No ValidatorDriver');
+    expect(logsMatching(/No ValidatorDriver/).map((r) => r.level)).toEqual([
+      'error',
+    ]);
   });
 });

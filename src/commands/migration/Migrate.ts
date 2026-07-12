@@ -38,8 +38,10 @@ class Migrate extends AbstractCommand {
     // migrations approach that runtime.
     const gotLock = await LockModel.acquireLock('migrations', 600);
     if (!gotLock) {
+      // Lock contention is a successful skip, not a failure: another instance
+      // is running the migrations, so this replica returns true to exit 0.
       this.logger?.warn('Another migration run holds the lock — skipping');
-      return false;
+      return true;
     }
 
     try {

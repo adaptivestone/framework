@@ -95,22 +95,32 @@ class Lock extends BaseModel {
         name: string,
         timeoutMs?: number,
       ) {
-        // Register the change stream BEFORE checking existence: a delete that
-        // lands between the two would otherwise be missed and the promise would
-        // never resolve.
+        // The driver opens the change-stream cursor lazily on the first
+        // 'change' listener and only then fixes its server-side start point.
+        // Checking existence BEFORE that point leaves a window where a delete
+        // is missed forever. So: attach the listener (opening the cursor),
+        // wait for 'resumeTokenChanged' — the wrapper's first signal that the
+        // aggregate has run and the start point is fixed — and only then read.
+        // A delete after that point is guaranteed observed; if the lock is
+        // already gone, the re-check resolves.
         const stream = this.watch([
           { $match: { operationType: 'delete', 'documentKey._id': name } },
         ]);
         try {
-          const exists = await this.findOne({ _id: name });
-          if (!exists) {
-            return undefined;
-          }
           return await new Promise((resolve, reject) => {
             stream.on('change', () => resolve(true));
             // A standalone Mongo (change streams need a replica set) or a stream
             // failure emits 'error'; unhandled, it would crash the process.
             stream.on('error', reject);
+            stream.once('resumeTokenChanged', () => {
+              this.findOne({ _id: name })
+                .then((exists) => {
+                  if (!exists) {
+                    resolve(undefined);
+                  }
+                })
+                .catch(reject);
+            });
             if (timeoutMs) {
               setTimeout(
                 () => reject(new Error(`waitForUnlock('${name}') timed out`)),

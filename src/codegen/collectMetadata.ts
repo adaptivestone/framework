@@ -12,6 +12,19 @@ export interface MiddlewareRef {
   params?: Record<string, unknown>;
 }
 
+/**
+ * How a middleware binding was imported, so the gen file emits the matching
+ * `import type` form: `default` → `import type X`, `named` → `import type { X }`
+ * (or `{ Orig as X }` when renamed), `namespace` → `import type * as X`.
+ */
+export interface MiddlewareImport {
+  /** Module specifier to import the binding from. */
+  specifier: string;
+  kind: 'default' | 'named' | 'namespace';
+  /** Original export name when the local binding renames it (`{ Orig as X }`). */
+  orig?: string;
+}
+
 /** One route registered by a controller. */
 export interface RouteMeta {
   method: string;

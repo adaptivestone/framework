@@ -201,6 +201,65 @@ describe('getUserByToken middleware methods', () => {
     expect(status).toBe(200);
   });
 
+  // A non-string body token (JSON `{"token": 123}`, or a repeated form field
+  // parsed as an array) reaches resolveToken before schema validation. It must
+  // be treated as absent — no `token.replace(...)` on a non-string, no 500.
+  it('treats a number body token as absent, not a 500', async () => {
+    expect.assertions(2);
+
+    const middleware = new GetUserByToken(appInstance);
+    let isCalled = false;
+    const nextFunction = () => {
+      isCalled = true;
+    };
+    const req = {
+      appInfo: {
+        user: undefined,
+      },
+      body: {
+        token: 123,
+      },
+      get: () => undefined,
+    };
+
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
+
+    expect(isCalled).toBeTruthy();
+    expect(req.appInfo.user).toBeUndefined();
+  });
+
+  it('treats an array body token as absent, not a 500', async () => {
+    expect.assertions(2);
+
+    const middleware = new GetUserByToken(appInstance);
+    let isCalled = false;
+    const nextFunction = () => {
+      isCalled = true;
+    };
+    const req = {
+      appInfo: {
+        user: undefined,
+      },
+      body: {
+        token: ['a', 'b'],
+      },
+      get: () => undefined,
+    };
+
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      nextFunction,
+    );
+
+    expect(isCalled).toBeTruthy();
+    expect(req.appInfo.user).toBeUndefined();
+  });
+
   it('never logs the token value (doc 20)', async () => {
     expect.assertions(1);
 

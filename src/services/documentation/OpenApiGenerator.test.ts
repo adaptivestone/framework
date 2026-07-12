@@ -20,6 +20,17 @@ function route(
   };
 }
 
+// Collect every operationId in the emitted document, in path/verb order.
+function operationIds(doc: AnyDoc): string[] {
+  const ids: string[] = [];
+  for (const pathItem of Object.values(doc.paths as Record<string, AnyDoc>)) {
+    for (const op of Object.values(pathItem)) {
+      ids.push((op as AnyDoc).operationId);
+    }
+  }
+  return ids;
+}
+
 // A synthetic middleware carrying a static auth scheme (read with no instance).
 function authMiddleware(): MiddlewareEntry {
   const Class = {
@@ -69,7 +80,7 @@ describe('generateOpenApi', () => {
     );
 
     const op = (doc as AnyDoc).paths['/{id}'].get;
-    expect(op.operationId).toBe('getItem');
+    expect(op.operationId).toBe('Items_getItem');
     expect(op.tags).toEqual(['Items']);
     expect(op.parameters).toContainEqual({
       name: 'id',
@@ -231,6 +242,76 @@ describe('generateOpenApi', () => {
 
     expect((doc as AnyDoc).paths['/files/{rest}'].get).toBeDefined();
     expect(onWarning).toHaveBeenCalledWith(expect.stringMatching(/catch-all/i));
+  });
+
+  it('namespaces operationIds by controller and keeps them unique', async () => {
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/items',
+          entry: {
+            handler: () => {},
+            meta: { methodName: 'getList', controllerClass: 'Items' },
+          },
+        }),
+        route({
+          method: 'GET',
+          path: '/users',
+          entry: {
+            handler: () => {},
+            meta: { methodName: 'getList', controllerClass: 'Users' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    expect((doc as AnyDoc).paths['/items'].get.operationId).toBe(
+      'Items_getList',
+    );
+    expect((doc as AnyDoc).paths['/users'].get.operationId).toBe(
+      'Users_getList',
+    );
+    expect(operationIds(doc)).toHaveLength(new Set(operationIds(doc)).size);
+  });
+
+  it('disambiguates deterministically when a controller+method maps to multiple routes', async () => {
+    const routes: FlatRoute[] = [
+      route({
+        method: 'GET',
+        path: '/',
+        entry: {
+          handler: () => {},
+          meta: { methodName: 'getList', controllerClass: 'Reports' },
+        },
+      }),
+      route({
+        method: 'GET',
+        path: '/archive',
+        entry: {
+          handler: () => {},
+          meta: { methodName: 'getList', controllerClass: 'Reports' },
+        },
+      }),
+      route({
+        method: 'POST',
+        path: '/',
+        entry: {
+          handler: () => {},
+          meta: { methodName: 'getList', controllerClass: 'Reports' },
+        },
+      }),
+    ];
+    const opts = { info: { title: 't', version: '1' } };
+
+    const doc = await generateOpenApi(routes, opts);
+    const ids = operationIds(doc);
+    expect(ids).toHaveLength(new Set(ids).size); // all unique
+
+    // Deterministic across runs.
+    const again = operationIds(await generateOpenApi(routes, opts));
+    expect(again).toEqual(ids);
   });
 
   it('uses meta.description as the operation summary', async () => {

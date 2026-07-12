@@ -77,7 +77,7 @@ describe('generateOpenApi over a real ControllerManager registry', () => {
     // POST /items — body merges route schema (name, note) + middleware (token).
     const post = paths['/items'].post;
     expect(post.summary).toBe('Create an item');
-    expect(post.operationId).toBe('create');
+    expect(post.operationId).toBe('Items_create');
     expect(post.tags).toEqual(['Items']);
     const body = post.requestBody.content['application/json'].schema;
     expect(Object.keys(body.properties).sort()).toEqual([

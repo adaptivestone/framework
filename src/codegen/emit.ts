@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
   ControllerMeta,
+  MiddlewareImport,
   MiddlewareRef,
   RouteMeta,
 } from './collectMetadata.ts';
@@ -28,8 +29,8 @@ export interface RenderInput {
   srcPath: string;
   /** Resolved+filtered chains (binding names), parallel to `controller.routes`. */
   filteredChains: MiddlewareRef[][];
-  /** `binding → specifier` for every binding referenced in `filteredChains`. */
-  importMap: Map<string, string>;
+  /** `binding → import` (specifier + kind) for every binding in `filteredChains`. */
+  importMap: Map<string, MiddlewareImport>;
   /**
    * Whether the gen file may `import type` the controller's own module to
    * navigate its `routes` type for precise inline-schema `InferOutput`. False
@@ -77,7 +78,7 @@ export function renderGenFile(input: RenderInput): string {
   const ctrlImportPath = `./${ctrlBaseName}${ctrlExt}`;
 
   const middlewareImports = uniqueMiddlewares
-    .map((mw) => `import type ${mw} from '${importMap.get(mw)}';`)
+    .map((mw) => renderMiddlewareImport(mw, importMap.get(mw)))
     .sort();
 
   const routesAlias = `${controller.className}Routes`;
@@ -269,6 +270,28 @@ function parsePathParams(routePath: string): string[] {
     names.push(match[1] as string);
   }
   return names;
+}
+
+/**
+ * Emit the `import type` line for one middleware binding, matching the shape it
+ * was imported with — a default import must not be forced onto a named export
+ * (`TS2613`), and a renamed named import keeps its `Orig as Local` binding.
+ */
+function renderMiddlewareImport(
+  binding: string,
+  info: MiddlewareImport | undefined,
+): string {
+  const spec = info?.specifier ?? '';
+  switch (info?.kind) {
+    case 'named':
+      return info.orig && info.orig !== binding
+        ? `import type { ${info.orig} as ${binding} } from '${spec}';`
+        : `import type { ${binding} } from '${spec}';`;
+    case 'namespace':
+      return `import type * as ${binding} from '${spec}';`;
+    default:
+      return `import type ${binding} from '${spec}';`;
+  }
 }
 
 function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {
