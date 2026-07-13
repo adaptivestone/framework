@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import { appInstance } from '../helpers/appInstance.ts';
-import { scryptAsync } from '../helpers/crypto.ts';
+import { burnPasswordVerify, scryptAsync } from '../helpers/crypto.ts';
 import type {
   IAbstractModel,
   IAbstractModelMethods,
@@ -73,8 +73,11 @@ class UserOld extends AbstractModel<
   IStatic
 > {
   constructor(app: IApp) {
-    console.warn(
-      'UserOld model is deprecated and will be removed in v6. Please use the User model instead.',
+    process.emitWarning(
+      'UserOld is deprecated and will be removed in v6 — migrate to the User model. ' +
+        'SECURITY: UserOld implements known-weak legacy auth (timing-unsafe password ' +
+        'compare, no per-user salt, plaintext non-expiring session tokens).',
+      { type: 'DeprecationWarning', code: 'ASF_DEP_USEROLD' },
     );
     super(app);
   }
@@ -139,6 +142,9 @@ class UserOld extends AbstractModel<
   ) {
     const data = await this.findOne({ email: String(email) });
     if (!data) {
+      // Equalize timing with the hash path below: an unknown email must not be
+      // distinguishable from a wrong password by response latency.
+      await burnPasswordVerify(password);
       return false;
     }
     const hashedPasswords = await this.hashPassword(password);
@@ -240,13 +246,15 @@ class UserOld extends AbstractModel<
   ) {
     const data = await this.findOne({
       passwordRecoveryTokens: {
-        $elemMatch: { token: String(passwordRecoveryToken) },
+        $elemMatch: {
+          token: String(passwordRecoveryToken),
+          until: { $gt: new Date() },
+        },
       },
     });
     if (!data) {
       return Promise.reject(new Error('User not exists'));
     }
-    // TODO token expiration and remove that token
 
     data.passwordRecoveryTokens.pop();
 
@@ -319,13 +327,15 @@ class UserOld extends AbstractModel<
   ) {
     const data = await this.findOne({
       verificationTokens: {
-        $elemMatch: { token: String(verificationToken) },
+        $elemMatch: {
+          token: String(verificationToken),
+          until: { $gt: new Date() },
+        },
       },
     });
     if (!data) {
       return Promise.reject(new Error('User not exists'));
     }
-    // TODO token expiration and remove that token
 
     data.verificationTokens.pop();
 

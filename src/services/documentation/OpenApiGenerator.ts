@@ -83,8 +83,9 @@ export async function generateOpenApi(
     if (meta.description) {
       operation.summary = meta.description;
     }
-    if (parameters.length > 0) {
-      operation.parameters = parameters;
+    const uniqueParameters = dedupeParameters(parameters);
+    if (uniqueParameters.length > 0) {
+      operation.parameters = uniqueParameters;
     }
 
     const requestBody = await buildRequestBody(route, warn, ctx);
@@ -278,6 +279,28 @@ function collectMiddlewareSchemas(
 }
 
 // ── query / body / security ─────────────────────────────────────────────────────
+
+/**
+ * Enforce OpenAPI 3.1's unique-`(name, in)` rule. Emitted in precedence order —
+ * path params, then the route's own query schema, then middleware-contributed
+ * params (middleware order) — so keeping the first occurrence of each key lets
+ * the route win over middleware and covers the same-middleware-at-two-scopes
+ * duplicate `flatten()` produces. Deterministic; a collision-free array passes
+ * through unchanged.
+ */
+function dedupeParameters(params: Obj[]): Obj[] {
+  const seen = new Set<string>();
+  const out: Obj[] = [];
+  for (const param of params) {
+    const key = `${String(param.in)} ${String(param.name)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(param);
+  }
+  return out;
+}
 
 async function buildQueryParameters(
   route: FlatRoute,

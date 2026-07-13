@@ -9,9 +9,15 @@ class PrepareAppInfo extends AbstractMiddleware {
 
   async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
     if (!req.appInfo) {
-      //@ts-expect-error extending
+      // `request`/`query` are declared non-optional; seed both so a schema-less
+      // route's handler can read them. The validation wrapper overwrites
+      // (assigns, not merges) when a route/middleware declares schemas, so
+      // these defaults never leak stale keys. `ip`/`i18n` are optional and set
+      // by later middleware.
       req.appInfo = {
         app: this.app,
+        request: {},
+        query: {},
       };
     }
     next();

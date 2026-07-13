@@ -181,7 +181,10 @@ function renderHandlerGroup(
   const typeName = `${pascalCase(handlerName)}Request`;
 
   const docComment = group
-    .map(({ route }) => `\`${route.method.toUpperCase()} ${route.path}\``)
+    .map(
+      ({ route }) =>
+        `\`${route.method.toUpperCase()} ${escapeBlockComment(route.path)}\``,
+    )
     .join(', ');
   // Dedup identical shapes (same chain + same schemas + same path params)
   // so multi-route handlers with structurally-equivalent contexts emit one
@@ -218,7 +221,7 @@ function renderShape(
   const pathParams = parsePathParams(route.path);
   const paramsOverride =
     pathParams.length > 0
-      ? ` & { params: { ${pathParams.map((p) => `${p}: string`).join('; ')} } }`
+      ? ` & { params: { ${pathParams.map((p) => `${paramKey(p)}: string`).join('; ')} } }`
       : '';
 
   // appInfo overrides for body/query when their schema is declared inline
@@ -260,16 +263,33 @@ function renderShape(
  * Pull path-param names out of a route path string. Handles `:name` (single
  * segment) and `{*name}` (splat — author-facing syntax that the registry
  * normalizes to internal `*name` for matching).
+ *
+ * A `:name` param is the WHOLE segment after `:` — the runtime router does
+ * `seg.slice(1)` with no character restriction (`RouteRegistry`), so
+ * `:order-id` → `order-id` and `:1st` → `1st` land in `req.params` verbatim;
+ * matching `[^/]+` mirrors that. The splat form mirrors `convertPathSyntax`'s
+ * `\{\*([a-zA-Z_][a-zA-Z0-9_]*)\}` exactly — a non-identifier there is NOT
+ * normalized to a splat at runtime, so it must not be reported as a param here.
  */
 function parsePathParams(routePath: string): string[] {
   const names: string[] = [];
-  for (const match of routePath.matchAll(/:([a-zA-Z_][a-zA-Z0-9_]*)/g)) {
+  for (const match of routePath.matchAll(/:([^/]+)/g)) {
     names.push(match[1] as string);
   }
   for (const match of routePath.matchAll(/\{\*([a-zA-Z_][a-zA-Z0-9_]*)\}/g)) {
     names.push(match[1] as string);
   }
   return names;
+}
+
+/**
+ * Render a path-param name as an object-type key: bare when it is a valid TS
+ * identifier (so identifier params stay byte-identical to the pre-quoting
+ * output), single-quoted otherwise so full runtime segment names like
+ * `order-id` or `1st` remain valid TS.
+ */
+function paramKey(name: string): string {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : sq(name);
 }
 
 /**
@@ -310,8 +330,19 @@ function collectUniqueMiddlewares(chains: MiddlewareRef[][]): string[] {
  * Route keys round-trip exactly (the literal denotes the author's original key),
  * and ordinary paths (no `\`/`'`) come out byte-identical to a plain `'${s}'`.
  */
-function sq(s: string): string {
+export function sq(s: string): string {
   return `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+}
+
+/**
+ * Escape `*\/` so a route path that legally contains it (only a LEADING `*` is a
+ * splat, so `/a*\/b` is a valid key) can't terminate the generated JSDoc block
+ * comment (TS1443/TS1160). `*\/` reads identically; paths without it are
+ * byte-identical. Only the doc comment needs this — type-navigation keys go
+ * through `sq()` into string literals, where `*\/` is inert.
+ */
+function escapeBlockComment(s: string): string {
+  return s.replace(/\*\//g, '*\\/');
 }
 
 function pascalCase(name: string): string {

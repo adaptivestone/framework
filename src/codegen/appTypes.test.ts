@@ -1,4 +1,6 @@
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { getTemplate } from './appTypes.ts';
 
@@ -152,5 +154,54 @@ describe('appTypes — appInfo.user binding', () => {
     expect(out).not.toContain(
       "declare module '@adaptivestone/framework/models/User.js'",
     );
+  });
+});
+
+/**
+ * Config names, model names, and model relPaths are interpolated into
+ * single-quoted TS string literals in the emitted `genTypes.d.ts`. A name or
+ * path containing `'` or `\` (both legal in a filename on macOS/Linux) must be
+ * escaped — otherwise the literal is unterminated and the consumer's whole
+ * typecheck breaks with a confusing parse error (finding #20).
+ */
+describe('appTypes — name escaping in emitted string literals (finding #20)', () => {
+  /** Syntactic-only parse gate: reports TS1002 (unterminated string) etc. */
+  function parseDiagnostics(code: string): string[] {
+    const { diagnostics } = ts.transpileModule(code, {
+      reportDiagnostics: true,
+      compilerOptions: {
+        module: ts.ModuleKind.ESNext,
+        target: ts.ScriptTarget.ESNext,
+      },
+    });
+    return (diagnostics ?? []).map(
+      (d) =>
+        `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`,
+    );
+  }
+
+  it('escapes a config name containing an apostrophe or backslash', async () => {
+    const out = await getTemplate(
+      new Map<string, unknown>([
+        ["us'er", { port: 3300 }],
+        ['back\\slash', { port: 3300 }],
+      ]),
+      [],
+    );
+    expect(out).toContain("getConfig(configName: 'us\\'er')");
+    expect(out).toContain("getConfig(configName: 'back\\\\slash')");
+    // The emitted module still parses — an unescaped `'` leaves it unterminated.
+    expect(parseDiagnostics(out)).toEqual([]);
+  });
+
+  it('escapes a model name and relPath containing an apostrophe or backslash', async () => {
+    // A path that fails to read (→ non-BaseModel branch) but sits inside cwd so
+    // its relative specifier is emitted, carrying both an apostrophe and a
+    // backslash into the `import('…')` string literal.
+    const weird = path.join(process.cwd(), "src/models/wei'rd\\Model.ts");
+    const out = await getTemplate(new Map(), [{ file: "Mo'del", path: weird }]);
+    expect(out).toContain("getModel(modelName: 'Mo\\'del')");
+    expect(out).toContain("wei\\'rd\\\\Model.ts");
+    expect(parseDiagnostics(out)).toEqual([]);
   });
 });

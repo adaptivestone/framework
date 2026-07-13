@@ -47,4 +47,22 @@ describe('prepareAppInfo methods', () => {
 
     expect(req.appInfo?.test).toBe(5);
   });
+
+  it('initializes request and query to {} so schema-less routes can read them', async () => {
+    expect.assertions(2);
+
+    // The declared `appInfo.request`/`.query` types are non-optional, but a
+    // route without schemas never has them assigned by the validation wrapper.
+    // `PrepareAppInfo` must seed both so a handler reading them can't crash.
+    const middleware = new PrepareAppInfo(appInstance);
+    const req: { appInfo?: FrameworkRequest['appInfo'] } = {};
+    await middleware.middleware(
+      req as unknown as FrameworkRequest,
+      {} as Response,
+      () => {},
+    );
+
+    expect(req.appInfo?.request).toStrictEqual({});
+    expect(req.appInfo?.query).toStrictEqual({});
+  });
 });

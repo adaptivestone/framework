@@ -145,6 +145,10 @@ class HttpServer extends Base {
    * `instanceof` match whose handler returns non-null wins; return `null` to
    * pass to the next entry. Typical registration point is the project's
    * `bootHttp` hook. Returns an unregister function.
+   *
+   * Scope: handlers fire for errors thrown from route handlers and request
+   * validation only. Errors thrown by middleware bypass the registry and are
+   * finalized by the generic 500 sink (`addErrorHandler`).
    */
   registerErrorHandler<E extends Error>(
     errorClass: abstract new (...args: never[]) => E,
@@ -172,7 +176,8 @@ class HttpServer extends Base {
    * then built-ins; first `instanceof` match returning non-null wins. A
    * handler that itself throws aborts the walk (logged here at `error`; the
    * caller falls through to its 500) — never a crash loop. Returns null when
-   * no entry produced a response.
+   * no entry produced a response. Scope: only the route-handler and validation
+   * catches call this; middleware throws bypass it and hit the 500 sink.
    */
   async resolveError(
     err: unknown,

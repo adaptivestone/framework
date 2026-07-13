@@ -15,6 +15,7 @@ import {
   mergeEnvShapes,
 } from './astConfig.ts';
 import { isBaseModelSource } from './astModel.ts';
+import { sq } from './emit.ts';
 
 /** A `./`-rooted, forward-slash specifier from `dir` to `target` for the emitted
  * `import('…')`. Throws if `target` is outside `dir` (can't be a relative import)
@@ -169,7 +170,7 @@ export async function getTemplate(
   const configTypes = Array.from(configs)
     .map(
       ([name, value]) =>
-        `    getConfig(configName: '${name}'): ${valueToTypeString(value, envByConfig.get(name))};`,
+        `    getConfig(configName: ${sq(name)}): ${valueToTypeString(value, envByConfig.get(name))};`,
     )
     .join('\n');
 
@@ -189,8 +190,8 @@ export async function getTemplate(
   const modelTypes = models
     .map((m) =>
       m.isBaseModel
-        ? `    getModel(modelName: '${m.file}'): GetModelTypeFromClass<typeof import('${m.relPath}').default>`
-        : `    getModel(modelName: '${m.file}'): import('${m.relPath}').default['mongooseModel']`,
+        ? `    getModel(modelName: ${sq(m.file)}): GetModelTypeFromClass<typeof import(${sq(m.relPath)}).default>`
+        : `    getModel(modelName: ${sq(m.file)}): import(${sq(m.relPath)}).default['mongooseModel']`,
     )
     .join('\n');
 
@@ -204,7 +205,7 @@ export async function getTemplate(
     ? `
 declare module '@adaptivestone/framework/models/User.js' {
   export interface AppModels {
-    User: InstanceType<GetModelTypeFromClass<typeof import('${userModel.relPath}').default>>;
+    User: InstanceType<GetModelTypeFromClass<typeof import(${sq(userModel.relPath)}).default>>;
   }
 }
 `

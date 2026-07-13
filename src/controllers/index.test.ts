@@ -4,6 +4,7 @@
  * earlier unit tests against a free `translateController` function.
  */
 
+import type { Response } from 'express';
 import mongoose from 'mongoose';
 import {
   afterAll,
@@ -36,7 +37,7 @@ import ValidationLeakController, {
   LEAK_SECRET,
 } from '../tests/fixtures/controllers/ValidationLeakController.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
-import ControllerManager from './index.ts';
+import ControllerManager, { compareControllerLoadOrder } from './index.ts';
 
 // ─── fixtures ────────────────────────────────────────────────────────
 
@@ -103,6 +104,63 @@ class CaptureTransport extends Transport {
     next();
   }
 }
+
+// ─── index-first load order (finding #16) ────────────────────────────
+//
+// The controller discovery sort must be a consistent, antisymmetric
+// comparator per ECMA-262 — index files load first (so root-level
+// routes/middleware accumulate before nested ones), and among index files
+// the shallower one loads first (root `Index` before nested `sub/Index`),
+// by contract rather than V8 TimSort luck.
+
+describe('ControllerManager — index-first load order', () => {
+  const nonIndex = { file: 'Auth.ts' };
+  const index = { file: 'Index.ts' };
+  const nestedIndex = { file: 'sub/Index.ts' };
+
+  it('sorts an index file ahead of a non-index one regardless of input order', () => {
+    expect([nonIndex, index].sort(compareControllerLoadOrder)[0]).toBe(index);
+    expect([index, nonIndex].sort(compareControllerLoadOrder)[0]).toBe(index);
+  });
+
+  it('is antisymmetric for a mixed (index vs non-index) pair', () => {
+    expect(compareControllerLoadOrder(index, nonIndex)).toBe(
+      -compareControllerLoadOrder(nonIndex, index),
+    );
+  });
+
+  it('sorts a root index file ahead of a nested one (root first, by contract)', () => {
+    expect([nestedIndex, index].sort(compareControllerLoadOrder)[0]).toBe(
+      index,
+    );
+    expect(compareControllerLoadOrder(index, nestedIndex)).toBe(
+      -compareControllerLoadOrder(nestedIndex, index),
+    );
+  });
+
+  it('recognizes backslash-separated paths (Windows path.join output)', () => {
+    const winNestedIndex = { file: 'sub\\Index.ts' };
+    // Index detection must not depend on the separator…
+    expect([nonIndex, winNestedIndex].sort(compareControllerLoadOrder)[0]).toBe(
+      winNestedIndex,
+    );
+    // …and neither must the depth tiebreak (root before nested).
+    expect([winNestedIndex, index].sort(compareControllerLoadOrder)[0]).toBe(
+      index,
+    );
+    expect(compareControllerLoadOrder(index, winNestedIndex)).toBe(
+      -compareControllerLoadOrder(winNestedIndex, index),
+    );
+  });
+
+  it('leaves the relative order of non-index files untouched (stable)', () => {
+    const home = { file: 'Home.ts' };
+    expect([nonIndex, home].sort(compareControllerLoadOrder)).toEqual([
+      nonIndex,
+      home,
+    ]);
+  });
+});
 
 // ─── routes ──────────────────────────────────────────────────────────
 
@@ -613,6 +671,59 @@ describe('ControllerManager — mixed-case path segments', () => {
 // `ValidationError` becomes a 400 with per-field detail ONLY when every failing
 // model path is a field the client actually sent; renamed/internal/mixed
 // failures stay an honest 500.
+
+// ─── schema-less route appInfo defaults (finding #14) ────────────────
+//
+// `appInfo.request`/`.query` are declared non-optional, but the validation
+// wrapper only assigns them when a route (or a chained middleware) declares
+// schemas. `PrepareAppInfo` seeds both to `{}` so a schema-less handler
+// reading them can't crash to a 500 — the runtime now matches the types.
+class SchemalessAppInfoController extends AbstractController {
+  get routes() {
+    return {
+      get: {
+        '/read': { handler: this.read },
+      },
+    };
+  }
+
+  async read(req: FrameworkRequest, res: Response) {
+    return res.status(200).json({
+      data: {
+        query: req.appInfo.query.page ?? 'absent',
+        request: req.appInfo.request.foo ?? 'absent',
+        queryIsObject: typeof req.appInfo.query === 'object',
+        requestIsObject: typeof req.appInfo.request === 'object',
+      },
+    });
+  }
+
+  static get middleware() {
+    return new Map();
+  }
+}
+
+describe('ControllerManager — schema-less route appInfo defaults', () => {
+  const base = '/test/schemalessappinfocontroller';
+
+  beforeAll(() => {
+    appInstance.controllerManager?.registerController(
+      SchemalessAppInfoController,
+      'test',
+    );
+  });
+
+  it('a schema-less handler reads appInfo.query/request without a 500', async () => {
+    const res = await fetch(getTestServerURL(`${base}/read`));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.query).toBe('absent');
+    expect(body.data.request).toBe('absent');
+    expect(body.data.queryIsObject).toBe(true);
+    expect(body.data.requestIsObject).toBe(true);
+  });
+});
 
 describe('ControllerManager — Mongoose validation safety net', () => {
   const base = '/test/safetynetcontroller';

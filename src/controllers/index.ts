@@ -153,21 +153,7 @@ class ControllerManager extends Base {
     );
 
     // Index files first so root-level routes/middleware land before nested ones.
-    controllersToLoad.sort((a, b) => {
-      if (
-        a.file.toLowerCase().endsWith('index.js') ||
-        a.file.toLowerCase().endsWith('index.ts')
-      ) {
-        if (
-          b.file.toLowerCase().endsWith('index.js') ||
-          b.file.toLowerCase().endsWith('index.ts')
-        ) {
-          return 0;
-        }
-        return -1;
-      }
-      return 0;
-    });
+    controllersToLoad.sort(compareControllerLoadOrder);
 
     return Promise.all(
       controllersToLoad.map(async ({ path: modulePath, file }) => {
@@ -563,6 +549,36 @@ export function buildSubtreeFromSpec(
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────
+
+/**
+ * A controller module named `index.(ts|js)` at any folder depth. Discovery
+ * joins paths with `path.join`, so accept both `/` and `\` separators.
+ */
+const isIndexFile = (file: string): boolean =>
+  /(^|[\\/])index\.(js|ts)$/i.test(file);
+
+/** Folder depth of a discovered `file` path (number of `/` or `\` separators). */
+const fileDepth = (file: string): number => file.match(/[\\/]/g)?.length ?? 0;
+
+/**
+ * Controller discovery order: index files first (so root-level
+ * routes/middleware accumulate before nested ones), and among index files the
+ * shallower one first (root `index` before nested `sub/index`). Consistent and
+ * antisymmetric per ECMA-262; non-index pairs compare equal and rely on
+ * `Array.prototype.sort` stability to keep discovery order.
+ */
+export function compareControllerLoadOrder(
+  a: { file: string },
+  b: { file: string },
+): number {
+  const byIndex = Number(isIndexFile(b.file)) - Number(isIndexFile(a.file));
+  if (byIndex !== 0) {
+    return byIndex;
+  }
+  // Both index or both non-index. Order index files by depth (root first);
+  // leave non-index pairs equal so the stable sort preserves discovery order.
+  return isIndexFile(a.file) ? fileDepth(a.file) - fileDepth(b.file) : 0;
+}
 
 /**
  * `'POST/login'` → method=POST,path=/login · `'/login'` → method=ALL,path=/login

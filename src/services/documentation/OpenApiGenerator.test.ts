@@ -48,6 +48,16 @@ function authMiddleware(): MiddlewareEntry {
   return { Class: Class as unknown as MiddlewareEntry['Class'] };
 }
 
+// A synthetic middleware exposing a static, introspectable query schema.
+function queryMiddleware(schema: unknown): MiddlewareEntry {
+  const Class = {
+    get relatedQueryParameters() {
+      return schema;
+    },
+  };
+  return { Class: Class as unknown as MiddlewareEntry['Class'] };
+}
+
 describe('generateOpenApi', () => {
   it('emits the 3.1 skeleton with info and servers', async () => {
     const doc = await generateOpenApi([], {
@@ -161,6 +171,60 @@ describe('generateOpenApi', () => {
     const q = params.find((p: AnyDoc) => p.name === 'q');
     expect(page).toMatchObject({ in: 'query', required: true });
     expect(q).toMatchObject({ in: 'query', required: false });
+  });
+
+  it('dedups a (name, in) collision between route and middleware query, route wins', async () => {
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/',
+          // Middleware also declares `limit` (as a string) — must lose to route.
+          middlewares: [queryMiddleware(z.object({ limit: z.string() }))],
+          entry: {
+            handler: () => {},
+            query: z.object({ limit: z.number() }),
+            meta: { methodName: 'list', controllerClass: 'Items' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    const params = (doc as AnyDoc).paths['/'].get.parameters;
+    const limits = params.filter(
+      (p: AnyDoc) => p.name === 'limit' && p.in === 'query',
+    );
+    // Exactly one `(limit, query)` entry — OpenAPI 3.1 forbids duplicates.
+    expect(limits).toHaveLength(1);
+    // The survivor is the route's own schema (number), not the middleware's.
+    expect(limits[0].schema).toEqual({ type: 'number' });
+  });
+
+  it('dedups the same middleware contributed at two mount scopes', async () => {
+    // flatten() concatenates a middleware mounted at two scopes into the chain
+    // twice; the same Class appears twice in `middlewares`.
+    const mw = queryMiddleware(z.object({ limit: z.string() }));
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/',
+          middlewares: [mw, mw],
+          entry: {
+            handler: () => {},
+            meta: { methodName: 'list', controllerClass: 'Items' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    const params = (doc as AnyDoc).paths['/'].get.parameters;
+    const limits = params.filter(
+      (p: AnyDoc) => p.name === 'limit' && p.in === 'query',
+    );
+    expect(limits).toHaveLength(1);
   });
 
   it('collects security schemes from middleware static auth params', async () => {
