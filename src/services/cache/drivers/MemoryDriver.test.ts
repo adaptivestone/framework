@@ -33,6 +33,17 @@ describe('MemoryDriver', () => {
     expect(await driver.del('k')).toBe(0); // already gone
   });
 
+  it('a non-positive TTL never stores an entry (issue #10)', async () => {
+    expect.assertions(2);
+    const driver = new MemoryDriver();
+    // A negative TTL would otherwise arm no timer yet still store → immortal.
+    await driver.set('neg', 'v', -5);
+    expect(await driver.get('neg')).toBeNull();
+    // Zero converges on the same "don't cache" contract as redis' EX <= 0.
+    await driver.set('zero', 'v', 0);
+    expect(await driver.get('zero')).toBeNull();
+  });
+
   it('expires a key after its TTL', async () => {
     expect.assertions(2);
     const driver = new MemoryDriver();

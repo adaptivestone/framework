@@ -28,6 +28,25 @@ describe('cache', () => {
     expect(counter).toBe(2);
   });
 
+  it('a negative storeTime skips the cache and recomputes every call (issue #10)', async () => {
+    expect.assertions(3);
+    const { cache } = appInstance;
+    let counter = 0;
+    const compute = async () => {
+      counter += 1;
+      return counter;
+    };
+
+    // A negative storeTime (e.g. from `(expiresAt - Date.now())/1000` once the
+    // source is already expired) must never persist a never-expiring entry.
+    const first = await cache.getSetValue('NEG_TTL', compute, -5);
+    const second = await cache.getSetValue('NEG_TTL', compute, -5);
+
+    expect(first).toBe(1);
+    expect(second).toBe(2); // recomputed, not served from a stale entry
+    expect(counter).toBe(2);
+  });
+
   it('can get set values', async () => {
     expect.assertions(2);
 

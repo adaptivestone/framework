@@ -1,6 +1,7 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const basePath = new URL('.', import.meta.url).pathname;
+const basePath = fileURLToPath(new URL('.', import.meta.url));
 
 export default {
   folders: {

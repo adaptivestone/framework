@@ -162,7 +162,7 @@ class Server {
       },
       httpServer: null,
       controllerManager: null,
-      frameworkFolder: new URL('.', import.meta.url).pathname,
+      frameworkFolder: url.fileURLToPath(new URL('.', import.meta.url)),
       internalFilesCache: that.cache,
     };
 
@@ -530,13 +530,36 @@ class Server {
       configName: string,
       values: Record<string, string>,
     ) => {
-      // The source files that contribute to this config, in merge order:
-      // base default first, then the NODE_ENV-specific override. Used both to
-      // import the values AND (by codegen) to recover env-only key types from
-      // source — deriving the list once keeps the two perfectly in sync.
-      const paths = [values.default];
+      // The source files that contribute to this config, in merge order: base
+      // default first (may be absent for an env-only config), then the
+      // NODE_ENV-specific override. Used both to import the values AND (by
+      // codegen) to recover env-only key types from source — deriving the list
+      // once keeps the two perfectly in sync. Only real paths go in, so
+      // `import(undefined)` can never be reached.
+      const paths: string[] = [];
+      if (values.default) {
+        paths.push(values.default);
+      }
       if (process.env.NODE_ENV && values[process.env.NODE_ENV]) {
         paths.push(values[process.env.NODE_ENV]);
+      }
+      if (paths.length === 0) {
+        // Env-only config (no base `<name>.ts`) whose env segment doesn't match
+        // the current NODE_ENV → no applicable file. Treat it as absent, exactly
+        // like a config that was never defined (getConfig warns + returns {}),
+        // rather than importing `undefined` and crashing boot with an opaque
+        // `Cannot find package 'undefined'`.
+        consoleLogger(
+          'warn',
+          `Config '${configName}' has only environment-specific file(s) [${Object.keys(
+            values,
+          ).join(
+            ', ',
+          )}] and no base '${configName}.ts'; none matches NODE_ENV=${
+            process.env.NODE_ENV ?? '(unset)'
+          }, so it is treated as absent (getConfig('${configName}') returns {}).`,
+        );
+        return null;
       }
       const result = await Promise.all(paths.map((p) => import(p)));
       return {
@@ -544,7 +567,7 @@ class Server {
         finalValue: merge(result[0].default, result[1]?.default || {}, {
           arrayMerge: (_destinationArray, sourceArray) => sourceArray,
         }),
-        paths: paths.filter((p): p is string => Boolean(p)),
+        paths,
       };
     };
 
@@ -557,6 +580,9 @@ class Server {
     const configs = await Promise.all(loadingPromises);
 
     for (const config of configs) {
+      if (!config) {
+        continue;
+      }
       this.cache.configs.set(config.name, config.finalValue);
       this.cache.configPaths.set(config.name, config.paths);
     }

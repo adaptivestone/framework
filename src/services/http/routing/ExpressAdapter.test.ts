@@ -63,6 +63,19 @@ const makeReq = (method: string, path: string) =>
     // biome-ignore lint/suspicious/noExplicitAny: minimal request stub
   }) as any;
 
+// App stub exposing a spyable logger so tests can assert what gets logged.
+const makeAppWithLogger = () => {
+  const error = vi.fn();
+  const app = {
+    getConfig: () => ({}),
+    logger: { error },
+  } as unknown as IApp;
+  return { app, error };
+};
+
+// Flush pending microtasks + timers so a post-`next()` rejection can settle.
+const flush = () => new Promise((resolve) => setTimeout(resolve, 10));
+
 // ─── tests ───────────────────────────────────────────────────────────
 
 describe('createExpressAdapter — 404 fallthrough', () => {
@@ -337,6 +350,78 @@ describe('createExpressAdapter — middleware instance caching', () => {
     );
 
     expect(constructCount).toBe(1);
+  });
+});
+
+describe('createExpressAdapter — late middleware rejection', () => {
+  it('logs the error when a middleware rejects after calling next()', async () => {
+    class LateRejectMw {
+      readonly _kind = 'mw';
+      // biome-ignore lint/suspicious/noExplicitAny: minimal mw shape for test
+      async middleware(_req: any, _res: any, next: any) {
+        next();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        throw new Error('late boom');
+      }
+    }
+
+    const r = new RouteRegistry();
+    r.root.middlewares.push({
+      // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
+      Class: LateRejectMw as any,
+    });
+    r.registerRoute('GET', '/x', {
+      handler: async (_req, res) => {
+        res.end();
+      },
+    });
+
+    const { app, error } = makeAppWithLogger();
+    const adapter = createExpressAdapter(r, app);
+    const res = makeRes();
+    const next = vi.fn();
+    await adapter(makeReq('GET', '/x'), res, next);
+    await flush();
+
+    // The late rejection is surfaced, not swallowed…
+    expect(error).toHaveBeenCalledTimes(1);
+    const logged = String(error.mock.calls[0]?.[0]);
+    expect(logged).toContain('late boom');
+    expect(logged).toContain('LateRejectMw');
+    // …but the already-advanced request still completed normally.
+    expect(res.writableEnded).toBe(true);
+    expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it('stays silent on a benign double next() with no error', async () => {
+    class DoubleNextMw {
+      readonly _kind = 'mw';
+      // biome-ignore lint/suspicious/noExplicitAny: minimal mw shape for test
+      async middleware(_req: any, _res: any, next: any) {
+        next();
+        next();
+      }
+    }
+
+    const r = new RouteRegistry();
+    r.root.middlewares.push({
+      // biome-ignore lint/suspicious/noExplicitAny: synthetic mw class
+      Class: DoubleNextMw as any,
+    });
+    r.registerRoute('GET', '/x', {
+      handler: async (_req, res) => {
+        res.end();
+      },
+    });
+
+    const { app, error } = makeAppWithLogger();
+    const adapter = createExpressAdapter(r, app);
+    const res = makeRes();
+    await adapter(makeReq('GET', '/x'), res, vi.fn());
+    await flush();
+
+    expect(error).not.toHaveBeenCalled();
+    expect(res.writableEnded).toBe(true);
   });
 });
 

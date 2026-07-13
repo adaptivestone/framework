@@ -19,6 +19,12 @@ class MemoryDriver implements CacheDriver {
   }
 
   async set(key: string, value: string, ttlSeconds: number): Promise<void> {
+    // A non-positive TTL never stores (issue #10): storing without a timer would
+    // strand an immortal entry, so converge on redis' `EX <= 0` = no-cache and
+    // leave any existing entry untouched (redis rejects the write, not the key).
+    if (ttlSeconds <= 0) {
+      return;
+    }
     const existing = this.#store.get(key);
     if (existing?.timer) {
       clearTimeout(existing.timer);

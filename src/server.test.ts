@@ -1,4 +1,6 @@
+import { existsSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import folderConfig from './folderConfig.ts';
 import { appInstance } from './helpers/appInstance.ts';
 
 /**
@@ -43,5 +45,26 @@ describe('Server lookups — DX guards', () => {
 
   it('getConfig returns the cached config for a known name', () => {
     expect(appInstance.getConfig('auth')).toHaveProperty('hashRounds');
+  });
+});
+
+/**
+ * Both `folderConfig`'s defaults and `app.frameworkFolder` derive filesystem
+ * paths from `import.meta.url`. They must decode the URL (`fileURLToPath`), not
+ * read `.pathname` — the latter leaves percent-encoding in place, so a checkout
+ * under a directory with a space yields `%20`-laden paths that miss on disk.
+ * These pin real, on-disk paths free of any `%` so the encoded form can't return.
+ */
+describe('Filesystem paths from import.meta.url are decoded, not percent-encoded', () => {
+  it('folderConfig folders exist on disk and are not percent-encoded', () => {
+    for (const folder of Object.values(folderConfig.folders)) {
+      expect(folder).not.toContain('%');
+      expect(existsSync(folder)).toBe(true);
+    }
+  });
+
+  it('app.frameworkFolder exists on disk and is not percent-encoded', () => {
+    expect(appInstance.frameworkFolder).not.toContain('%');
+    expect(existsSync(appInstance.frameworkFolder)).toBe(true);
   });
 });

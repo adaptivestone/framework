@@ -32,6 +32,25 @@ const isMissing = (v: unknown) => v === undefined || v === null || v === '';
 const coerceStr = (v: unknown): unknown =>
   v == null || typeof v === 'object' ? v : String(v);
 
+// Mongo surfaces a unique-index violation as a raw driver error with
+// `code === 11000` and a `keyPattern`/`keyValue` map keyed by the offending
+// index field(s) — mongoose does not wrap it. Returns the collided field names,
+// or `null` when `err` is not a duplicate-key error.
+const DUPLICATE_KEY_CODE = 11000;
+const duplicateKeyFields = (err: unknown): string[] | null => {
+  if (
+    typeof err !== 'object' ||
+    err === null ||
+    (err as { code?: unknown }).code !== DUPLICATE_KEY_CODE
+  ) {
+    return null;
+  }
+  const source =
+    (err as { keyPattern?: Record<string, unknown> }).keyPattern ??
+    (err as { keyValue?: Record<string, unknown> }).keyValue;
+  return source ? Object.keys(source) : [];
+};
+
 const pushEmailIssues = (email: unknown, issues: StandardSchemaV1.Issue[]) => {
   if (isMissing(email)) {
     issues.push({ message: 'auth.emailProvided', path: ['email'] });
@@ -284,15 +303,35 @@ class Auth extends AbstractController {
       }
     }
 
-    user = await User.create({
-      email: req.appInfo.request.email,
-      password: req.appInfo.request.password,
-      name: {
-        first: req.appInfo.request.firstName,
-        last: req.appInfo.request.lastName,
-        nick: req.appInfo.request.nickName,
-      },
-    });
+    try {
+      user = await User.create({
+        email: req.appInfo.request.email,
+        password: req.appInfo.request.password,
+        name: {
+          first: req.appInfo.request.firstName,
+          last: req.appInfo.request.lastName,
+          nick: req.appInfo.request.nickName,
+        },
+      });
+    } catch (err) {
+      // Concurrency: a request that passed the existence checks above can still
+      // lose the race to the unique index. Map the same distinct 400s the
+      // sequential path returns, keyed by which index collided. Any other
+      // collision (a future index) or non-duplicate error is rethrown unchanged
+      // so the error-handler registry keeps returning its honest 500.
+      const dupFields = duplicateKeyFields(err);
+      if (dupFields?.includes('email')) {
+        return res
+          .status(400)
+          .json({ message: req.appInfo.i18n?.t('email.registered') });
+      }
+      if (dupFields?.includes('name.nick')) {
+        return res
+          .status(400)
+          .json({ message: req.appInfo.i18n?.t('auth.nicknameExists') });
+      }
+      throw err;
+    }
 
     const isAuthWithVerificationFlow = isVerificationFlowEnabled(
       this.app.getConfig('auth'),

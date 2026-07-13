@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
@@ -672,6 +672,118 @@ describe('auth', () => {
       const statusCodes = responses.map((response) => response.status);
 
       expect(statusCodes).toContain(429);
+    });
+  });
+
+  // Under concurrency both requests pass the check-then-create existence guard,
+  // so the loser's `User.create` hits a unique index (E11000). That must map to
+  // the SAME friendly 400s as the sequential path — not a generic 500 (finding
+  // #9). Spying the existence check reproduces the race deterministically.
+  describe('concurrent duplicate registration (finding #9)', () => {
+    // E11000 only fires when the unique indexes actually exist; boot does not
+    // build them in the test DB, so create them explicitly first.
+    beforeAll(async () => {
+      const UserModel = appInstance.getModel('User') as unknown as {
+        syncIndexes: () => Promise<unknown>;
+      };
+      await UserModel.syncIndexes();
+    });
+
+    type SpyableUser = {
+      create: (...args: unknown[]) => Promise<unknown>;
+      findOne: (...args: unknown[]) => Promise<unknown>;
+      getUserByEmail: (...args: unknown[]) => Promise<unknown>;
+    };
+
+    it('maps a raced duplicate-email create to 400, not 500', async () => {
+      expect.assertions(2);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'race-dup-email@test.com';
+      await UserModel.create({ email, password: userPassword });
+
+      // The existence check reports "free" though the row exists, so `create`
+      // reaches the unique email index and throws E11000.
+      const spy = vi
+        .spyOn(UserModel as unknown as SpyableUser, 'getUserByEmail')
+        .mockResolvedValue(null);
+      try {
+        const response = await fetch(getTestServerURL('/auth/register'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({ email, password: userPassword }),
+        });
+        const body = (await response.json()) as { message?: string };
+        expect(response.status).toBe(400);
+        expect(body.message).toBe('User with such an email already registered');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('maps a raced duplicate-nick create to 400, not 500', async () => {
+      expect.assertions(2);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const nickName = 'raceDupNick';
+      await UserModel.create({
+        email: 'race-nick-owner@test.com',
+        password: userPassword,
+        name: { nick: nickName },
+      });
+
+      // `findOne` backs both existence checks; mocking it null lets a genuinely
+      // new email through while the pre-existing nick still collides in `create`.
+      const spy = vi
+        .spyOn(UserModel as unknown as SpyableUser, 'findOne')
+        .mockResolvedValue(null);
+      try {
+        const response = await fetch(getTestServerURL('/auth/register'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({
+            email: 'race-nick-newcomer@test.com',
+            password: userPassword,
+            nickName,
+          }),
+        });
+        const body = (await response.json()) as { message?: string };
+        expect(response.status).toBe(400);
+        expect(body.message).toBe('User with such nickname already exists');
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it('does NOT swallow a duplicate on any other index (stays 500)', async () => {
+      expect.assertions(1);
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      // A future unique index (not email/nick) is not one of the register form's
+      // known conflicts, so its E11000 must propagate to the generic 500 — never
+      // be reported as a client-facing 400.
+      const foreignDup = Object.assign(new Error('E11000 duplicate key'), {
+        code: 11000,
+        keyPattern: { tenantId: 1 },
+        keyValue: { tenantId: 'acme' },
+      });
+      const emailSpy = vi
+        .spyOn(UserModel as unknown as SpyableUser, 'getUserByEmail')
+        .mockResolvedValue(null);
+      const createSpy = vi
+        .spyOn(UserModel as unknown as SpyableUser, 'create')
+        .mockRejectedValue(foreignDup);
+      try {
+        const response = await fetch(getTestServerURL('/auth/register'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({
+            email: 'race-foreign@test.com',
+            password: userPassword,
+          }),
+        });
+        expect(response.status).toBe(500);
+      } finally {
+        emailSpy.mockRestore();
+        createSpy.mockRestore();
+      }
     });
   });
 });

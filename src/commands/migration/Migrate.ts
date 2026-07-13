@@ -50,11 +50,34 @@ class Migrate extends AbstractCommand {
       // recent one — means a branch-merged migration with an older timestamp is
       // still run instead of silently skipped. Order by filename timestamp.
       const applied = new Set(await MigrationModel.distinct('migrationFile'));
+
+      // Discovery is recursive, so a migration can arrive as a subfolder-relative
+      // path (`2024/1699…_x.ts`). Order by the numeric timestamp prefix of the
+      // *basename* (strip directory segments), not the whole path.
       const pending = files
         .filter((f) => !applied.has(f.file))
-        .sort(
-          (a, b) => Number(a.file.split('_')[0]) - Number(b.file.split('_')[0]),
+        .map((f) => {
+          const prefix = /^(\d+)_/.exec(path.basename(f.file));
+          return { ...f, order: prefix ? Number(prefix[1]) : NaN };
+        });
+
+      // A pending migration whose basename is not `<timestamp>_name` has no
+      // defined position — running migrations in an undefined order against prod
+      // is worse than refusing. Fail loudly (log + non-zero exit) BEFORE running
+      // anything, rather than let a NaN comparator silently mis-sort the rest.
+      const malformed = pending.filter((f) => Number.isNaN(f.order));
+      if (malformed.length > 0) {
+        this.logger?.error(
+          `Refusing to run migrations — these files are not named <timestamp>_name: ${malformed
+            .map((f) => f.file)
+            .join(', ')}`,
         );
+        return false;
+      }
+
+      // Ties (same timestamp) break on the full path so the order is total and
+      // deterministic even across subfolders.
+      pending.sort((a, b) => a.order - b.order || a.file.localeCompare(b.file));
 
       // NOTE: `up()` and the journal write below are NOT atomic — no transaction
       // wraps them. If the process dies (or the lock is stolen after its TTL)

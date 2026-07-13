@@ -95,6 +95,18 @@ function runMiddleware(
     let resolved = false;
     const settle = (err?: unknown): void => {
       if (resolved) {
+        // The middleware already advanced the chain (called `next()` or ended
+        // the response), so the flow can't be rewound and the request is not
+        // corrupted. A late rejection still means something failed — surface
+        // it instead of dropping it silently. A benign late settle (double
+        // `next()`, no error) stays quiet.
+        if (err) {
+          app.logger.error(
+            `Middleware ${entry.Class.name} rejected after settling: ${
+              err instanceof Error ? (err.stack ?? err.message) : err
+            }`,
+          );
+        }
         return;
       }
       resolved = true;

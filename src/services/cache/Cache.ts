@@ -62,10 +62,12 @@ class Cache extends Base {
     onNotFound: () => Promise<T>,
     storeTime = 60 * 5,
   ) {
-    // A zero TTL means "don't cache" (issue #10): recompute every call. Short
-    // circuit before touching the driver or the in-flight map so a `0` can never
-    // write a never-expiring entry.
-    if (storeTime === 0) {
+    // A non-positive TTL means "don't cache" (issue #10): recompute every call.
+    // Short circuit before touching the driver or the in-flight map so a `<= 0`
+    // storeTime can never write a never-expiring entry — a negative value (e.g.
+    // `(expiresAt - Date.now())/1000` once the source is expired) is the hazard
+    // memory keeps immortal while redis rejects `EX <= 0`.
+    if (storeTime <= 0) {
       return onNotFound();
     }
     await this.whenReady;
