@@ -1,9 +1,12 @@
+import type { Response } from 'express';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
+import type { IApp } from '../server.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
+import Auth from './Auth.ts';
 
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
@@ -23,6 +26,257 @@ class CaptureTransport extends Transport {
     callback();
   }
 }
+
+describe('auth route schemas', () => {
+  const routes = new Auth(appInstance, '').routes.post;
+  const validate = async (path: string, value: unknown) => {
+    const route = routes[path];
+    if (
+      typeof route === 'function' ||
+      !route?.request ||
+      !('~standard' in route.request)
+    ) {
+      throw new Error(`No Standard Schema request validator for ${path}`);
+    }
+    return route.request['~standard'].validate(value);
+  };
+
+  it.each([
+    [{}, ['auth.emailProvided', 'auth.passwordProvided']],
+    [
+      { email: 'valid@example.com', password: 'contains a space' },
+      ['auth.passwordValid'],
+    ],
+    [
+      { email: 'valid@example.com', password: 'valid123', nickName: '' },
+      ['auth.nickNameValid'],
+    ],
+    [
+      {
+        email: 'valid@example.com',
+        password: 'valid123',
+        firstName: {},
+        lastName: [],
+      },
+      ['auth.nameValid', 'auth.nameValid'],
+    ],
+  ])('validates registration input %#', async (input, expectedMessages) => {
+    const result = await validate('/register', input);
+    expect(
+      'issues' in result ? result.issues?.map((issue) => issue.message) : [],
+    ).toEqual(expectedMessages);
+  });
+
+  it.each([
+    [{}, ['auth.passwordProvided', 'auth.passwordRecoveryTokenProvided']],
+    [
+      { password: 'contains a space', passwordRecoveryToken: 'token' },
+      ['auth.passwordValid'],
+    ],
+  ])('validates password recovery input %#', async (input, expectedMessages) => {
+    const result = await validate('/recover-password', input);
+    expect(
+      'issues' in result ? result.issues?.map((issue) => issue.message) : [],
+    ).toEqual(expectedMessages);
+  });
+
+  it.each([
+    '/send-recovery-email',
+    '/send-verification',
+  ])('requires an email for %s', async (path) => {
+    const result = await validate(path, {});
+    expect(
+      'issues' in result ? result.issues?.map((issue) => issue.message) : [],
+    ).toEqual(['auth.emailProvided']);
+  });
+});
+
+describe('auth controller failure paths', () => {
+  const response = () => {
+    const state: { status?: number; body?: unknown } = {};
+    const res = {
+      status: vi.fn((status: number) => {
+        state.status = status;
+        return res;
+      }),
+      json: vi.fn((body?: unknown) => {
+        state.body = body;
+        return res;
+      }),
+    };
+    return { res: res as unknown as Response, state };
+  };
+
+  const fakeApp = (
+    User: Record<string, unknown>,
+    authConfig: Record<string, unknown> = {},
+    error = vi.fn(),
+  ) =>
+    ({
+      getModel: () => User,
+      getConfig: () => authConfig,
+      logger: { child: () => ({ error, debug: vi.fn() }) },
+    }) as unknown as IApp;
+
+  const request = (app: IApp, values: Record<string, unknown>) =>
+    ({
+      appInfo: {
+        app,
+        request: values,
+        i18n: { t: (key: string) => key },
+      },
+      query: {},
+    }) as never;
+
+  it('honors the legacy verification-flow key and warns only once', async () => {
+    const sendVerificationEmail = vi.fn().mockResolvedValue(undefined);
+    const User = {
+      getUserByEmail: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ sendVerificationEmail }),
+    };
+    const app = fakeApp(User, { isAuthWithVefificationFlow: false });
+    const auth = new Auth(app, '');
+    const emitWarning = vi
+      .spyOn(process, 'emitWarning')
+      .mockImplementation(() => {});
+    try {
+      for (const email of [
+        'legacy-one@example.com',
+        'legacy-two@example.com',
+      ]) {
+        const { res, state } = response();
+        await auth.postRegister(
+          request(app, { email, password: 'valid123' }),
+          res,
+        );
+        expect(state.status).toBe(201);
+      }
+
+      expect(emitWarning).toHaveBeenCalledTimes(1);
+      expect(emitWarning).toHaveBeenCalledWith(
+        expect.stringContaining('isAuthWithVefificationFlow'),
+        expect.objectContaining({ code: 'ASF_DEP_AUTH_VERIFICATION_KEY' }),
+      );
+      expect(sendVerificationEmail).not.toHaveBeenCalled();
+    } finally {
+      emitWarning.mockRestore();
+    }
+  });
+
+  it('logs a registration verification-email failure and still returns 201', async () => {
+    const error = vi.fn();
+    const User = {
+      getUserByEmail: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({
+        sendVerificationEmail: vi
+          .fn()
+          .mockRejectedValue(new Error('verification mail down')),
+      }),
+    };
+    const app = fakeApp(User, {}, error);
+    const auth = new Auth(app, '');
+    const { res, state } = response();
+
+    await auth.postRegister(
+      request(app, {
+        email: 'mail-failure@example.com',
+        password: 'valid123',
+      }),
+      res,
+    );
+
+    expect(state.status).toBe(201);
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'verification mail down' }),
+    );
+  });
+
+  it('rethrows a non-object user-create failure unchanged', async () => {
+    const User = {
+      getUserByEmail: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockRejectedValue('primitive failure'),
+    };
+    const app = fakeApp(User);
+    const auth = new Auth(app, '');
+
+    await expect(
+      auth.postRegister(
+        request(app, {
+          email: 'primitive-failure@example.com',
+          password: 'valid123',
+        }),
+        response().res,
+      ),
+    ).rejects.toBe('primitive failure');
+  });
+
+  it('keeps recovery and verification lookup failures on uniform 200 responses', async () => {
+    const error = vi.fn();
+    const User = {
+      getUserByEmail: vi.fn().mockRejectedValue(new Error('database down')),
+    };
+    const app = fakeApp(User, {}, error);
+    const auth = new Auth(app, '');
+
+    const recovery = response();
+    await auth.sendPasswordRecoveryEmail(
+      request(app, { email: 'x@example.com' }),
+      recovery.res,
+    );
+    const verification = response();
+    await auth.sendVerification(
+      request(app, { email: 'x@example.com' }),
+      verification.res,
+    );
+
+    expect(recovery.state.status).toBe(200);
+    expect(verification.state.status).toBe(200);
+    expect(error).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs asynchronous mail failures after returning uniform responses', async () => {
+    const error = vi.fn();
+    const user = {
+      sendPasswordRecoveryEmail: vi
+        .fn()
+        .mockRejectedValue(new Error('recovery mail down')),
+      sendVerificationEmail: vi
+        .fn()
+        .mockRejectedValue(new Error('verification mail down')),
+    };
+    const User = { getUserByEmail: vi.fn().mockResolvedValue(user) };
+    const app = fakeApp(User, {}, error);
+    const auth = new Auth(app, '');
+
+    await auth.sendPasswordRecoveryEmail(
+      request(app, { email: 'x@example.com' }),
+      response().res,
+    );
+    await auth.sendVerification(
+      request(app, { email: 'x@example.com' }),
+      response().res,
+    );
+    await Promise.resolve();
+
+    expect(error).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns 400 when verification lookup resolves without a user', async () => {
+    const User = {
+      getUserByVerificationToken: vi.fn().mockResolvedValue(null),
+    };
+    const app = fakeApp(User);
+    const auth = new Auth(app, '');
+    const { res, state } = response();
+
+    await auth.verifyUser(request(app, {}), res);
+
+    expect(state.status).toBe(400);
+    expect(state.body).toEqual({
+      message: 'email.alreadyVerifiedOrWrongToken',
+    });
+  });
+});
 
 describe('auth', () => {
   describe('registration', () => {

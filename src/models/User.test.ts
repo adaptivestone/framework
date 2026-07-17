@@ -239,6 +239,39 @@ describe('token security (doc 01)', () => {
       appInstance.getModel('User').getUserByPasswordRecoveryToken(rRaw),
     ).rejects.toStrictEqual(new Error('User not exists'));
   });
+
+  it('requires an email before generating any auth token', async () => {
+    const UserModel = appInstance.getModel('User') as unknown as TUser;
+    const user = new UserModel();
+    const helperUser = {
+      email: '',
+      verificationTokens: [],
+      passwordRecoveryTokens: [],
+      save: vi.fn(),
+    };
+
+    await expect(user.generateToken()).rejects.toThrow('Email is required');
+    await expect(
+      userHelpers.generateUserVerificationToken(helperUser as never),
+    ).rejects.toThrow('Email is required');
+    await expect(
+      userHelpers.generateUserPasswordRecoveryToken(helperUser as never),
+    ).rejects.toThrow('Email is required');
+    expect(helperUser.save).not.toHaveBeenCalled();
+  });
+
+  it('initializes a missing session-token array before appending', async () => {
+    const UserModel = appInstance.getModel('User') as unknown as TUser;
+    const user = new UserModel({ email: 'fresh-token-array@example.com' });
+    user.sessionTokens = undefined;
+    const save = vi.spyOn(user, 'save').mockResolvedValue(user);
+
+    const generated = await user.generateToken();
+
+    expect(generated.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(user.sessionTokens).toHaveLength(1);
+    expect(save).toHaveBeenCalledOnce();
+  });
 });
 
 describe('password hashing (doc 02)', () => {

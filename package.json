@@ -1,6 +1,6 @@
 {
   "name": "@adaptivestone/framework",
-  "version": "5.1.2",
+  "version": "5.1.3",
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
@@ -31,7 +31,7 @@
     "postbuild": "cp -R ./src/migrations ./dist/migrations && cp -R ./src/locales ./dist/locales && cp -R ./src/services/messaging ./dist/services/messaging",
     "check:types": "npm run gen && tsc --noEmit",
     "check:types:raw": "tsc --noEmit",
-    "check:types:fast": "npm run gen && tsgo --noEmit",
+    "check:types:fast": "npm run gen && tsc --noEmit",
     "dev": "node --watch ./src/index.ts",
     "prod": "node --watch ./src/cluster.ts",
     "test": "vitest run",
@@ -78,11 +78,10 @@
     "@types/express": "^5.0.1",
     "@types/formidable": "^3.4.5",
     "@types/node": "^26.0.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260604.1",
     "@vitest/coverage-v8": "^4.0.0",
     "lefthook": "^2.0.0",
     "mongodb-memory-server": "^11.0.0",
-    "typescript": "^6.0.0",
+    "typescript": "^7.0.2",
     "vitest": "^4.0.0",
     "yup": "^1.7.0",
     "zod": "^4.0.0"

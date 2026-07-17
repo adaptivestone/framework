@@ -173,6 +173,43 @@ describe('astExtract — routes', () => {
     expect(ex.routes[0]?.middleware).toEqual(['Mw', 'Other']);
   });
 
+  it('sees through TS-only wrappers around route middleware arrays and tuples', () => {
+    const forms = [
+      '[Auth]',
+      '[[RateLimiter, { points: 10 }]]',
+      '[[RateLimiter, { points: 10 }] as const]',
+      '[[RateLimiter, { points: 10 }]] as const',
+      '[([RateLimiter, { points: 10 }] as const)]',
+      '[[(RateLimiter as typeof RateLimiter), { points: 10 }] as const]',
+    ];
+    for (const middleware of forms) {
+      const ex = extract(`export default class C extends B {
+  get routes() {
+    return { post: { '/message': { handler: this.message, middleware: ${middleware} } } };
+  }
+}`);
+      expect(
+        ex.ok,
+        `${middleware}: ${ex.reason ?? 'no extraction error'}`,
+      ).toBe(true);
+      expect(ex.routes[0]?.middleware, middleware).toEqual([
+        middleware === '[Auth]' ? 'Auth' : 'RateLimiter',
+      ]);
+    }
+  });
+
+  it('still rejects dynamically constructed route middleware', () => {
+    for (const middleware of ['buildMiddleware()', '[buildMiddleware()]']) {
+      const ex = extract(`export default class C extends B {
+  get routes() { return { get: { '/': { handler: this.r, middleware: ${middleware} } } }; }
+}`);
+      expect(ex.ok, middleware).toBe(false);
+      expect(ex.reason, middleware).toMatch(
+        /unanalyzable route-level middleware/,
+      );
+    }
+  });
+
   it('keeps a single-schema (non-content-type) object request without media types', () => {
     const ex = extract(`export default class C extends B {
   get routes() { return { post: { '/x': { handler: this.x, request: { a: s() } } } }; }
@@ -259,6 +296,47 @@ describe('astExtract — middleware', () => {
     expect(ex.middleware).toEqual([
       { scope: '/{*splat}', bindings: ['RateLimiter'] },
     ]);
+  });
+
+  it('sees through TS-only wrappers in a static middleware Map', () => {
+    const ex = extract(`export default class C extends B {
+  static get middleware() {
+    return new Map(([
+      (['/{*splat}', ([
+        Auth,
+        ([RateLimiter, { points: 20 }] as const),
+        [(Other as typeof Other), { enabled: true }],
+      ] as const)] as const),
+    ] as const));
+  }
+}`);
+    expect(ex.ok).toBe(true);
+    expect(ex.middleware).toEqual([
+      {
+        scope: '/{*splat}',
+        bindings: ['Auth', 'RateLimiter', 'Other'],
+      },
+    ]);
+  });
+
+  it('still rejects dynamically constructed static middleware', () => {
+    const forms = [
+      {
+        list: 'buildMiddleware()',
+        reason: /middleware list not an array literal/,
+      },
+      {
+        list: '[buildMiddleware()]',
+        reason: /middleware entry not a binding identifier/,
+      },
+    ];
+    for (const { list, reason } of forms) {
+      const ex = extract(`export default class C extends B {
+  static get middleware() { return new Map([['/', ${list}]]); }
+}`);
+      expect(ex.ok, list).toBe(false);
+      expect(ex.reason, list).toMatch(reason);
+    }
   });
 
   it('leaves middleware undefined when none is declared (inherits)', () => {

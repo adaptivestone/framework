@@ -1,7 +1,14 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import folderConfig from './folderConfig.ts';
-import { appInstance } from './helpers/appInstance.ts';
+import {
+  appInstance,
+  resetAppInstance,
+  setAppInstance,
+} from './helpers/appInstance.ts';
+import BaseCli from './modules/BaseCli.ts';
+import Server from './server.ts';
+import { serverInstance } from './tests/testHelpers.ts';
 
 /**
  * `getModel` / `getConfig` are the two lookups every consumer uses. These pin
@@ -45,6 +52,51 @@ describe('Server lookups — DX guards', () => {
 
   it('getConfig returns the cached config for a known name', () => {
     expect(appInstance.getConfig('auth')).toHaveProperty('hashRounds');
+  });
+
+  it('fails clearly when config/model lookups happen before init', () => {
+    const original = appInstance;
+    resetAppInstance();
+    try {
+      const server = new Server(folderConfig);
+      const error = vi.fn();
+      Object.defineProperty(server.app, 'logger', {
+        value: { error, warn: vi.fn() },
+      });
+
+      expect(server.getModel('Uninitialized')).toBe(false);
+      expect(error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'You should call Server.init() before using getModel',
+        }),
+      );
+      expect(() => server.getConfig('missing')).toThrow(
+        'You should call Server.init() before using getConfig',
+      );
+    } finally {
+      resetAppInstance();
+      setAppInstance(original);
+    }
+  });
+});
+
+describe('Server.runCliCommand', () => {
+  it('lazily creates one CLI and delegates subsequent commands to it', async () => {
+    const run = vi.spyOn(BaseCli.prototype, 'run').mockResolvedValue(true);
+    serverInstance.cli = null;
+    try {
+      await expect(serverInstance.runCliCommand('first')).resolves.toBe(true);
+      const cli = serverInstance.cli;
+      await expect(serverInstance.runCliCommand('second')).resolves.toBe(true);
+
+      expect(cli).toBeInstanceOf(BaseCli);
+      expect(serverInstance.cli).toBe(cli);
+      expect(run).toHaveBeenNthCalledWith(1, 'first');
+      expect(run).toHaveBeenNthCalledWith(2, 'second');
+    } finally {
+      run.mockRestore();
+      serverInstance.cli = null;
+    }
   });
 });
 

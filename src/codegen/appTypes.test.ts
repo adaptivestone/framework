@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { parseDiagnostics } from './__fixtures__/parseDiagnostics.ts';
 import { getTemplate } from './appTypes.ts';
 
 /**
@@ -165,21 +165,6 @@ describe('appTypes — appInfo.user binding', () => {
  * typecheck breaks with a confusing parse error (finding #20).
  */
 describe('appTypes — name escaping in emitted string literals (finding #20)', () => {
-  /** Syntactic-only parse gate: reports TS1002 (unterminated string) etc. */
-  function parseDiagnostics(code: string): string[] {
-    const { diagnostics } = ts.transpileModule(code, {
-      reportDiagnostics: true,
-      compilerOptions: {
-        module: ts.ModuleKind.ESNext,
-        target: ts.ScriptTarget.ESNext,
-      },
-    });
-    return (diagnostics ?? []).map(
-      (d) =>
-        `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`,
-    );
-  }
-
   it('escapes a config name containing an apostrophe or backslash', async () => {
     const out = await getTemplate(
       new Map<string, unknown>([

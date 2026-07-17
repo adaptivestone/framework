@@ -1,10 +1,29 @@
 import { setTimeout } from 'node:timers/promises';
 import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../helpers/appInstance.ts';
+import type { IApp } from '../../server.ts';
+import Cache from './Cache.ts';
 import MemoryDriver from './drivers/MemoryDriver.ts';
+import RedisDriver from './drivers/RedisDriver.ts';
 
 describe('cache', () => {
   const time = Date.now();
+
+  it('accepts an injected driver and selects redis only when configured', () => {
+    const injected = {
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue(undefined),
+      del: vi.fn().mockResolvedValue(0),
+    };
+    const app = (driver: unknown) =>
+      ({
+        getConfig: (name: string) =>
+          name === 'cache' ? { driver } : { namespace: 'unit' },
+      }) as unknown as IApp;
+
+    expect(new Cache(app(injected)).driver).toBe(injected);
+    expect(new Cache(app('redis')).driver).toBeInstanceOf(RedisDriver);
+  });
 
   it('defaults to the in-memory driver (redis is optional)', () => {
     expect.assertions(1);
@@ -133,6 +152,17 @@ describe('cache', () => {
   });
 
   describe('failure paths (doc 09)', () => {
+    it('recomputes and overwrites a corrupt cached value', async () => {
+      const { cache } = appInstance;
+      const key = cache.getKeyWithNameSpace('CORRUPT');
+      await cache.driver.set(key, '{not-json', 300);
+
+      const result = await cache.getSetValue('CORRUPT', async () => 'repaired');
+
+      expect(result).toBe('repaired');
+      expect(await cache.driver.get(key)).toBe(JSON.stringify('repaired'));
+    });
+
     it('falls back to onNotFound on a driver read failure, without deadlocking the key', async () => {
       expect.assertions(2);
       const { cache } = appInstance;
@@ -183,6 +213,16 @@ describe('cache', () => {
       const { cache } = appInstance;
       const res = await cache.getSetValue('UNDEF', async () => undefined);
       expect(res).toBeUndefined();
+    });
+
+    it('returns zero when cache invalidation fails', async () => {
+      const { cache } = appInstance;
+      const del = vi
+        .spyOn(cache.driver, 'del')
+        .mockRejectedValueOnce(new Error('delete down'));
+
+      await expect(cache.removeKey('DELETE_FAIL')).resolves.toBe(0);
+      del.mockRestore();
     });
   });
 });

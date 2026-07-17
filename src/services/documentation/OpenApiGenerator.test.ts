@@ -378,6 +378,167 @@ describe('generateOpenApi', () => {
     expect(again).toEqual(ids);
   });
 
+  it('adds numeric suffixes after repeated operationId verb collisions', async () => {
+    const routes = ['/one', '/two', '/three', '/four'].map((path) =>
+      route({
+        method: 'GET',
+        path,
+        entry: {
+          handler: () => {},
+          meta: { methodName: 'list', controllerClass: 'Reports' },
+        },
+      }),
+    );
+
+    expect(
+      operationIds(
+        await generateOpenApi(routes, {
+          info: { title: 't', version: '1' },
+        }),
+      ),
+    ).toEqual([
+      'Reports_list',
+      'Reports_list_get',
+      'Reports_list_get_2',
+      'Reports_list_get_3',
+    ]);
+  });
+
+  it('derives operationIds from the method and path when handler metadata is absent', async () => {
+    const doc = await generateOpenApi(
+      [
+        route({ method: 'GET', path: '/' }),
+        route({ method: 'POST', path: '/files/:id' }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    expect(operationIds(doc)).toEqual(['get_root', 'post_files_id']);
+  });
+
+  it('warns and uses safe fallbacks for opaque query and content-map schemas', async () => {
+    const onWarning = vi.fn();
+    const opaque = {
+      '~standard': {
+        version: 1,
+        vendor: 'opaque',
+        validate: () => ({ value: {} }),
+      },
+    } as AnyDoc;
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'POST',
+          path: '/opaque',
+          entry: {
+            handler: () => {},
+            query: opaque,
+            request: { 'application/custom': opaque } as AnyDoc,
+            meta: { methodName: 'create', controllerClass: 'Opaque' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' }, onWarning },
+    );
+
+    const operation = (doc as AnyDoc).paths['/opaque'].post;
+    expect(operation.parameters).toBeUndefined();
+    expect(
+      operation.requestBody.content['application/custom'].schema,
+    ).toMatchObject({
+      type: 'object',
+      description: expect.stringMatching(/introspection unavailable/i),
+    });
+    expect(onWarning).toHaveBeenCalledWith(expect.stringContaining('query'));
+    expect(onWarning).toHaveBeenCalledWith(
+      expect.stringContaining('application/custom'),
+    );
+  });
+
+  it('passes through custom middleware security scheme types', async () => {
+    const Class = {
+      get usedAuthParameters() {
+        return [
+          {
+            name: 'PartnerOAuth',
+            type: 'oauth2',
+            description: 'Partner authorization',
+          },
+          {
+            name: 'BearerAuth',
+            type: 'http',
+            description: 'Bearer authorization',
+          },
+        ];
+      },
+    };
+    const middleware = {
+      Class: Class as unknown as MiddlewareEntry['Class'],
+    };
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/partner',
+          middlewares: [middleware],
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    expect((doc as AnyDoc).components.securitySchemes.PartnerOAuth).toEqual({
+      type: 'oauth2',
+      description: 'Partner authorization',
+    });
+    expect((doc as AnyDoc).components.securitySchemes.BearerAuth).toEqual({
+      type: 'http',
+      scheme: 'bearer',
+      description: 'Bearer authorization',
+    });
+  });
+
+  it('merges introspectable middleware body fields and ignores opaque ones', async () => {
+    const requestMiddleware = (schema: unknown): MiddlewareEntry => {
+      const Class = {
+        get relatedRequestParameters() {
+          return schema;
+        },
+      };
+      return { Class: Class as unknown as MiddlewareEntry['Class'] };
+    };
+    const opaque = {
+      '~standard': {
+        version: 1,
+        vendor: 'opaque',
+        validate: () => ({ value: {} }),
+      },
+    } as AnyDoc;
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'POST',
+          path: '/middleware-body',
+          middlewares: [
+            requestMiddleware(z.object({ traceId: z.string() })),
+            requestMiddleware(opaque),
+          ],
+          entry: {
+            handler: () => {},
+            request: z.object({ name: z.string() }),
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    const schema = (doc as AnyDoc).paths['/middleware-body'].post.requestBody
+      .content['application/json'].schema;
+    expect(schema.properties).toMatchObject({
+      name: { type: 'string' },
+      traceId: { type: 'string' },
+    });
+  });
+
   it('uses meta.description as the operation summary', async () => {
     const doc = await generateOpenApi(
       [

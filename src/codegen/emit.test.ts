@@ -15,8 +15,8 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { parseDiagnostics } from './__fixtures__/parseDiagnostics.ts';
 import type { RouteMeta } from './collectMetadata.ts';
 import { type RenderInput, renderGenFile } from './emit.ts';
 
@@ -40,21 +40,6 @@ function inputFor(routes: RouteMeta[]): RenderInput {
     importMap: new Map(),
     controllerTypeImportable: false,
   };
-}
-
-/** Syntactic-only parse gate: no import resolution, reports TS1443/TS1160 etc. */
-function parseDiagnostics(code: string): string[] {
-  const { diagnostics } = ts.transpileModule(code, {
-    reportDiagnostics: true,
-    compilerOptions: {
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ESNext,
-    },
-  });
-  return (diagnostics ?? []).map(
-    (d) =>
-      `TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`,
-  );
 }
 
 describe('renderGenFile — path-param robustness (finding #17)', () => {

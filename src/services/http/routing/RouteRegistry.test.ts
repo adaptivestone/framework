@@ -252,6 +252,103 @@ describe('RouteRegistry — registerSubtree', () => {
     const postMatch = r.match('POST', '/foo/bar');
     expect(postMatch?.params).toEqual({ type: 'foo', event: 'bar' });
   });
+
+  it('prepends mount params through static, param, and splat descendants', () => {
+    const r = new RouteRegistry();
+    const subtree: RouteNode = {
+      segment: '',
+      middlewares: [],
+      children: new Map([
+        [
+          'fixed',
+          {
+            segment: 'fixed',
+            middlewares: [],
+            children: new Map(),
+            methods: {
+              GET: { handler: noop, paramNames: ['fixedId'] },
+            },
+          },
+        ],
+      ]),
+      paramChild: {
+        segment: ':item',
+        middlewares: [],
+        children: new Map(),
+        methods: { POST: { handler: noop, paramNames: ['item'] } },
+      },
+      splatChild: {
+        segment: '*rest',
+        middlewares: [],
+        children: new Map(),
+        methods: { PUT: { handler: noop, paramNames: ['rest'] } },
+      },
+    };
+
+    r.registerSubtree('/:tenant', subtree);
+
+    expect(r.match('GET', '/acme/fixed')?.params).toEqual({
+      tenant: 'acme',
+      fixedId: undefined,
+    });
+    expect(r.match('POST', '/acme/widget')?.params).toEqual({
+      tenant: 'acme',
+      item: 'widget',
+    });
+    expect(r.match('PUT', '/acme/a/b')?.params).toEqual({
+      tenant: 'acme',
+      rest: 'a/b',
+    });
+    expect(r.flatten().map((entry) => entry.path)).toContain('/:tenant/*rest');
+  });
+
+  it('merges splat subtrees and ignores sparse method entries', () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/api/*rest', { handler: noop });
+    // Ensure the child already exists so registerSubtree() merges its sparse
+    // method map instead of attaching the node wholesale.
+    r.registerRoute('GET', '/api/sparse', { handler: noop });
+    const sparseMethods = {
+      DELETE: undefined,
+    } as unknown as RouteNode['methods'];
+    const subtree: RouteNode = {
+      segment: '',
+      middlewares: [],
+      children: new Map([
+        [
+          'sparse',
+          {
+            segment: 'sparse',
+            middlewares: [],
+            children: new Map(),
+            methods: sparseMethods,
+          },
+        ],
+        [
+          'flat-sparse',
+          {
+            segment: 'flat-sparse',
+            middlewares: [],
+            children: new Map(),
+            methods: sparseMethods,
+          },
+        ],
+      ]),
+      splatChild: {
+        segment: '*tail',
+        middlewares: [],
+        children: new Map(),
+        methods: { POST: { handler: noop } },
+      },
+    };
+
+    r.registerSubtree('/api', subtree);
+
+    expect(r.match('GET', '/api/one')?.entry.handler).toBe(noop);
+    expect(r.match('POST', '/api/one')?.entry.handler).toBe(noop);
+    expect(r.match('GET', '/api/sparse')?.entry.handler).toBe(noop);
+    expect(r.flatten().some((entry) => entry.method === 'DELETE')).toBe(false);
+  });
 });
 
 describe('RouteRegistry — flatten', () => {

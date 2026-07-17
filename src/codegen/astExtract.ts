@@ -506,23 +506,35 @@ function objectKeys(value: Node): string[] | null {
 /** Binding names from a `[X, [Y, params]]` middleware array, or `undefined` if
  * the value isn't a literal array of binding identifiers. */
 function middlewareBindings(value: Node): string[] | undefined {
-  if (value.type !== 'ArrayExpression') {
+  const list = unwrapExpression(value);
+  if (list?.type !== 'ArrayExpression') {
     return undefined;
   }
   const out: string[] = [];
-  for (const el of value.elements) {
-    if (el?.type === 'Identifier') {
-      out.push(el.name);
-    } else if (
-      el?.type === 'ArrayExpression' &&
-      el.elements[0]?.type === 'Identifier'
-    ) {
-      out.push(el.elements[0].name);
-    } else {
+  for (const el of list.elements) {
+    const binding = middlewareBindingName(el);
+    if (binding === undefined) {
       return undefined;
     }
+    out.push(binding);
   }
   return out;
+}
+
+/** A middleware binding from either `Mw` or `[Mw, params]`, ignoring TS-only
+ * wrappers such as `as const` at both the entry and tuple-head boundaries. */
+function middlewareBindingName(value: Node | undefined): string | undefined {
+  const entry = unwrapExpression(value);
+  if (entry?.type === 'Identifier') {
+    return entry.name;
+  }
+  if (entry?.type === 'ArrayExpression') {
+    const binding = unwrapExpression(entry.elements[0]);
+    if (binding?.type === 'Identifier') {
+      return binding.name;
+    }
+  }
+  return undefined;
 }
 
 // ─── middleware ──────────────────────────────────────────────────────────────
@@ -538,19 +550,22 @@ function extractMiddleware(
   ) {
     return { ok: false, reason: 'not `return new Map([ … ])`' };
   }
-  const arg = ret.arguments?.[0];
-  if (!arg) {
+  const rawArg = ret.arguments?.[0];
+  if (!rawArg) {
     return { ok: true, scopes: [] }; // `new Map()` — a valid empty middleware map
   }
-  if (arg.type !== 'ArrayExpression') {
+  const arg = unwrapExpression(rawArg);
+  if (arg?.type !== 'ArrayExpression') {
     return { ok: false, reason: 'Map arg not an array literal' };
   }
   const scopes: MiddlewareScope[] = [];
-  for (const pair of arg.elements) {
+  for (const rawPair of arg.elements) {
+    const pair = unwrapExpression(rawPair);
     if (pair?.type !== 'ArrayExpression' || pair.elements.length < 2) {
       return { ok: false, reason: 'Map entry not a `[scope, [...]]` tuple' };
     }
-    const [scopeNode, listNode] = pair.elements;
+    const scopeNode = unwrapExpression(pair.elements[0]);
+    const listNode = unwrapExpression(pair.elements[1]);
     if (scopeNode?.type !== 'Literal' || typeof scopeNode.value !== 'string') {
       return { ok: false, reason: 'scope key not a string literal' };
     }
@@ -559,19 +574,14 @@ function extractMiddleware(
     }
     const bindings: string[] = [];
     for (const el of listNode.elements) {
-      if (el?.type === 'Identifier') {
-        bindings.push(el.name); // `Mw`
-      } else if (
-        el?.type === 'ArrayExpression' &&
-        el.elements[0]?.type === 'Identifier'
-      ) {
-        bindings.push(el.elements[0].name); // `[Mw, params]`
-      } else {
+      const binding = middlewareBindingName(el);
+      if (binding === undefined) {
         return {
           ok: false,
           reason: 'middleware entry not a binding identifier',
         };
       }
+      bindings.push(binding);
     }
     scopes.push({ scope: scopeNode.value, bindings });
   }
