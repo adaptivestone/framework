@@ -6,7 +6,10 @@
 
 ## Goal (one-line)
 
-Drop `express` dep entirely. Web Fetch handler signature `(ctx) => Response` becomes canonical. `BunAdapter`, `DenoAdapter` ship. Cloudflare Containers adapter. Sub-MCP servers per Mongoose model. Tool-quality lint + eval harness.
+Drop `express` dep entirely. The canonical handler contract remains `(ctx) => HttpResponse` from
+P1q; Fetch-style adapters render it to Web `Response`, and `HttpResponse.native(Response)` remains
+the portable pass-through. `BunAdapter`, `DenoAdapter` ship. Cloudflare Containers adapter.
+Sub-MCP servers per Mongoose model. Tool-quality lint + eval harness.
 
 ## Detail
 

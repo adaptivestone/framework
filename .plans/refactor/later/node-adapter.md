@@ -1,12 +1,15 @@
 # P3 — `NodeAdapter` (drop Express router)
 
 **Status**: ⏸ deferred
-**Depends on**: P1b, P2c
+**Depends on**: P1b, [P1q universal HTTP responses](../queued/universal-http-responses.md), P2c
 **Unblocks**: P4
 
 ## Goal (one-line)
 
-Native `node:http` adapter — no Express. `URLPatternAdapter` option. CI runs both alongside `ExpressAdapter`. Streaming response helpers (`streamSSE`, `streamJSON`). `undici` default outbound HTTP with shared Agent.
+Native `node:http` adapter — no Express. It consumes the same `HttpResponse` values already
+exercised by `ExpressResponseWriter`; controllers do not change. `URLPatternAdapter` option. CI
+runs both alongside `ExpressAdapter`. Streaming response helpers (`streamSSE`, `streamJSON`).
+`undici` default outbound HTTP with shared Agent.
 
 ## Detail
 

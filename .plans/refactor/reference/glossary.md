@@ -16,7 +16,11 @@ Type and concept names that appear across multiple phase docs. Update this file 
 - **`HandlerEntry`** — value at `node.methods[VERB]`. Carries `{ handler, request?, query?, middlewares?, bodyParsing?, meta }`. `meta` includes `methodName`, `controllerClass`, `sourceFile` for codegen + observability.
 - **`MiddlewareEntry`** — `{ Class, params?, source }`. The `source` field carries `{ kind: 'package' | 'file', spec }` so codegen can emit the right import for the middleware class without source-file scanning.
 - **`RouteRegistry`** — global tree (one per app, lives on `app.routeRegistry`). APIs: `registerSubtree(prefix, node)`, `registerRoute(method, path, entry)`, `registerGlobalMiddleware(mw, position?)`, `match(method, path)`, `walk(visitor)`, `flatten()`.
-- **`RouterAdapter`** — interface bridging `RouteRegistry` to a transport engine. Implementations: `ExpressAdapter` (P1b, single-mount via `app.use(adapter)`); `NodeAdapter` (v5.1); `BunAdapter` / `DenoAdapter` / `WorkersAdapter` (v6+).
+- **`RouterAdapter`** — interface bridging `RouteRegistry` to a transport engine. Implementations:
+  `ExpressAdapter` (P1b, single-mount via `app.use(adapter)`); `NodeAdapter` (planned P3);
+  `BunAdapter` / `DenoAdapter` / `WorkersAdapter` later.
+- **`HttpResponse<Status, ContentType, Body>`** — P1q/v5.2 branded, immutable outbound descriptor returned by controllers and produced by error resolution. Specialized aliases include `JsonResponse`, `StreamResponse`, `FileResponse`, and `EmptyResponse`. It is framework-owned data, not Express `Response` and not a subclass of Web `Response`.
+- **`ResponseWriter`** — adapter boundary that renders an `HttpResponse` to the active transport. `ExpressResponseWriter` ships first; Node/Fetch writers follow. Writers own headers, serialization, stream abort/backpressure, and the point after which an error can no longer replace a response.
 - **Match-then-walk dispatch** — the adapter runs `registry.match()` first (populating `req.routeMeta` and `req.params`), THEN walks the accumulated middleware chain. Lets globally-registered middleware (`RequestParser`, OTel, ValidationStage) read `req.routeMeta` and adapt per-route.
 
 ## Pipeline (P1b)
@@ -40,7 +44,7 @@ A schema/validator participates in three orthogonal concerns. The split:
 
 ## Body parsing (P1b)
 
-- **`bodyParsing`** — per-route or per-`RouteNode` mode: `'parsed' | 'raw' | 'none'`. Default `'parsed'`. `'raw'` captures `req.rawBody: Buffer` and skips parsing (Stripe-style webhook scenarios). `'none'` leaves the request stream untouched (streaming handlers).
+- **`bodyParsing`** — per-route or per-`RouteNode` mode: `'parsed' | 'raw' | 'none'`. Default `'parsed'`. `'raw'` captures `req.rawBody: Buffer` and skips parsing (signed-webhook scenarios). `'none'` leaves the request stream untouched (streaming handlers).
 - **Parser registry** — `app.parsers.register(contentType, parser)`. Built-ins seeded at boot: `application/json`, `multipart/form-data`, `application/x-www-form-urlencoded`. User-registered parsers compose without monkey-patching.
 - **`multipartScalar(inner)`** — Standard-Schema-conformant wrapper in `src/helpers/multipart.ts` that auto-unwraps single-element arrays before delegating to `inner`. Vendor-neutral; works with any validator. Used because multipart parsing always produces arrays for fields (formidable v3+ behavior).
 - **`File`** — type alias exported from `@adaptivestone/framework/types`. Aliases `formidable.PersistentFile` today; will alias web-standard `File` after the busboy/web-`File` swap (P3 / OQ #2). User schemas reference `File`; framework ripple is one type-alias line.
@@ -86,5 +90,7 @@ A schema/validator participates in three orthogonal concerns. The split:
 ## Versioning conventions
 
 - **v5** — `5.0.0` final. Stays close to current Express-flavored behavior. Additive changes only. Tree-based router, codegen, validators, parser registry, project boot hook all ship in v5.
-- **v5.1** — `NodeAdapter` opt-in (drops Express dependency, native Node + shim).
-- **v6** — Aggressive default flips: `next()` → awaitable middleware, strict Content-Type default, trailing-slash strict default, case-sensitive default, `getHttpPath()` hard-removed.
+- **v5.1** — current Express-backed line: boot/error/OpenAPI and consumer-hardening additions remain
+  backward-compatible. `NodeAdapter` was deferred to P3 and did not ship in v5.1.
+- **v5.2** — additive universal `HttpResponse` + Express writer; legacy `res` and registered `{status, body}` error results continue to work. OpenAPI response contracts build on the same response algebra.
+- **v6** — Ordinary controllers/middleware lose raw `res`/`next` and return `HttpResponse | void`; explicit native-Web and adapter-specific raw routes remain. Also flips strict Content-Type, trailing-slash strictness, and case sensitivity, and removes `getHttpPath()`.
