@@ -73,22 +73,25 @@ describe('auth route schemas', () => {
       { password: 'contains a space', passwordRecoveryToken: 'token' },
       ['auth.passwordValid'],
     ],
-  ])('validates password recovery input %#', async (input, expectedMessages) => {
-    const result = await validate('/recover-password', input);
-    expect(
-      'issues' in result ? result.issues?.map((issue) => issue.message) : [],
-    ).toEqual(expectedMessages);
-  });
+  ])(
+    'validates password recovery input %#',
+    async (input, expectedMessages) => {
+      const result = await validate('/recover-password', input);
+      expect(
+        'issues' in result ? result.issues?.map((issue) => issue.message) : [],
+      ).toEqual(expectedMessages);
+    },
+  );
 
-  it.each([
-    '/send-recovery-email',
-    '/send-verification',
-  ])('requires an email for %s', async (path) => {
-    const result = await validate(path, {});
-    expect(
-      'issues' in result ? result.issues?.map((issue) => issue.message) : [],
-    ).toEqual(['auth.emailProvided']);
-  });
+  it.each(['/send-recovery-email', '/send-verification'])(
+    'requires an email for %s',
+    async (path) => {
+      const result = await validate(path, {});
+      expect(
+        'issues' in result ? result.issues?.map((issue) => issue.message) : [],
+      ).toEqual(['auth.emailProvided']);
+    },
+  );
 });
 
 describe('auth controller failure paths', () => {

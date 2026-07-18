@@ -106,6 +106,27 @@ describe('cors middleware methods', () => {
     expect(isCalled).toBeTruthy();
   });
 
+  it('continues safely if origins are unavailable at request time', async () => {
+    const middleware = new Cors(appInstance, {
+      origins: ['https://localhost'],
+    });
+    middleware.params = undefined;
+    let isCalled = false;
+
+    await middleware.middleware(
+      {
+        method: 'GET',
+        headers: { origin: 'https://localhost' },
+      } as FrameworkRequest,
+      {} as Response,
+      () => {
+        isCalled = true;
+      },
+    );
+
+    expect(isCalled).toBe(true);
+  });
+
   it('string domain match', async () => {
     expect.assertions(5);
 

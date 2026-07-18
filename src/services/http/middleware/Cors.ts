@@ -35,7 +35,11 @@ class Cors extends AbstractMiddleware {
   }
 
   async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
-    for (const host of this.params?.origins as (string | RegExp)[]) {
+    const origins = this.params?.origins;
+    if (!Array.isArray(origins)) {
+      return next();
+    }
+    for (const host of origins as (string | RegExp)[]) {
       if (
         (typeof host === 'string' && req.headers.origin === host) ||
         (host instanceof RegExp && host.test(req.headers.origin ?? ''))

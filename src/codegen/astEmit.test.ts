@@ -21,16 +21,17 @@ const controllersDir = path.join(here, '__fixtures__/controllers');
 const FIXTURES = ['File', 'Inherited', 'Schemas', 'Advanced', 'ParamSiblings'];
 
 describe('astEmit', () => {
-  it.each(
-    FIXTURES,
-  )('resolves %s via the AST path (no needsBoot deferral)', async (name) => {
-    // Emitted content is gated by the golden tsc test; here we assert each
-    // fixture is statically analyzable through the shared front-end.
-    const { resolved } = await specFromExtracted(
-      path.join(controllersDir, `${name}.ts`),
-    );
-    expect(resolved.needsBoot).toBe(false);
-  });
+  it.each(FIXTURES)(
+    'resolves %s via the AST path (no needsBoot deferral)',
+    async (name) => {
+      // Emitted content is gated by the golden tsc test; here we assert each
+      // fixture is statically analyzable through the shared front-end.
+      const { resolved } = await specFromExtracted(
+        path.join(controllersDir, `${name}.ts`),
+      );
+      expect(resolved.needsBoot).toBe(false);
+    },
+  );
 
   // NOTE: the full pipeline over `__fixtures__/controllers` (discover → write →
   // tsc-check) is exercised by `routeTypes.golden.test.ts` — and ONLY there, so a
