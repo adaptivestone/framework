@@ -32,7 +32,6 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
-| [public-cluster-runner](active/public-cluster-runner.md) | P1r | **Implemented and verified; awaiting `[NEXT]` release.** Narrow public `runCluster` with fixed crash-loop safety, structured lifecycle events, signal forwarding, and shutdown timeout; framework/example entries and docs migrated; packed smoke green. |
 
 ### queued/
 
@@ -42,7 +41,6 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.2 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.2; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
-| [named-rate-limit-policies](queued/named-rate-limit-policies.md) | P1t | **Documentation/example only.** Put named option objects in consumer `config/rateLimiter.ts` and pass `policy.someName` directly; existing merge behavior and generated config types already provide the feature. |
 | [http-engine-spike](queued/http-engine-spike.md) | Spike | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships. |
 
 ### later/
@@ -66,6 +64,8 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 
 | File | Ref | Summary |
 |---|---|---|
+| [public-cluster-runner](done/public-cluster-runner.md) | P1r | **Shipped in 5.1.4.** Narrow public `runCluster` with fixed crash-loop safety, structured lifecycle events, signal forwarding, and shutdown timeout; framework/example entries and docs migrated; packed smoke green. |
+| [named-rate-limit-policies](done/named-rate-limit-policies.md) | P1t | **Included in 5.1.4.** Typed merged-config recipe using `policy.someName` directly; canonical docs and example updated; no framework runtime change. |
 | [baseline](done/baseline.md) | P−1 | Perf pin 2026-05-03: plaintext 16591 req/s, realistic 15549 req/s. |
 | [type-contracts](done/type-contracts.md) | P0 | `BaseRequestContext`, `ProvidesOf`, `UnionAppInfoProvides`. |
 | [runtime-validators](done/runtime-validators.md) | P1a | Standard Schema dispatch, `ValidatorDriver`, `ValidationError`, auto-i18n. 132/132 tests. |
@@ -93,12 +93,20 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 - ✅ **Project boot hook (`bootHttp`)** — shipped 2026-06-22. **Explicit** `Server` constructor option `bootHttp(app)` (type `BootHttpHook`), called in `startServer` after controllers register, before the adapter mounts (type + call inlined in `server.ts` — no separate module). Explicit, NOT file-discovered — every framework folder is owned (config/ merges its files, controllers/ auto-loads its files), so there's no conflict-free folder to scan. HTTP-specific (needs `app.httpServer`). For ad-hoc routes (`registerRoute`) + Express middleware + boot setup. **`useGlobal`/global-middleware positioning still deferred** — lands in this same hook later (see [tree-router](done/tree-router.md) note).
 - ✅ **`routes` CLI command** — shipped 2026-06-22. `node src/cli.ts routes` / `npm run routes` prints the route tree via `formatRouteTree` over a `skipWrap` registry build (the `openapi` command's pattern). `formatTree.ts` got its first unit test (0→96%).
 
+## v5.1.4 — released 2026-07-19
+
+- ✅ [Public cluster runner](done/public-cluster-runner.md) — additive Node-only export with fixed
+  safety policy, lifecycle events, signal forwarding, and bounded shutdown.
+- ✅ [Typed rate-limit policy recipe](done/named-rate-limit-policies.md) — documentation/example
+  only; no framework runtime change.
+- ✅ Documentation corrections: default controller paths come from folder prefix + lowercased class
+  name (not filename), and ordinary API tests assert raw application i18n keys unless application
+  locales are explicitly loaded.
+
 ## v5.2 target
 
 - [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
-- [Typed rate-limit policies](queued/named-rate-limit-policies.md) require only a documentation/example recipe, not a framework release.
-- The [public cluster runner](active/public-cluster-runner.md) is an independent additive v5.2.x candidate.
 - [Observability Phase 1 — metrics](queued/metrics-seam.md) ships the core metrics seam independently, then uses P1q's response writer for automatic HTTP response status/size measurements.
 
 ## v6 breaking defaults (no phase doc — tracked as bullets)

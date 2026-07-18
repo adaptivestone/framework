@@ -1,7 +1,7 @@
 # P1r — Public cluster runner
 
-**Status**: 🟢 implemented and verified 2026-07-18 · awaiting `[NEXT]` release
-**Target**: v5.2.x, additive
+**Status**: ✅ shipped 2026-07-19 in `5.1.4`
+**Release**: `5.1.4`, additive
 **Depends on**: current internal `src/cluster.ts` supervision + graceful server shutdown
 **Origin**: consumers currently copy `node:cluster` lifecycle code even though the framework
 already maintains bounded restarts and signal forwarding for its own `prod` script.

@@ -1,7 +1,7 @@
 # P1t — Document typed rate-limit policies from application config
 
-**Status**: ✅ direction settled 2026-07-18 · documentation not written
-**Target**: documentation/example update; no framework runtime release required
+**Status**: ✅ included 2026-07-19 in `5.1.4`
+**Release**: `5.1.4` documentation/example update; no framework runtime change
 **Depends on**: existing `RateLimiter` parameter merge and shipped config-shape codegen
 (`genTypes.d.ts`)
 **Origin**: controller-specific rate limits currently repeat anonymous option objects. The
@@ -39,7 +39,7 @@ const { policy } = app.getConfig('rateLimiter');
 export default class AuthController extends AbstractController {
   static get middleware() {
     return new Map([
-      ['POST/login', [[RateLimiter, policy.loginAttempt]]],
+      ['POST/login', [[RateLimiter, policy.loginAttempt] as const]],
     ]);
   }
 }
@@ -90,3 +90,12 @@ contains the actual options object; no policy-name lookup happens inside `RateLi
 - `npm run gen` makes a misspelled policy property a TypeScript error.
 - The example needs no custom `ConfiguredRateLimiter` subclass or framework runtime change.
 - Merge/lifecycle limitations are explicit rather than promised away by new machinery.
+
+## Verification
+
+- ✅ Canonical middleware documentation includes the typed policy recipe and lifecycle caveats.
+- ✅ Example config declares `policy.personCreate`; generated `genTypes.d.ts` preserves the key.
+- ✅ Example `AGENTS.md` tells coding agents to keep limiter values in typed config.
+- ✅ Example TypeScript check passes against the locally packed unreleased framework.
+- ✅ Route-tree output shows `RateLimiter{…}` only on `POST /person`.
+- ✅ Documentation production build passes.

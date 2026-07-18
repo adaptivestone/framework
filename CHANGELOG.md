@@ -6,9 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [NEXT] - Unreleased
 
+## [5.1.4] - 2026-07-19
+
 ### Added
 
 - **Public Node cluster runner.** Consumers can import `runCluster` from `@adaptivestone/framework/cluster.js` to run a worker callback across a configurable number of processes. The narrow API exposes worker count, shutdown timeout, and a structured lifecycle-event hook; fixed internal safety policy provides delayed abnormal-exit recovery and crash-loop protection without turning the framework into a configurable process manager. SIGTERM/SIGINT are forwarded, stuck workers are force-terminated after the timeout, the callback runs only in workers, and importing the entry has no side effects. Clustering is optional—systemd, PM2, Kubernetes, and similar deployment supervisors should normally own replica count and restarts themselves. The framework's `prod` entry now uses this same implementation and no longer enables file watching implicitly.
+
+### Documentation
+
+- **Controller routing now documents the runtime rule precisely.** The default mount path is the controller-folder prefix plus the lowercased class name; the filename does not determine the URL and exporting one controller class from multiple files mounts it multiple times. Multi-word class names are not implicitly kebab-cased.
+- **Typed rate-limit policies and stable validation assertions are documented.** Reusable limiter option objects can live under `config/rateLimiter.ts` `policy`, where generated config types catch misspelled names before the selected object is passed directly to `RateLimiter`. The testing guide now explains that application validation keys remain raw unless the application locale folder is explicitly enabled, so ordinary API tests should assert keys and status codes rather than translated prose.
 
 ## [5.1.3] - 2026-07-18
 
