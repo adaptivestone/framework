@@ -31,15 +31,18 @@ export default {
 
 ```ts
 import { getAppInstance } from '@adaptivestone/framework/helpers/appInstance.js';
+import AbstractController, {
+  type TMiddleware,
+} from '@adaptivestone/framework/modules/AbstractController.js';
 import RateLimiter from '@adaptivestone/framework/services/http/middleware/RateLimiter.js';
 
 const app = getAppInstance();
 const { policy } = app.getConfig('rateLimiter');
 
 export default class AuthController extends AbstractController {
-  static get middleware() {
+  static get middleware(): Map<string, TMiddleware> {
     return new Map([
-      ['POST/login', [[RateLimiter, policy.loginAttempt] as const]],
+      ['POST/login', [[RateLimiter, policy.loginAttempt]]],
     ]);
   }
 }
