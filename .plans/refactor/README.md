@@ -32,7 +32,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
-| [public-cluster-runner](active/public-cluster-runner.md) | P1r | **Implementation complete; packed smoke pending.** Public `runCluster` with bounded exponential restarts, signal forwarding and drain timeout; framework and example entries migrated, docs built. |
+| [public-cluster-runner](active/public-cluster-runner.md) | P1r | **Implemented and verified; awaiting `[NEXT]` release.** Narrow public `runCluster` with fixed crash-loop safety, structured lifecycle events, signal forwarding, and shutdown timeout; framework/example entries and docs migrated; packed smoke green. |
 
 ### queued/
 

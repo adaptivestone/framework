@@ -162,6 +162,107 @@ describe('ControllerManager — index-first load order', () => {
   });
 });
 
+// ─── folder prefix / mount path ──────────────────────────────────────
+//
+// Auto-loader sets `prefix` from the folder relative to `controllers/`
+// (`admin/User.ts` → prefix `admin`). `getHttpPath()` is
+// `/{prefix}/{ClassName}` fully lowercased — class name, not file name.
+// Same basename under different folders is fine; mounts stay distinct.
+
+describe('ControllerManager — folder prefix mounts', () => {
+  it('same class name under different folders mounts at different paths', () => {
+    class User extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { registry, cm } = setup();
+    cm.registerController(User, 'admin');
+    cm.registerController(User, 'moderator');
+
+    expect(registry.match('GET', '/admin/user')?.entry?.handler).toBeDefined();
+    expect(
+      registry.match('GET', '/moderator/user')?.entry?.handler,
+    ).toBeDefined();
+    // Unprefixed / wrong casing of folder is not how default mounts work.
+    expect(registry.match('GET', '/user')).toBeNull();
+  });
+
+  it('compound class name and camelCase folder are fully lowercased', () => {
+    class SomeBigName extends AbstractController {
+      get routes() {
+        return { post: { '/run': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    class UserAdmin extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { registry, cm } = setup();
+    const big = cm.registerController(SomeBigName, 'someFolder');
+    const admin = cm.registerController(UserAdmin, 'someFolder');
+
+    // Canonical mount is fully lowercased (folder + class name).
+    expect(big.getHttpPath()).toBe('/somefolder/somebigname');
+    expect(admin.getHttpPath()).toBe('/somefolder/useradmin');
+    expect(
+      registry.match('POST', '/somefolder/somebigname/run')?.entry?.handler,
+    ).toBeDefined();
+    expect(
+      registry.match('GET', '/somefolder/useradmin')?.entry?.handler,
+    ).toBeDefined();
+    // Router matching is case-insensitive today, so mixed-case URLs still hit.
+    expect(
+      registry.match('POST', '/someFolder/SomeBigName/run')?.entry?.handler,
+    ).toBeDefined();
+  });
+
+  it('multi-segment folder prefix nests the full path', () => {
+    class User extends AbstractController {
+      get routes() {
+        return { get: { '/:id': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { registry, cm } = setup();
+    cm.registerController(User, 'admin/sub');
+
+    const hit = registry.match('GET', '/admin/sub/user/42');
+    expect(hit?.entry?.handler).toBeDefined();
+    expect(hit?.params).toEqual({ id: '42' });
+  });
+
+  it('stores controllers keyed by prefix/name so peers do not overwrite', () => {
+    class User extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { cm } = setup();
+    cm.registerController(User, 'admin');
+    cm.registerController(User, 'moderator');
+
+    expect(cm.controllers['admin/user']).toBeDefined();
+    expect(cm.controllers['moderator/user']).toBeDefined();
+    expect(cm.controllers.user).toBeUndefined();
+  });
+});
+
 // ─── routes ──────────────────────────────────────────────────────────
 
 describe('ControllerManager — routes', () => {

@@ -75,12 +75,32 @@ const appFor = (controllers: string) =>
   }) as unknown as IApp;
 
 describe('codegen discovery — folder prefix & merge (doc 06)', () => {
+  /**
+   * Mount path = `/{folderPrefix}/{ClassName}` fully lowercased.
+   * Folder can be multi-segment (`admin/sub`). Class name (not file name) is
+   * the last segment — keep `User.ts` + `class User` aligned in real apps.
+   */
   it('defaultControllerHttpPath includes the folder prefix', () => {
-    expect.assertions(3);
+    expect.assertions(8);
     expect(defaultControllerHttpPath('', 'Users')).toBe('/users');
     expect(defaultControllerHttpPath('admin', 'Users')).toBe('/admin/users');
     expect(defaultControllerHttpPath('admin/sub', 'Users')).toBe(
       '/admin/sub/users',
+    );
+    // Same final basename (User.ts) under different folders → different mounts.
+    expect(defaultControllerHttpPath('admin', 'User')).toBe('/admin/user');
+    expect(defaultControllerHttpPath('moderator', 'User')).toBe(
+      '/moderator/user',
+    );
+    // CamelCase folder + compound class name — both lowercased as whole path.
+    expect(defaultControllerHttpPath('someFolder', 'UserAdmin')).toBe(
+      '/somefolder/useradmin',
+    );
+    expect(defaultControllerHttpPath('someFolder', 'SomeBigName')).toBe(
+      '/somefolder/somebigname',
+    );
+    expect(defaultControllerHttpPath('a/b/c', 'SomeBigName')).toBe(
+      '/a/b/c/somebigname',
     );
   });
 
@@ -94,6 +114,48 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       'nested',
     );
     expect(resolved.urlPrefix).toBe('/nested/items');
+  });
+
+  it('same final file (User.ts) in multiple folders resolve distinct mounts', async () => {
+    expect.assertions(1);
+    const dir = await makeControllers({
+      'admin/User.ts': ctrl('User', 'get', '/'),
+      'moderator/User.ts': ctrl('User', 'get', '/'),
+      'someFolder/User.ts': ctrl('User', 'get', '/'),
+    });
+    const mounts = await Promise.all(
+      (
+        [
+          ['admin/User.ts', 'admin'],
+          ['moderator/User.ts', 'moderator'],
+          ['someFolder/User.ts', 'someFolder'],
+        ] as const
+      ).map(async ([rel, prefix]) => {
+        const { resolved } = await specFromExtracted(
+          path.join(dir, rel),
+          prefix,
+        );
+        return resolved.urlPrefix;
+      }),
+    );
+    // Same class + basename; only the folder prefix separates the mounts.
+    expect(mounts).toEqual([
+      '/admin/user',
+      '/moderator/user',
+      '/somefolder/user',
+    ]);
+  });
+
+  it('compound class name SomeBigName under a folder mounts lowercased', async () => {
+    expect.assertions(1);
+    const dir = await makeControllers({
+      'someFolder/SomeBigName.ts': ctrl('SomeBigName', 'get', '/list'),
+    });
+    const { resolved } = await specFromExtracted(
+      path.join(dir, 'someFolder/SomeBigName.ts'),
+      'someFolder',
+    );
+    expect(resolved.urlPrefix).toBe('/somefolder/somebigname');
   });
 
   it('emits gen files for nested AND digit-prefixed controllers', async () => {
@@ -121,6 +183,49 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     expect(await readdir(path.join(dir, 'nested'))).toContain(
       'Users.routes.gen.ts',
     );
+  });
+
+  it('multiple folders with the same basename emit sibling gen files without conflict', async () => {
+    expect.assertions(6);
+    const dir = await makeControllers({
+      // Same final path segment User.ts — mounts differ by folder prefix only.
+      'admin/User.ts': ctrl('User', 'get', '/'),
+      'moderator/User.ts': ctrl('User', 'get', '/'),
+      // Compound name + camelCase folder.
+      'someFolder/SomeBigName.ts': ctrl('SomeBigName', 'post', '/run'),
+      'someFolder/UserAdmin.ts': ctrl('UserAdmin', 'get', '/'),
+    });
+    await generateRouteTypesViaAst(appFor(dir), noopLogger);
+
+    expect(await readdir(path.join(dir, 'admin'))).toContain(
+      'User.routes.gen.ts',
+    );
+    expect(await readdir(path.join(dir, 'moderator'))).toContain(
+      'User.routes.gen.ts',
+    );
+    expect(await readdir(path.join(dir, 'someFolder'))).toEqual(
+      expect.arrayContaining([
+        'SomeBigName.routes.gen.ts',
+        'UserAdmin.routes.gen.ts',
+      ]),
+    );
+
+    // Resolve path math still matches what emit registered (no shared-path throw).
+    const admin = await specFromExtracted(
+      path.join(dir, 'admin/User.ts'),
+      'admin',
+    );
+    const moderator = await specFromExtracted(
+      path.join(dir, 'moderator/User.ts'),
+      'moderator',
+    );
+    const big = await specFromExtracted(
+      path.join(dir, 'someFolder/SomeBigName.ts'),
+      'someFolder',
+    );
+    expect(admin.resolved.urlPrefix).toBe('/admin/user');
+    expect(moderator.resolved.urlPrefix).toBe('/moderator/user');
+    expect(big.resolved.urlPrefix).toBe('/somefolder/somebigname');
   });
 
   it('two controllers mounting at the same path fail, naming both files', async () => {

@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.1.3] - Unreleased
+## [NEXT] - Unreleased
+
+### Added
+
+- **Public Node cluster runner.** Consumers can import `runCluster` from `@adaptivestone/framework/cluster.js` to run a worker callback across a configurable number of processes. The narrow API exposes worker count, shutdown timeout, and a structured lifecycle-event hook; fixed internal safety policy provides delayed abnormal-exit recovery and crash-loop protection without turning the framework into a configurable process manager. SIGTERM/SIGINT are forwarded, stuck workers are force-terminated after the timeout, the callback runs only in workers, and importing the entry has no side effects. Clustering is optional—systemd, PM2, Kubernetes, and similar deployment supervisors should normally own replica count and restarts themselves. The framework's `prod` entry now uses this same implementation and no longer enables file watching implicitly.
+
+## [5.1.3] - 2026-07-18
 
 ### Security
 

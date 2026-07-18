@@ -41,6 +41,7 @@ import path from 'node:path';
 for (const spec of [
   '@adaptivestone/framework/server.js',
   '@adaptivestone/framework/Cli.js',
+  '@adaptivestone/framework/cluster.js',
   '@adaptivestone/framework/folderConfig.js',
   '@adaptivestone/framework/types.js',
   '@adaptivestone/framework/modules/AbstractController.js',
@@ -52,6 +53,22 @@ for (const spec of [
   await import(spec);
   console.log('  ✓ import', spec);
 }
+
+const { runCluster } = await import('@adaptivestone/framework/cluster.js');
+if (typeof runCluster !== 'function') {
+  throw new Error('Public cluster export is missing runCluster');
+}
+console.log('  ✓ cluster import has no side effects and exports runCluster');
+
+// Exercise the packed runner with one real worker. The worker exits cleanly
+// from the callback; the primary must not resurrect it and then continues this
+// smoke script. A broken callback/primary distinction causes recursion or a
+// non-zero exit instead of reaching the next check.
+await runCluster(() => process.exit(0), {
+  workers: 1,
+  onEvent() {},
+});
+console.log('  ✓ packed runCluster started one worker and observed its clean exit');
 
 // 2. Public subpath that pulls a dev dep (vitest): resolve only, don't execute.
 import.meta.resolve('@adaptivestone/framework/tests/setupVitest.js');
