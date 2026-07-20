@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { object, string } from 'yup';
 import { z } from 'zod';
+import Pagination from '../http/middleware/Pagination.ts';
 import type { FlatRoute, MiddlewareEntry } from '../http/routing/RouteNode.ts';
 import { generateOpenApi } from './OpenApiGenerator.ts';
 
@@ -171,6 +172,43 @@ describe('generateOpenApi', () => {
     const q = params.find((p: AnyDoc) => p.name === 'q');
     expect(page).toMatchObject({ in: 'query', required: true });
     expect(q).toMatchObject({ in: 'query', required: false });
+  });
+
+  it('emits Pagination page and limit parameters without an introspection warning', async () => {
+    const onWarning = vi.fn();
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/',
+          middlewares: [{ Class: Pagination }],
+          entry: {
+            handler: () => {},
+            meta: { methodName: 'list', controllerClass: 'Items' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' }, onWarning },
+    );
+
+    const params = (doc as AnyDoc).paths['/'].get.parameters;
+    expect(params).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'page',
+          in: 'query',
+          required: false,
+          schema: expect.objectContaining({ type: 'number' }),
+        }),
+        expect.objectContaining({
+          name: 'limit',
+          in: 'query',
+          required: false,
+          schema: expect.objectContaining({ type: 'number' }),
+        }),
+      ]),
+    );
+    expect(onWarning).not.toHaveBeenCalled();
   });
 
   it('dedups a (name, in) collision between route and middleware query, route wins', async () => {

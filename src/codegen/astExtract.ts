@@ -333,7 +333,10 @@ function extractRoutes(
 ): { ok: true; routes: RouteInfo[] } | { ok: false; reason: string } {
   const obj = literalReturn(node);
   if (obj?.type !== 'ObjectExpression') {
-    return { ok: false, reason: 'not a single `return { … }`' };
+    return {
+      ok: false,
+      reason: 'not a literal `return { … }` with optional `const` setup',
+    };
   }
   // Keyed by `${method} ${path}` so duplicate literal keys dedupe last-wins,
   // mirroring JS object semantics at runtime (the registry would otherwise throw
@@ -629,19 +632,39 @@ function unwrapExpression(node: Node | undefined): Node | undefined {
   return n;
 }
 
-/** The single `return <expr>` of a getter body, or a property's initializer. */
+/**
+ * The literal `return <expr>` of a getter body, or a property's initializer.
+ * Getter bodies may contain simple initialized `const` declarations before the
+ * final return. This supports configuration reads used only as middleware tuple
+ * parameters while keeping control flow, mutation, and computed route shapes
+ * outside the declarative codegen contract.
+ */
 function literalReturn(node: Node): Node | undefined {
   if (node.type === 'PropertyDefinition') {
     return unwrapExpression(node.value ?? undefined);
   }
   // MethodDefinition → FunctionExpression → BlockStatement
   const body = node.value?.body;
-  if (body?.type !== 'BlockStatement' || body.body.length !== 1) {
+  if (body?.type !== 'BlockStatement' || body.body.length === 0) {
     return undefined;
   }
-  const only = body.body[0];
-  return only.type === 'ReturnStatement'
-    ? unwrapExpression(only.argument ?? undefined)
+  const last = body.body.at(-1);
+  const setup = body.body.slice(0, -1);
+  const hasOnlyInitializedConstants = setup.every(
+    (statement: Node) =>
+      statement.type === 'VariableDeclaration' &&
+      statement.kind === 'const' &&
+      statement.declarations.length > 0 &&
+      statement.declarations.every(
+        (declaration: Node) =>
+          declaration.init !== null && declaration.init !== undefined,
+      ),
+  );
+  if (!hasOnlyInitializedConstants) {
+    return undefined;
+  }
+  return last?.type === 'ReturnStatement'
+    ? unwrapExpression(last.argument ?? undefined)
     : undefined;
 }
 

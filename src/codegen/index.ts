@@ -66,6 +66,31 @@ export async function generateAll(
         '(e.g. a controller that extends another and merges `super.routes`). They work at runtime — only their ' +
         'generated request types are skipped. Declare literal `routes` to get types.',
     );
+    // A skipped controller that already has a gen file on disk is worse than a
+    // routine skip: the file no longer reflects the source, is never rewritten
+    // here, and is not an orphan (its source still exists) — without a loud
+    // signal the stale types rot until a confusing consumer tsc error.
+    const staleGen: string[] = [];
+    for (const srcPath of plan.needsBoot) {
+      const genPath = path.join(
+        path.dirname(srcPath),
+        `${path.basename(srcPath, path.extname(srcPath))}.routes.gen.ts`,
+      );
+      try {
+        await fs.access(genPath);
+        staleGen.push(genPath);
+      } catch {
+        // No gen file → routine skip, warning above is enough.
+      }
+    }
+    if (staleGen.length > 0) {
+      logger?.error?.(
+        `Route-type codegen: ${staleGen.length} previously generated file(s) are now stale — ` +
+          'their controller is no longer statically analyzable, so the file will NOT be updated:\n' +
+          `${staleGen.map((p) => `  ${p}`).join('\n')}\n` +
+          'Restore a literal `routes` return (optional `const` setup is allowed) or delete the stale file.',
+      );
+    }
   }
 
   const outputs: PlannedOutput[] = [

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { defineSchema } from '../defineSchema.ts';
 import type { StandardSchemaV1 } from '../types.ts';
 import { standardSchemaDriver } from './StandardSchemaDriver.ts';
 
@@ -71,6 +72,25 @@ describe('standardSchemaDriver.toJsonSchema', () => {
     const json = await standardSchemaDriver.toJsonSchema?.(schema);
 
     expect(json).toBe(sentinel);
+  });
+
+  it('exports an explicit JSON Schema from defineSchema as a defensive copy', async () => {
+    const sentinel = {
+      type: 'object',
+      properties: { page: { type: 'number' } },
+    };
+    const schema = defineSchema<{ page?: number }>(() => ({ value: {} }), {
+      jsonSchema: sentinel,
+    });
+
+    const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
+
+    expect(json).toEqual(sentinel);
+    expect(json).not.toBe(sentinel);
+
+    json.properties.page.type = 'mutated';
+    const fresh = await standardSchemaDriver.toJsonSchema?.(schema);
+    expect(fresh).toEqual(sentinel);
   });
 
   it('returns null for a vendor with no introspection (e.g. valibot-like)', async () => {

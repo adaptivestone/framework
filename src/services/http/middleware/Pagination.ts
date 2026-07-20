@@ -14,6 +14,47 @@ export interface PaginationMiddlewareAppInfo {
   };
 }
 
+const paginationQueryParameters = defineSchema<{
+  page?: number;
+  limit?: number;
+}>(
+  (value) => {
+    const v = (value ?? {}) as Record<string, unknown>;
+    const issues: StandardSchemaV1.Issue[] = [];
+    const out: { page?: number; limit?: number } = {};
+    for (const key of ['page', 'limit'] as const) {
+      if (v[key] === undefined || v[key] === null || v[key] === '') {
+        continue;
+      }
+      const n = Number(v[key]);
+      if (Number.isNaN(n)) {
+        issues.push({ message: `${key} must be a number`, path: [key] });
+      } else {
+        out[key] = n;
+      }
+    }
+    if (issues.length) {
+      return { issues };
+    }
+    return { value: out };
+  },
+  {
+    jsonSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'One-based page number.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return per page.',
+        },
+      },
+    },
+  },
+);
+
 /**
  * Middleware for reusing pagination
  */
@@ -27,26 +68,7 @@ class Pagination extends AbstractMiddleware {
   }
 
   static get relatedQueryParameters() {
-    return defineSchema<{ page?: number; limit?: number }>((value) => {
-      const v = (value ?? {}) as Record<string, unknown>;
-      const issues: StandardSchemaV1.Issue[] = [];
-      const out: { page?: number; limit?: number } = {};
-      for (const key of ['page', 'limit'] as const) {
-        if (v[key] === undefined || v[key] === null || v[key] === '') {
-          continue;
-        }
-        const n = Number(v[key]);
-        if (Number.isNaN(n)) {
-          issues.push({ message: `${key} must be a number`, path: [key] });
-        } else {
-          out[key] = n;
-        }
-      }
-      if (issues.length) {
-        return { issues };
-      }
-      return { value: out };
-    });
+    return paginationQueryParameters;
   }
 
   async middleware(

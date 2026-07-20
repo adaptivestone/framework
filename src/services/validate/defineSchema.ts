@@ -1,4 +1,19 @@
-import type { StandardSchemaV1 } from './types.ts';
+import type { JsonSchema, StandardSchemaV1 } from './types.ts';
+
+export interface DefineSchemaOptions {
+  /**
+   * Optional JSON Schema used by documentation generators. This keeps small
+   * framework-owned validators dependency-free while still making their wire
+   * shape available to OpenAPI. Every `toJsonSchema()` call returns a copy, so
+   * a shared module-level object can't be mutated through a generated document.
+   */
+  jsonSchema?: JsonSchema | (() => JsonSchema);
+}
+
+export interface DefinedSchema<Output>
+  extends StandardSchemaV1<unknown, Output> {
+  readonly toJsonSchema?: () => JsonSchema;
+}
 
 /**
  * Wrap a validate function into a Standard Schema object — zero dependencies.
@@ -19,6 +34,12 @@ import type { StandardSchemaV1 } from './types.ts';
  *     return { issues: [{ message: 'email required', path: ['email'] }] };
  *   }
  *   return { value: { email: v.email } };
+ * }, {
+ *   jsonSchema: {
+ *     type: 'object',
+ *     properties: { email: { type: 'string', format: 'email' } },
+ *     required: ['email'],
+ *   },
  * });
  */
 export function defineSchema<Output>(
@@ -27,6 +48,20 @@ export function defineSchema<Output>(
   ) =>
     | StandardSchemaV1.Result<Output>
     | Promise<StandardSchemaV1.Result<Output>>,
-): StandardSchemaV1<unknown, Output> {
-  return { '~standard': { version: 1, vendor: 'framework', validate } };
+  options: DefineSchemaOptions = {},
+): DefinedSchema<Output> {
+  const schema: DefinedSchema<Output> = {
+    '~standard': { version: 1, vendor: 'framework', validate },
+  };
+  if (options.jsonSchema) {
+    const jsonSchema = options.jsonSchema;
+    return {
+      ...schema,
+      toJsonSchema: () =>
+        structuredClone(
+          typeof jsonSchema === 'function' ? jsonSchema() : jsonSchema,
+        ),
+    };
+  }
+  return schema;
 }
