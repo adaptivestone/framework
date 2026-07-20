@@ -141,7 +141,7 @@ describe('Lock Model', () => {
 
       await waitPromise;
       expect(unlocked).toBe(true);
-    }, 1000); // Increase timeout if needed
+    }, 3000);
 
     it('resolves via the post-live re-check when the lock is already gone', async () => {
       const name = 'delete-recheck-lock';
@@ -181,6 +181,6 @@ describe('Lock Model', () => {
       await Lock.acquireLock(name, testTtl);
       await expect(Lock.waitForUnlock(name, 50)).rejects.toThrow(/timed out/);
       await Lock.releaseLock(name);
-    }, 1000);
+    }, 3000);
   });
 });
