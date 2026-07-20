@@ -10,12 +10,12 @@
 import { after, afterEach, before, beforeEach } from 'node:test';
 import {
   clearTestRedisNamespace,
+  ensureTestServerReady,
   setTestRedisNamespace,
-  startTestServer,
   stopTestServer,
 } from './setupFramework.ts';
 
-before(startTestServer);
+before(ensureTestServerReady);
 beforeEach(setTestRedisNamespace);
 afterEach(clearTestRedisNamespace);
 after(stopTestServer);

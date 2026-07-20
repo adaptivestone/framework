@@ -56,12 +56,14 @@ export async function stopTestMongo(): Promise<void> {
 
 // ── Per-suite server lifecycle ──────────────────────────────────────────────
 
+let testServerStartPromise: Promise<Server> | null = null;
+
 /**
  * Boot a framework `Server` against a fresh per-suite database (derived from
  * `TEST_MONGO_URI`) and start its HTTP server on a random port. Registers the
  * instance via `setServerInstance` so `testHelpers` can reach it.
  */
-export async function startTestServer(): Promise<Server> {
+async function bootTestServer(): Promise<Server> {
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
   process.env.AUTH_SALT = crypto.randomBytes(16).toString('hex');
   const server = new Server({
@@ -110,6 +112,23 @@ export async function startTestServer(): Promise<Server> {
   await server.initAllModels();
   await server.startServer();
   return server;
+}
+
+/**
+ * Return the one shared server-start promise for this test-file process.
+ *
+ * node:test may execute sibling root-level `before()` hooks concurrently. Both
+ * the framework preload and application setup hooks must use this gate so they
+ * await the same initialization instead of racing two server boots.
+ */
+export function ensureTestServerReady(): Promise<Server> {
+  testServerStartPromise ??= bootTestServer();
+  return testServerStartPromise;
+}
+
+/** Start the per-file test server through the idempotent readiness gate. */
+export function startTestServer(): Promise<Server> {
+  return ensureTestServerReady();
 }
 
 /** Shut down the server, drop its database, and disconnect mongoose. */

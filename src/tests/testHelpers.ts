@@ -34,6 +34,22 @@ export const setDefaultAuthToken = (tokenToSet: string) => {
 export const getTestServerURL = (urlPart?: string) =>
   `http://127.0.0.1:${appInstance.getConfig('http').port}${urlPart}`;
 
+let publicServerReadyPromise: Promise<Server> | null = null;
+
+/**
+ * Await the idempotent per-file server startup used by the node:test preload.
+ * Call this first from an application root-level `before()` hook before using
+ * `appInstance`, models, config, or the HTTP server.
+ */
+export function ensureTestServerReady(): Promise<Server> {
+  // Lazy import avoids an eager cycle: setupFramework owns startup and imports
+  // the instance setters above, while consumer tests discover this helper here.
+  publicServerReadyPromise ??= import('./setupFramework.ts').then(
+    ({ ensureTestServerReady: ensureReady }) => ensureReady(),
+  );
+  return publicServerReadyPromise;
+}
+
 export const createDefaultTestUser = async () => {
   if (defaultUser) {
     throw new Error('You already have created default user');

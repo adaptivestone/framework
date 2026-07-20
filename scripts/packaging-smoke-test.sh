@@ -74,6 +74,14 @@ console.log('  ✓ packed runCluster started one worker and observed its clean e
 import.meta.resolve('@adaptivestone/framework/tests/setupVitest.js');
 console.log('  ✓ resolve @adaptivestone/framework/tests/setupVitest.js');
 
+const { ensureTestServerReady } = await import(
+  '@adaptivestone/framework/tests/testHelpers.js'
+);
+if (typeof ensureTestServerReady !== 'function') {
+  throw new Error('Public test helpers are missing ensureTestServerReady');
+}
+console.log('  ✓ test helpers export ensureTestServerReady');
+
 // 2b. Config files are the extension surface: consumers import a framework
 //     default config and re-export an edited copy (see the example project's
 //     src/config/*). They MUST stay importable.

@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - **One unrepresentable request schema no longer aborts the entire OpenAPI export.** Zod schemas are exported from their input shape (`io: 'input'`), so transforms describe what clients send; unsupported constructs degrade to an unconstrained schema instead of throwing, and `z.coerce.date()` follows the framework HTTP convention of an RFC 3339 `date-time` string. Conversion failures from any validator driver are contained per schema with a contextual warning: body schemas receive the existing placeholder, query parameters are omitted, and every healthy route remains in the document. Genuine command failures still exit non-zero through the existing CLI failure path.
+- **Application node:test setup can no longer race framework server bootstrap.** `ensureTestServerReady()` is now exported from `@adaptivestone/framework/tests/testHelpers.js`; it and the framework preload share one idempotent per-file startup promise, so sibling root-level `before()` hooks can explicitly await the initialized server without constructing it twice. The node-runner regression suite exercises the race, and testing guidance now covers hook placement plus common assertion and mocking migration traps. The documented coverage thresholds remain enforced by Node 24 with simultaneous `spec` and `lcov` reporters.
 
 ## [5.1.4] - 2026-07-19
 

@@ -13,13 +13,36 @@
  */
 import './setupNodeTest.ts';
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 import mongoose from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
-import { createDefaultTestUser, getTestServerURL } from './testHelpers.ts';
+import type Server from '../server.ts';
+import {
+  createDefaultTestUser,
+  ensureTestServerReady,
+  getTestServerURL,
+  serverInstance,
+} from './testHelpers.ts';
+
+let serverAwaitedBySiblingRootHook: Server;
+
+// This is intentionally a sibling of setupNodeTest's root hook. node:test may
+// start both hooks concurrently; the public helper must return the same startup
+// promise and resolve only after the server is ready.
+before(async () => {
+  const firstReadiness = ensureTestServerReady();
+  const secondReadiness = ensureTestServerReady();
+  assert.strictEqual(firstReadiness, secondReadiness);
+  serverAwaitedBySiblingRootHook = await firstReadiness;
+});
 
 describe('node:test: server boot + Mongo round-trip', () => {
+  it('shares readiness with sibling root-level setup hooks', async () => {
+    assert.strictEqual(serverAwaitedBySiblingRootHook, serverInstance);
+    assert.strictEqual(await ensureTestServerReady(), serverInstance);
+  });
+
   it('booted a Server connected to the shared Mongo', async () => {
     await mongoose.connection.asPromise(); // resolves once the connection is open
     assert.equal(mongoose.connection.readyState, 1); // 1 === connected

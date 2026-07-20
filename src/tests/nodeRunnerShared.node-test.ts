@@ -8,7 +8,7 @@
  * and that it got its own fresh per-suite DB off the shared instance.
  *
  * The per-file server lifecycle comes from the shipped `setupNodeTest.ts` glue
- * (it wires `before(startTestServer)` etc. but never touches Mongo init). Runs as
+ * (it wires the idempotent server-readiness hook but never touches Mongo init). Runs as
  * part of `npm run test:node`.
  */
 import './setupNodeTest.ts';

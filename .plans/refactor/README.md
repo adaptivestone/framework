@@ -38,6 +38,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
 | [openapi-schema-resilience](active/openapi-schema-resilience.md) | P2a-fix | **Implemented for 5.2.0.** Zod input-shape/date export plus per-schema failure containment; one unrepresentable route no longer aborts the document. |
 | [controller-route-groups](active/controller-route-groups.md) | P1u | **Implemented for 5.2.0.** Parenthesized controller folders organize source without contributing URL segments; runtime and AST codegen share path derivation. |
+| [node-test-readiness](active/node-test-readiness.md) | P1v | **Implemented for 5.2.0.** Public idempotent server-readiness helper prevents sibling root hooks from racing node:test bootstrap; regression and migration warnings included. |
 
 ### queued/
 
@@ -115,7 +116,9 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
   coerced date-time convention, and per-schema containment.
 - [Route-transparent controller groups](active/controller-route-groups.md) — parenthesized folders
   organize source without changing URLs or generated-type placement.
-- Release both changes before starting v5.3 implementation.
+- [Deterministic node:test readiness](active/node-test-readiness.md) — application root hooks and
+  the framework preload await one server-start promise; testing migration traps are documented.
+- Release these changes before starting v5.3 implementation.
 
 ## v5.3 target
 
