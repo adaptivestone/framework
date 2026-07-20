@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [NEXT] - Unreleased
+## [5.2.0] - Unreleased
+
+### Added
+
+- **Controller route groups.** A fully parenthesized folder below `controllers/` is now organizational only and does not contribute a URL segment: `controllers/(group)/Reports.ts` keeps the default `/reports` mount, while `controllers/(group)/admin/Settings.ts` mounts at `/admin/settings`. Runtime registration and AST route-type generation use the same prefix normalizer, generated files remain beside their controller sources, ordinary folders are unchanged, and a route collision created by grouping fails loudly at boot.
+
+### Fixed
+
+- **One unrepresentable request schema no longer aborts the entire OpenAPI export.** Zod schemas are exported from their input shape (`io: 'input'`), so transforms describe what clients send; unsupported constructs degrade to an unconstrained schema instead of throwing, and `z.coerce.date()` follows the framework HTTP convention of an RFC 3339 `date-time` string. Conversion failures from any validator driver are contained per schema with a contextual warning: body schemas receive the existing placeholder, query parameters are omitted, and every healthy route remains in the document. Genuine command failures still exit non-zero through the existing CLI failure path.
 
 ## [5.1.4] - 2026-07-19
 

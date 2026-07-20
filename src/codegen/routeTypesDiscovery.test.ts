@@ -20,7 +20,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { noopLogger } from '../helpers/logger.ts';
-import { defaultControllerHttpPath } from '../modules/AbstractController.ts';
+import {
+  controllerRoutePrefix,
+  defaultControllerHttpPath,
+} from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
 import { generateRouteTypesViaAst } from './astEmit.ts';
 import { specFromExtracted } from './astSpec.ts';
@@ -104,6 +107,17 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     );
   });
 
+  it('omits parenthesized route-group segments from default paths', () => {
+    expect(controllerRoutePrefix('(group)')).toBe('');
+    expect(controllerRoutePrefix('(group)/admin')).toBe('admin');
+    expect(controllerRoutePrefix('api/(internal)/reports')).toBe('api/reports');
+    expect(controllerRoutePrefix('(group)\\admin')).toBe('admin');
+    expect(defaultControllerHttpPath('(group)', 'Reports')).toBe('/reports');
+    expect(defaultControllerHttpPath('(group)/admin', 'Settings')).toBe(
+      '/admin/settings',
+    );
+  });
+
   it('a nested controller mounts under its folder prefix', async () => {
     expect.assertions(1);
     const dir = await makeControllers({
@@ -114,6 +128,32 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       'nested',
     );
     expect(resolved.urlPrefix).toBe('/nested/items');
+  });
+
+  it('AST codegen keeps route groups in the file layout but not the URL', async () => {
+    const dir = await makeControllers({
+      '(group)/Reports.ts': ctrl('Reports', 'get', '/list'),
+      '(group)/admin/Settings.ts': ctrl('Settings', 'get', '/'),
+    });
+
+    await generateRouteTypesViaAst(appFor(dir), noopLogger);
+    const reports = await specFromExtracted(
+      path.join(dir, '(group)/Reports.ts'),
+      '(group)',
+    );
+    const settings = await specFromExtracted(
+      path.join(dir, '(group)/admin/Settings.ts'),
+      '(group)/admin',
+    );
+
+    expect(reports.resolved.urlPrefix).toBe('/reports');
+    expect(settings.resolved.urlPrefix).toBe('/admin/settings');
+    expect(await readdir(path.join(dir, '(group)'))).toContain(
+      'Reports.routes.gen.ts',
+    );
+    expect(await readdir(path.join(dir, '(group)/admin'))).toContain(
+      'Settings.routes.gen.ts',
+    );
   });
 
   it('same final file (User.ts) in multiple folders resolve distinct mounts', async () => {

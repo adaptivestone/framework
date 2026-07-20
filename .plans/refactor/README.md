@@ -16,10 +16,14 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
                └──→ polish (independent) ───────────→ any order
                     [rate-limiter-lazy ✅] [cache-drivers ✅] [test-helpers ✅]
 
-v5.2 (queued/) ─────→ universal HttpResponse + Express writer
+v5.3 (queued/) ─────→ universal HttpResponse + Express writer
                       └──→ OpenAPI response contracts ──→ v6 removes ordinary `res`
 
+v5.2.0 (active/) ───→ OpenAPI schema resilience + route-transparent controller groups
+                      └──→ release gate before v5.3 implementation starts
+
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
+          v5.3 implementation waits for the v5.2.0 release
           v6 cutover blocked by all v5.1 active + queued work
           node-adapter blocked by v6
           drop-express blocked by node-adapter
@@ -32,13 +36,15 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
+| [openapi-schema-resilience](active/openapi-schema-resilience.md) | P2a-fix | **Implemented for 5.2.0.** Zod input-shape/date export plus per-schema failure containment; one unrepresentable route no longer aborts the document. |
+| [controller-route-groups](active/controller-route-groups.md) | P1u | **Implemented for 5.2.0.** Parenthesized controller folders organize source without contributing URL segments; runtime and AST codegen share path derivation. |
 
 ### queued/
 
 | File | Ref | Summary |
 |---|---|---|
 | [params-validation](queued/params-validation.md) | P1b+ | **Route `params:` schema.** Validate + coerce path params (`:id`) like `request:`/`query:`, typed on `req.appInfo.params`; malformed param → 400 (today: raw string → Mongoose `CastError` → 500). Additive, reuses the validation runtime; codegen typing is the only new work. Interim docs recipe shipped 2026-06-23. |
-| [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.2 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.2; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
+| [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.3 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.3; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
 | [http-engine-spike](queued/http-engine-spike.md) | Spike | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships. |
@@ -103,11 +109,22 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
   name (not filename), and ordinary API tests assert raw application i18n keys unless application
   locales are explicitly loaded.
 
-## v5.2 target
+## v5.2.0 target
 
-- [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
+- [OpenAPI schema resilience](active/openapi-schema-resilience.md) — request-input Zod export,
+  coerced date-time convention, and per-schema containment.
+- [Route-transparent controller groups](active/controller-route-groups.md) — parenthesized folders
+  organize source without changing URLs or generated-type placement.
+- Release both changes before starting v5.3 implementation.
+
+## v5.3 target
+
+- **Starts after v5.2.0:** [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
-- [Observability Phase 1 — metrics](queued/metrics-seam.md) ships the core metrics seam independently, then uses P1q's response writer for automatic HTTP response status/size measurements.
+
+## Unscheduled after v5.2.0
+
+- [Observability Phase 1 — metrics](queued/metrics-seam.md) stays queued until it is planned with the broader observability work. Its automatic HTTP response status/size measurements may build on P1q's response writer.
 
 ## v6 breaking defaults (no phase doc — tracked as bullets)
 

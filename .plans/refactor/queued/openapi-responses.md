@@ -36,13 +36,13 @@ type keeps its status/media type and emits a warning rather than a fabricated sc
   statuses/media types. Structural enrichment also ships; neither is sufficient alone.
 - **D2 — Shape: settled direction**, full `status → content-type → schema` with concise shorthands
   for a single JSON schema and empty response. Phase 0 locks the exact TypeScript syntax.
-- **D3 — Runtime behavior: docs/types only in v5.2.** Optional output validation/serialization is
+- **D3 — Runtime behavior: docs/types only in v5.3.** Optional output validation/serialization is
   later work and must be explicitly enabled; merely documenting a response cannot alter runtime.
 - **D4 — Option 1 scope:** which known responses to emit, and verify each shape exists —
   the `ValidationError`/`issuesToPayload` 400 body, the auth 401 body, 415, pagination wrapper.
   Emit them as shared `components.responses`/`components.schemas` referenced from operations.
 - **D5 — Reuse: settled direction.** `responses:` feeds OpenAPI and generated handler/client
-  types. Its schema values may feed a future explicitly enabled P2c serializer, but v5.2 does not
+  types. Its schema values may feed a future explicitly enabled P2c serializer, but v5.3 does not
   compile or validate outputs.
 - **D6 — Error envelope as a shared component:** document the framework's standard validation
   -error payload once and `$ref` it everywhere, so routes don't repeat it.

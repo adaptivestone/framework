@@ -1,7 +1,7 @@
 # P1s — Observability Phase 1: metrics
 
 **Status**: ✅ direction settled 2026-07-18 · implementation not started
-**Target**: v5.2.x, additive; core seam can land before the HTTP/exporter slice
+**Target**: unscheduled after v5.2.0; coordinate with the broader observability plan before implementation
 **Depends on**: app lifecycle/config; automatic response metrics use
 [P1q ResponseWriter](./universal-http-responses.md)
 **Feeds**: [observability phases 2+](../later/observability.md), jobs/queues,

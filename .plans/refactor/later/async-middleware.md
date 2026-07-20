@@ -2,7 +2,7 @@
 
 **Status**: ⏸ v6 cutover — linear direction settled by
 [P1q universal HTTP responses](../queued/universal-http-responses.md); implementation deferred.
-**Depends on**: P1b ✅ (tree router / `ExpressAdapter`) and P1q v5.2 response bridge. Best
+**Depends on**: P1b ✅ (tree router / `ExpressAdapter`) and P1q v5.3 response bridge. Best
 landed alongside [static-middleware-cutover](static-middleware-cutover.md) — both touch
 `AbstractMiddleware` + the adapter, so one breaking-doc migration note for users.
 **Time**: ~1 day (signature + adapter simplification + response returns) + framework middleware
@@ -35,7 +35,7 @@ async middleware(req, res, next): Promise<void | Response> {
 | **B — Awaitable `next()` (rejected until demanded)** | `async middleware(ctx, next): Promise<void \| HttpResponse>` | `await next()` runs downstream then returns control | New onion capability (post-handler timing/cleanup) with continuation machinery nobody currently needs. |
 
 **Option A is settled.** It matches current linear ordering, removes both Express parameters, and
-uses the returned-response path already exercised in v5.2. Reopen B only with a concrete
+uses the returned-response path already exercised in v5.3. Reopen B only with a concrete
 wrap-around middleware use case.
 
 ## API change (Option A)
@@ -114,7 +114,7 @@ factory return.
 
 ## Trade-offs
 
-- Breaking for every consumer registry middleware — but v5.2 provides a full release line to
+- Breaking for every consumer registry middleware — but v5.3 provides a full release line to
   migrate response-producing code before v6 removes `res`.
 - **A** forecloses onion wrap-around (post-handler code) — acceptable since today's model already can't do it; a consumer needing it is the trigger to revisit **B**.
 - **B** keeps `next` and adds continuation machinery for a capability nobody currently uses — heavier, speculative. Default to A.

@@ -47,17 +47,35 @@ export type RouteParams = {
 };
 
 /**
+ * Convert a physical controller-folder prefix into its URL prefix. A fully
+ * parenthesized segment is a route-transparent organizational group:
+ * `(group)/admin` becomes `admin`. Both runtime loading and AST codegen call
+ * the default-path helper below, so the convention cannot drift between them.
+ */
+export function controllerRoutePrefix(prefix: string): string {
+  return prefix
+    .split(/[\\/]+/)
+    .filter(
+      (segment) =>
+        segment.length > 0 &&
+        !(segment.startsWith('(') && segment.endsWith(')')),
+    )
+    .join('/');
+}
+
+/**
  * The default mount segment for a controller: `ClassName`, prefixed by the
- * folder when nested (`admin/Users.ts` → `Admin/Users`). Exported so codegen
- * computes the same mount path as the runtime instance method below — the two
- * must never drift on where a controller mounts (see codegen doc 06).
+ * route-bearing folders when nested (`admin/Users.ts` → `Admin/Users`). Exported
+ * so codegen computes the same mount path as the runtime instance method below
+ * — the two must never drift on where a controller mounts (see codegen doc 06).
  */
 export function controllerConstructorName(
   prefix: string,
   className: string,
 ): string {
-  return prefix
-    ? `${prefix.charAt(0).toUpperCase()}${prefix.slice(1)}/${className}`
+  const routePrefix = controllerRoutePrefix(prefix);
+  return routePrefix
+    ? `${routePrefix.charAt(0).toUpperCase()}${routePrefix.slice(1)}/${className}`
     : className;
 }
 

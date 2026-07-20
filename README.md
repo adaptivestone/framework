@@ -52,14 +52,33 @@ editor until the first run). In CI, guard against stale types with
 `node src/cli.ts generatetypes --check`, which writes nothing and exits non-zero
 if anything is out of date. The template wires this into its `check:types` script.
 
+Starting with v5.2.0, a fully parenthesized controller-folder segment is an
+organizational route group: `src/controllers/(group)/Reports.ts` keeps the
+default `/reports` URL, while its generated file remains beside the controller.
+Ordinary folders still contribute their lowercased URL segments.
+
+## OpenAPI
+
+Generate an OpenAPI 3.1 document from the same controller routes and request
+schemas used at runtime:
+
+```sh
+node src/cli.ts openapi --output openapi.json
+```
+
+Zod request schemas describe their input shape. An unsupported individual
+schema produces a contextual warning and safe fallback without removing healthy
+routes from the document. See the full [OpenAPI guide](https://framework.adaptivestone.com/docs/openapi).
+
 ## Public API & stability
 
 Only the subpaths listed under `exports` in `package.json` are importable as
 `@adaptivestone/framework/<path>`; internal modules are intentionally not
 exported. Exported paths follow semver in two tiers:
 
-- **Tier 1 — stable:** `server.js`, `Cli.js`, `types.js`, `folderConfig.js`,
-  `modules/*`, `models/*`, `controllers/*`, `tests/*`, `migrations/*`.
+- **Tier 1 — stable:** `server.js`, `Cli.js`, `cluster.js`, `types.js`,
+  `folderConfig.js`, `modules/*`, `models/*`, `controllers/*`, `tests/*`,
+  `migrations/*`.
 - **Tier 2 — extension surface:** `config/*`, `helpers/*`, and `services/*` — may
   change in a minor (with a deprecation cycle); pin to a minor if you import them
   directly. `config/*` is what you import to extend the framework's default

@@ -2,7 +2,7 @@
 
 **Status**: 📝 documented 2026-07-18 · deferred until the metrics foundation and a concrete driver
 package are selected
-**Target**: v5.3+ or separately versioned `@adaptivestone/framework-module-jobs`
+**Target**: v5.4+ or separately versioned `@adaptivestone/framework-module-jobs`
 **Depends on**: [Observability Phase 1 metrics API](../queued/metrics-seam.md); app lifecycle outside HTTP
 **Origin**: email dispatch and activity persistence need explicit delivery state, bounded retry,
 dead letters, and observability. Detached promises reduced to logs cannot distinguish accepted work

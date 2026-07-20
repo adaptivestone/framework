@@ -191,6 +191,51 @@ describe('ControllerManager — folder prefix mounts', () => {
     expect(registry.match('GET', '/user')).toBeNull();
   });
 
+  it('omits parenthesized route-group folders from runtime mounts', () => {
+    class Reports extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    class Settings extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { registry, cm } = setup();
+    cm.registerController(Reports, '(group)');
+    cm.registerController(Settings, '(group)/admin');
+
+    expect(registry.match('GET', '/reports')?.entry?.handler).toBeDefined();
+    expect(
+      registry.match('GET', '/admin/settings')?.entry?.handler,
+    ).toBeDefined();
+    expect(registry.match('GET', '/(group)/reports')).toBeNull();
+  });
+
+  it('fails loudly when route groups collapse two controllers onto one route', () => {
+    class User extends AbstractController {
+      get routes() {
+        return { get: { '/': { handler: handlerStub } } };
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const { cm } = setup();
+    cm.registerController(User, '(one)');
+
+    expect(() => cm.registerController(User, '(two)')).toThrow(
+      /conflicting handler|already registered/i,
+    );
+  });
+
   it('compound class name and camelCase folder are fully lowercased', () => {
     class SomeBigName extends AbstractController {
       get routes() {

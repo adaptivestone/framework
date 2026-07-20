@@ -19,7 +19,7 @@ Type and concept names that appear across multiple phase docs. Update this file 
 - **`RouterAdapter`** — interface bridging `RouteRegistry` to a transport engine. Implementations:
   `ExpressAdapter` (P1b, single-mount via `app.use(adapter)`); `NodeAdapter` (planned P3);
   `BunAdapter` / `DenoAdapter` / `WorkersAdapter` later.
-- **`HttpResponse<Status, ContentType, Body>`** — P1q/v5.2 branded, immutable outbound descriptor returned by controllers and produced by error resolution. Specialized aliases include `JsonResponse`, `StreamResponse`, `FileResponse`, and `EmptyResponse`. It is framework-owned data, not Express `Response` and not a subclass of Web `Response`.
+- **`HttpResponse<Status, ContentType, Body>`** — P1q/v5.3 branded, immutable outbound descriptor returned by controllers and produced by error resolution. Specialized aliases include `JsonResponse`, `StreamResponse`, `FileResponse`, and `EmptyResponse`. It is framework-owned data, not Express `Response` and not a subclass of Web `Response`.
 - **`ResponseWriter`** — adapter boundary that renders an `HttpResponse` to the active transport. `ExpressResponseWriter` ships first; Node/Fetch writers follow. Writers own headers, serialization, stream abort/backpressure, and the point after which an error can no longer replace a response.
 - **Match-then-walk dispatch** — the adapter runs `registry.match()` first (populating `req.routeMeta` and `req.params`), THEN walks the accumulated middleware chain. Lets globally-registered middleware (`RequestParser`, OTel, ValidationStage) read `req.routeMeta` and adapt per-route.
 
@@ -92,5 +92,5 @@ A schema/validator participates in three orthogonal concerns. The split:
 - **v5** — `5.0.0` final. Stays close to current Express-flavored behavior. Additive changes only. Tree-based router, codegen, validators, parser registry, project boot hook all ship in v5.
 - **v5.1** — current Express-backed line: boot/error/OpenAPI and consumer-hardening additions remain
   backward-compatible. `NodeAdapter` was deferred to P3 and did not ship in v5.1.
-- **v5.2** — additive universal `HttpResponse` + Express writer; legacy `res` and registered `{status, body}` error results continue to work. OpenAPI response contracts build on the same response algebra.
+- **v5.3** — additive universal `HttpResponse` + Express writer; legacy `res` and registered `{status, body}` error results continue to work. OpenAPI response contracts build on the same response algebra.
 - **v6** — Ordinary controllers/middleware lose raw `res`/`next` and return `HttpResponse | void`; explicit native-Web and adapter-specific raw routes remain. Also flips strict Content-Type, trailing-slash strictness, and case sensitivity, and removes `getHttpPath()`.

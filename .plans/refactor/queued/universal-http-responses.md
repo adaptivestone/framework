@@ -1,7 +1,7 @@
-# P1q — Universal typed HTTP responses (v5.2 bridge → v6 cutover)
+# P1q — Universal typed HTTP responses (v5.3 bridge → v6 cutover)
 
 **Status**: ✅ design direction settled 2026-07-18 · implementation not started  
-**Target**: v5.2, additive; ordinary controller `res` removal is v6  
+**Target**: v5.3, additive; ordinary controller `res` removal is v6
 **Depends on**: [tree-router](../done/tree-router.md) ✅, [error-handler-registry](../done/error-handler-registry.md) ✅  
 **Feeds**: [OpenAPI responses](openapi-responses.md), [async middleware](../later/async-middleware.md), [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
 **Origin**: an authorized file-delivery workaround exposed the immediate stream/file gap. The wider design discussion showed that a file-only helper would preserve the real problem: controllers would still use Express for JSON, statuses, headers, redirects, and errors.
@@ -9,13 +9,13 @@
 ## Goal
 
 Introduce one framework-owned, typed response value for JSON, text, bytes, streams, files,
-redirects, empty bodies, and standard Web responses. In v5.2 it is rendered by Express and
+redirects, empty bodies, and standard Web responses. In v5.3 it is rendered by Express and
 coexists with today's `(req, res, next)` handlers. In v6 ordinary controllers stop receiving
 `res`; replacing Express later becomes an adapter change rather than a consumer rewrite.
 
 ```text
 controller return ─┐
-                   ├─> HttpResponse ─> ResponseWriter ─> Express (v5.2)
+                   ├─> HttpResponse ─> ResponseWriter ─> Express (v5.3)
 thrown error ──────┘                                  └> Node/Fetch (later)
 ```
 
@@ -30,7 +30,7 @@ thrown error ──────┘                                  └> Node/Fe
 3. **Thrown errors stay.** Controllers continue throwing `HttpError` subclasses or errors handled
    by `registerErrorHandler`. Error resolution normalizes to the same `HttpResponse` boundary;
    handlers do not need `JsonResponse<404, ...>` unions for every failure.
-4. **v5.2 supports both styles.** Only a branded `HttpResponse` return activates the writer.
+4. **v5.3 supports both styles.** Only a branded `HttpResponse` return activates the writer.
    Existing `res.status().json()`, streaming, and third-party Express handlers keep working.
    Mixing both styles in one invocation is an error.
 5. **v6 removes `res` from ordinary controllers and registry middleware.** Raw transport access is
@@ -95,7 +95,7 @@ an async iterable without making the descriptor depend on Express.
 - SSE is a later specialized stream helper (`HttpResponse.sse`) so its abort/framing rules are not
   hidden inside the generic byte-stream API.
 
-## v5.2 compatibility contract
+## v5.3 compatibility contract
 
 The controller wrapper distinguishes new responses by a private/unique brand, not duck typing:
 
@@ -142,7 +142,7 @@ first-match/null-fallthrough semantics do not change.
 
 ## Raw response access
 
-### v5.2
+### v5.3
 
 The legacy `(req, res, next)` signature remains the raw Express escape hatch. It is needed for
 existing third-party Express integrations and gives consumers one release line to migrate.
@@ -183,7 +183,7 @@ Type-first extraction therefore requires an explicit handler return annotation. 
 to infer the type of `return HttpResponse.json(200, value)` from local control flow. Handlers that
 prefer inferred TypeScript returns use the route `responses:` contract for OpenAPI instead.
 
-Therefore v5.2 uses this precedence:
+Therefore v5.3 uses this precedence:
 
 1. A route `responses:` Standard-Schema map, when supplied, is authoritative for body JSON Schema
    and can also power optional future response validation/serialization.
@@ -247,13 +247,13 @@ unhandled `500`. The old unconditional `200/400/401/404` stub set is removed.
   `src/services/documentation/OpenApiGenerator.ts` and tests.
 - Public surface: `package.json` exports if a dedicated subpath is chosen; generated declaration
   packaging smoke test.
-- Documentation: controller responses, streams/files, error handling, OpenAPI, v5.2 adoption,
+- Documentation: controller responses, streams/files, error handling, OpenAPI, v5.3 adoption,
   v6 migration, and `CHANGELOG.md`.
 
 The file set is finalized after Phase 0 fixes the module/export layout; later phases must update
 this list before touching additional production files.
 
-## Out of scope for v5.2
+## Out of scope for v5.3
 
 - Removing Express, changing the server/listener, or shipping `NodeAdapter`.
 - Removing `res`/`next` from legacy controllers or middleware.
