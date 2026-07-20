@@ -194,19 +194,41 @@ function baseOperationId(
 
 // ── schema conversion ──────────────────────────────────────────────────────────
 
-/** Resolve a schema's driver and emit JSON Schema; null when not introspectable. */
-async function schemaToJson(schema: unknown): Promise<JsonSchema | null> {
-  const driver = ValidateService.resolve(schema);
-  if (!driver?.toJsonSchema) {
+/**
+ * Resolve one schema's driver and emit JSON Schema. Conversion is contained at
+ * this boundary: a vendor exporter may throw for an unsupported construct, but
+ * one bad route must not discard the rest of the OpenAPI document.
+ */
+async function schemaToJson(
+  schema: unknown,
+  warn: (message: string) => void,
+  context: string,
+): Promise<JsonSchema | null> {
+  try {
+    const driver = ValidateService.resolve(schema);
+    if (!driver?.toJsonSchema) {
+      warn(`${context}: schema introspection unavailable.`);
+      return null;
+    }
+    const result = await driver.toJsonSchema(schema);
+    if (!result) {
+      warn(`${context}: schema introspection unavailable.`);
+      return null;
+    }
+    // `$schema` is a standalone-document marker; invalid when embedded in OpenAPI.
+    const { $schema, ...rest } = result as Obj;
+    return rest as JsonSchema;
+  } catch (error) {
+    warn(`${context}: schema conversion failed — ${errorMessage(error)}.`);
     return null;
   }
-  const result = await driver.toJsonSchema(schema);
-  if (!result) {
-    return null;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
   }
-  // `$schema` is a standalone-document marker; invalid when embedded in OpenAPI.
-  const { $schema, ...rest } = result as Obj;
-  return rest as JsonSchema;
+  return String(error);
 }
 
 function placeholderSchema(): JsonSchema {
@@ -313,9 +335,8 @@ async function buildQueryParameters(
   ];
   const params: Obj[] = [];
   for (const schema of schemas) {
-    const json = await schemaToJson(schema);
+    const json = await schemaToJson(schema, warn, `${ctx} query`);
     if (!json) {
-      warn(`${ctx} query: schema introspection unavailable — params omitted.`);
       continue;
     }
     const props = (json.properties as Obj) ?? {};
@@ -342,17 +363,20 @@ async function buildRequestBody(
   const req = route.entry.request;
   const mwSchemas = collectMiddlewareSchemas(route.middlewares, 'request');
   const mwParts = (
-    await Promise.all(mwSchemas.map((s) => schemaToJson(s)))
+    await Promise.all(
+      mwSchemas.map((s) => schemaToJson(s, warn, `${ctx} middleware request`)),
+    )
   ).filter((s): s is JsonSchema => s != null);
 
   // Content-type map → one media type per declared key (native multipart support).
   if (req && isContentTypeRequestMap(req)) {
     const content: Obj = {};
     for (const [mediaType, schema] of Object.entries(req)) {
-      const converted = await schemaToJson(schema);
-      if (!converted) {
-        warn(`${ctx} body (${mediaType}): schema introspection unavailable.`);
-      }
+      const converted = await schemaToJson(
+        schema,
+        warn,
+        `${ctx} body (${mediaType})`,
+      );
       const merged = combineSchemas([
         converted ?? placeholderSchema(),
         ...mwParts,
@@ -365,12 +389,7 @@ async function buildRequestBody(
   // Single schema (or none).
   let routeObj: JsonSchema | null = null;
   if (req) {
-    routeObj = await schemaToJson(req);
-    if (!routeObj) {
-      warn(
-        `${ctx} body: schema introspection unavailable — placeholder emitted.`,
-      );
-    }
+    routeObj = await schemaToJson(req, warn, `${ctx} body`);
   }
 
   const parts = [

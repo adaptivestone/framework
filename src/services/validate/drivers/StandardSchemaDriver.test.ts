@@ -28,6 +28,35 @@ describe('standardSchemaDriver.toJsonSchema', () => {
     expect(json.required).toEqual(['email']);
   });
 
+  it('exports request input shapes for transforms', async () => {
+    const schema = z.object({
+      count: z.string().transform((value) => Number(value)),
+    });
+
+    const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
+
+    expect(json.properties.count).toEqual({ type: 'string' });
+  });
+
+  it('exports coerced dates as date-time strings', async () => {
+    const schema = z.object({ startsAt: z.coerce.date() });
+
+    const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
+
+    expect(json.properties.startsAt).toEqual({
+      type: 'string',
+      format: 'date-time',
+    });
+  });
+
+  it('degrades unrepresentable zod inputs instead of throwing', async () => {
+    const schema = z.object({ payload: z.instanceof(Uint8Array) });
+
+    const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
+
+    expect(json.properties.payload).toEqual({});
+  });
+
   it('prefers a native .toJsonSchema() method when present (arktype-style)', async () => {
     const sentinel = { type: 'string', format: 'custom' };
     const schema = {

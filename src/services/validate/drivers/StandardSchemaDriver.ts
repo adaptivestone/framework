@@ -62,8 +62,18 @@ export const standardSchemaDriver: ValidatorDriver = {
       };
       const toJSONSchema = mod.toJSONSchema ?? mod.z?.toJSONSchema;
       if (typeof toJSONSchema === 'function') {
-        // draft-2020-12 is what OpenAPI 3.1 expects.
-        return toJSONSchema(body, { target: 'draft-2020-12' });
+        // Route schemas describe what an HTTP client sends, so transforms and
+        // coercions must be rendered from their INPUT shape. A validator detail
+        // that JSON Schema cannot express degrades to `{}` instead of aborting
+        // the entire OpenAPI export. `z.coerce.date()` accepts wire values but
+        // otherwise becomes `{}`; the framework's HTTP convention documents it
+        // as an RFC 3339 date-time string.
+        return toJSONSchema(body, {
+          target: 'draft-2020-12',
+          io: 'input',
+          unrepresentable: 'any',
+          override: applyZodOpenApiOverride,
+        });
       }
     }
 
@@ -74,5 +84,28 @@ export const standardSchemaDriver: ValidatorDriver = {
 
 type ZodToJsonSchema = (
   schema: unknown,
-  opts?: { target?: string },
+  opts?: {
+    target?: string;
+    io?: 'input' | 'output';
+    unrepresentable?: 'throw' | 'any';
+    override?: (ctx: ZodOverrideContext) => void;
+  },
 ) => JsonSchema;
+
+interface ZodOverrideContext {
+  zodSchema?: {
+    _zod?: {
+      def?: { type?: unknown; coerce?: unknown };
+    };
+  };
+  jsonSchema: JsonSchema;
+  path: Array<string | number>;
+}
+
+function applyZodOpenApiOverride(ctx: ZodOverrideContext): void {
+  const def = ctx.zodSchema?._zod?.def;
+  if (def?.type === 'date' && def.coerce === true) {
+    ctx.jsonSchema.type = 'string';
+    ctx.jsonSchema.format = 'date-time';
+  }
+}

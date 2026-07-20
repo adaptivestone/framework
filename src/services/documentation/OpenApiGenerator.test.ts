@@ -287,6 +287,63 @@ describe('generateOpenApi', () => {
     expect(onWarning).toHaveBeenCalled();
   });
 
+  it('contains a throwing schema exporter to its route and keeps exporting', async () => {
+    const onWarning = vi.fn();
+    const broken = {
+      '~standard': {
+        version: 1,
+        vendor: 'custom',
+        validate: () => ({ value: {} }),
+      },
+      toJsonSchema() {
+        throw new Error('deliberately unrepresentable');
+      },
+    } as AnyDoc;
+
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'POST',
+          path: '/broken',
+          entry: {
+            handler: () => {},
+            request: broken,
+            meta: { methodName: 'broken', controllerClass: 'Broken' },
+          },
+        }),
+        route({
+          method: 'POST',
+          path: '/healthy',
+          entry: {
+            handler: () => {},
+            request: z.object({ name: z.string() }),
+            meta: { methodName: 'healthy', controllerClass: 'Healthy' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' }, onWarning },
+    );
+
+    expect(
+      (doc as AnyDoc).paths['/broken'].post.requestBody.content[
+        'application/json'
+      ].schema,
+    ).toMatchObject({
+      type: 'object',
+      description: expect.stringMatching(/introspection unavailable/i),
+    });
+    expect(
+      (doc as AnyDoc).paths['/healthy'].post.requestBody.content[
+        'application/json'
+      ].schema.properties.name,
+    ).toEqual({ type: 'string' });
+    expect(onWarning).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /POST \/broken body: schema conversion failed.*deliberately unrepresentable/i,
+      ),
+    );
+  });
+
   it('approximates a splat as a path parameter and warns', async () => {
     const onWarning = vi.fn();
     const doc = await generateOpenApi(
