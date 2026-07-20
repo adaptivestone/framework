@@ -2,7 +2,7 @@
 
 **Status**: ✅ DONE (2026-06-21; node:test entry point added 2026-06-22) — runner-agnostic `setupFramework.ts` extracted; `setupVitest`/`globalSetupVitest` are thin wrappers; new `setupNodeTest.ts` (per-file glue) + `globalSetupNodeTest.ts` (run-once entry, wired via node:test's native `--test-global-setup`, the analog of vitest's `globalSetup`). Worked example: `nodeRunner.node-test.ts` + `nodeRunnerShared.node-test.ts` (two suites sharing one Mongo) run by `npm run test:node`; the `.node-test.ts` suffix keeps them out of vitest's glob. Docs `09-testsing.md` "Using with `node:test`" section teaches the `--test-global-setup` entry point. `vitest`/`mongodb-memory-server` were already optional peers. 480/480 vitest tests + 6/6 node:test still green. The folded-in **isolated-test utilities** (`createTestApp` etc.) were **NOT** built — see that section below (future follow-up).
 
-**v5.2 follow-up:** [node-test-readiness](../active/node-test-readiness.md) adds the public
+**v5.2 follow-up:** [node-test-readiness](./node-test-readiness.md) adds the public
 `ensureTestServerReady()` gate for application root hooks and expands the node:test suite to 7 tests.
 **Depends on**: nothing critical — can ship anytime
 **Time**: ~½ day

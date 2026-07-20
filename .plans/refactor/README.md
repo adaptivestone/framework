@@ -19,11 +19,12 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
 v5.3 (queued/) ─────→ universal HttpResponse + Express writer
                       └──→ OpenAPI response contracts ──→ v6 removes ordinary `res`
 
-v5.2.0 (active/) ───→ OpenAPI schema resilience + route-transparent controller groups
-                      └──→ release gate before v5.3 implementation starts
+v5.2.0 (done/) ────→ OpenAPI resilience + route groups + node:test readiness
+v5.2.1 (active/) ──→ adoption fixes + literal-route codegen polish
+                      └──→ patch release before v5.3 implementation starts
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
-          v5.3 implementation waits for the v5.2.0 release
+          v5.3 implementation waits for the v5.2.1 patch release
           v6 cutover blocked by all v5.1 active + queued work
           node-adapter blocked by v6
           drop-express blocked by node-adapter
@@ -36,9 +37,8 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | File | Ref | Summary |
 |---|---|---|
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
-| [openapi-schema-resilience](active/openapi-schema-resilience.md) | P2a-fix | **Implemented for 5.2.0.** Zod input-shape/date export plus per-schema failure containment; one unrepresentable route no longer aborts the document. |
-| [controller-route-groups](active/controller-route-groups.md) | P1u | **Implemented for 5.2.0.** Parenthesized controller folders organize source without contributing URL segments; runtime and AST codegen share path derivation. |
-| [node-test-readiness](active/node-test-readiness.md) | P1v | **Implemented for 5.2.0.** Public idempotent server-readiness helper prevents sibling root hooks from racing node:test bootstrap; regression and migration warnings included. |
+| [codegen-literal-prelude](active/codegen-literal-prelude.md) | P1w | **Implemented for 5.2.1.** Route getters may read typed config through initialized `const` declarations before their literal return; dynamic route construction remains excluded. |
+| [v5.2.1-adoption-fixes](active/v5.2.1-adoption-fixes.md) | P1x | **Implemented for 5.2.1.** Grouped same-name controllers retain override identity; `defineSchema` can expose an explicit JSON Schema and Pagination emits `page`/`limit`. |
 
 ### queued/
 
@@ -71,6 +71,9 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 
 | File | Ref | Summary |
 |---|---|---|
+| [openapi-schema-resilience](done/openapi-schema-resilience.md) | P2a-fix | **Shipped in 5.2.0.** Zod input-shape/date export plus per-schema failure containment; one unrepresentable route no longer aborts the document. |
+| [controller-route-groups](done/controller-route-groups.md) | P1u | **Shipped in 5.2.0.** Parenthesized controller folders organize source without contributing URL segments; runtime and AST codegen share path derivation. |
+| [node-test-readiness](done/node-test-readiness.md) | P1v | **Shipped in 5.2.0.** Public idempotent server-readiness helper prevents sibling root hooks from racing node:test bootstrap; regression and migration warnings included. |
 | [public-cluster-runner](done/public-cluster-runner.md) | P1r | **Shipped in 5.1.4.** Narrow public `runCluster` with fixed crash-loop safety, structured lifecycle events, signal forwarding, and shutdown timeout; framework/example entries and docs migrated; packed smoke green. |
 | [named-rate-limit-policies](done/named-rate-limit-policies.md) | P1t | **Included in 5.1.4.** Typed merged-config recipe using `policy.someName` directly; canonical docs and example updated; no framework runtime change. |
 | [baseline](done/baseline.md) | P−1 | Perf pin 2026-05-03: plaintext 16591 req/s, realistic 15549 req/s. |
@@ -110,22 +113,29 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
   name (not filename), and ordinary API tests assert raw application i18n keys unless application
   locales are explicitly loaded.
 
-## v5.2.0 target
+## v5.2.0 — released 2026-07-20
 
-- [OpenAPI schema resilience](active/openapi-schema-resilience.md) — request-input Zod export,
+- ✅ [OpenAPI schema resilience](done/openapi-schema-resilience.md) — request-input Zod export,
   coerced date-time convention, and per-schema containment.
-- [Route-transparent controller groups](active/controller-route-groups.md) — parenthesized folders
+- ✅ [Route-transparent controller groups](done/controller-route-groups.md) — parenthesized folders
   organize source without changing URLs or generated-type placement.
-- [Deterministic node:test readiness](active/node-test-readiness.md) — application root hooks and
+- ✅ [Deterministic node:test readiness](done/node-test-readiness.md) — application root hooks and
   the framework preload await one server-start promise; testing migration traps are documented.
-- Release these changes before starting v5.3 implementation.
+
+## v5.2.1 target
+
+- [Literal route-getter setup](active/codegen-literal-prelude.md) — initialized `const` config reads
+  may precede a literal return, keeping route-local typed policy tuples codegen-safe.
+- [5.2.1 adoption fixes](active/v5.2.1-adoption-fixes.md) — Pagination contributes its optional
+  `page`/`limit` parameters to OpenAPI, and a grouped same-name controller remains an override.
+- Release the verified patch before starting v5.3 implementation.
 
 ## v5.3 target
 
-- **Starts after v5.2.0:** [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
+- **Starts after v5.2.1:** [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
 
-## Unscheduled after v5.2.0
+## Unscheduled after v5.2.1
 
 - [Observability Phase 1 — metrics](queued/metrics-seam.md) stays queued until it is planned with the broader observability work. Its automatic HTTP response status/size measurements may build on P1q's response writer.
 

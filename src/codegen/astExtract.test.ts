@@ -173,6 +173,64 @@ describe('astExtract — routes', () => {
     expect(ex.routes[0]?.middleware).toEqual(['Mw', 'Other']);
   });
 
+  it('allows initialized const config reads before a literal route return', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() {
+    const { policy } = this.app.getConfig('rateLimiter');
+    return {
+      post: {
+        '/': {
+          handler: this.create,
+          middleware: [[RateLimiter, policy.personCreate] as const],
+        },
+      },
+    };
+  }
+}`);
+
+    expect(ex.ok).toBe(true);
+    expect(ex.routes).toEqual([
+      {
+        method: 'post',
+        path: '/',
+        handler: 'create',
+        hasRequest: false,
+        hasQuery: false,
+        middleware: ['RateLimiter'],
+      },
+    ]);
+  });
+
+  it('still rejects mutable setup before a literal route return', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() {
+    let policy = this.app.getConfig('rateLimiter').policy;
+    return { post: { '/': this.create } };
+  }
+}`);
+
+    expect(ex.ok).toBe(false);
+    expect(ex.reason).toMatch(/optional `const` setup/);
+  });
+
+  it('still rejects non-const setup statements before a literal route return', () => {
+    const setups = [
+      "this.app.getConfig('rateLimiter');",
+      "if (this.app) { console.log('x'); }",
+      'return { post: {} }; const late = 1;',
+    ];
+    for (const setup of setups) {
+      const ex = extract(`export default class C extends B {
+  get routes() {
+    ${setup}
+    return { post: { '/': this.create } };
+  }
+}`);
+      expect(ex.ok, setup).toBe(false);
+      expect(ex.reason, setup).toMatch(/optional `const` setup/);
+    }
+  });
+
   it('sees through TS-only wrappers around route middleware arrays and tuples', () => {
     const forms = [
       '[Auth]',

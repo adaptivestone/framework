@@ -34,6 +34,7 @@ function toRelativeSpecifier(dir: string, target: string): string {
 export interface CodegenLogger {
   info?(msg: string): void;
   warn?(msg: string): void;
+  error?(msg: string): void;
 }
 
 /** Generate the app-level `genTypes.d.ts` file. */

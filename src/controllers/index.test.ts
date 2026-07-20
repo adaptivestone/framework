@@ -4,6 +4,9 @@
  * earlier unit tests against a free `translateController` function.
  */
 
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { Response } from 'express';
 import mongoose from 'mongoose';
 import {
@@ -170,6 +173,34 @@ describe('ControllerManager — index-first load order', () => {
 // Same basename under different folders is fine; mounts stay distinct.
 
 describe('ControllerManager — folder prefix mounts', () => {
+  it('a grouped external controller still overrides the same-name framework controller', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'controller-override-'));
+    try {
+      const groupedDir = path.join(dir, '(group)');
+      await mkdir(groupedDir, { recursive: true });
+      await writeFile(
+        path.join(groupedDir, 'Auth.ts'),
+        'export default class Auth {}\n',
+        'utf8',
+      );
+
+      const registry = new RouteRegistry();
+      const app = {
+        ...fakeApp(registry),
+        foldersConfig: { controllers: dir },
+      } as IApp;
+      const classes = await new ControllerManager(app).loadControllerClasses();
+      const auth = classes.filter(
+        ({ ControllerClass }) => ControllerClass.name === 'Auth',
+      );
+
+      expect(auth).toHaveLength(1);
+      expect(auth[0]?.prefix).toBe('(group)');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('same class name under different folders mounts at different paths', () => {
     class User extends AbstractController {
       get routes() {

@@ -64,6 +64,19 @@ export function controllerRoutePrefix(prefix: string): string {
 }
 
 /**
+ * Controller-file identity for framework inheritance. Route-group directory
+ * segments are organizational, so `(group)/Auth.ts` must override the same
+ * framework controller as root `Auth.ts`. This affects override comparison
+ * only; generated files and source discovery keep their physical grouped path.
+ */
+export function controllerOverridePath(relativePath: string): string {
+  const segments = relativePath.split(/[\\/]+/);
+  const fileName = segments.pop() ?? '';
+  const routePrefix = controllerRoutePrefix(segments.join('/'));
+  return routePrefix ? `${routePrefix}/${fileName}` : fileName;
+}
+
+/**
  * The default mount segment for a controller: `ClassName`, prefixed by the
  * route-bearing folders when nested (`admin/Users.ts` → `Admin/Users`). Exported
  * so codegen computes the same mount path as the runtime instance method below

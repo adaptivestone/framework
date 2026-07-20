@@ -56,6 +56,7 @@ class Base {
     internalFolder: string,
     externalFolder: string,
     isUseSimpleLogger = false, // just to speed up to load logger in some cases
+    normalizeOverridePath?: (relativePath: string) => string,
   ) {
     const logger = isUseSimpleLogger
       ? (m: string) => consoleLogger('info', m)
@@ -64,6 +65,7 @@ class Base {
       internalFolder,
       externalFolder,
       logger,
+      normalizeOverridePath,
     });
   }
 

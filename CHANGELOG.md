@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.1] - Unreleased
+
+### Added
+
+- **Dependency-free schemas can now describe their OpenAPI shape explicitly.** `defineSchema(validate, { jsonSchema })` accepts a JSON Schema object or factory without adding a validator dependency. Runtime validation remains callback-driven; the optional shape is consumed through the existing Standard Schema driver and can be reused by application or framework-owned schemas. Every `toJsonSchema()` call returns a copy, so a shared schema object cannot be mutated through a generated document.
+
+### Fixed
+
+- **Route-type generation now accepts simple initialized `const` declarations before a literal routes return.** A route getter can read typed config such as `const { policy } = this.app.getConfig('rateLimiter')` and pass a policy into a literal route-level middleware tuple without losing its generated request types. Mutable declarations, control flow, computed route structures, and dynamically constructed middleware remain intentionally unanalyzable and are still skipped with a warning.
+- **A controller that regresses to unanalyzable can no longer rot its generated types silently.** When a skipped controller still has a previously generated `.routes.gen.ts` beside it, `generatetypes` now emits an error-level message naming the stale file in addition to the routine skip warning. The file is left in place so consumer imports keep resolving while the controller is fixed.
+- **Pagination query parameters now appear in OpenAPI.** The built-in `Pagination` middleware supplies an explicit dependency-free JSON Schema, so optional numeric `page` and `limit` parameters are emitted without an introspection warning.
+- **A controller override keeps working after it moves into a route group.** Override matching now ignores parenthesized controller-folder segments only for its comparison key, so `(group)/Auth.ts` still replaces the framework's `Auth` controller at runtime and during AST codegen. Physical source paths, generated-file placement, and inheritance matching for models, configs, commands, and migrations are unchanged.
+
 ## [5.2.0] - 2026-07-20
 
 ### Added

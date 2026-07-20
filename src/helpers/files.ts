@@ -7,6 +7,11 @@ interface getFilesPathWithInheritanceProps {
   externalFolder: string;
   logger: (val: string) => void;
   loggerFileType?: string;
+  /**
+   * Optional comparison-only normalizer for override matching. Returned file
+   * paths stay physical; only the internal-vs-external identity key changes.
+   */
+  normalizeOverridePath?: (relativePath: string) => string;
   filter?: {
     startWithCapital?: boolean;
     notTests?: boolean;
@@ -19,6 +24,7 @@ const getFilesPathWithInheritance = async ({
   externalFolder,
   logger,
   loggerFileType = '',
+  normalizeOverridePath = (relativePath) => relativePath,
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
 }: getFilesPathWithInheritanceProps) => {
   const readDir = (folder: string, which: string) =>
@@ -80,25 +86,20 @@ const getFilesPathWithInheritance = async ({
         .replace(`${externalFolder}`, ''),
     );
 
+  // Override identity ignores only the source extension (`.js` vs `.ts`), as
+  // before. A caller may additionally normalize its own virtual directory
+  // semantics (controller route groups); the generic loader must not impose
+  // those semantics on configs, models, commands, or migrations.
+  const overrideKey = (relativePath: string) => {
+    const normalized = normalizeOverridePath(relativePath);
+    const details = parse(normalized);
+    return format({ dir: details.dir, name: details.name });
+  };
+  const externalOverrideKeys = new Set(externalFilesString.map(overrideKey));
+
   const filesToLoad = [];
   for (const file of internalFilesString) {
-    const fileDetails = parse(file);
-    const jsFile = format({
-      dir: fileDetails.dir,
-      name: fileDetails.name,
-      ext: '.js',
-    });
-
-    const tsFile = format({
-      dir: fileDetails.dir,
-      name: fileDetails.name,
-      ext: '.ts',
-    });
-
-    if (
-      externalFilesString.includes(jsFile) ||
-      externalFilesString.includes(tsFile)
-    ) {
+    if (externalOverrideKeys.has(overrideKey(file))) {
       logger(
         `Skipping register INTERNAL file '${file}' ${
           loggerFileType ? `of type ${loggerFileType}` : ''

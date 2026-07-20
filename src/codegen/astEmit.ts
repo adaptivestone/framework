@@ -20,6 +20,7 @@ import {
   convertPathSyntax,
 } from '../controllers/index.ts';
 import { getFilesPathWithInheritance } from '../helpers/files.ts';
+import { controllerOverridePath } from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
 import type { FlatRoute } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
@@ -427,6 +428,7 @@ async function discoverControllers(
     internalFolder: internalDir,
     externalFolder: userDir,
     logger: (m) => logger?.info?.(m),
+    normalizeOverridePath: controllerOverridePath,
   });
   return files.map(({ path: srcPath, file }) => {
     const dir = path.dirname(file);

@@ -21,6 +21,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { noopLogger } from '../helpers/logger.ts';
 import {
+  controllerOverridePath,
   controllerRoutePrefix,
   defaultControllerHttpPath,
 } from '../modules/AbstractController.ts';
@@ -115,6 +116,30 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     expect(defaultControllerHttpPath('(group)', 'Reports')).toBe('/reports');
     expect(defaultControllerHttpPath('(group)/admin', 'Settings')).toBe(
       '/admin/settings',
+    );
+    expect(controllerOverridePath('(group)/Auth.ts')).toBe('Auth.ts');
+    expect(controllerOverridePath('api/(group)/Auth.ts')).toBe('api/Auth.ts');
+    expect(controllerOverridePath('(group)\\Auth.ts')).toBe('Auth.ts');
+  });
+
+  it('a grouped same-name controller overrides the framework controller during codegen', async () => {
+    const dir = await makeControllers({
+      '(group)/Auth.ts': ctrl('Auth', 'get', '/custom'),
+    });
+    const logs: string[] = [];
+    const logger = {
+      info: (message: string) => logs.push(message),
+      warn() {},
+      error() {},
+    };
+
+    await generateRouteTypesViaAst(appFor(dir), logger);
+
+    expect(await readdir(path.join(dir, '(group)'))).toContain(
+      'Auth.routes.gen.ts',
+    );
+    expect(logs.join('\n')).toMatch(
+      /Skipping register INTERNAL file 'Auth\.[jt]s'/,
     );
   });
 
@@ -401,6 +426,34 @@ describe('generateAll — atomicity & --check (doc 08)', () => {
       expect(files).toContain('Good.routes.gen.ts'); // analyzable → written
       expect(files).not.toContain('Dynamic.routes.gen.ts'); // skipped, not written
       expect(warnings.join('\n')).toMatch(/skipped[\s\S]*Dynamic\.ts/); // warned + named
+    } finally {
+      cwdSpy.mockRestore();
+    }
+  });
+
+  it('escalates to an error when a skipped controller leaves a stale gen file', async () => {
+    expect.assertions(3);
+    const dir = await makeControllers({
+      // Was analyzable once (its gen file exists), now it isn't — the routine
+      // skip warning alone would let the stale types rot silently.
+      'Dynamic.ts': `export default class Dynamic {
+  get routes() { const m = 'get'; return { [m]: { '/x': this.h } }; }
+  h() {}
+}`,
+      'Dynamic.routes.gen.ts': "import './Dynamic.ts';\nexport {};\n",
+    });
+    const errors: string[] = [];
+    const logger = {
+      info() {},
+      warn() {},
+      error: (m: string) => errors.push(m),
+    };
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(dir);
+    try {
+      await expect(generateAll(appFor(dir), logger)).resolves.toBeUndefined();
+      // Deleting it would break consumer imports mid-edit — leave it, but shout.
+      expect(await readdir(dir)).toContain('Dynamic.routes.gen.ts');
+      expect(errors.join('\n')).toMatch(/stale[\s\S]*Dynamic\.routes\.gen\.ts/);
     } finally {
       cwdSpy.mockRestore();
     }

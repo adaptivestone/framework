@@ -1,6 +1,6 @@
 # P1v — Deterministic node:test server readiness
 
-**Status**: 🟢 implemented 2026-07-20 · focused node:test/type/format checks green · awaiting `5.2.0`
+**Status**: ✅ shipped in `5.2.0` on 2026-07-20
 **Target**: `5.2.0`, additive/fix
 **Depends on**: runner-agnostic test lifecycle and the public test-helper export
 
@@ -40,4 +40,5 @@ bootstrap under `node:test`.
 - `npm run check`
 - `npm run check:types:raw`
 - `npm run test:node` — 7/7 passing
+- Full 5.2.0 release gate — 72 Vitest files (685/685); example node:test — 3/3 tests.
 - Deliberately unmet branch coverage exits `1` on Node 24.18.0 and 26.5.0 with `spec` + `lcov`.

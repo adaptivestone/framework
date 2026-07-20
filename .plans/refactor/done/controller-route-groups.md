@@ -1,6 +1,6 @@
 # P1u — Route-transparent controller groups
 
-**Status**: 🟢 implemented 2026-07-20 · build/focused/smoke/docs green · awaiting `5.2.0`
+**Status**: ✅ shipped in `5.2.0` on 2026-07-20
 **Target**: `5.2.0`, additive
 **Depends on**: shared default controller-path helper used by runtime and AST codegen
 
@@ -27,7 +27,7 @@ controllers/(group)/admin/Settings.ts   → /admin/settings
 ## Files
 
 - `src/modules/AbstractController.ts` — shared route-prefix normalization.
-- `src/controllers/index.test.ts` — runtime mounts and collision coverage.
+- `src/controllers/index.test.ts` — runtime mounts and collisions.
 - `src/codegen/routeTypesDiscovery.test.ts` — AST paths and generated-file placement.
 - Controller documentation and changelog.
 
@@ -39,10 +39,8 @@ controllers/(group)/admin/Settings.ts   → /admin/settings
 
 ## Verification
 
-- Build, 103 focused tests, package-consumer smoke, formatting, and the documentation build pass.
-- The full local run reached 677 passing tests and 6 skips. Its migration-suite hook timeout passed
-  all 6 tests when rerun alone; the remaining 2 failures require a Redis service that was not
-  available in the local environment.
+- The 5.2.0 release gate passed build, formatting, TypeScript, package-consumer smoke,
+  documentation build, 72 Vitest files (685/685), framework node:test (7/7), and the example (3/3).
 
 ## Done when
 

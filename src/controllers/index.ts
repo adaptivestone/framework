@@ -3,6 +3,7 @@ import * as url from 'node:url';
 import type { NextFunction, Response } from 'express';
 import { makeOncePerClassWarner } from '../helpers/deprecation.ts';
 import type AbstractController from '../modules/AbstractController.ts';
+import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import { toLoggableError } from '../services/http/builtinErrorHandlers.ts';
@@ -150,6 +151,8 @@ class ControllerManager extends Base {
     const controllersToLoad = await this.getFilesPathWithInheritance(
       dirname,
       this.app.foldersConfig.controllers,
+      false,
+      controllerOverridePath,
     );
 
     // Index files first so root-level routes/middleware land before nested ones.
