@@ -142,9 +142,48 @@ type HasTsOverride<S> = S extends object
 type MaybeApplyOverrides<Doc, Schema> =
   HasTsOverride<Schema> extends true ? ApplyTsOverrides<Doc, Schema> : Doc;
 
+/**
+ * Remove readonly modifiers introduced by `as const` before handing a schema
+ * definition to Mongoose's `InferRawDocType`.
+ *
+ * Mongoose recommends literal-preserving schema definitions, but its required
+ * path detection currently recognizes mutable `[true, message]` tuples and
+ * mutable array definitions only. Without this boundary normalization,
+ * `required: [true, 'message'] as const` and `type: [String] as const` are
+ * incorrectly inferred as optional. Literal values (`true`, `false`, enum
+ * members) are preserved; only readonly containers/properties become mutable.
+ *
+ * Runtime/opaque values that can legally appear in schema definitions stop the
+ * recursion. `Schema` and `SchemaType` are especially important because their
+ * instance types are deeply self-referential.
+ */
+type SchemaInferenceAtomic =
+  | Schema
+  | mongoose.SchemaType
+  | Date
+  | RegExp
+  | Buffer
+  | Map<unknown, unknown>
+  | Set<unknown>
+  | { readonly _bsontype: string };
+
+type MutableSchemaForInference<T> = T extends SchemaInferenceAtomic
+  ? T
+  : T extends abstract new (
+        ...args: never[]
+      ) => unknown
+    ? T
+    : T extends (...args: never[]) => unknown
+      ? T
+      : T extends readonly unknown[]
+        ? { -readonly [K in keyof T]: MutableSchemaForInference<T[K]> }
+        : T extends object
+          ? { -readonly [K in keyof T]: MutableSchemaForInference<T[K]> }
+          : T;
+
 /** The raw doc type Mongoose infers from a class's `modelSchema` + timestamps. */
 type InferredRawDoc<T extends typeof BaseModel> = InferRawDocType<
-  ExtractProperty<T, 'modelSchema'> &
+  MutableSchemaForInference<ExtractProperty<T, 'modelSchema'>> &
     WithTimestamps<
       Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
     >
@@ -233,7 +272,10 @@ export type GetModelTypeLiteFromSchema<
   // TRawDocType, with any per-field `__tsType` overrides applied (and no wrapper
   // when the schema carries no markers).
   MaybeApplyOverrides<
-    InferRawDocType<T & WithTimestamps<Merge<typeof defaultOptions, TOptions>>>,
+    InferRawDocType<
+      MutableSchemaForInference<T> &
+        WithTimestamps<Merge<typeof defaultOptions, TOptions>>
+    >,
     T
   >
 >;

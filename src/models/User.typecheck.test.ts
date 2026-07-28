@@ -21,6 +21,9 @@
  *    Map, nested);
  *  - `liteModelType.ts` — `GetModelTypeLiteFromSchema` as the `this:` context in
  *    statics / instance methods / `initHooks`, and as `InstanceType<…>`;
+ *  - `readonlySchemaInference.ts` — `as const` schemas keep required-message
+ *    tuples and ordinary arrays non-null while explicit optional/default-null
+ *    paths remain optional;
  *  - `schemaInstance.ts` — a pre-built mongoose `Schema` instance reused as a
  *    (sub-)doc def (`field: Sub` / `[Sub]`) stays opaque to the override scan
  *    (rc.8 regression: it triggered a TS2615 circular mapped type).
