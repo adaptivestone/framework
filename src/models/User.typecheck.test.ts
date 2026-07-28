@@ -7,7 +7,8 @@
  * to a real `tsc`. This compiles the whole `__fixtures__` dir, each file
  * pinning one fix:
  *  - `customUserModel.ts`  — `User` auth statics/methods reused on *customized*
- *    models (additive `extends` + divergent compose) with no `this` casts;
+ *    models (additive `extends` + divergent compose) with no `this` casts,
+ *    including Mongoose 9.8.1's typed `Model.schema` surface;
  *  - `tsTypeOverride.ts`   — per-field `__tsType` overrides for plugin-reshaped
  *    fields applied at every depth;
  *  - `instanceMethodThis.ts` — instance methods with an authored narrow `this`

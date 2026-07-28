@@ -8,12 +8,14 @@
  * `GetModelTypeFromClass<typeof X>` is exactly what a consumer's
  * `getModel('User')` resolves to (see `genTypes.d.ts`), so calling the methods
  * on it here reproduces real call sites. A regression in the structural typing
- * of `UserAuthDoc` / `UserAuthModel` makes this file fail `tsc`.
+ * of `UserAuthDoc` / `UserAuthModel` makes this file fail `tsc`. This also pins
+ * Mongoose 9.8.1 compatibility: its default `Model.schema` type must not make
+ * the framework's structural auth-model bridge invariant in the entire schema.
  */
 
 import type { GetModelTypeFromClass } from '../../modules/BaseModel.ts';
 import { BaseModel } from '../../modules/BaseModel.ts';
-import User from '../User.ts';
+import User, { type UserAuthModel } from '../User.ts';
 
 /* ---- Additive customization: `extends User`, add a field, keep the rest. ---- */
 class AdditiveUser extends User {
@@ -65,6 +67,8 @@ type DivergentHandle = GetModelTypeFromClass<typeof DivergentUser>;
 
 /** Exercise every reused auth method on both customized handles. No casts. */
 export async function additive(M: AdditiveHandle) {
+  const authModel: UserAuthModel = M; // structural bridge ignores schema-only differences
+  void authModel;
   const u = await M.getUserByEmailAndPassword('e@x.io', 'pw');
   if (u) {
     const company: string | null | undefined = u.company; // app-added field survives
@@ -86,6 +90,8 @@ export async function additive(M: AdditiveHandle) {
 }
 
 export async function divergent(M: DivergentHandle) {
+  const authModel: UserAuthModel = M; // composition also satisfies the bridge
+  void authModel;
   const u = await M.getUserByEmailAndPassword('e@x.io', 'pw');
   if (u) {
     const role: string | null | undefined = u.role; // app-replaced field

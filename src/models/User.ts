@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { TFunction } from 'i18next';
-import type { Model, Schema } from 'mongoose';
+import type { HydratedDocument, Model, Schema } from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import {
   burnPasswordVerify,
@@ -67,10 +67,27 @@ export interface UserAuthDoc {
 /** A hydrated {@link UserAuthDoc} the instance-side helpers bind to. */
 export type UserAuthInstance = UserAuthDoc & { save: () => Promise<unknown> };
 
-/** Any Mongoose `User` model the auth statics can bind to: one whose documents
+/**
+ * Any Mongoose `User` model the auth statics can bind to: one whose documents
  * carry {@link UserAuthDoc}. The framework's own `User` and a project's
- * replacement both satisfy it. */
-export type UserAuthModel = Model<UserAuthDoc>;
+ * replacement both satisfy it.
+ *
+ * `TSchema` is deliberately `unknown`. Since Mongoose 9.8.1, leaving that
+ * generic as its `any` default reconstructs a fully typed `Model.schema`; that
+ * makes otherwise-compatible models invariant in their complete raw schema.
+ * These auth helpers never touch `schema`, so hiding only that unused surface
+ * preserves the useful Model operations and the caller's concrete
+ * `InstanceType<T>` without requiring every customized User to have exactly the
+ * framework schema.
+ */
+export type UserAuthModel = Model<
+  UserAuthDoc,
+  object,
+  object,
+  object,
+  HydratedDocument<UserAuthDoc>,
+  unknown
+>;
 
 /**
  * The fields `getPublic` reads, as a plain object (a `Pick` of the framework
