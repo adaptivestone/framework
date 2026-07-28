@@ -15,7 +15,25 @@
 
 import type { GetModelTypeFromClass } from '../../modules/BaseModel.ts';
 import { BaseModel } from '../../modules/BaseModel.ts';
-import User, { type UserAuthModel } from '../User.ts';
+import User, {
+  type UserAuthDoc,
+  type UserAuthModel,
+  type UserModelLite,
+} from '../User.ts';
+
+type AuthFieldMatchesSchema = {
+  [K in keyof UserAuthDoc]-?: [UserAuthDoc[K]] extends [
+    InstanceType<UserModelLite>[K],
+  ]
+    ? [InstanceType<UserModelLite>[K]] extends [UserAuthDoc[K]]
+      ? true
+      : false
+    : false;
+};
+type AuthFieldsFollowSchema =
+  AuthFieldMatchesSchema[keyof UserAuthDoc] extends true ? true : false;
+const authFieldsFollowSchema: true = null as unknown as AuthFieldsFollowSchema;
+void authFieldsFollowSchema;
 
 /* ---- Additive customization: `extends User`, add a field, keep the rest. ---- */
 class AdditiveUser extends User {

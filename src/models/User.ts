@@ -42,27 +42,24 @@ export type UserModelLite = GetModelTypeLiteFromSchema<
 
 export type TUser = GetModelTypeFromClass<typeof User>;
 
-/** A session-token sub-doc (`generateToken` / `getUserByToken`). */
-type SessionToken = { token?: string | null; valid?: Date | null };
-/** A verification / recovery sub-doc (carries an expiry, not a `valid` window). */
-type ExpiringToken = { token?: string | null; until?: Date | null };
+type UserSchemaDocument = InstanceType<UserModelLite>;
+type UserAuthField =
+  | 'email'
+  | 'password'
+  | 'sessionTokens'
+  | 'verificationTokens'
+  | 'passwordRecoveryTokens';
 
 /**
  * The document fields the framework's auth statics & instance methods actually
- * read or write — typed **structurally**, not pinned to the framework's own
- * schema. A project that replaces `User` (extra fields, an i18n `name`, a
- * singular `role`, …) keeps the shipped auth logic callable on its model
- * without casts, as long as it preserves these few fields. This is what lets
- * `getModel('User').getUserByEmailAndPassword(…)` and friends type-check on a
- * customized model instead of forcing a `this`-binding cast at every call site.
+ * read or write. Their value types are picked from the schema-derived lite
+ * document rather than declared a second time, keeping `User.modelSchema` as
+ * the single source of truth. The `Pick` is a structural behavior capability,
+ * not a separately maintained model shape: a project may add fields or reshape
+ * unrelated ones (`name`, `role`, …) and still reuse the auth logic as long as
+ * it preserves these paths.
  */
-export interface UserAuthDoc {
-  email?: string | null;
-  password?: string | null;
-  sessionTokens?: SessionToken[] | null;
-  verificationTokens?: ExpiringToken[] | null;
-  passwordRecoveryTokens?: ExpiringToken[] | null;
-}
+export type UserAuthDoc = Pick<UserSchemaDocument, UserAuthField>;
 
 /** A hydrated {@link UserAuthDoc} the instance-side helpers bind to. */
 export type UserAuthInstance = UserAuthDoc & { save: () => Promise<unknown> };
