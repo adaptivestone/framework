@@ -1,5 +1,5 @@
 /**
- * Type-level fixture (compiled by the `User.typecheck.test.ts` tsc-gate, excluded
+ * Type-level fixture (compiled by the `ModelTyping.typecheck.test.ts` tsc-gate, excluded
  * from the build). Pins the *full model surface* a consumer touches on a plain
  * `BaseModel` — so the common shapes "just work" with no casts:
  *

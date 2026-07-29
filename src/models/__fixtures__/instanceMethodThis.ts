@@ -1,5 +1,5 @@
 /**
- * tsc-gate fixture (compiled by `User.typecheck.test.ts`, excluded from build).
+ * tsc-gate fixture (compiled by `ModelTyping.typecheck.test.ts`, excluded from build).
  *
  * Pins the caller-facing `this`-stripping on instance methods: a method that
  * declares an explicit `this: <bridge>` (a narrower hand-written shape its body

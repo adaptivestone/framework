@@ -20,8 +20,10 @@
  *    create shapes, custom statics, virtuals as a clean getter return, instance
  *    methods, and array + complex field types: enum, ref arrays, subdoc arrays,
  *    Map, nested);
- *  - `liteModelType.ts` — `GetModelTypeLiteFromSchema` as the `this:` context in
- *    statics / instance methods / `initHooks`, and as `InstanceType<…>`;
+ *  - `liteModelType.ts` — the reduced schema-derived authoring model as a
+ *    `this:` context in statics / instance methods / `initHooks`, including
+ *    native Mongoose read/write/aggregate/populate operations and custom schema
+ *    options;
  *  - `readonlySchemaInference.ts` — `as const` schemas keep required-message
  *    tuples and ordinary arrays non-null while explicit optional/default-null
  *    paths remain optional;
@@ -42,8 +44,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
 const fixturesTsconfig = path.join(here, '__fixtures__', 'tsconfig.json');
 
-describe('User auth helpers — customized-model type gate', () => {
-  it('type-checks reuse of the auth statics/methods on a customized User', () => {
+describe('Model typing — compile-time fixture gate', () => {
+  it('type-checks schema-derived and class-derived model contracts', () => {
     const tsc = path.join(repoRoot, 'node_modules/.bin/tsc');
     let ok = true;
     let output = '';

@@ -1,5 +1,5 @@
 /**
- * Type-level fixture (compiled by the `User.typecheck.test.ts` tsc-gate, excluded
+ * Type-level fixture (compiled by the `ModelTyping.typecheck.test.ts` tsc-gate, excluded
  * from the build). Pins the documented "typing populated references" pattern
  * (docs repo `05-models.md`): a ref field marked with
  * `TsTypeOverride<Types.ObjectId | PopulatedDoc>` resolves to that union on

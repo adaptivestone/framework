@@ -1,5 +1,5 @@
 /**
- * Type-level fixture (compiled only by `User.typecheck.test.ts`'s tsc gate,
+ * Type-level fixture (compiled only by `ModelTyping.typecheck.test.ts`'s tsc gate,
  * excluded from the main build). It pins the guarantee behind issue-#2's fix:
  * the framework's `User` auth statics & instance methods stay callable on a
  * project's *customized* `User` model — both the additive (`extends User`) and

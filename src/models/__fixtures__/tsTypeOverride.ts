@@ -1,5 +1,5 @@
 /**
- * Type-level fixture (compiled by the `User.typecheck.test.ts` tsc-gate, excluded
+ * Type-level fixture (compiled by the `ModelTyping.typecheck.test.ts` tsc-gate, excluded
  * from the build). Pins the per-field `__tsType` override: a field marked with
  * {@link TsTypeOverride} is typed as the override on `getModel(...).findOne()`
  * results (and on method `this`), at every depth — top-level, nested object, and

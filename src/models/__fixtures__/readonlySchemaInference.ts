@@ -1,5 +1,5 @@
 /**
- * Type-level fixture (compiled by `User.typecheck.test.ts`, excluded from the
+ * Type-level fixture (compiled by `ModelTyping.typecheck.test.ts`, excluded from the
  * build). Pins readonly-schema inference at the framework boundary.
  *
  * Mongoose's `InferRawDocType` recognizes mutable required-message tuples and

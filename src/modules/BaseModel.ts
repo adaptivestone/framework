@@ -18,11 +18,37 @@ type Timestamps = {
   updatedAt: { type: DateConstructor; required: true };
 };
 
-export type WithTimestamps<TOptions> = TOptions extends { timestamps: true }
-  ? Timestamps
-  : TOptions extends { timestamps: false }
+type TimestampFieldName<Value, DefaultName extends string> = Value extends false
+  ? never
+  : Value extends string
+    ? Value
+    : DefaultName;
+
+type TimestampFieldsFromConfig<TConfig> = {
+  [K in keyof Timestamps as K extends keyof TConfig
+    ? TimestampFieldName<TConfig[K], K>
+    : K]: Timestamps[K];
+};
+
+/**
+ * Timestamp schema fields implied by the effective Mongoose schema options.
+ *
+ * The framework enables both default timestamp paths unless a model overrides
+ * that default. Object-form options can disable either path independently or
+ * rename it. An omitted key in an object config keeps its default field, which
+ * matches Mongoose's runtime `handleTimestampOption()` behavior.
+ */
+export type WithTimestamps<TOptions> = TOptions extends {
+  timestamps: infer TConfig;
+}
+  ? TConfig extends false
     ? object
-    : Timestamps;
+    : TConfig extends true
+      ? Timestamps
+      : TConfig extends object
+        ? TimestampFieldsFromConfig<TConfig>
+        : Timestamps
+  : Timestamps;
 
 export type ExtractProperty<
   T,
@@ -265,6 +291,19 @@ export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
 > &
   ExtractProperty<T, 'modelStatics'>; // Add intersection with static methods
 
+/**
+ * A reduced Mongoose model type inferred from the runtime schema definition.
+ *
+ * Use this only as an authoring context inside a model class, where resolving
+ * `GetModelTypeFromClass<typeof CurrentClass>` would circularly reference the
+ * class member still being inferred. It has native Mongoose model operations
+ * and schema fields, but intentionally cannot contain that unfinished class's
+ * custom statics, methods, or virtuals.
+ *
+ * This is a TypeScript authoring limitation, not a second runtime schema. Use
+ * {@link GetModelTypeFromClass} for complete model handles after class
+ * definition.
+ */
 export type GetModelTypeLiteFromSchema<
   T extends typeof BaseModel.modelSchema,
   TOptions = object,

@@ -1,5 +1,5 @@
 /**
- * Type-level fixture (compiled by the `User.typecheck.test.ts` tsc-gate, excluded
+ * Type-level fixture (compiled by the `ModelTyping.typecheck.test.ts` tsc-gate, excluded
  * from the build). Pins that a pre-built mongoose `Schema` INSTANCE reused as a
  * (sub-)document definition — `field: SubSchema` and `[SubSchema]`, a standard
  * Mongoose pattern — is opaque to the `__tsType` override scan.
