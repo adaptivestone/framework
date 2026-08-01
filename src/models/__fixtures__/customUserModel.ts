@@ -83,6 +83,24 @@ class DivergentUser extends BaseModel {
 }
 type DivergentHandle = GetModelTypeFromClass<typeof DivergentUser>;
 
+/* ---- Capability-scoped customization. A model may reuse login statics
+ * without implementing unrelated verification/recovery token flows. Each
+ * static should require only the schema fields its own body reads. ---- */
+class CredentialsUser extends BaseModel {
+  static get modelSchema() {
+    return {
+      email: { type: String, required: true },
+      password: String,
+      accountCode: { type: String, required: true },
+    } as const;
+  }
+
+  static get modelStatics() {
+    return { ...User.modelStatics } as const;
+  }
+}
+type CredentialsHandle = GetModelTypeFromClass<typeof CredentialsUser>;
+
 /** Exercise every reused auth method on both customized handles. No casts. */
 export async function additive(M: AdditiveHandle) {
   const authModel: UserAuthModel = M; // structural bridge ignores schema-only differences
@@ -123,4 +141,18 @@ export async function divergent(M: DivergentHandle) {
   // NOTE: `getPublic` is intentionally NOT reused here — this model reshapes
   // `name` (i18n), so its public shape differs and it overrides `getPublic`
   // with its own. The auth statics above, which don't touch `name`, are reused.
+}
+
+export async function credentialsOnly(M: CredentialsHandle) {
+  const byEmail = await M.getUserByEmail('e@x.io');
+  if (byEmail) {
+    const accountCode: string = byEmail.accountCode;
+    void accountCode;
+  }
+
+  const byPassword = await M.getUserByEmailAndPassword('e@x.io', 'pw');
+  if (byPassword) {
+    const accountCode: string = byPassword.accountCode;
+    void accountCode;
+  }
 }

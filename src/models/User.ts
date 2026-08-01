@@ -43,7 +43,7 @@ export type UserModelLite = GetModelTypeLiteFromSchema<
 export type TUser = GetModelTypeFromClass<typeof User>;
 
 type UserSchemaDocument = InstanceType<UserModelLite>;
-type UserAuthField =
+export type UserAuthField =
   | 'email'
   | 'password'
   | 'sessionTokens'
@@ -51,23 +51,24 @@ type UserAuthField =
   | 'passwordRecoveryTokens';
 
 /**
- * The document fields the framework's auth statics & instance methods actually
- * read or write. Their value types are picked from the schema-derived lite
- * document rather than declared a second time, keeping `User.modelSchema` as
- * the single source of truth. The `Pick` is a structural behavior capability,
- * not a separately maintained model shape: a project may add fields or reshape
- * unrelated ones (`name`, `role`, …) and still reuse the auth logic as long as
- * it preserves these paths.
+ * Schema-derived fields used by the framework's auth statics and instance
+ * methods. `TField` lets each operation expose only the paths it actually
+ * needs; omitting it selects the complete auth field set. The `Pick` is a
+ * structural behavior capability, not a separately maintained model shape, so
+ * `User.modelSchema` remains the single source of truth.
  */
-export type UserAuthDoc = Pick<UserSchemaDocument, UserAuthField>;
+export type UserAuthDoc<TField extends UserAuthField = UserAuthField> = Pick<
+  UserSchemaDocument,
+  TField
+>;
 
 /** A hydrated {@link UserAuthDoc} the instance-side helpers bind to. */
 export type UserAuthInstance = UserAuthDoc & { save: () => Promise<unknown> };
 
 /**
- * Any Mongoose `User` model the auth statics can bind to: one whose documents
- * carry {@link UserAuthDoc}. The framework's own `User` and a project's
- * replacement both satisfy it.
+ * Any Mongoose `User` model an auth static can bind to: one whose documents
+ * carry its selected {@link UserAuthDoc} fields. The framework's own `User` and
+ * a replacement that supports that operation both satisfy it.
  *
  * `TSchema` is deliberately `unknown`. Since Mongoose 9.8.1, leaving that
  * generic as its `any` default reconstructs a fully typed `Model.schema`; that
@@ -77,12 +78,12 @@ export type UserAuthInstance = UserAuthDoc & { save: () => Promise<unknown> };
  * `InstanceType<T>` without requiring every customized User to have exactly the
  * framework schema.
  */
-export type UserAuthModel = Model<
-  UserAuthDoc,
+export type UserAuthModel<TField extends UserAuthField = UserAuthField> = Model<
+  UserAuthDoc<TField>,
   object,
   object,
   object,
-  HydratedDocument<UserAuthDoc>,
+  HydratedDocument<UserAuthDoc<TField>>,
   unknown
 >;
 
@@ -222,7 +223,7 @@ class User extends BaseModel {
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
       getUserByEmailAndPassword: async function getUserByEmailAndPassword<
-        T extends UserAuthModel,
+        T extends UserAuthModel<'email' | 'password'>,
       >(this: T, email: string, password: string) {
         const data = await this.findOne<InstanceType<T>>({
           email: String(email),
@@ -260,10 +261,9 @@ class User extends BaseModel {
        * @param {string}
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
-      getUserByToken: async function getUserByToken<T extends UserAuthModel>(
-        this: T,
-        token: string,
-      ) {
+      getUserByToken: async function getUserByToken<
+        T extends UserAuthModel<'sessionTokens'>,
+      >(this: T, token: string) {
         const data = await this.findOne<InstanceType<T>>({
           sessionTokens: {
             $elemMatch: {
@@ -279,10 +279,9 @@ class User extends BaseModel {
        * @param {string}
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
-      getUserByEmail: async function getUserByEmail<T extends UserAuthModel>(
-        this: T,
-        email: string,
-      ) {
+      getUserByEmail: async function getUserByEmail<
+        T extends UserAuthModel<'email'>,
+      >(this: T, email: string) {
         const data = await this.findOne<InstanceType<T>>({
           email: String(email),
         });
@@ -297,10 +296,9 @@ class User extends BaseModel {
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
       getUserByPasswordRecoveryToken:
-        async function getUserByPasswordRecoveryToken<T extends UserAuthModel>(
-          this: T,
-          passwordRecoveryToken: string,
-        ) {
+        async function getUserByPasswordRecoveryToken<
+          T extends UserAuthModel<'passwordRecoveryTokens'>,
+        >(this: T, passwordRecoveryToken: string) {
           const hashed = hashToken(String(passwordRecoveryToken));
           const data = await this.findOne<InstanceType<T>>({
             passwordRecoveryTokens: {
@@ -330,7 +328,7 @@ class User extends BaseModel {
        * @returns {Promise<InstanceType<UserModelLite> | false>}
        */
       getUserByVerificationToken: async function getUserByVerificationToken<
-        T extends UserAuthModel,
+        T extends UserAuthModel<'verificationTokens'>,
       >(this: T, verificationToken: string) {
         const hashed = hashToken(String(verificationToken));
         const data = await this.findOne<InstanceType<T>>({
