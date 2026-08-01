@@ -7,9 +7,10 @@ import { getTemplate } from './appTypes.ts';
 /**
  * The config branch of `getTemplate` emits a TypeScript type derived from each
  * config value's *shape* — value types (`string`, `number`), never the literal
- * values. These tests pin that contract: no secret leak, structure-preserving
- * (arrays stay tuples so `Object.values(item)` keeps precise types), and inline
- * (no `import()` to resolve). `modelPaths` is empty so nothing is imported.
+ * values. These tests pin that contract: no secret leak, homogeneous arrays
+ * widened independently of their current length, heterogeneous arrays kept as
+ * tuples, and inline output (no `import()` to resolve). `modelPaths` is empty
+ * so nothing is imported.
  */
 describe('appTypes — config type emission (shape-derived)', () => {
   const get = (name: string, value: unknown) =>
@@ -29,7 +30,27 @@ describe('appTypes — config type emission (shape-derived)', () => {
     expect(out).not.toContain('3300');
   });
 
-  it('keeps arrays as tuples so per-element types survive (the siteMap regression)', async () => {
+  it('widens homogeneous primitive, nested, and object arrays', async () => {
+    const out = await get('collections', {
+      domains: ['one.example', 'two.example'],
+      retries: [1],
+      dimensions: [
+        [300, 300],
+        [1080, 1080],
+      ],
+      endpoints: [
+        { hostname: 'one.example', secure: true },
+        { hostname: 'two.example', secure: false },
+      ],
+    });
+    expect(out).toContain(
+      `getConfig(configName: 'collections'): { "domains": string[]; "retries": number[]; "dimensions": number[][]; "endpoints": { "hostname": string; "secure": boolean }[] };`,
+    );
+    expect(out).not.toContain('one.example');
+    expect(out).not.toContain('1080');
+  });
+
+  it('keeps heterogeneous arrays as tuples so per-element types survive', async () => {
     const out = await get('siteMap', {
       domains: [
         { 'example.com': 'en' },

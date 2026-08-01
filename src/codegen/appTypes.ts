@@ -55,9 +55,10 @@ export async function generateAppTypes(
  * Render a TypeScript type from a runtime config value's **shape** — value
  * *types* (`string`, `number`), never the literal values. This is emitted
  * inline (no `import()` to resolve, so output is robust across compilers and
- * module settings) and structure-preserving (arrays stay tuples, so patterns
- * like `Object.values(config.list[0])` keep precise per-element types) — while
- * never serializing a secret value into the generated file.
+ * module settings). Homogeneous arrays widen to reusable array types instead
+ * of freezing the runtime sample's length into a tuple; heterogeneous arrays
+ * stay tuples so their distinct per-position types survive. No secret value is
+ * ever serialized into the generated file.
  *
  * A `undefined`-valued key is normally dropped (no knowable type at gen time).
  * `env` (from {@link extractConfigEnvShape}) overrides that for keys read from
@@ -86,9 +87,14 @@ function valueToTypeString(value: unknown, env?: EnvShape): string {
       return '((...args: any[]) => any)';
     case 'object': {
       if (Array.isArray(value)) {
-        return value.length === 0
-          ? 'unknown[]'
-          : `[${value.map((v) => valueToTypeString(v)).join(', ')}]`;
+        if (value.length === 0) {
+          return 'unknown[]';
+        }
+        const itemTypes = value.map((v) => valueToTypeString(v));
+        const firstItemType = itemTypes[0];
+        return itemTypes.every((itemType) => itemType === firstItemType)
+          ? `${firstItemType}[]`
+          : `[${itemTypes.join(', ')}]`;
       }
       // Only walk plain objects; anything exotic (Date, RegExp, Map, …) is opaque.
       const proto = Object.getPrototypeOf(value);
