@@ -31,7 +31,7 @@ const receipt = await app.jobs.enqueue('sendEmail', payload, {
 await app.jobs.status(receipt.id); // queued | running | succeeded | failed | dead-lettered
 
 app.jobs.onDeadLetter((job, error) => {
-  app.logger.error({ job, error }, 'Job dead-lettered');
+  app.logger.error('Job dead-lettered', error, { job });
 });
 ```
 

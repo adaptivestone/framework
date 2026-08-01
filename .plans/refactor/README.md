@@ -53,6 +53,9 @@ flowchart LR
 
     Patch --> Params["⏸ params validation"]
     Patch --> Metrics["⏸ metrics seam"]
+    Patch --> Logging["⏸ logging facade + Pino"]
+    Logging --> Observability["◌ traces + correlation"]
+    Metrics --> Observability
 
     OpenAPIGen["✅ OpenAPI generator"] --> MCP["◌ MCP surface"]
 ```
@@ -88,6 +91,7 @@ repository; Markdown remains the reviewed source of truth.
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.3 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.3; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
+| [logging-facade-and-pino](queued/logging-facade-and-pino.md) | P1z | **Vendor-neutral logging + Pino.** Lock a framework-owned structured logger/Error contract in v5.x, then cut `IApp.logger`, config, Sentry and tests from Winston to a Pino-backed sink runtime in v6; LogTape remains a conformance-gated future option. |
 | [http-engine-spike](queued/http-engine-spike.md) | Spike | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships. |
 | [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md) | P1y | **Typed, auditable i18n for framework + projects.** Missing/unused/coverage checks, generated autocomplete, large-catalog selector mode, isolated runtime instance/backend seam; additive v5 foundation and v6 framework-namespace cutover. |
 
@@ -179,6 +183,9 @@ repository; Markdown remains the reviewed source of truth.
 ## Unscheduled after v5.2.1
 
 - [Observability Phase 1 — metrics](queued/metrics-seam.md) stays queued until it is planned with the broader observability work. Its automatic HTTP response status/size measurements may build on P1q's response writer.
+- [Vendor-neutral logging + Pino](queued/logging-facade-and-pino.md) starts with an additive v5.x
+  contract/conformance phase; the public logger, config and dependency replacement land together
+  in v6 because `IApp.logger` currently exposes Winston directly.
 
 ## v6 breaking defaults (no phase doc — tracked as bullets)
 

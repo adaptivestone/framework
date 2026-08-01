@@ -17,6 +17,11 @@ These were debated and settled. Don't relitigate without proposing an amendment 
 - **Pre-compiled middleware chains.** `RouteRegistry` flattens [global stages] + [controller MWs] + [route MWs] + [validation] + [handler] into a single array at registration; `Pipeline.dispatch` walks it index-by-index. No per-request closure allocation.
 - **Hidden-class-stable `RequestContext`.** Every field initialized in the constructor (the single biggest "free" V8 perf win). Lazy getters for expensive resources (`ctx.req`, `ctx.cookies`, `ctx.var`).
 - **Observability on by default** (Phase 2b). All optional peers; no overhead when not installed.
+- **Framework-owned logger contract; Pino is an implementation sink, not public API** (P1z).
+  `IApp.logger` exposes message-first `FrameworkLogger`, and the runtime fans one normalized record
+  out to Pino JSON, development pretty, direct Sentry, test-memory or registered custom sinks.
+  Native Error values survive until sinks consume them. Winston-specific transports/config leave
+  in v6; LogTape is re-evaluated against the same conformance suite without changing call sites.
 - **MCP-first agent surface** (Phase 2d). `app.toMcpServer()` derives tools from the `RouteRegistry` (and the per-controller `*.routes.gen.d.ts` artefacts). Three meta-tools handle the >40-tool ceiling. Typed-TS client export from the same registry walk.
 - **URL prefixes via `getHttpPath()`** — default returns `/{constructor-name-lowercased}`; override in subclasses for custom paths (e.g., `Home` → `/`). Codegen reads the value via runtime introspection on the controller instance — no separate `static httpPath` field needed. `app.mount(prefix, Controller)` registers a controller with a runtime-computed prefix.
 

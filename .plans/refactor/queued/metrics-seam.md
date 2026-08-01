@@ -121,7 +121,7 @@ try {
   await Activity.create(event);
 } catch (error) {
   app.metrics.increment('audit.write_failed');
-  app.logger.error({ error, eventType: event.type }, 'Activity write failed');
+  app.logger.error('Activity write failed', error, { eventType: event.type });
 }
 ```
 
