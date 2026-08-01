@@ -177,7 +177,7 @@ export async function getTemplate(
 
   // Detect `BaseModel` subclasses by parsing each model's source (no runtime
   // import — codegen never loads the model graph / Mongoose). Result drives both
-  // the `getModel` emission and the `appInfo.user` augmentation below.
+  // the `AppModelTypes` emission and the `appInfo.user` augmentation below.
   // One probe cache for the whole run — a shared base model parses once.
   const modelCache = new Map<string, boolean>();
   const models = await Promise.all(
@@ -189,11 +189,12 @@ export async function getTemplate(
   );
 
   const modelTypes = models
-    .map((m) =>
-      m.isBaseModel
-        ? `    getModel(modelName: ${sq(m.file)}): GetModelTypeFromClass<typeof import(${sq(m.relPath)}).default>`
-        : `    getModel(modelName: ${sq(m.file)}): import(${sq(m.relPath)}).default['mongooseModel']`,
-    )
+    .map((m) => {
+      const modelType = m.isBaseModel
+        ? `GetModelTypeFromClass<typeof import(${sq(m.relPath)}).default>`
+        : `import(${sq(m.relPath)}).default['mongooseModel']`;
+      return `    ${sq(m.file)}: ${modelType};`;
+    })
     .join('\n');
 
   // Bind `req.appInfo.user` to the project's `User` model (if it's a BaseModel),
@@ -217,9 +218,12 @@ import type {} from '@adaptivestone/framework/server.js';
 import type { GetModelTypeFromClass } from '@adaptivestone/framework/modules/BaseModel.js';
 
 declare module '@adaptivestone/framework/server.js' {
+  export interface AppModelTypes {
+      ${modelTypes}
+  }
+
   export interface IApp {
       ${configTypes}
-      ${modelTypes}
   }
 }
 ${userAppInfo}`;

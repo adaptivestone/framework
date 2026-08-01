@@ -126,7 +126,7 @@ describe('appTypes — config type emission (shape-derived)', () => {
 /**
  * `appInfo.user` must follow the project's `User` model (not the framework's)
  * when it's replaced — so codegen emits an `AppModels` augmentation binding
- * `User` to the project model, mirroring how it types `getModel('User')`.
+ * `User` to the project model, mirroring the generated `AppModelTypes` entry.
  */
 describe('appTypes — appInfo.user binding', () => {
   const userModelPath = fileURLToPath(
@@ -141,9 +141,12 @@ describe('appTypes — appInfo.user binding', () => {
       "declare module '@adaptivestone/framework/models/User.js'",
     );
     expect(out).toContain('export interface AppModels {');
+    expect(out).toMatch(
+      /'User': GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>/,
+    );
     // `appInfo.user` is the hydrated DOCUMENT, so the binding must be wrapped in
-    // `InstanceType<…>` — emitting the bare Model class (as `getModel('User')`
-    // returns) inverts the type so `user.id` / `user.email` stop type-checking.
+    // `InstanceType<…>` — emitting the bare Model class (as the AppModelTypes
+    // entry uses) inverts the type so `user.id` / `user.email` stop type-checking.
     expect(out).toMatch(
       /User: InstanceType<GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>>/,
     );
@@ -185,7 +188,7 @@ describe('appTypes — name escaping in emitted string literals (finding #20)', 
     // backslash into the `import('…')` string literal.
     const weird = path.join(process.cwd(), "src/models/wei'rd\\Model.ts");
     const out = await getTemplate(new Map(), [{ file: "Mo'del", path: weird }]);
-    expect(out).toContain("getModel(modelName: 'Mo\\'del')");
+    expect(out).toContain("'Mo\\'del': import(");
     expect(out).toContain("wei\\'rd\\\\Model.ts");
     expect(parseDiagnostics(out)).toEqual([]);
   });

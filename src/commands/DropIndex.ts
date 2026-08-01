@@ -1,4 +1,5 @@
 import AbstractCommand from '../modules/AbstractCommand.ts';
+import type { AppModel } from '../server.ts';
 
 class DropIndex extends AbstractCommand {
   static get description() {
@@ -19,9 +20,10 @@ class DropIndex extends AbstractCommand {
   }
 
   async run() {
-    const Model = this.app.getModel(this.args.model as string);
-
-    if (!Model) {
+    let Model: AppModel;
+    try {
+      Model = this.app.getModelOrThrow(this.args.model as string);
+    } catch {
       this.logger?.error('Not able to find model');
       return false;
     }

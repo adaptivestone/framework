@@ -29,11 +29,44 @@ interface AppCache {
   modelPaths: { path: string; file: string }[];
 }
 
+/** Models shipped by the framework and therefore available without codegen. */
+export type FrameworkModelName =
+  | 'KeyValue'
+  | 'Lock'
+  | 'Migration'
+  | 'Sequence'
+  | 'User'
+  | 'UserOld';
+
+/** Runtime model type used when a model name is not statically known. */
+export type AppModel = AbstractModel['mongooseModel'] | TBaseModel;
+
+/**
+ * Generated application model-name map. `npm run gen` augments this interface
+ * in `genTypes.d.ts`; it is empty before code generation by design.
+ */
+// biome-ignore lint/suspicious/noEmptyInterface: codegen augmentation target
+export interface AppModelTypes {}
+
 export interface IApp {
   getConfig(configName: string): Record<string, unknown>;
-  getModel(
-    modelName: string,
-  ): AbstractModel['mongooseModel'] | false | TBaseModel;
+  /**
+   * Return a statically known model. Application model names and types are
+   * generated into `genTypes.d.ts`; arbitrary strings must use
+   * {@link getModelOrThrow}.
+   */
+  getModel<TModelName extends keyof AppModelTypes>(
+    modelName: TModelName,
+  ): AppModelTypes[TModelName];
+  getModel(modelName: FrameworkModelName): AppModel | false;
+  /**
+   * Resolve a runtime model name or throw when it is unavailable. Generated
+   * model mappings preserve the concrete model type for known names.
+   */
+  getModelOrThrow<TModelName extends keyof AppModelTypes>(
+    modelName: TModelName,
+  ): AppModelTypes[TModelName];
+  getModelOrThrow(modelName: string): AppModel;
   runCliCommand(commandName: string): Promise<boolean | undefined>;
   updateConfig(
     configName: string,
@@ -148,7 +181,13 @@ class Server {
     const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),
-      getModel: this.getModel.bind(this),
+      // Application overloads are added to IApp by generated declarations.
+      // Runtime dispatch remains name-based, so bridge the broad implementation
+      // to that augmented overload set at this single construction boundary.
+      getModel: this.getModel.bind(this) as IApp['getModel'],
+      getModelOrThrow: this.getModelOrThrow.bind(
+        this,
+      ) as IApp['getModelOrThrow'],
       runCliCommand: this.runCliCommand.bind(this),
       updateConfig: this.updateConfig.bind(this),
       getI18nService: this.getI18nService.bind(this),
@@ -820,9 +859,7 @@ class Server {
    * Support cache
    * @param {String} modelName name on config file to load
    */
-  getModel(
-    modelName: string,
-  ): AbstractModel['mongooseModel'] | TBaseModel | false {
+  getModel(modelName: string): AppModel | false {
     if (modelName.endsWith('s')) {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
@@ -840,6 +877,23 @@ class Server {
         `You asked for model ${modelName} that not exists. Please check you codebase `,
       );
       return false;
+    }
+    return model;
+  }
+
+  /**
+   * Resolve a model whose name is only known at runtime.
+   *
+   * Unlike {@link getModel}, this method never returns `false`: an unknown
+   * model name or a lookup before initialization throws after the normal
+   * lookup diagnostic has been logged.
+   */
+  getModelOrThrow(modelName: string): AppModel {
+    const model = this.getModel(modelName);
+    if (!model) {
+      throw new Error(
+        `Model '${modelName}' is not available. Check the model name and ensure Server.init() has completed.`,
+      );
     }
     return model;
   }

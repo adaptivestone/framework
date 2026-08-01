@@ -16,6 +16,9 @@
  *     `query:` schema flows to a typed `req.appInfo.request` / `.query`, and a
  *     `:id` segment to `req.params.id` — asserted via typed-local assignments
  *     (a fallback to `Record<string, unknown>` or a missing param fails tsc).
+ *   - generated model-name lookup (`appModelLookup.ts`): known literals and
+ *     unions resolve precisely, replacements win framework fallbacks, unknown
+ *     names fail, and the explicit runtime-name API has no `false` branch.
  *
  * The bare-package-ancestor variant of inheritance is unit-tested in
  * `astResolve.test.ts` (it can't run end-to-end inside this repo).

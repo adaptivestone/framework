@@ -19,7 +19,7 @@ class SyncIndexes extends AbstractCommand {
     this.logger?.info(`Total found ${models.length} models`);
 
     for (const modelName of models) {
-      const Model = this.app.getModel(modelName) as TModel<unknown>;
+      const Model = this.app.getModelOrThrow(modelName) as TModel<unknown>;
       const removedIndexes = await Model.syncIndexes(); // await in loop not a bug. Lets do one by one
       if (removedIndexes.length) {
         this.logger?.info(

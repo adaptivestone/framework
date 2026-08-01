@@ -12,16 +12,17 @@ import { serverInstance } from './tests/testHelpers.ts';
 
 /**
  * `getModel` / `getConfig` are the two lookups every consumer uses. These pin
- * their DX-safety guards on the already-initialized app: an unknown name warns
- * and returns a safe empty value (never throws mid-request), and a plural model
- * name nudges toward the singular convention.
+ * their DX-safety guards on the already-initialized app: the low-level server
+ * lookup still warns and returns a safe empty value for an unknown runtime
+ * name, while the app's explicit dynamic API throws instead of returning a
+ * `false | Model` union. A plural name nudges toward the singular convention.
  */
 describe('Server lookups — DX guards', () => {
   it('getModel warns and returns false for an unknown model', () => {
     const warn = vi
       .spyOn(appInstance.logger, 'warn')
       .mockImplementation(() => appInstance.logger);
-    expect(appInstance.getModel('NoSuchModel')).toBe(false);
+    expect(serverInstance.getModel('NoSuchModel')).toBe(false);
     expect(warn).toHaveBeenCalledOnce();
     warn.mockRestore();
   });
@@ -30,7 +31,7 @@ describe('Server lookups — DX guards', () => {
     const warn = vi
       .spyOn(appInstance.logger, 'warn')
       .mockImplementation(() => appInstance.logger);
-    appInstance.getModel('Users'); // plural → nudge + (also unknown) → false
+    serverInstance.getModel('Users'); // plural → nudge + (also unknown) → false
     expect(warn.mock.calls.some(([m]) => String(m).includes('plural'))).toBe(
       true,
     );
@@ -39,6 +40,23 @@ describe('Server lookups — DX guards', () => {
 
   it('getModel returns a real model for a known name', () => {
     expect(appInstance.getModel('User')).toBeTruthy();
+  });
+
+  it('getModelOrThrow returns a real model for a known name', () => {
+    expect(appInstance.getModelOrThrow('User')).toBe(
+      appInstance.getModel('User'),
+    );
+  });
+
+  it('getModelOrThrow throws for an unknown runtime name', () => {
+    const warn = vi
+      .spyOn(appInstance.logger, 'warn')
+      .mockImplementation(() => appInstance.logger);
+    expect(() => appInstance.getModelOrThrow('NoSuchModel')).toThrow(
+      "Model 'NoSuchModel' is not available",
+    );
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 
   it('getConfig warns and returns {} for an unknown config', () => {
@@ -65,6 +83,9 @@ describe('Server lookups — DX guards', () => {
       });
 
       expect(server.getModel('Uninitialized')).toBe(false);
+      expect(() => server.getModelOrThrow('Uninitialized')).toThrow(
+        "Model 'Uninitialized' is not available",
+      );
       expect(error).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'You should call Server.init() before using getModel',

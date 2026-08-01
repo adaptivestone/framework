@@ -1,6 +1,6 @@
 {
   "extends": "../../../tsconfig.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["controllers/**/*.ts"],
+  "include": ["controllers/**/*.ts", "appModelLookup.ts"],
   "exclude": []
 }
