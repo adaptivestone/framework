@@ -30,6 +30,46 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           drop-express blocked by node-adapter
 ```
 
+## Visual roadmap
+
+```mermaid
+flowchart LR
+    Foundation["✅ v5 foundations"] --> Patch["🔄 v5.2.1 adoption fixes"]
+
+    Patch --> Responses["⏸ v5.3 universal responses"]
+    Responses --> OpenAPI["⏸ OpenAPI response contracts"]
+
+    Patch --> I18nV5["⏸ P1y i18n audit + types + runtime"]
+    I18nV5 --> I18nV6["◌ v6 namespace + selector defaults"]
+
+    Foundation --> Codegen["✅ AST codegen"]
+    Codegen --> V6["◌ v6 cutover"]
+    V6 --> NodeAdapter["◌ Node adapter"]
+    NodeAdapter --> DefaultNode["◌ Node adapter default"]
+    DefaultNode --> DropExpress["◌ Express removed"]
+
+    Foundation --> Docs["🔄 docs + LLM skills"]
+    Docs --> Publish["◌ publish pipeline"]
+
+    Patch --> Params["⏸ params validation"]
+    Patch --> Metrics["⏸ metrics seam"]
+
+    OpenAPIGen["✅ OpenAPI generator"] --> MCP["◌ MCP surface"]
+```
+
+`✅ done` · `🔄 active` · `⏸ queued` · `◌ later`
+
+For an interactive, collapsible view of any plan, render its Markdown with
+[Markmap](https://markmap.js.org/docs/packages--markmap-cli):
+
+```sh
+npx markmap-cli .plans/refactor/queued/i18n-contracts-and-tooling.md \
+  -o /tmp/framework-i18n-plan.html
+```
+
+Add `--watch` while editing. The HTML is intentionally written outside the
+repository; Markdown remains the reviewed source of truth.
+
 ## Index
 
 ### active/
@@ -49,6 +89,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
 | [http-engine-spike](queued/http-engine-spike.md) | Spike | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships. |
+| [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md) | P1y | **Typed, auditable i18n for framework + projects.** Missing/unused/coverage checks, generated autocomplete, large-catalog selector mode, isolated runtime instance/backend seam; additive v5 foundation and v6 framework-namespace cutover. |
 
 ### later/
 
@@ -151,6 +192,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 ## Conventions
 
 - **Each phase doc fits on one screen** when collapsed. Goal, files, API, test plan, out-of-scope, done.
+- **Add one Mermaid visual overview when relationships matter** — three or more dependent phases, branches, owners, or downstream consumers. Keep prose authoritative; the diagram is navigation, not a second specification.
 - **Out-of-scope lists are mandatory.** "What's NOT in this phase" prevents scope-creep panic.
 - **Files touched is exhaustive.** If a phase modifies a file not listed, that's a bug in the plan.
 - **Done when is verifiable in under 5 minutes.** Not "feature complete"; specific commands or observations.
