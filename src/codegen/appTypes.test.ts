@@ -32,13 +32,13 @@ describe('appTypes — config type emission (shape-derived)', () => {
   it('keeps arrays as tuples so per-element types survive (the siteMap regression)', async () => {
     const out = await get('siteMap', {
       domains: [
-        { 'insailing.com': 'en' },
-        { 'insailing.ru': 'ru' },
-        { 'insailing.de': 'de' },
+        { 'example.com': 'en' },
+        { 'example.org': 'fr' },
+        { 'example.net': 'de' },
       ],
     });
     expect(out).toContain(
-      `getConfig(configName: 'siteMap'): { "domains": [{ "insailing.com": string }, { "insailing.ru": string }, { "insailing.de": string }] };`,
+      `getConfig(configName: 'siteMap'): { "domains": [{ "example.com": string }, { "example.org": string }, { "example.net": string }] };`,
     );
     expect(out).not.toContain("'en'");
     expect(out).not.toContain(': "en"');

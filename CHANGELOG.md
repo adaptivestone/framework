@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- **Model typing regression coverage now includes complex schema and document patterns.** Compile-only fixtures cover required-message fields, nested generated-id documents, fields named `type`, reusable schema fragments, document and query middleware, plugin-shaped values, populated nested refs, aggregation projections and facets, `$locals`, typed `$model<T>()`, and custom timestamp configurations.
 - **Dependency-free schemas can now describe their OpenAPI shape explicitly.** `defineSchema(validate, { jsonSchema })` accepts a JSON Schema object or factory without adding a validator dependency. Runtime validation remains callback-driven; the optional shape is consumed through the existing Standard Schema driver and can be reused by application or framework-owned schemas. Every `toJsonSchema()` call returns a copy, so a shared schema object cannot be mutated through a generated document.
 
 ### Fixed

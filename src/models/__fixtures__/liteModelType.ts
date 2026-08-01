@@ -131,7 +131,7 @@ export function asDocument(doc: AccountSchemaDocument) {
 }
 
 // The schema-derived type preserves the native Mongoose model surface used by
-// tht-server's statics, controllers, services, commands, and tests.
+// common statics, controllers, services, commands, and tests.
 export async function asModel(M: AccountModelLite) {
   const one = await M.findOne({ email: 'a@b.io' });
   const email: string | undefined = one?.email;
