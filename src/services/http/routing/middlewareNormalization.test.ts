@@ -39,6 +39,30 @@ describe('normalizeMiddleware', () => {
     ).toThrow(TypeError);
   });
 
+  it('throws TypeError when tuple length is not exactly two', () => {
+    expect(() =>
+      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+      normalizeMiddleware([FakeMw as any] as any),
+    ).toThrow('expected exactly [Class, params]');
+
+    expect(() =>
+      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+      normalizeMiddleware([FakeMw as any, {}, 'extra'] as any),
+    ).toThrow('expected exactly [Class, params]');
+  });
+
+  it('throws TypeError when tuple params are not a plain object shape', () => {
+    expect(() =>
+      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+      normalizeMiddleware([FakeMw as any, null] as any),
+    ).toThrow('expected a params object');
+
+    expect(() =>
+      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+      normalizeMiddleware([FakeMw as any, []] as any),
+    ).toThrow('expected a params object');
+  });
+
   it('throws TypeError on plain non-class, non-tuple input', () => {
     expect(() =>
       // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input

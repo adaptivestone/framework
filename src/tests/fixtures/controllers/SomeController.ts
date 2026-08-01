@@ -1,10 +1,6 @@
 import type { Response } from 'express';
 import { boolean, number, object, string } from 'yup';
 import type { TUser } from '../../../models/User.ts';
-import type {
-  RouteParams,
-  TMiddleware,
-} from '../../../modules/AbstractController.ts';
 import AbstractController from '../../../modules/AbstractController.ts';
 import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
 import AuthMiddleware from '../../../services/http/middleware/Auth.ts';
@@ -18,7 +14,7 @@ import CheckFlag from '../middleware/CheckFlag.ts';
 import DeprecatedSchemaMiddleware from '../middleware/DeprecatedSchemaMiddleware.ts';
 
 class SomeController extends AbstractController {
-  get routes(): RouteParams {
+  get routes() {
     return {
       get: {
         '/': {
@@ -183,7 +179,7 @@ class SomeController extends AbstractController {
     });
   }
 
-  static get middleware(): Map<string, TMiddleware> {
+  static get middleware() {
     return new Map([
       ['/{*splat}', [GetUserByToken]],
       ['PATCH/userAvatar', [GetUserByToken, AuthMiddleware]],

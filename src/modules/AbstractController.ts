@@ -11,8 +11,23 @@ type MiddlewareWithParamsTuple = readonly [
   typeof AbstractMiddleware,
   Record<string, unknown>,
 ];
+
+/**
+ * The type TypeScript infers for an inline `[Middleware, params]` entry inside
+ * an unannotated derived `routes` getter. Derived getters do not receive a
+ * contextual return type from the base getter, so the tuple widens to an array
+ * before override compatibility is checked. The exact tuple remains accepted
+ * for explicitly typed values; this authoring-boundary form accepts the same
+ * runtime shape after that unavoidable widening.
+ */
+type InferredMiddlewareWithParams = ReadonlyArray<
+  typeof AbstractMiddleware | Record<string, unknown>
+>;
+
 export type TMiddleware = Array<
-  typeof AbstractMiddleware | MiddlewareWithParamsTuple
+  | typeof AbstractMiddleware
+  | MiddlewareWithParamsTuple
+  | InferredMiddlewareWithParams
 >;
 // biome-ignore lint/complexity/noBannedTypes: Route handlers are generic callable values from user controllers
 type RouteHandler = Function;

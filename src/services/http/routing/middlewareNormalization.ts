@@ -14,16 +14,31 @@ export type MiddlewareSpec =
 /** Throws `TypeError` on malformed input. */
 export function normalizeMiddleware(spec: MiddlewareSpec): MiddlewareEntry {
   if (Array.isArray(spec)) {
-    const [Class, params] = spec as [
-      typeof AbstractMiddleware,
-      Record<string, unknown>,
-    ];
+    const tuple = spec as readonly unknown[];
+    if (tuple.length !== 2) {
+      throw new TypeError(
+        `normalizeMiddleware: tuple form expected exactly [Class, params] but got ${tuple.length} element(s)`,
+      );
+    }
+    const [Class, params] = tuple;
     if (typeof Class !== 'function') {
       throw new TypeError(
         `normalizeMiddleware: tuple form expected [Class, params] but got [${typeof Class}, …]`,
       );
     }
-    return { Class, params };
+    if (
+      typeof params !== 'object' ||
+      params === null ||
+      Array.isArray(params)
+    ) {
+      throw new TypeError(
+        `normalizeMiddleware: tuple form expected a params object but got ${params === null ? 'null' : Array.isArray(params) ? 'array' : typeof params}`,
+      );
+    }
+    return {
+      Class: Class as typeof AbstractMiddleware,
+      params: params as Record<string, unknown>,
+    };
   }
   if (typeof spec !== 'function') {
     throw new TypeError(
