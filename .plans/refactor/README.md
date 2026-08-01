@@ -19,6 +19,9 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
 v5.3 (queued/) ─────→ universal HttpResponse + Express writer
                       └──→ OpenAPI response contracts ──→ v6 removes ordinary `res`
 
+Bun stable with fix (external) ──→ immediate Bun-support v5.x patch
+                                  never waits for v5.3, v6, or native adapters
+
 v5.2.0 (done/) ────→ OpenAPI resilience + route groups + node:test readiness
 v5.2.1 (active/) ──→ adoption fixes + literal-route codegen polish
                       └──→ patch release before v5.3 implementation starts
@@ -26,6 +29,7 @@ v5.2.1 (active/) ──→ adoption fixes + literal-route codegen polish
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           v5.3 implementation waits for the v5.2.1 patch release
           v6 cutover blocked by all v5.1 active + queued work
+          Bun runtime support blocked only by Bun shipping the fix in stable
           node-adapter blocked by v6
           drop-express blocked by node-adapter
 ```
@@ -38,6 +42,8 @@ flowchart LR
 
     Patch --> Responses["⏸ v5.3 universal responses"]
     Responses --> OpenAPI["⏸ OpenAPI response contracts"]
+
+    BunRelease["Bun stable release with fix"] --> BunSupport["⏸ Immediate Bun-support v5.x patch"]
 
     Patch --> I18nV5["⏸ P1y i18n audit + types + runtime"]
     I18nV5 --> I18nV6["◌ v6 namespace + selector defaults"]
@@ -87,6 +93,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [bun-runtime-support](queued/bun-runtime-support.md) | Runtime | **Stable-fix-gated Bun certification.** Activate immediately when Bun ships `oven-sh/bun#32502` in any stable version; run the existing Express adapter through Bun's Node compatibility layer, require real Mongoose CRUD and packed-consumer CI, then cut an immediate v5.x patch. Never waits for v5.3, v6, or P3/P5; native `BunAdapter` remains separate. |
 | [params-validation](queued/params-validation.md) | P1b+ | **Route `params:` schema.** Validate + coerce path params (`:id`) like `request:`/`query:`, typed on `req.appInfo.params`; malformed param → 400 (today: raw string → Mongoose `CastError` → 500). Additive, reuses the validation runtime; codegen typing is the only new work. Interim docs recipe shipped 2026-06-23. |
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.3 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.3; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
@@ -182,6 +189,9 @@ repository; Markdown remains the reviewed source of truth.
 
 ## Unscheduled after v5.2.1
 
+- [Bun runtime support](queued/bun-runtime-support.md) activates as soon as Bun publishes the fix
+  in any stable release and immediately cuts a v5.x patch; it does **not** wait for v5.3, v6, the
+  Node adapter, the later native `BunAdapter`, or any unrelated roadmap work.
 - [Observability Phase 1 — metrics](queued/metrics-seam.md) stays queued until it is planned with the broader observability work. Its automatic HTTP response status/size measurements may build on P1q's response writer.
 - [Vendor-neutral logging + Pino](queued/logging-facade-and-pino.md) starts with an additive v5.x
   contract/conformance phase; the public logger, config and dependency replacement land together
