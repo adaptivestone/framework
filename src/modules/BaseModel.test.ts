@@ -22,6 +22,25 @@ describe('BaseModel default getters', () => {
       BaseModel.initHooks({} as any),
     ).not.toThrow();
   });
+
+  it('passes schema-level lean defaults to the runtime Mongoose schema', () => {
+    class LeanDefaultOptionRecord extends BaseModel {
+      static get modelSchema() {
+        return { title: { type: String, required: true } } as const;
+      }
+
+      static get schemaOptions() {
+        return { lean: true } as const;
+      }
+    }
+
+    const Model = LeanDefaultOptionRecord.initialize();
+    try {
+      expect(Model.schema.options.lean).toBe(true);
+    } finally {
+      Model.db.deleteModel(Model.modelName);
+    }
+  });
 });
 
 /**

@@ -24,6 +24,9 @@
  *    `this:` context in statics / instance methods / `initHooks`, including
  *    native Mongoose read/write/aggregate/populate operations and custom schema
  *    options;
+ *  - `schemaLevelLean.ts` — literal and object-form schema-level lean defaults
+ *    return plain objects from both model helpers, while `{ lean: false }`
+ *    restores hydrated documents;
  *  - `readonlySchemaInference.ts` — `as const` schemas keep required-message
  *    tuples and ordinary arrays non-null while explicit optional/default-null
  *    paths remain optional;

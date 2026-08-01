@@ -207,12 +207,29 @@ type MutableSchemaForInference<T> = T extends SchemaInferenceAtomic
           ? { -readonly [K in keyof T]: MutableSchemaForInference<T[K]> }
           : T;
 
+/** Schema options after applying the same framework defaults used at runtime. */
+type EffectiveSchemaOptions<TOptions> = Merge<typeof defaultOptions, TOptions>;
+
+// biome-ignore lint/suspicious/noExplicitAny: unfinished class members must stay variance-neutral in Mongoose's Schema carrier
+type UnfinishedSchemaMember = any;
+
+type InferredRawDocFromSchema<
+  TSchema extends typeof BaseModel.modelSchema,
+  TOptions,
+> = InferRawDocType<
+  MutableSchemaForInference<TSchema> &
+    WithTimestamps<EffectiveSchemaOptions<TOptions>>
+>;
+
+type OverriddenRawDocFromSchema<
+  TSchema extends typeof BaseModel.modelSchema,
+  TOptions,
+> = MaybeApplyOverrides<InferredRawDocFromSchema<TSchema, TOptions>, TSchema>;
+
 /** The raw doc type Mongoose infers from a class's `modelSchema` + timestamps. */
-type InferredRawDoc<T extends typeof BaseModel> = InferRawDocType<
-  MutableSchemaForInference<ExtractProperty<T, 'modelSchema'>> &
-    WithTimestamps<
-      Merge<typeof defaultOptions, ExtractProperty<T, 'schemaOptions'>>
-    >
+type InferredRawDoc<T extends typeof BaseModel> = InferredRawDocFromSchema<
+  ExtractProperty<T, 'modelSchema'>,
+  ExtractProperty<T, 'schemaOptions'>
 >;
 
 /** {@link InferredRawDoc} with any per-field `__tsType` overrides applied —
@@ -300,6 +317,11 @@ export type GetModelTypeFromClass<T extends typeof BaseModel> = Model<
  * and schema fields, but intentionally cannot contain that unfinished class's
  * custom statics, methods, or virtuals.
  *
+ * Pass the model's literal `schemaOptions` as `TOptions` when they affect query
+ * results. In particular, Mongoose 9.9 uses the schema generic to make
+ * schema-level `lean: true` queries return plain objects by default and
+ * `{ lean: false }` queries return hydrated documents.
+ *
  * This is a TypeScript authoring limitation, not a second runtime schema. Use
  * {@link GetModelTypeFromClass} for complete model handles after class
  * definition.
@@ -308,15 +330,20 @@ export type GetModelTypeLiteFromSchema<
   T extends typeof BaseModel.modelSchema,
   TOptions = object,
 > = Model<
-  // TRawDocType, with any per-field `__tsType` overrides applied (and no wrapper
-  // when the schema carries no markers).
-  MaybeApplyOverrides<
-    InferRawDocType<
-      MutableSchemaForInference<T> &
-        WithTimestamps<Merge<typeof defaultOptions, TOptions>>
-    >,
-    T
-  >
+  OverriddenRawDocFromSchema<T, TOptions>, // TRawDocType
+  object, // TQueryHelpers
+  object, // TInstanceMethods (unfinished in this authoring context)
+  object, // TVirtuals (unfinished in this authoring context)
+  HydratedDocument<OverriddenRawDocFromSchema<T, TOptions>>,
+  Schema<
+    OverriddenRawDocFromSchema<T, TOptions>,
+    UnfinishedSchemaMember, // TModelType: the owning class is unfinished here
+    UnfinishedSchemaMember, // TInstanceMethods: keep complete models assignable
+    UnfinishedSchemaMember, // TQueryHelpers
+    UnfinishedSchemaMember, // TVirtuals
+    UnfinishedSchemaMember, // TStaticMethods
+    EffectiveSchemaOptions<TOptions>
+  > // TSchema: preserves schema-level query defaults such as `lean`
 >;
 
 export const defaultOptions = { timestamps: true, minimize: false } as const;
