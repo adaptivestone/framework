@@ -434,7 +434,7 @@ class Auth extends AbstractController {
     // Revoke every existing session on reset: a recovery is often triggered
     // precisely because the account is compromised, so any token issued before
     // the reset must stop working.
-    user.sessionTokens = [] as typeof user.sessionTokens;
+    user.set('sessionTokens', []);
     await user.save();
     return res.status(200).json();
   }

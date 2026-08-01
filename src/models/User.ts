@@ -43,6 +43,19 @@ export type UserModelLite = GetModelTypeLiteFromSchema<
 export type TUser = GetModelTypeFromClass<typeof User>;
 
 type UserSchemaDocument = InstanceType<UserModelLite>;
+type RawDocumentOf<T> =
+  T extends Model<
+    infer Raw,
+    infer _QueryHelpers,
+    infer _InstanceMethods,
+    infer _Virtuals,
+    infer _HydratedDocument,
+    infer _Schema,
+    infer _Document
+  >
+    ? Raw
+    : never;
+type UserSchemaRawDocument = RawDocumentOf<UserModelLite>;
 export type UserAuthField =
   | 'email'
   | 'password'
@@ -58,12 +71,14 @@ export type UserAuthField =
  * `User.modelSchema` remains the single source of truth.
  */
 export type UserAuthDoc<TField extends UserAuthField = UserAuthField> = Pick<
-  UserSchemaDocument,
+  UserSchemaRawDocument,
   TField
 >;
 
-/** A hydrated {@link UserAuthDoc} the instance-side helpers bind to. */
-export type UserAuthInstance = UserAuthDoc & { save: () => Promise<unknown> };
+/** Schema-derived hydrated fields the instance-side auth helpers bind to. */
+export type UserAuthInstance = Pick<UserSchemaDocument, UserAuthField> & {
+  save: () => Promise<unknown>;
+};
 
 /**
  * Any Mongoose `User` model an auth static can bind to: one whose documents
@@ -99,6 +114,20 @@ export type UserPublicDoc = Pick<
   InstanceType<UserModelLite>,
   'avatar' | 'name' | 'email' | 'id' | 'isVerified' | 'permissions' | 'locale'
 >;
+
+type ArrayPath<T extends object> = {
+  [K in keyof T]-?: NonNullable<T[K]> extends readonly unknown[] ? K : never;
+}[keyof T];
+
+/**
+ * Clear through Mongoose's runtime property setter while keeping the public
+ * hydrated property typed as its real `DocumentArray`. This preserves the
+ * direct-assignment versioning behavior these auth helpers historically used.
+ */
+const clearHydratedArray = <T extends object>(
+  document: T,
+  path: ArrayPath<T>,
+) => Object.assign(document, { [path]: [] });
 
 /**
  * Augmentation point so `req.appInfo.user` follows a project's OWN `User` model
@@ -494,11 +523,11 @@ export const userHelpers = {
       throw new Error('Email is required');
     }
     const token = createRandomToken();
-    userMongoose.verificationTokens = [];
+    clearHydratedArray(userMongoose, 'verificationTokens');
     userMongoose.verificationTokens.push({
       until: date,
       token: hashToken(token),
-    } as (typeof userMongoose.verificationTokens)[number]);
+    });
     await userMongoose.save();
     // Raw token goes into the email link; only its hash is persisted.
     return { token, until: date.getTime() };
@@ -519,11 +548,11 @@ export const userHelpers = {
       }
       const token = createRandomToken();
 
-      userMongoose.passwordRecoveryTokens = [];
+      clearHydratedArray(userMongoose, 'passwordRecoveryTokens');
       userMongoose.passwordRecoveryTokens.push({
         until: date,
         token: hashToken(token),
-      } as (typeof userMongoose.passwordRecoveryTokens)[number]);
+      });
       await userMongoose.save();
       // Raw token goes into the recovery email link; only its hash is persisted.
       return { token, until: date.getTime() };

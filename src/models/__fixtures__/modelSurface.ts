@@ -10,7 +10,7 @@
  *    `string`, NOT the raw `{ get, options }` definition leaking in;
  *  - `modelInstanceMethods` callable on the doc;
  *  - field types across array + complex forms: `enum` union, array of refs
- *    (`ObjectId[]`), subdocument array (element + `_id`), `Map` (`Record`),
+ *    (`ObjectId[]`), subdocument array (element + `_id`), `Map`,
  *    nested object, primitive array.
  *
  * A regression in any of these fails `tsc` here.
@@ -26,7 +26,7 @@ class Order extends BaseModel {
       kind: { type: String, enum: ['web', 'pos'] as const }, // enum → union
       tagIds: [{ type: Schema.Types.ObjectId, ref: 'Tag' }], // array of refs
       lines: [{ sku: { type: String }, qty: { type: Number } }], // subdoc array
-      attrs: { type: Map, of: Number }, // Map → Record
+      attrs: { type: Map, of: Number }, // hydrated Map
       address: { city: { type: String }, zip: { type: String } }, // nested object
       labels: [String], // primitive array
     } as const;
@@ -107,9 +107,9 @@ export async function check(M: OrderModel) {
   const line = one.lines?.[0]; // subdoc array element
   const sku: string | null | undefined = line?.sku;
   const lineId: Types.ObjectId | undefined = line?._id; // subdocs get `_id`
-  // Mongoose infers a `Map` field as a `Record` (runtime is a real `Map` — a
-  // known Mongoose inference quirk the framework inherits):
-  const attrs: Record<string, number> | null | undefined = one.attrs;
+  // Hydrated documents expose the same Map API available at runtime; lean/raw
+  // results remain plain values.
+  const attrs: Map<string, number> | null | undefined = one.attrs;
   const city: string | null | undefined = one.address?.city; // nested object
   const label: string | null | undefined = one.labels?.[0]; // primitive array
   void [kind, sku, lineId, attrs, city, label];

@@ -33,8 +33,9 @@
  *  - `schemaInstance.ts` — a pre-built mongoose `Schema` instance reused as a
  *    (sub-)doc def (`field: Sub` / `[Sub]`) stays opaque to the override scan
  *    (rc.8 regression: it triggered a TS2615 circular mapped type).
- *  - `nestedWorkflowModelPatterns.ts` — required-message paths, nested
- *    generated-id documents, projections, `$locals`, model recovery, and
+ *  - `nestedWorkflowModelPatterns.ts` — required-message paths, raw write
+ *    values and hydrated `DocumentArray` operations for generated-id and
+ *    `_id: false` subdocuments, projections, `$locals`, model recovery, and
  *    document/query hooks;
  *  - `tenantScopedModelPatterns.ts` — schema fragments, query/aggregate
  *    scoping, nested `type` fields, validation hooks, Mixed values, and

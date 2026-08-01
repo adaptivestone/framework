@@ -78,6 +78,16 @@ class NestedWorkflowRecord extends BaseModel {
         ],
         default: [],
       },
+      checkpoints: {
+        type: [
+          {
+            _id: false,
+            label: { type: String, required: true },
+            score: { type: Number, default: 0 },
+          },
+        ],
+        default: [],
+      },
     } as const;
   }
 
@@ -175,13 +185,13 @@ export async function checkNestedWorkflowPatterns(M: NestedWorkflowModel) {
     relatedEntityIds: [relatedEntityId],
     entries: [
       {
-        _id: itemId,
         target: targetId,
         amount: 2,
         value: 12,
         allocation: { primary: 2, secondary: 0 },
       },
     ],
+    checkpoints: [{ label: 'initial' }],
   });
 
   const code: string = created.code;
@@ -194,8 +204,50 @@ export async function checkNestedWorkflowPatterns(M: NestedWorkflowModel) {
   const sourceEntry: Types.ObjectId | null | undefined = firstItem.sourceEntry;
   const primaryAllocation: number | null | undefined =
     firstItem.allocation?.primary;
+  if (firstItem.allocation) {
+    const allocationIdMustNotExist: never = firstItem.allocation._id;
+    void allocationIdMustNotExist;
+  }
   const total: number = created.calculateTotal();
   const flagged: boolean = created.hasFlaggedEntries;
+
+  created.entries.push({
+    target: targetId,
+    amount: 1,
+    value: 8,
+    allocation: { primary: 1, secondary: 0 },
+  });
+  const castEntry = created.entries.create({
+    target: targetId,
+    amount: 3,
+    value: 5,
+  });
+  const castEntryId: Types.ObjectId = castEntry._id;
+  created.entries.splice(0, created.entries.length, {
+    target: targetId,
+    amount: 4,
+    value: 6,
+  });
+
+  const checkpoint = created.checkpoints[0];
+  const checkpointLabel: string = checkpoint.label;
+  const checkpointScore: number = checkpoint.score;
+  const checkpointIdMustNotExist: never = checkpoint._id;
+  created.checkpoints.push({ label: 'reviewed' });
+
+  const leanCreated = await M.findById(created._id).lean();
+  if (leanCreated) {
+    const leanEntryId: Types.ObjectId = leanCreated.entries[0]._id;
+    const leanCheckpoint = leanCreated.checkpoints[0];
+    // @ts-expect-error `_id: false` removes the path from raw/lean values too.
+    leanCheckpoint._id;
+    const leanAllocation = leanCreated.entries[0].allocation;
+    if (leanAllocation) {
+      // @ts-expect-error a single nested `_id: false` value has no raw id.
+      leanAllocation._id;
+    }
+    void leanEntryId;
+  }
 
   await M.findForRelatedEntity(relatedEntityId);
   const projection = await M.readItemProjection([itemId]);
@@ -219,5 +271,9 @@ export async function checkNestedWorkflowPatterns(M: NestedWorkflowModel) {
     total,
     flagged,
     projectedAmount,
+    castEntryId,
+    checkpointLabel,
+    checkpointScore,
+    checkpointIdMustNotExist,
   ];
 }

@@ -13,6 +13,7 @@
  * the framework's structural auth-model bridge invariant in the entire schema.
  */
 
+import type { Model } from 'mongoose';
 import type { GetModelTypeFromClass } from '../../modules/BaseModel.ts';
 import { BaseModel } from '../../modules/BaseModel.ts';
 import User, {
@@ -21,11 +22,25 @@ import User, {
   type UserModelLite,
 } from '../User.ts';
 
+type RawDocumentOf<T> =
+  T extends Model<
+    infer Raw,
+    infer _QueryHelpers,
+    infer _InstanceMethods,
+    infer _Virtuals,
+    infer _HydratedDocument,
+    infer _Schema,
+    infer _Document
+  >
+    ? Raw
+    : never;
+type UserSchemaRawDocument = RawDocumentOf<UserModelLite>;
+
 type AuthFieldMatchesSchema = {
   [K in keyof UserAuthDoc]-?: [UserAuthDoc[K]] extends [
-    InstanceType<UserModelLite>[K],
+    UserSchemaRawDocument[K],
   ]
-    ? [InstanceType<UserModelLite>[K]] extends [UserAuthDoc[K]]
+    ? [UserSchemaRawDocument[K]] extends [UserAuthDoc[K]]
       ? true
       : false
     : false;
@@ -34,6 +49,12 @@ type AuthFieldsFollowSchema =
   AuthFieldMatchesSchema[keyof UserAuthDoc] extends true ? true : false;
 const authFieldsFollowSchema: true = null as unknown as AuthFieldsFollowSchema;
 void authFieldsFollowSchema;
+
+type VerificationTokenDocument = NonNullable<
+  InstanceType<UserModelLite>['verificationTokens']
+>[number];
+declare const verificationTokenDocument: VerificationTokenDocument;
+verificationTokenDocument._id.toHexString();
 
 /* ---- Additive customization: `extends User`, add a field, keep the rest. ---- */
 class AdditiveUser extends User {

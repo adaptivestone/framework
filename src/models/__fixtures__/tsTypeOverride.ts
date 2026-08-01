@@ -54,6 +54,13 @@ export async function check(M: EventModel) {
       doc.organizer?.name;
     const schedTitle: IntlSubDocValue<string> | null | undefined =
       doc.schedule?.[0]?.title;
+    const createdScheduleItem = doc.schedule.create({
+      title: { native: 'Session', machine: 'Session' },
+    });
+    doc.schedule.push(createdScheduleItem);
+    const createdScheduleItemId: Types.ObjectId = createdScheduleItem._id;
+    const createdScheduleTitle: IntlSubDocValue<string> | null | undefined =
+      createdScheduleItem.title;
     const sessionLabel: IntlSubDocValue<string> | null | undefined =
       doc.sessions?.[0]?.room?.label; // array → nested object → marker
     void sessionLabel;
@@ -76,6 +83,8 @@ export async function check(M: EventModel) {
     void title;
     void orgName;
     void schedTitle;
+    void createdScheduleItemId;
+    void createdScheduleTitle;
     void plain;
     void tag;
     void owner;

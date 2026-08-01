@@ -93,7 +93,7 @@ class CreateUser extends AbstractCommand {
     }
 
     if (roles) {
-      user.roles = roles.split(',');
+      user.set('roles', roles.split(','));
     }
 
     await user.save();
