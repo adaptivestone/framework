@@ -59,20 +59,39 @@ export type ExtractProperty<
 
 /**
  * Phantom per-field type override. Intersect a schema field with this to type
- * that field as `T` instead of the type Mongoose infers from `type:` — for
- * fields a plugin reshapes at runtime (`mongoose-intl`, encrypted fields,
- * custom getters), so the static type matches what's actually stored. `__tsType`
- * is never set at runtime; only the compile-time type changes. Opt-in and a
- * strict no-op for any field that doesn't carry the marker.
+ * its raw/stored value as `TRaw` instead of the type Mongoose infers from
+ * `type:` — for fields a plugin reshapes at runtime (`mongoose-intl`, encrypted
+ * fields, custom getters). When a getter exposes a different hydrated value,
+ * pass it as `THydrated`; the default preserves the original one-type behavior.
+ * Both marker properties are compile-time only and are never set at runtime.
+ * The override is opt-in and a strict no-op for unmarked fields.
  *
  * @example
  *   // app-side, ideally behind a small factory:
  *   title: { type: String, intl: true } as { type: StringConstructor; intl: true } &
- *     TsTypeOverride<IntlSubDocValue<string>>;
+ *     TsTypeOverride<IntlText, string | IntlText>;
  */
-export interface TsTypeOverride<T> {
-  readonly __tsType?: T;
+export interface TsTypeOverride<TRaw, THydrated = TRaw> {
+  readonly __tsType?: TRaw;
+  readonly __tsHydratedType?: THydrated;
 }
+
+type TsOverrideSurface = 'raw' | 'hydrated';
+
+type RawTsOverride<S> = S extends { readonly __tsType?: infer T } ? T : never;
+
+type HydratedTsOverride<S> = S extends object
+  ? '__tsHydratedType' extends keyof S
+    ? S extends { readonly __tsHydratedType?: infer T }
+      ? T
+      : RawTsOverride<S>
+    : RawTsOverride<S>
+  : never;
+
+type TsOverrideFor<
+  S,
+  Surface extends TsOverrideSurface,
+> = Surface extends 'hydrated' ? HydratedTsOverride<S> : RawTsOverride<S>;
 
 /**
  * A leaf field definition — a bare constructor (`String`, `ObjectId`), a
@@ -104,22 +123,25 @@ type IsLeafFieldDef<S> = S extends Schema
       : false;
 
 /**
- * Walk an inferred raw-doc type alongside its schema and replace each field
- * marked with {@link TsTypeOverride} by the declared override type. Recurses
- * into nested objects and subdocument arrays (a reshaped field can appear at any
- * depth); leaves everything else — including arrays of primitives and built-in
- * instances (ObjectId/Date/Map, via {@link IsLeafFieldDef}) — untouched. A
- * schema with no markers maps to a structurally identical type, so existing
- * models are unaffected. The marker is detected by the *presence* of the
- * `__tsType` key (not by `extends TsTypeOverride`, which an optional property
+ * Walk an inferred document type alongside its schema and replace each field
+ * marked with {@link TsTypeOverride} by the override for the selected surface.
+ * The default remains `raw` for compatibility with existing two-argument uses.
+ * Recurses into nested objects and subdocument arrays (a reshaped field can
+ * appear at any depth); leaves everything else — including arrays of primitives
+ * and built-in instances (ObjectId/Date/Map, via {@link IsLeafFieldDef}) —
+ * untouched. A schema with no markers maps to a structurally identical type, so
+ * existing models are unaffected. The marker is detected by the *presence* of
+ * the `__tsType` key (not by `extends TsTypeOverride`, which an optional property
  * would match on every field).
  */
-export type ApplyTsOverrides<Doc, Schema> = {
+export type ApplyTsOverrides<
+  Doc,
+  Schema,
+  Surface extends TsOverrideSurface = 'raw',
+> = {
   [K in keyof Doc]: K extends keyof Schema
     ? '__tsType' extends keyof Schema[K]
-      ? Schema[K] extends TsTypeOverride<infer U>
-        ? U
-        : Doc[K]
+      ? TsOverrideFor<Schema[K], Surface>
       : NonNullable<Schema[K]> extends readonly (infer E)[]
         ? NonNullable<Doc[K]> extends mongoose.Types.DocumentArray<
             infer R,
@@ -129,12 +151,17 @@ export type ApplyTsOverrides<Doc, Schema> = {
             ? Doc[K]
             :
                 | mongoose.Types.DocumentArray<
-                    ApplyTsOverrides<R, E>,
+                    ApplyTsOverrides<R, E, 'raw'>,
                     ApplyTsOverrides<
                       NonNullable<Doc[K]>[number],
-                      E
+                      E,
+                      'hydrated'
                     > extends mongoose.Types.Subdocument
-                      ? ApplyTsOverrides<NonNullable<Doc[K]>[number], E>
+                      ? ApplyTsOverrides<
+                          NonNullable<Doc[K]>[number],
+                          E,
+                          'hydrated'
+                        >
                       : H
                   >
                 | Extract<Doc[K], null | undefined>
@@ -142,7 +169,9 @@ export type ApplyTsOverrides<Doc, Schema> = {
             ? D extends object
               ? IsLeafFieldDef<E> extends true
                 ? Doc[K]
-                : ApplyTsOverrides<D, E>[] | Exclude<Doc[K], readonly unknown[]>
+                :
+                    | ApplyTsOverrides<D, E, Surface>[]
+                    | Exclude<Doc[K], readonly unknown[]>
               : Doc[K]
             : Doc[K]
         : NonNullable<Schema[K]> extends object
@@ -152,7 +181,8 @@ export type ApplyTsOverrides<Doc, Schema> = {
               :
                   | ApplyTsOverrides<
                       NonNullable<Doc[K]>,
-                      NonNullable<Schema[K]>
+                      NonNullable<Schema[K]>,
+                      Surface
                     >
                   | Exclude<Doc[K], object>
             : Doc[K]
@@ -183,8 +213,14 @@ type HasTsOverride<S> = S extends object
 
 /** {@link ApplyTsOverrides} only when the schema actually has a marker;
  * otherwise the inferred doc verbatim (a strict no-op, but without the wrapper). */
-type MaybeApplyOverrides<Doc, Schema> =
-  HasTsOverride<Schema> extends true ? ApplyTsOverrides<Doc, Schema> : Doc;
+type MaybeApplyOverrides<
+  Doc,
+  Schema,
+  Surface extends TsOverrideSurface = 'raw',
+> =
+  HasTsOverride<Schema> extends true
+    ? ApplyTsOverrides<Doc, Schema, Surface>
+    : Doc;
 
 type SchemaArrayElement<S> =
   NonNullable<S> extends readonly (infer E)[]
@@ -375,7 +411,11 @@ type OverriddenRawDocFromSchema<
   TSchema extends typeof BaseModel.modelSchema,
   TOptions,
 > = CorrectRawSubdocumentIds<
-  MaybeApplyOverrides<InferredRawDocFromSchema<TSchema, TOptions>, TSchema>,
+  MaybeApplyOverrides<
+    InferredRawDocFromSchema<TSchema, TOptions>,
+    TSchema,
+    'raw'
+  >,
   TSchema
 >;
 
@@ -393,7 +433,8 @@ type OverriddenHydratedDocFromSchema<
 > =
   MaybeApplyOverrides<
     InferredHydratedDocFromSchema<TSchema, TOptions>,
-    TSchema
+    TSchema,
+    'hydrated'
   > extends infer Doc
     ? CorrectHydratedSubdocumentIds<Doc, TSchema>
     : never;

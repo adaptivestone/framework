@@ -10,7 +10,8 @@
  *    models (additive `extends` + divergent compose) with no `this` casts,
  *    including Mongoose 9.8.1's typed `Model.schema` surface;
  *  - `tsTypeOverride.ts`   — per-field `__tsType` overrides for plugin-reshaped
- *    fields applied at every depth;
+ *    fields applied at every depth, including distinct raw/create/lean and
+ *    hydrated getter surfaces;
  *  - `instanceMethodThis.ts` — instance methods with an authored narrow `this`
  *    callable as `doc.method(...)` (caller-facing `this` stripped);
  *  - `populatedRefOverride.ts` — the documented populate-ref pattern: a ref

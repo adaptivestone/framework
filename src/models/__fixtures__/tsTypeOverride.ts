@@ -1,29 +1,37 @@
 /**
  * Type-level fixture (compiled by the `ModelTyping.typecheck.test.ts` tsc-gate, excluded
  * from the build). Pins the per-field `__tsType` override: a field marked with
- * {@link TsTypeOverride} is typed as the override on `getModel(...).findOne()`
- * results (and on method `this`), at every depth — top-level, nested object, and
- * subdocument array — while unmarked fields (including arrays of primitives, and
- * built-in instances like ObjectId refs / Date, which stay clean and usable
- * rather than being mapped over) keep their Mongoose-inferred type. Mirrors how a
- * runtime-reshaping plugin like `mongoose-intl` keeps static and runtime types in
- * sync.
+ * {@link TsTypeOverride} can expose one type on raw/create/lean values and a
+ * different type on hydrated documents, at every depth — top-level, nested
+ * object, and subdocument array. Its one-argument form remains the same type on
+ * both surfaces. Unmarked fields (including arrays of primitives and built-in
+ * instances like ObjectId refs / Date, which stay clean and usable rather than
+ * being mapped over) keep their Mongoose-inferred type.
  */
 
 import { Schema, type Types } from 'mongoose';
 import type {
   GetModelTypeFromClass,
+  GetModelTypeLiteFromSchema,
   TsTypeOverride,
 } from '../../modules/BaseModel.ts';
 import { BaseModel } from '../../modules/BaseModel.ts';
 
 /** Stand-in for mongoose-intl's `IntlSubDocValue` (the reshaped runtime value). */
 type IntlSubDocValue<T> = { native: T; machine: T };
+type IntlText = Partial<Record<'en' | 'fr', string>>;
+type IntlHydratedValue = string | IntlText;
 
 /** Tiny app-side factory: a `String` field whose static type is an intl value.
  * Runtime is unchanged (`type: String`); only the compile-time type is marked. */
 function intlString<C extends object>(field: C) {
   return field as C & TsTypeOverride<IntlSubDocValue<string>>;
+}
+
+/** A plugin stores a locale map but its virtual getter normally returns the
+ * selected string and can expose the full map in an explicit document mode. */
+function localeString<C extends object>(field: C) {
+  return field as C & TsTypeOverride<IntlText, IntlHydratedValue>;
 }
 
 class Event extends BaseModel {
@@ -39,13 +47,57 @@ class Event extends BaseModel {
       // deepest combined path: marker in a nested object INSIDE a subdoc array
       // (array → object → field) — exercises HasTsOverride's full recursion.
       sessions: [{ room: { label: intlString({ type: String }) } }],
+      localizedTitle: localeString({
+        type: String,
+        required: true,
+        intl: true,
+      }),
+      localizedSchedule: [
+        {
+          title: localeString({
+            type: String,
+            required: true,
+            intl: true,
+          }),
+        },
+      ],
     } as const;
   }
 }
 
 type EventModel = GetModelTypeFromClass<typeof Event>;
+type EventAuthoringModel = GetModelTypeLiteFromSchema<typeof Event.modelSchema>;
+
+export async function checkAuthoringModel(M: EventAuthoringModel) {
+  const created = await M.create({
+    localizedTitle: { en: 'Title', fr: 'Titre' },
+  });
+  const hydratedStringState: typeof created.localizedTitle = 'Title';
+  void hydratedStringState;
+
+  const lean = await M.findOne().lean();
+  if (lean) {
+    const rawTitle: IntlText = lean.localizedTitle;
+    // @ts-expect-error the reduced model also keeps strings off the raw surface
+    const invalidRawTitle: typeof lean.localizedTitle = 'Title';
+    void rawTitle;
+    void invalidRawTitle;
+  }
+}
 
 export async function check(M: EventModel) {
+  const created = await M.create({
+    localizedTitle: { en: 'Title', fr: 'Titre' },
+    localizedSchedule: [{ title: { en: 'Session', fr: 'Séance' } }],
+  });
+  const createdTitle: IntlHydratedValue = created.localizedTitle;
+  const createdScheduleTitle: IntlHydratedValue =
+    created.localizedSchedule[0].title;
+  const createdStringGetterState: typeof created.localizedTitle = 'Title';
+  void createdTitle;
+  void createdScheduleTitle;
+  void createdStringGetterState;
+
   const doc = await M.findOne();
   if (doc) {
     // overridden at every depth
@@ -63,7 +115,26 @@ export async function check(M: EventModel) {
       createdScheduleItem.title;
     const sessionLabel: IntlSubDocValue<string> | null | undefined =
       doc.sessions?.[0]?.room?.label; // array → nested object → marker
+    // The distinct hydrated override accepts every state the plugin getter can
+    // expose, while a raw locale map remains inspectable after narrowing.
+    const hydratedStringState: typeof doc.localizedTitle = 'Title';
+    const hydratedMapState: typeof doc.localizedTitle = { en: 'Title' };
+    if (typeof doc.localizedTitle !== 'string') {
+      const hydratedEnglish: string | undefined = doc.localizedTitle.en;
+      void hydratedEnglish;
+    }
+    const localizedItem = doc.localizedSchedule.create({
+      title: { en: 'Session', fr: 'Séance' },
+    });
+    const localizedItemTitle: IntlHydratedValue = localizedItem.title;
+    const localizedItemStringGetterState: typeof localizedItem.title =
+      'Session';
+    doc.localizedSchedule.push(localizedItem);
     void sessionLabel;
+    void hydratedStringState;
+    void hydratedMapState;
+    void localizedItemTitle;
+    void localizedItemStringGetterState;
     // unmarked fields keep their inferred type
     const plain: string | null | undefined = doc.plain;
     const tag: string | null | undefined = doc.tags?.[0];
@@ -91,5 +162,20 @@ export async function check(M: EventModel) {
     void startsAt;
     void createdAt;
     void updatedAt;
+  }
+
+  const lean = await M.findOne().lean();
+  if (lean) {
+    // The one-argument form remains identical on raw and hydrated surfaces.
+    const legacyRawTitle: IntlSubDocValue<string> | null | undefined =
+      lean.title;
+    const rawTitle: IntlText = lean.localizedTitle;
+    const rawScheduleTitle: IntlText = lean.localizedSchedule[0].title;
+    // @ts-expect-error raw/lean values use the stored locale-map surface
+    const invalidRawTitle: typeof lean.localizedTitle = 'Title';
+    void legacyRawTitle;
+    void rawTitle;
+    void rawScheduleTitle;
+    void invalidRawTitle;
   }
 }

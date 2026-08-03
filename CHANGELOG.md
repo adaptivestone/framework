@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.2.1] - Unreleased
+## [5.2.3] - Unreleased
+
+### Fixed
+
+- **Plugin-reshaped model fields can now declare different raw and hydrated types.** `TsTypeOverride<TRaw, THydrated = TRaw>` keeps its existing one-type behavior by default, while plugins with a stored shape that differs from their document getter can opt into both surfaces. Raw values drive create/casting inputs and lean results; hydrated values drive loaded documents, including nested objects and `DocumentArray` elements. This remains a generic, compile-time-only extension point—the framework does not special-case plugin options such as `intl: true`. A locale plugin can therefore accept a stored `{ en, fr }` map while exposing `string | LocaleMap` from its stateful hydrated getter, without per-call model casts.
+
+## [5.2.2] - 2026-08-01
 
 ### Added
 
