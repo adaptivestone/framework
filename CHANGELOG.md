@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.2.3] - Unreleased
 
+### Changed
+
+- **The framework's own test suite now runs on Node's built-in test runner.** All framework tests, assertions, parameterized cases, timers, spies, and module mocks have moved from Vitest to `node:test`; `npm test` now emits native JUnit and LCOV reports, and the test workflow is pinned to Node 26. Vitest remains an optional peer dependency, and the public `tests/setupVitest.js` / `tests/globalSetupVitest.js` adapters remain available for consumer projects. Native-runner consumers should preload `@adaptivestone/framework/tests/setupNodeTest.js` and use `--test-global-setup=@adaptivestone/framework/tests/globalSetupNodeTest.js`. The published runtime requirement remains Node 24 or newer; Node 26 is the development and CI test runtime.
+
 ### Fixed
 
 - **Plugin-reshaped model fields can now declare different raw and hydrated types.** `TsTypeOverride<TRaw, THydrated = TRaw>` keeps its existing one-type behavior by default, while plugins with a stored shape that differs from their document getter can opt into both surfaces. Raw values drive create/casting inputs and lean results; hydrated values drive loaded documents, including nested objects and `DocumentArray` elements. This remains a generic, compile-time-only extension point—the framework does not special-case plugin options such as `intl: true`. A locale plugin can therefore accept a stored `{ en, fr }` map while exposing `string | LocaleMap` from its stateful hydrated getter, without per-call model casts.

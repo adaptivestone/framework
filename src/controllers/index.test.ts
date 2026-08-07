@@ -4,21 +4,21 @@
  * earlier unit tests against a free `translateController` function.
  */
 
+import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { Response } from 'express';
-import mongoose from 'mongoose';
 import {
-  afterAll,
+  after,
   afterEach,
-  beforeAll,
+  before,
   beforeEach,
   describe,
-  expect,
   it,
-  vi,
-} from 'vitest';
+  mock,
+} from 'node:test';
+import type { Response } from 'express';
+import mongoose from 'mongoose';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import AbstractController from '../modules/AbstractController.ts';
@@ -31,6 +31,7 @@ import type {
   RouteNode,
 } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
+import { assertCalledTimes, assertThrowsLike } from '../tests/assertions.ts';
 import ErrorRegistryController, {
   FakeDriverError,
   HandlerCrashError,
@@ -122,21 +123,30 @@ describe('ControllerManager — index-first load order', () => {
   const nestedIndex = { file: 'sub/Index.ts' };
 
   it('sorts an index file ahead of a non-index one regardless of input order', () => {
-    expect([nonIndex, index].sort(compareControllerLoadOrder)[0]).toBe(index);
-    expect([index, nonIndex].sort(compareControllerLoadOrder)[0]).toBe(index);
+    assert.strictEqual(
+      [nonIndex, index].sort(compareControllerLoadOrder)[0],
+      index,
+    );
+    assert.strictEqual(
+      [index, nonIndex].sort(compareControllerLoadOrder)[0],
+      index,
+    );
   });
 
   it('is antisymmetric for a mixed (index vs non-index) pair', () => {
-    expect(compareControllerLoadOrder(index, nonIndex)).toBe(
+    assert.strictEqual(
+      compareControllerLoadOrder(index, nonIndex),
       -compareControllerLoadOrder(nonIndex, index),
     );
   });
 
   it('sorts a root index file ahead of a nested one (root first, by contract)', () => {
-    expect([nestedIndex, index].sort(compareControllerLoadOrder)[0]).toBe(
+    assert.strictEqual(
+      [nestedIndex, index].sort(compareControllerLoadOrder)[0],
       index,
     );
-    expect(compareControllerLoadOrder(index, nestedIndex)).toBe(
+    assert.strictEqual(
+      compareControllerLoadOrder(index, nestedIndex),
       -compareControllerLoadOrder(nestedIndex, index),
     );
   });
@@ -144,21 +154,24 @@ describe('ControllerManager — index-first load order', () => {
   it('recognizes backslash-separated paths (Windows path.join output)', () => {
     const winNestedIndex = { file: 'sub\\Index.ts' };
     // Index detection must not depend on the separator…
-    expect([nonIndex, winNestedIndex].sort(compareControllerLoadOrder)[0]).toBe(
+    assert.strictEqual(
+      [nonIndex, winNestedIndex].sort(compareControllerLoadOrder)[0],
       winNestedIndex,
     );
     // …and neither must the depth tiebreak (root before nested).
-    expect([winNestedIndex, index].sort(compareControllerLoadOrder)[0]).toBe(
+    assert.strictEqual(
+      [winNestedIndex, index].sort(compareControllerLoadOrder)[0],
       index,
     );
-    expect(compareControllerLoadOrder(index, winNestedIndex)).toBe(
+    assert.strictEqual(
+      compareControllerLoadOrder(index, winNestedIndex),
       -compareControllerLoadOrder(winNestedIndex, index),
     );
   });
 
   it('leaves the relative order of non-index files untouched (stable)', () => {
     const home = { file: 'Home.ts' };
-    expect([nonIndex, home].sort(compareControllerLoadOrder)).toEqual([
+    assert.deepStrictEqual([nonIndex, home].sort(compareControllerLoadOrder), [
       nonIndex,
       home,
     ]);
@@ -194,8 +207,8 @@ describe('ControllerManager — folder prefix mounts', () => {
         ({ ControllerClass }) => ControllerClass.name === 'Auth',
       );
 
-      expect(auth).toHaveLength(1);
-      expect(auth[0]?.prefix).toBe('(group)');
+      assert.strictEqual(auth.length, 1);
+      assert.strictEqual(auth[0]?.prefix, '(group)');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -214,12 +227,16 @@ describe('ControllerManager — folder prefix mounts', () => {
     cm.registerController(User, 'admin');
     cm.registerController(User, 'moderator');
 
-    expect(registry.match('GET', '/admin/user')?.entry?.handler).toBeDefined();
-    expect(
+    assert.notStrictEqual(
+      registry.match('GET', '/admin/user')?.entry?.handler,
+      undefined,
+    );
+    assert.notStrictEqual(
       registry.match('GET', '/moderator/user')?.entry?.handler,
-    ).toBeDefined();
+      undefined,
+    );
     // Unprefixed / wrong casing of folder is not how default mounts work.
-    expect(registry.match('GET', '/user')).toBeNull();
+    assert.strictEqual(registry.match('GET', '/user'), null);
   });
 
   it('omits parenthesized route-group folders from runtime mounts', () => {
@@ -243,11 +260,15 @@ describe('ControllerManager — folder prefix mounts', () => {
     cm.registerController(Reports, '(group)');
     cm.registerController(Settings, '(group)/admin');
 
-    expect(registry.match('GET', '/reports')?.entry?.handler).toBeDefined();
-    expect(
+    assert.notStrictEqual(
+      registry.match('GET', '/reports')?.entry?.handler,
+      undefined,
+    );
+    assert.notStrictEqual(
       registry.match('GET', '/admin/settings')?.entry?.handler,
-    ).toBeDefined();
-    expect(registry.match('GET', '/(group)/reports')).toBeNull();
+      undefined,
+    );
+    assert.strictEqual(registry.match('GET', '/(group)/reports'), null);
   });
 
   it('fails loudly when route groups collapse two controllers onto one route', () => {
@@ -262,7 +283,8 @@ describe('ControllerManager — folder prefix mounts', () => {
     const { cm } = setup();
     cm.registerController(User, '(one)');
 
-    expect(() => cm.registerController(User, '(two)')).toThrow(
+    assertThrowsLike(
+      () => cm.registerController(User, '(two)'),
       /conflicting handler|already registered/i,
     );
   });
@@ -289,18 +311,21 @@ describe('ControllerManager — folder prefix mounts', () => {
     const admin = cm.registerController(UserAdmin, 'someFolder');
 
     // Canonical mount is fully lowercased (folder + class name).
-    expect(big.getHttpPath()).toBe('/somefolder/somebigname');
-    expect(admin.getHttpPath()).toBe('/somefolder/useradmin');
-    expect(
+    assert.strictEqual(big.getHttpPath(), '/somefolder/somebigname');
+    assert.strictEqual(admin.getHttpPath(), '/somefolder/useradmin');
+    assert.notStrictEqual(
       registry.match('POST', '/somefolder/somebigname/run')?.entry?.handler,
-    ).toBeDefined();
-    expect(
+      undefined,
+    );
+    assert.notStrictEqual(
       registry.match('GET', '/somefolder/useradmin')?.entry?.handler,
-    ).toBeDefined();
+      undefined,
+    );
     // Router matching is case-insensitive today, so mixed-case URLs still hit.
-    expect(
+    assert.notStrictEqual(
       registry.match('POST', '/someFolder/SomeBigName/run')?.entry?.handler,
-    ).toBeDefined();
+      undefined,
+    );
   });
 
   it('multi-segment folder prefix nests the full path', () => {
@@ -316,8 +341,8 @@ describe('ControllerManager — folder prefix mounts', () => {
     cm.registerController(User, 'admin/sub');
 
     const hit = registry.match('GET', '/admin/sub/user/42');
-    expect(hit?.entry?.handler).toBeDefined();
-    expect(hit?.params).toEqual({ id: '42' });
+    assert.notStrictEqual(hit?.entry?.handler, undefined);
+    assert.deepStrictEqual(hit?.params, { id: '42' });
   });
 
   it('stores controllers keyed by prefix/name so peers do not overwrite', () => {
@@ -333,9 +358,9 @@ describe('ControllerManager — folder prefix mounts', () => {
     cm.registerController(User, 'admin');
     cm.registerController(User, 'moderator');
 
-    expect(cm.controllers['admin/user']).toBeDefined();
-    expect(cm.controllers['moderator/user']).toBeDefined();
-    expect(cm.controllers.user).toBeUndefined();
+    assert.notStrictEqual(cm.controllers['admin/user'], undefined);
+    assert.notStrictEqual(cm.controllers['moderator/user'], undefined);
+    assert.strictEqual(cm.controllers.user, undefined);
   });
 });
 
@@ -355,7 +380,7 @@ describe('ControllerManager — routes', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['login']);
-    expect(node?.methods?.POST?.handler).toBeDefined();
+    assert.notStrictEqual(node?.methods?.POST?.handler, undefined);
   });
 
   it('handles bare-function shorthand', () => {
@@ -371,7 +396,7 @@ describe('ControllerManager — routes', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['me']);
-    expect(node?.methods?.GET?.handler).toBeDefined();
+    assert.notStrictEqual(node?.methods?.GET?.handler, undefined);
   });
 
   it('multiple methods on the same path coexist', () => {
@@ -390,8 +415,8 @@ describe('ControllerManager — routes', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['users']);
-    expect(node?.methods?.GET).toBeDefined();
-    expect(node?.methods?.POST).toBeDefined();
+    assert.notStrictEqual(node?.methods?.GET, undefined);
+    assert.notStrictEqual(node?.methods?.POST, undefined);
   });
 
   it('handles deep paths with multiple params', () => {
@@ -419,7 +444,7 @@ describe('ControllerManager — routes', () => {
       ':ideaId',
       'thumbnail-status',
     ]);
-    expect(node?.methods?.GET?.handler).toBeDefined();
+    assert.notStrictEqual(node?.methods?.GET?.handler, undefined);
   });
 });
 
@@ -439,8 +464,11 @@ describe('ControllerManager — path syntax conversion', () => {
     cm.registerController(C);
 
     const apiNode = findNode(registry, 'C', ['api']);
-    expect(apiNode?.splatChild?.segment).toBe('*rest');
-    expect(apiNode?.splatChild?.methods?.GET?.handler).toBeDefined();
+    assert.strictEqual(apiNode?.splatChild?.segment, '*rest');
+    assert.notStrictEqual(
+      apiNode?.splatChild?.methods?.GET?.handler,
+      undefined,
+    );
   });
 
   it('keeps existing :name params untouched', () => {
@@ -456,7 +484,7 @@ describe('ControllerManager — path syntax conversion', () => {
     cm.registerController(C);
 
     const usersNode = findNode(registry, 'C', ['users']);
-    expect(usersNode?.paramChild?.segment).toBe(':id');
+    assert.strictEqual(usersNode?.paramChild?.segment, ':id');
   });
 });
 
@@ -476,8 +504,8 @@ describe('ControllerManager — middleware Map: splat scope (root-level)', () =>
     cm.registerController(C);
 
     const subtreeRoot = registry.root.children.get('c');
-    expect(subtreeRoot?.middlewares).toHaveLength(1);
-    expect(subtreeRoot?.middlewares[0]?.Class).toBe(FakeMw);
+    assert.strictEqual(subtreeRoot?.middlewares.length, 1);
+    assert.strictEqual(subtreeRoot?.middlewares[0]?.Class, FakeMw);
   });
 
   it("'ALL/{*splat}' is equivalent to '/{*splat}'", () => {
@@ -495,8 +523,8 @@ describe('ControllerManager — middleware Map: splat scope (root-level)', () =>
     cm.registerController(C);
 
     const subtreeRoot = registry.root.children.get('c');
-    expect(subtreeRoot?.middlewares).toHaveLength(1);
-    expect(subtreeRoot?.middlewares[0]?.Class).toBe(FakeMw);
+    assert.strictEqual(subtreeRoot?.middlewares.length, 1);
+    assert.strictEqual(subtreeRoot?.middlewares[0]?.Class, FakeMw);
   });
 });
 
@@ -519,8 +547,8 @@ describe('ControllerManager — middleware Map: per-handler scope', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['login']);
-    expect(node?.methods?.POST?.middlewares?.[0]?.Class).toBe(FakeMw);
-    expect(node?.methods?.GET?.middlewares).toBeUndefined();
+    assert.strictEqual(node?.methods?.POST?.middlewares?.[0]?.Class, FakeMw);
+    assert.strictEqual(node?.methods?.GET?.middlewares, undefined);
   });
 
   it("'GET/users/:id' attaches to the GET handler at /:id", () => {
@@ -538,7 +566,7 @@ describe('ControllerManager — middleware Map: per-handler scope', () => {
     cm.registerController(C);
 
     const idNode = findNode(registry, 'C', ['users', ':id']);
-    expect(idNode?.methods?.GET?.middlewares?.[0]?.Class).toBe(FakeMw);
+    assert.strictEqual(idNode?.methods?.GET?.middlewares?.[0]?.Class, FakeMw);
   });
 });
 
@@ -563,8 +591,10 @@ describe('ControllerManager — middleware Map: tuple form', () => {
     cm.registerController(C);
 
     const subtreeRoot = registry.root.children.get('c');
-    expect(subtreeRoot?.middlewares[0]?.Class).toBe(FakeMw);
-    expect(subtreeRoot?.middlewares[0]?.params).toEqual({ roles: ['admin'] });
+    assert.strictEqual(subtreeRoot?.middlewares[0]?.Class, FakeMw);
+    assert.deepStrictEqual(subtreeRoot?.middlewares[0]?.params, {
+      roles: ['admin'],
+    });
   });
 });
 
@@ -592,9 +622,9 @@ describe('ControllerManager — handler-level middleware on route', () => {
 
     const node = findNode(registry, 'C', ['login']);
     const mws = node?.methods?.POST?.middlewares;
-    expect(mws).toHaveLength(2);
-    expect(mws?.[0]?.Class).toBe(FakeMw);
-    expect(mws?.[1]?.Class).toBe(OtherMw);
+    assert.strictEqual(mws.length, 2);
+    assert.strictEqual(mws?.[0]?.Class, FakeMw);
+    assert.strictEqual(mws?.[1]?.Class, OtherMw);
   });
 });
 
@@ -618,7 +648,7 @@ describe('ControllerManager — bodyParsing pass-through', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['webhook']);
-    expect(node?.methods?.POST?.bodyParsing).toBe('raw');
+    assert.strictEqual(node?.methods?.POST?.bodyParsing, 'raw');
   });
 });
 
@@ -639,7 +669,7 @@ describe('ControllerManager — handler binding', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['login']);
-    expect(node?.methods?.POST?.meta?.methodName).toBe('postLogin');
+    assert.strictEqual(node?.methods?.POST?.meta?.methodName, 'postLogin');
   });
 });
 
@@ -671,18 +701,20 @@ describe('ControllerManager — combined production-style example', () => {
     cm.registerController(Auth);
 
     const subtreeRoot = registry.root.children.get('auth');
-    expect(subtreeRoot?.middlewares.map((m) => m.Class.name)).toEqual([
-      'FakeMw',
-    ]);
+    assert.deepStrictEqual(
+      subtreeRoot?.middlewares.map((m) => m.Class.name),
+      ['FakeMw'],
+    );
 
     const findHandler = (segs: string[], m: HttpMethod) =>
       findNode(registry, 'Auth', segs)?.methods?.[m];
-    expect(findHandler(['login'], 'POST')).toBeDefined();
-    expect(findHandler(['register'], 'POST')).toBeDefined();
-    expect(findHandler(['logout'], 'POST')).toBeDefined();
-    expect(findHandler(['me'], 'GET')).toBeDefined();
+    assert.notStrictEqual(findHandler(['login'], 'POST'), undefined);
+    assert.notStrictEqual(findHandler(['register'], 'POST'), undefined);
+    assert.notStrictEqual(findHandler(['logout'], 'POST'), undefined);
+    assert.notStrictEqual(findHandler(['me'], 'GET'), undefined);
     // Per-handler middleware on POST /login
-    expect(findHandler(['login'], 'POST')?.middlewares?.[0]?.Class).toBe(
+    assert.strictEqual(
+      findHandler(['login'], 'POST')?.middlewares?.[0]?.Class,
       OtherMw,
     );
   });
@@ -703,11 +735,11 @@ describe('ControllerManager — combined production-style example', () => {
     cm.registerController(Auth);
 
     const m = registry.match('POST', '/auth/login');
-    expect(m?.entry?.handler).toBeDefined();
-    expect(m?.middlewares.map((mw) => mw.Class.name)).toEqual([
-      'FakeMw',
-      'OtherMw',
-    ]);
+    assert.notStrictEqual(m?.entry?.handler, undefined);
+    assert.deepStrictEqual(
+      m?.middlewares.map((mw) => mw.Class.name),
+      ['FakeMw', 'OtherMw'],
+    );
   });
 });
 
@@ -746,10 +778,10 @@ describe('ControllerManager — cross-controller middleware', () => {
 
     // POST /auth/login walks: root (Home's FakeMw) → /auth (Auth's OtherMw) → /login
     const m = registry.match('POST', '/auth/login');
-    expect(m?.middlewares.map((mw) => mw.Class.name)).toEqual([
-      'FakeMw',
-      'OtherMw',
-    ]);
+    assert.deepStrictEqual(
+      m?.middlewares.map((mw) => mw.Class.name),
+      ['FakeMw', 'OtherMw'],
+    );
   });
 });
 
@@ -774,12 +806,14 @@ describe('ControllerManager — mixed-case path segments', () => {
 
     // Matching is case-insensitive by design; both variants must resolve to
     // the same handler at depth ≥ 2 (mounted under `/c`).
-    expect(
+    assert.notStrictEqual(
       registry.match('GET', '/c/user/Profile')?.entry?.handler,
-    ).toBeDefined();
-    expect(
+      undefined,
+    );
+    assert.notStrictEqual(
       registry.match('GET', '/c/user/profile')?.entry?.handler,
-    ).toBeDefined();
+      undefined,
+    );
   });
 
   it("a case-variant method-scoped key ('POST/Login' vs /login) attaches", () => {
@@ -795,7 +829,7 @@ describe('ControllerManager — mixed-case path segments', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['login']);
-    expect(node?.methods?.POST?.middlewares?.[0]?.Class).toBe(FakeMw);
+    assert.strictEqual(node?.methods?.POST?.middlewares?.[0]?.Class, FakeMw);
   });
 
   it('a nested case-variant method-scoped key attaches at depth', () => {
@@ -813,12 +847,12 @@ describe('ControllerManager — mixed-case path segments', () => {
     cm.registerController(C);
 
     const node = findNode(registry, 'C', ['user', 'profile']);
-    expect(node?.methods?.GET?.middlewares?.[0]?.Class).toBe(FakeMw);
+    assert.strictEqual(node?.methods?.GET?.middlewares?.[0]?.Class, FakeMw);
   });
 
   it('warns when a method-scoped key targets a nonexistent route', () => {
     const registry = new RouteRegistry();
-    const warn = vi.fn();
+    const warn = mock.fn();
     const app = {
       httpServer: { routeRegistry: registry },
       logger: { child: () => ({ warn, verbose() {}, error() {} }) },
@@ -835,10 +869,10 @@ describe('ControllerManager — mixed-case path segments', () => {
     }
     cm.registerController(GhostRouteController);
 
-    expect(warn).toHaveBeenCalledTimes(1);
-    const msg = warn.mock.calls[0]?.[0] as string;
-    expect(msg).toContain('GhostRouteController');
-    expect(msg).toContain('GET/ghost');
+    assertCalledTimes(warn, 1);
+    const msg = warn.mock.calls[0]?.arguments[0] as string;
+    assert.ok(msg.includes('GhostRouteController'));
+    assert.ok(msg.includes('GET/ghost'));
   });
 });
 
@@ -883,7 +917,7 @@ class SchemalessAppInfoController extends AbstractController {
 describe('ControllerManager — schema-less route appInfo defaults', () => {
   const base = '/test/schemalessappinfocontroller';
 
-  beforeAll(() => {
+  before(() => {
     appInstance.controllerManager?.registerController(
       SchemalessAppInfoController,
       'test',
@@ -894,11 +928,11 @@ describe('ControllerManager — schema-less route appInfo defaults', () => {
     const res = await fetch(getTestServerURL(`${base}/read`));
     const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.data.query).toBe('absent');
-    expect(body.data.request).toBe('absent');
-    expect(body.data.queryIsObject).toBe(true);
-    expect(body.data.requestIsObject).toBe(true);
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.data.query, 'absent');
+    assert.strictEqual(body.data.request, 'absent');
+    assert.strictEqual(body.data.queryIsObject, true);
+    assert.strictEqual(body.data.requestIsObject, true);
   });
 });
 
@@ -924,7 +958,7 @@ describe('ControllerManager — Mongoose validation safety net', () => {
       /SafetyNetFixture validation/.test(r.message),
     );
 
-  beforeAll(() => {
+  before(() => {
     appInstance.controllerManager?.registerController(
       SafetyNetController,
       'test',
@@ -937,7 +971,7 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     }
   });
 
-  afterAll(() => {
+  after(() => {
     for (const t of silenced) {
       t.silent = false;
     }
@@ -952,15 +986,18 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const res = await post('/matched', { name: 'toolong' });
     const body = await res.json();
 
-    expect(res.status).toBe(400);
+    assert.strictEqual(res.status, 400);
     // Only the public, client-sent path appears.
-    expect(Object.keys(body.errors)).toEqual(['name']);
+    assert.deepStrictEqual(Object.keys(body.errors), ['name']);
     // Message is rebuilt from the `maxlength` kind + bound, NOT the raw Mongoose
     // template — so it carries the constant (5) but never the submission.
-    expect(body.errors.name).toBe('Must be at most 5 characters');
-    expect(body.errors.name).not.toContain('toolong');
+    assert.strictEqual(body.errors.name, 'Must be at most 5 characters');
+    assert.ok(!body.errors.name.includes('toolong'));
     // Handled → warn, not error.
-    expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['warn'],
+    );
   });
 
   it('maxlength overflow → message carries the bound, never the value', async () => {
@@ -968,31 +1005,34 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const res = await post('/matched', { name: overflow });
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(body.errors.name).toBe('Must be at most 5 characters');
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(body.errors.name, 'Must be at most 5 characters');
     // The value must not appear anywhere in the serialized 400 body…
-    expect(JSON.stringify(body)).not.toContain(overflow);
+    assert.ok(!JSON.stringify(body).includes(overflow));
     // …nor in the warn log line (the Sentry/retention vector): the logged
     // error is rebuilt with the same kind-based texts (`toLoggableError`).
     const [entry] = netLogs();
-    expect(entry?.level).toBe('warn');
-    expect(entry?.message).toContain('Must be at most 5 characters');
-    expect(entry?.message).not.toContain(overflow);
+    assert.strictEqual(entry?.level, 'warn');
+    assert.ok(entry?.message.includes('Must be at most 5 characters'));
+    assert.ok(!entry?.message.includes(overflow));
   });
 
   it('cast failure (string → Number) → typed message, value not echoed', async () => {
     const res = await post('/cast', { age: '+7 (900) 123-45-67' });
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(Object.keys(body.errors)).toEqual(['age']);
-    expect(body.errors.age).toBe('Must be a number');
-    expect(JSON.stringify(body)).not.toContain('900');
-    expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(Object.keys(body.errors), ['age']);
+    assert.strictEqual(body.errors.age, 'Must be a number');
+    assert.ok(!JSON.stringify(body).includes('900'));
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['warn'],
+    );
     // The CastError template ("Cast to Number failed for value …") embeds the
     // PII — the sanitized log line must not.
     for (const r of netLogs()) {
-      expect(r.message).not.toContain('900');
+      assert.ok(!r.message.includes('900'));
     }
   });
 
@@ -1000,10 +1040,10 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const res = await post('/enum', { role: 'superhacker' });
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(Object.keys(body.errors)).toEqual(['role']);
-    expect(body.errors.role).toBe('Must be one of: admin, user');
-    expect(JSON.stringify(body)).not.toContain('superhacker');
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(Object.keys(body.errors), ['role']);
+    assert.strictEqual(body.errors.role, 'Must be one of: admin, user');
+    assert.ok(!JSON.stringify(body).includes('superhacker'));
   });
 
   it('custom model message embedding {VALUE} is rebuilt generically', async () => {
@@ -1011,19 +1051,22 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const res = await post('/custom', { nickname: secret });
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(Object.keys(body.errors)).toEqual(['nickname']);
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(Object.keys(body.errors), ['nickname']);
     // The model's custom string ("The nickname {VALUE} is far too long…") is
     // NOT passed through — rebuilt from the kind + bound instead.
-    expect(body.errors.nickname).toBe('Must be at most 5 characters');
-    expect(body.errors.nickname).not.toContain('far too long');
-    expect(JSON.stringify(body)).not.toContain(secret);
+    assert.strictEqual(body.errors.nickname, 'Must be at most 5 characters');
+    assert.ok(!body.errors.nickname.includes('far too long'));
+    assert.ok(!JSON.stringify(body).includes(secret));
     // The warn log line is sanitized too — neither the value nor the custom
     // template survives into it.
-    expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['warn'],
+    );
     for (const r of netLogs()) {
-      expect(r.message).not.toContain(secret);
-      expect(r.message).not.toContain('far too long');
+      assert.ok(!r.message.includes(secret));
+      assert.ok(!r.message.includes('far too long'));
     }
   });
 
@@ -1031,45 +1074,57 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const res = await post('/queryMatched?name=toolong');
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(Object.keys(body.errors)).toEqual(['name']);
-    expect(netLogs().map((r) => r.level)).toEqual(['warn']);
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(Object.keys(body.errors), ['name']);
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['warn'],
+    );
   });
 
   it('renamed field (model path not sent by client) → 500', async () => {
     const res = await post('/renamed', { name: 'toolong' });
 
-    expect(res.status).toBe(500);
-    expect(netLogs().map((r) => r.level)).toEqual(['error']);
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['error'],
+    );
   });
 
   it('internal required field failing → 500', async () => {
     const res = await post('/internal', { name: 'ok' });
 
-    expect(res.status).toBe(500);
-    expect(netLogs().map((r) => r.level)).toEqual(['error']);
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['error'],
+    );
   });
 
   it('mixed (one matched + one internal) → 500, full detail in log', async () => {
     const res = await post('/mixed', { name: 'toolong' });
 
-    expect(res.status).toBe(500);
+    assert.strictEqual(res.status, 500);
     // Logged as an error, carrying BOTH failing paths for the developer.
     const [entry] = netLogs();
-    expect(entry?.level).toBe('error');
-    expect(entry?.message).toContain('name');
-    expect(entry?.message).toContain('secret');
+    assert.strictEqual(entry?.level, 'error');
+    assert.ok(entry?.message.includes('name'));
+    assert.ok(entry?.message.includes('secret'));
     // The unresolved 500 path deliberately logs the ORIGINAL error — raw
     // Mongoose message, submitted value included — sanitization applies only
     // to the handled (400) branch.
-    expect(entry?.message).toContain('toolong');
+    assert.ok(entry?.message.includes('toolong'));
   });
 
   it('no route schema → no input keys → nothing matches → 500', async () => {
     const res = await post('/noSchema');
 
-    expect(res.status).toBe(500);
-    expect(netLogs().map((r) => r.level)).toEqual(['error']);
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(
+      netLogs().map((r) => r.level),
+      ['error'],
+    );
   });
 
   it('route-level ValidationError still handled by the pre-handler 400 path', async () => {
@@ -1080,16 +1135,16 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const res = await post('/routeValidation', {});
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(Array.isArray(body.errors.mustHave)).toBe(true);
+    assert.strictEqual(res.status, 400);
+    assert.strictEqual(Array.isArray(body.errors.mustHave), true);
   });
 
   it('headersSent → next(err): a throw after the response keeps the 200', async () => {
     const res = await post('/afterSend', { name: 'toolong' });
     const body = await res.json();
 
-    expect(res.status).toBe(200);
-    expect(body.data.saved).toBe('already');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.data.saved, 'already');
   });
 });
 
@@ -1110,7 +1165,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
   // the root logger's `log` contract satisfied while nothing here asserts on it.
   let capture: CaptureTransport;
   let silenced: Transport[] = [];
-  beforeAll(() => {
+  before(() => {
     capture = new CaptureTransport();
     appInstance.logger.add(capture);
     silenced = appInstance.logger.transports.filter((t) => t !== capture);
@@ -1118,7 +1173,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       t.silent = true;
     }
   });
-  afterAll(() => {
+  after(() => {
     for (const t of silenced) {
       t.silent = false;
     }
@@ -1137,7 +1192,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new NotFoundError('Boat not found'),
       fakeReq(),
     );
-    expect(resolved).toEqual({
+    assert.deepStrictEqual(resolved, {
       status: 404,
       body: { message: 'Boat not found' },
       logLevel: 'verbose',
@@ -1149,7 +1204,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new HttpError(422, 'Unprocessable', { errors: { csv: 'bad' } }),
       fakeReq(),
     );
-    expect(resolved).toEqual({
+    assert.deepStrictEqual(resolved, {
       status: 422,
       body: { errors: { csv: 'bad' } },
       logLevel: 'verbose',
@@ -1173,20 +1228,21 @@ describe('HttpServer.resolveError — registry resolution', () => {
       vErr,
       fakeReq({ name: 'x' }),
     );
-    expect(matched).toEqual({
+    assert.deepStrictEqual(matched, {
       status: 400,
       body: { errors: { name: 'Must be at most 5 characters' } },
       logLevel: 'warn',
     });
-    expect(JSON.stringify(matched)).not.toContain('SUPERSECRET');
+    assert.ok(!JSON.stringify(matched).includes('SUPERSECRET'));
     // Same error, no matching client key → null (caller keeps the 500).
-    expect(await httpServer().resolveError(vErr, fakeReq())).toBeNull();
+    assert.strictEqual(await httpServer().resolveError(vErr, fakeReq()), null);
   });
 
   it('unmatched error class → null', async () => {
-    expect(
+    assert.strictEqual(
       await httpServer().resolveError(new Error('x'), fakeReq()),
-    ).toBeNull();
+      null,
+    );
   });
 
   it('consumer handler wins over built-ins and unregister restores them', async () => {
@@ -1199,14 +1255,14 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new NotFoundError('x'),
       fakeReq(),
     );
-    expect(overridden?.status).toBe(418);
-    expect(overridden?.logLevel).toBe('warn'); // consumer default
+    assert.strictEqual(overridden?.status, 418);
+    assert.strictEqual(overridden?.logLevel, 'warn'); // consumer default
     unregister();
     const restored = await httpServer().resolveError(
       new NotFoundError('x'),
       fakeReq(),
     );
-    expect(restored?.status).toBe(404);
+    assert.strictEqual(restored?.status, 404);
   });
 
   it('null return falls through to the next entry (consumer → built-in)', async () => {
@@ -1215,7 +1271,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new NotFoundError('x'),
       fakeReq(),
     );
-    expect(resolved?.status).toBe(404); // built-in still reached
+    assert.strictEqual(resolved?.status, 404); // built-in still reached
   });
 
   it('consumer tier respects registration order', async () => {
@@ -1231,7 +1287,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new OrderedError(),
       fakeReq(),
     );
-    expect(resolved).toEqual({
+    assert.deepStrictEqual(resolved, {
       status: 410,
       body: { message: 'second' },
       logLevel: 'warn',
@@ -1251,7 +1307,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new AsyncMapped(),
       fakeReq(),
     );
-    expect(resolved).toEqual({
+    assert.deepStrictEqual(resolved, {
       status: 402,
       body: { message: 'later' },
       logLevel: 'info',
@@ -1270,7 +1326,10 @@ describe('HttpServer.resolveError — registry resolution', () => {
         body: { message: 'unreachable' },
       })),
     );
-    expect(await httpServer().resolveError(new Crashy(), fakeReq())).toBeNull();
+    assert.strictEqual(
+      await httpServer().resolveError(new Crashy(), fakeReq()),
+      null,
+    );
   });
 });
 
@@ -1286,7 +1345,7 @@ describe('Error-handler registry over HTTP', () => {
   const logsMatching = (re: RegExp) =>
     capture.records.filter((r) => re.test(r.message));
 
-  beforeAll(() => {
+  before(() => {
     appInstance.controllerManager?.registerController(
       ErrorRegistryController,
       'test',
@@ -1312,7 +1371,7 @@ describe('Error-handler registry over HTTP', () => {
     }
   });
 
-  afterAll(() => {
+  after(() => {
     for (const u of unregisters.splice(0)) {
       u();
     }
@@ -1328,54 +1387,61 @@ describe('Error-handler registry over HTTP', () => {
 
   it('thrown NotFoundError → 404 { message }, verbose log', async () => {
     const res = await get('/notFound');
-    expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ message: 'Boat not found' });
-    expect(logsMatching(/Boat not found/).map((r) => r.level)).toEqual([
-      'verbose',
-    ]);
+    assert.strictEqual(res.status, 404);
+    assert.deepStrictEqual(await res.json(), { message: 'Boat not found' });
+    assert.deepStrictEqual(
+      logsMatching(/Boat not found/).map((r) => r.level),
+      ['verbose'],
+    );
   });
 
   it('HttpError base with custom body → status + body override', async () => {
     const res = await get('/customBase');
-    expect(res.status).toBe(422);
-    expect(await res.json()).toEqual({ errors: { csv: 'row 17 malformed' } });
+    assert.strictEqual(res.status, 422);
+    assert.deepStrictEqual(await res.json(), {
+      errors: { csv: 'row 17 malformed' },
+    });
   });
 
   it('registered unowned error, matching branch → mapped 409, warn log', async () => {
     const res = await get('/unowned');
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ message: 'Already exists' });
-    expect(
+    assert.strictEqual(res.status, 409);
+    assert.deepStrictEqual(await res.json(), { message: 'Already exists' });
+    assert.deepStrictEqual(
       logsMatching(/driver failed with code 11000/).map((r) => r.level),
-    ).toEqual(['warn']);
+      ['warn'],
+    );
   });
 
   it('registered handler returns null → falls through to 500, error log', async () => {
     const res = await get('/unownedPass');
-    expect(res.status).toBe(500);
-    expect(
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(
       logsMatching(/driver failed with code 42/).map((r) => r.level),
-    ).toEqual(['error']);
+      ['error'],
+    );
   });
 
   it('a throwing consumer handler → 500, both errors logged at error', async () => {
     const res = await get('/handlerCrash');
-    expect(res.status).toBe(500);
-    expect(
-      logsMatching(/handler exploded|HandlerCrashError/).length,
-    ).toBeGreaterThanOrEqual(1);
-    expect(logsMatching(/boom/).map((r) => r.level)).toEqual(['error']);
+    assert.strictEqual(res.status, 500);
+    assert.ok(logsMatching(/handler exploded|HandlerCrashError/).length >= 1);
+    assert.deepStrictEqual(
+      logsMatching(/boom/).map((r) => r.level),
+      ['error'],
+    );
   });
 
   it('plain Error stays a 500 with error log (unchanged fallback)', async () => {
     const res = await get('/plain');
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(await res.json(), {
       message: 'Platform error. Please check later or contact support',
     });
-    expect(logsMatching(/unmapped plain error/).map((r) => r.level)).toEqual([
-      'error',
-    ]);
+    assert.deepStrictEqual(
+      logsMatching(/unmapped plain error/).map((r) => r.level),
+      ['error'],
+    );
   });
 
   it('consumer override of a built-in wins end-to-end', async () => {
@@ -1385,13 +1451,13 @@ describe('Error-handler registry over HTTP', () => {
     );
     try {
       const res = await get('/notFound');
-      expect(res.status).toBe(418);
-      expect(await res.json()).toEqual({ message: 'teapot' });
+      assert.strictEqual(res.status, 418);
+      assert.deepStrictEqual(await res.json(), { message: 'teapot' });
     } finally {
       unregister?.();
     }
     const restored = await get('/notFound');
-    expect(restored.status).toBe(404);
+    assert.strictEqual(restored.status, 404);
   });
 });
 
@@ -1420,7 +1486,7 @@ describe('ControllerManager — validation-phase error leak', () => {
   const logsMatching = (re: RegExp) =>
     capture.records.filter((r) => re.test(r.message));
 
-  beforeAll(() => {
+  before(() => {
     appInstance.controllerManager?.registerController(
       ValidationLeakController,
       'test',
@@ -1433,7 +1499,7 @@ describe('ControllerManager — validation-phase error leak', () => {
     }
   });
 
-  afterAll(() => {
+  after(() => {
     for (const t of silenced) {
       t.silent = false;
     }
@@ -1448,28 +1514,30 @@ describe('ControllerManager — validation-phase error leak', () => {
     const res = await post('/throwingValidator', { field: 'x' });
     const body = await res.json();
 
-    expect(res.status).toBe(500);
+    assert.strictEqual(res.status, 500);
     // The internal detail (a leaked DB URI in the repro) must not reach the wire.
-    expect(JSON.stringify(body)).not.toContain(LEAK_SECRET);
-    expect(JSON.stringify(body)).not.toContain('s3cret');
+    assert.ok(!JSON.stringify(body).includes(LEAK_SECRET));
+    assert.ok(!JSON.stringify(body).includes('s3cret'));
     // Generic 500 body, consistent with the framework's other 500 sink.
-    expect(body).toEqual({
+    assert.deepStrictEqual(body, {
       message: 'Platform error. Please check later or contact support',
     });
     // The server-side defect IS logged at error, in full, for the developer.
-    expect(logsMatching(new RegExp(LEAK_SECRET)).map((r) => r.level)).toEqual([
-      'error',
-    ]);
+    assert.deepStrictEqual(
+      logsMatching(new RegExp(LEAK_SECRET)).map((r) => r.level),
+      ['error'],
+    );
   });
 
   it('a schema no driver matches → 500 (not 400), migration message not echoed', async () => {
     const res = await post('/noDriver', { anything: 1 });
     const body = await res.json();
 
-    expect(res.status).toBe(500);
-    expect(JSON.stringify(body)).not.toContain('No ValidatorDriver');
-    expect(logsMatching(/No ValidatorDriver/).map((r) => r.level)).toEqual([
-      'error',
-    ]);
+    assert.strictEqual(res.status, 500);
+    assert.ok(!JSON.stringify(body).includes('No ValidatorDriver'));
+    assert.deepStrictEqual(
+      logsMatching(/No ValidatorDriver/).map((r) => r.level),
+      ['error'],
+    );
   });
 });

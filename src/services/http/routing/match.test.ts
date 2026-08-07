@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import {
+  assertMatches,
+  assertThrowsLike,
+  pattern,
+} from '../../../tests/assertions.ts';
 import { MalformedPathError, match } from './match.ts';
 import type { HandlerEntry, MiddlewareEntry } from './RouteNode.ts';
 import { createNode, RouteRegistry } from './RouteRegistry.ts';
@@ -18,8 +24,8 @@ describe('match — static segments', () => {
     root.children.set('users', users);
 
     const m = match(root, 'GET', '/users');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({});
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, {});
   });
 
   it('returns null for a non-existent path', () => {
@@ -28,14 +34,14 @@ describe('match — static segments', () => {
     users.methods = { GET: { handler: noop } };
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/posts')).toBeNull();
+    assert.strictEqual(match(root, 'GET', '/posts'), null);
   });
 
   it('matches the root path "/"', () => {
     const root = createNode('');
     root.methods = { GET: { handler: noop } };
 
-    expect(match(root, 'GET', '/')?.entry?.handler).toBe(noop);
+    assert.strictEqual(match(root, 'GET', '/')?.entry?.handler, noop);
   });
 
   it('matches deep static paths', () => {
@@ -48,7 +54,8 @@ describe('match — static segments', () => {
     admin.children.set('users', users);
     root.children.set('admin', admin);
 
-    expect(match(root, 'GET', '/admin/users/profile')?.entry?.handler).toBe(
+    assert.strictEqual(
+      match(root, 'GET', '/admin/users/profile')?.entry?.handler,
       noop,
     );
   });
@@ -64,8 +71,8 @@ describe('match — param segments', () => {
     root.children.set('users', users);
 
     const m = match(root, 'GET', '/users/42');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({ id: '42' });
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, { id: '42' });
   });
 
   it('uses handler paramNames to derive param keys', () => {
@@ -80,10 +87,10 @@ describe('match — param segments', () => {
     root.paramChild = paramNode;
 
     const putMatch = match(root, 'PUT', '/my-value');
-    expect(putMatch?.params).toEqual({ slug: 'my-value' });
+    assert.deepStrictEqual(putMatch?.params, { slug: 'my-value' });
 
     const postMatch = match(root, 'POST', '/my-value');
-    expect(postMatch?.params).toEqual({ event: 'my-value' });
+    assert.deepStrictEqual(postMatch?.params, { event: 'my-value' });
   });
 
   it('falls back to tree segment name when paramNames is not set', () => {
@@ -93,7 +100,7 @@ describe('match — param segments', () => {
     root.paramChild = paramNode;
 
     const m = match(root, 'GET', '/42');
-    expect(m?.params).toEqual({ id: '42' });
+    assert.deepStrictEqual(m?.params, { id: '42' });
   });
 
   it('static beats param when both could match', () => {
@@ -109,8 +116,8 @@ describe('match — param segments', () => {
 
     const staticMatch = match(root, 'GET', '/users/me');
     const paramMatch = match(root, 'GET', '/users/42');
-    expect(staticMatch?.params).toEqual({});
-    expect(paramMatch?.params).toEqual({ id: '42' });
+    assert.deepStrictEqual(staticMatch?.params, {});
+    assert.deepStrictEqual(paramMatch?.params, { id: '42' });
   });
 });
 
@@ -124,7 +131,7 @@ describe('match — splat segments', () => {
     root.children.set('api', api);
 
     const m = match(root, 'GET', '/api/v1/users/42');
-    expect(m?.params).toEqual({ rest: 'v1/users/42' });
+    assert.deepStrictEqual(m?.params, { rest: 'v1/users/42' });
   });
 
   it('captures deeply nested paths under a splat', () => {
@@ -137,7 +144,7 @@ describe('match — splat segments', () => {
 
     const deep = '/api/a/b/c/d/e/f/g/h/i/j';
     const m = match(root, 'GET', deep);
-    expect(m?.params).toEqual({ rest: 'a/b/c/d/e/f/g/h/i/j' });
+    assert.deepStrictEqual(m?.params, { rest: 'a/b/c/d/e/f/g/h/i/j' });
   });
 
   it('static and param beat splat', () => {
@@ -151,8 +158,10 @@ describe('match — splat segments', () => {
     api.splatChild = splat;
     root.children.set('api', api);
 
-    expect(match(root, 'GET', '/api/v1')?.params).toEqual({});
-    expect(match(root, 'GET', '/api/v2/x')?.params).toEqual({ rest: 'v2/x' });
+    assert.deepStrictEqual(match(root, 'GET', '/api/v1')?.params, {});
+    assert.deepStrictEqual(match(root, 'GET', '/api/v2/x')?.params, {
+      rest: 'v2/x',
+    });
   });
 });
 
@@ -165,7 +174,7 @@ describe('match — per-segment URL decoding', () => {
     users.paramChild = nameNode;
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/users/john%20doe')?.params).toEqual({
+    assert.deepStrictEqual(match(root, 'GET', '/users/john%20doe')?.params, {
       name: 'john doe',
     });
   });
@@ -180,7 +189,7 @@ describe('match — per-segment URL decoding', () => {
 
     // Spring-style per-segment: '%2F' stays as '/' inside the param value;
     // the matcher does NOT see foo%2Fbar as "/users/foo/bar".
-    expect(match(root, 'GET', '/users/foo%2Fbar')?.params).toEqual({
+    assert.deepStrictEqual(match(root, 'GET', '/users/foo%2Fbar')?.params, {
       name: 'foo/bar',
     });
   });
@@ -191,7 +200,7 @@ describe('match — per-segment URL decoding', () => {
     users.methods = { GET: { handler: noop } };
     root.children.set('users', users);
 
-    expect(() => match(root, 'GET', '/users/%')).toThrow(MalformedPathError);
+    assertThrowsLike(() => match(root, 'GET', '/users/%'), MalformedPathError);
   });
 
   it('splat reconstruction loses encoded-slash distinction (documented behavior)', () => {
@@ -204,10 +213,10 @@ describe('match — per-segment URL decoding', () => {
 
     // Both URLs produce the same splat value because per-segment decoding
     // happens before reconstruction. Documented in match.ts JSDoc.
-    expect(match(root, 'GET', '/api/foo%2Fbar/baz')?.params).toEqual({
+    assert.deepStrictEqual(match(root, 'GET', '/api/foo%2Fbar/baz')?.params, {
       rest: 'foo/bar/baz',
     });
-    expect(match(root, 'GET', '/api/foo/bar/baz')?.params).toEqual({
+    assert.deepStrictEqual(match(root, 'GET', '/api/foo/bar/baz')?.params, {
       rest: 'foo/bar/baz',
     });
   });
@@ -220,7 +229,7 @@ describe('match — case sensitivity', () => {
     users.methods = { GET: { handler: noop } };
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/Users')?.entry?.handler).toBe(noop);
+    assert.strictEqual(match(root, 'GET', '/Users')?.entry?.handler, noop);
   });
 });
 
@@ -231,7 +240,7 @@ describe('match — trailing slash', () => {
     users.methods = { GET: { handler: noop } };
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/users/')?.entry?.handler).toBe(noop);
+    assert.strictEqual(match(root, 'GET', '/users/')?.entry?.handler, noop);
   });
 });
 
@@ -242,7 +251,7 @@ describe('match — HEAD fallback', () => {
     users.methods = { GET: { handler: noop } };
     root.children.set('users', users);
 
-    expect(match(root, 'HEAD', '/users')?.entry?.handler).toBe(noop);
+    assert.strictEqual(match(root, 'HEAD', '/users')?.entry?.handler, noop);
   });
 
   it('explicit HEAD overrides GET fallback', () => {
@@ -252,7 +261,10 @@ describe('match — HEAD fallback', () => {
     users.methods = { GET: { handler: noop }, HEAD: { handler: headHandler } };
     root.children.set('users', users);
 
-    expect(match(root, 'HEAD', '/users')?.entry?.handler).toBe(headHandler);
+    assert.strictEqual(
+      match(root, 'HEAD', '/users')?.entry?.handler,
+      headHandler,
+    );
   });
 });
 
@@ -264,9 +276,10 @@ describe('match — 405 Method Not Allowed', () => {
     root.children.set('users', users);
 
     const m = match(root, 'DELETE', '/users');
-    expect(m?.entry).toBeNull();
-    expect(m?.allowedMethods).toEqual(
-      expect.arrayContaining(['GET', 'POST', 'HEAD']),
+    assert.strictEqual(m?.entry, null);
+    assertMatches(
+      m?.allowedMethods,
+      pattern.arrayContaining(['GET', 'POST', 'HEAD']),
     );
   });
 
@@ -277,8 +290,8 @@ describe('match — 405 Method Not Allowed', () => {
     root.children.set('users', users);
 
     const m = match(root, 'HEAD', '/users');
-    expect(m?.entry).toBeNull();
-    expect(m?.allowedMethods).toEqual(['POST']);
+    assert.strictEqual(m?.entry, null);
+    assert.deepStrictEqual(m?.allowedMethods, ['POST']);
   });
 });
 
@@ -300,12 +313,10 @@ describe('match — middleware accumulation', () => {
     root.children.set('users', users);
 
     const m = match(root, 'GET', '/users/42');
-    expect(m?.middlewares.map((entry) => entry.Class.name)).toEqual([
-      'Root',
-      'Sub',
-      'Leaf',
-      'Handler',
-    ]);
+    assert.deepStrictEqual(
+      m?.middlewares.map((entry) => entry.Class.name),
+      ['Root', 'Sub', 'Leaf', 'Handler'],
+    );
   });
 });
 
@@ -318,7 +329,10 @@ describe('match — bodyParsing inheritance', () => {
     users.children.set('webhook', webhook);
     root.children.set('users', users);
 
-    expect(match(root, 'POST', '/users/webhook')?.bodyParsing).toBe('raw');
+    assert.strictEqual(
+      match(root, 'POST', '/users/webhook')?.bodyParsing,
+      'raw',
+    );
   });
 
   it('subtree bodyParsing inherits to leaves without override', () => {
@@ -330,7 +344,10 @@ describe('match — bodyParsing inheritance', () => {
     webhooks.children.set('stripe', stripe);
     root.children.set('webhooks', webhooks);
 
-    expect(match(root, 'POST', '/webhooks/stripe')?.bodyParsing).toBe('raw');
+    assert.strictEqual(
+      match(root, 'POST', '/webhooks/stripe')?.bodyParsing,
+      'raw',
+    );
   });
 
   it('default is "parsed"', () => {
@@ -339,13 +356,13 @@ describe('match — bodyParsing inheritance', () => {
     users.methods = { GET: { handler: noop } };
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/users')?.bodyParsing).toBe('parsed');
+    assert.strictEqual(match(root, 'GET', '/users')?.bodyParsing, 'parsed');
   });
 });
 
 describe('match — empty / edge cases', () => {
   it('empty registry returns null', () => {
-    expect(match(createNode(''), 'GET', '/anything')).toBeNull();
+    assert.strictEqual(match(createNode(''), 'GET', '/anything'), null);
   });
 
   it('node with no methods returns null (404, not 405)', () => {
@@ -354,7 +371,7 @@ describe('match — empty / edge cases', () => {
     // No methods on `users` — it's a structural node only
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/users')).toBeNull();
+    assert.strictEqual(match(root, 'GET', '/users'), null);
   });
 });
 
@@ -370,8 +387,8 @@ describe('match — HEAD fallback uses GET paramNames', () => {
     root.children.set('users', users);
 
     const m = match(root, 'HEAD', '/users/42');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({ userId: '42' });
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, { userId: '42' });
   });
 
   it('explicit HEAD handler uses its own paramNames, not GET', () => {
@@ -387,8 +404,8 @@ describe('match — HEAD fallback uses GET paramNames', () => {
     root.children.set('users', users);
 
     const m = match(root, 'HEAD', '/users/42');
-    expect(m?.entry?.handler).toBe(headHandler);
-    expect(m?.params).toEqual({ headId: '42' });
+    assert.strictEqual(m?.entry?.handler, headHandler);
+    assert.deepStrictEqual(m?.params, { headId: '42' });
   });
 });
 
@@ -404,9 +421,9 @@ describe('match — 405 with params', () => {
     root.children.set('users', users);
 
     const m = match(root, 'DELETE', '/users/42');
-    expect(m?.entry).toBeNull();
+    assert.strictEqual(m?.entry, null);
     // handler is null so paramNames cannot be used; falls back to tree name
-    expect(m?.params).toEqual({ id: '42' });
+    assert.deepStrictEqual(m?.params, { id: '42' });
   });
 });
 
@@ -424,8 +441,8 @@ describe('match — mixed param + splat with paramNames', () => {
     root.children.set('files', files);
 
     const m = match(root, 'GET', '/files/alice/docs/report.pdf');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({ id: 'alice', rest: 'docs/report.pdf' });
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, { id: 'alice', rest: 'docs/report.pdf' });
   });
 
   it('without paramNames, uses tree segment names for param + splat', () => {
@@ -439,7 +456,10 @@ describe('match — mixed param + splat with paramNames', () => {
     root.children.set('files', files);
 
     const m = match(root, 'GET', '/files/alice/docs/report.pdf');
-    expect(m?.params).toEqual({ owner: 'alice', path: 'docs/report.pdf' });
+    assert.deepStrictEqual(m?.params, {
+      owner: 'alice',
+      path: 'docs/report.pdf',
+    });
   });
 
   it('paramNames length mismatch — extra paramValues are silently dropped', () => {
@@ -456,7 +476,7 @@ describe('match — mixed param + splat with paramNames', () => {
 
     const m = match(root, 'GET', '/files/x/y');
     // paramValues = ['x', 'y'], paramNames = ['only'] — only first zips
-    expect(m?.params).toEqual({ only: 'x' });
+    assert.deepStrictEqual(m?.params, { only: 'x' });
     // 'y' is silently lost — the handler declared fewer names than segments
   });
 });
@@ -476,7 +496,7 @@ describe('match — duplicate tree param names (mergeNode edge case)', () => {
     const m = match(root, 'GET', '/first/second');
     // walk does { ...parentParams, [paramName]: seg } so the second ':id'
     // overwrites the first — only 'second' survives.
-    expect(m?.params).toEqual({ id: 'second' });
+    assert.deepStrictEqual(m?.params, { id: 'second' });
   });
 
   it('with paramNames, both values are preserved under distinct keys', () => {
@@ -490,7 +510,7 @@ describe('match — duplicate tree param names (mergeNode edge case)', () => {
     root.paramChild = p1;
 
     const m = match(root, 'GET', '/first/second');
-    expect(m?.params).toEqual({ parentId: 'first', childId: 'second' });
+    assert.deepStrictEqual(m?.params, { parentId: 'first', childId: 'second' });
   });
 });
 
@@ -514,18 +534,25 @@ describe('match — backtracking past method-less static nodes (doc 05)', () => 
   it('a method-less static node does not shadow a sibling param route', () => {
     const { root } = buildUsers();
     // Main regression: /users/me must fall through to /users/:id.
-    expect(match(root, 'GET', '/users/me')?.params).toEqual({ id: 'me' });
+    assert.deepStrictEqual(match(root, 'GET', '/users/me')?.params, {
+      id: 'me',
+    });
     // The deep static route and other param values still work.
-    expect(match(root, 'GET', '/users/me/avatar')?.entry?.handler).toBe(noop);
-    expect(match(root, 'GET', '/users/42')?.params).toEqual({ id: '42' });
+    assert.strictEqual(
+      match(root, 'GET', '/users/me/avatar')?.entry?.handler,
+      noop,
+    );
+    assert.deepStrictEqual(match(root, 'GET', '/users/42')?.params, {
+      id: '42',
+    });
   });
 
   it('middleware on the abandoned static node does not leak into the param match', () => {
     const { root, me } = buildUsers();
     me.middlewares.push(mw('MeOnly'));
     const m = match(root, 'GET', '/users/me');
-    expect(m?.params).toEqual({ id: 'me' });
-    expect(m?.middlewares.map((e) => e.Class.name)).not.toContain('MeOnly');
+    assert.deepStrictEqual(m?.params, { id: 'me' });
+    assert.ok(!m?.middlewares.map((e) => e.Class.name).includes('MeOnly'));
   });
 
   it('PINNED: a static node with a different method wins (405), not the param route', () => {
@@ -542,8 +569,8 @@ describe('match — backtracking past method-less static nodes (doc 05)', () => 
     root.children.set('u', u);
 
     const m = match(root, 'GET', '/u/me');
-    expect(m?.entry).toBeNull();
-    expect(m?.allowedMethods).toEqual(['POST']);
+    assert.strictEqual(m?.entry, null);
+    assert.deepStrictEqual(m?.allowedMethods, ['POST']);
   });
 });
 
@@ -556,8 +583,8 @@ describe('match — empty segments (doc 05)', () => {
     users.paramChild = idNode;
     root.children.set('users', users);
 
-    expect(match(root, 'GET', '/users//')).toBeNull();
-    expect(match(root, 'GET', '/users//x')).toBeNull();
+    assert.strictEqual(match(root, 'GET', '/users//'), null);
+    assert.strictEqual(match(root, 'GET', '/users//x'), null);
   });
 });
 
@@ -571,10 +598,12 @@ describe('match — zero-segment splat (doc 05)', () => {
     root.children.set('api', api);
 
     const m = match(root, 'GET', '/api');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({ rest: '' });
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, { rest: '' });
     // non-empty path still captured
-    expect(match(root, 'GET', '/api/v1/x')?.params).toEqual({ rest: 'v1/x' });
+    assert.deepStrictEqual(match(root, 'GET', '/api/v1/x')?.params, {
+      rest: 'v1/x',
+    });
   });
 
   it('an exact node still wins over its own zero-segment splat child', () => {
@@ -586,7 +615,7 @@ describe('match — zero-segment splat (doc 05)', () => {
     api.splatChild = splat;
     root.children.set('api', api);
 
-    expect(match(root, 'GET', '/api')?.entry?.handler).toBe(noop);
+    assert.strictEqual(match(root, 'GET', '/api')?.entry?.handler, noop);
   });
 });
 
@@ -601,7 +630,7 @@ describe('RouteRegistry.registerSubtree — param prefix (doc 05)', () => {
     registry.registerSubtree('/tenant/:tenantId', subtreeRoot);
 
     const m = registry.match('GET', '/tenant/t1/i9');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({ tenantId: 't1', itemId: 'i9' });
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, { tenantId: 't1', itemId: 'i9' });
   });
 });

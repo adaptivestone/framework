@@ -1,5 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { PersistentFile } from 'formidable';
-import { describe, expect, it } from 'vitest';
 import { YupFile } from './yup.ts';
 
 describe('YupFile (deprecated)', () => {
@@ -13,8 +14,8 @@ describe('YupFile (deprecated)', () => {
       // Construct twice; the deprecation warning must still fire only once.
       const a = new YupFile();
       const b = new YupFile();
-      expect(a).toBeInstanceOf(YupFile);
-      expect(b).toBeInstanceOf(YupFile);
+      assert.ok(a instanceof YupFile);
+      assert.ok(b instanceof YupFile);
       // process.emitWarning fires on the next tick — let it flush.
       await new Promise((resolve) => setImmediate(resolve));
     } finally {
@@ -24,8 +25,8 @@ describe('YupFile (deprecated)', () => {
     const yupFileWarnings = captured.filter(
       (w) => w.code === 'ASF_DEP_YUPFILE',
     );
-    expect(yupFileWarnings).toHaveLength(1);
-    expect(yupFileWarnings[0]?.name).toBe('DeprecationWarning');
+    assert.strictEqual(yupFileWarnings.length, 1);
+    assert.strictEqual(yupFileWarnings[0]?.name, 'DeprecationWarning');
   });
 
   // The only real logic: the value must be an array of formidable
@@ -36,15 +37,18 @@ describe('YupFile (deprecated)', () => {
       Object.create(PersistentFile.prototype) as PersistentFile;
 
     it('accepts an array of PersistentFile instances', () => {
-      expect(new YupFile().isType([fakeFile(), fakeFile()])).toBe(true);
+      assert.strictEqual(new YupFile().isType([fakeFile(), fakeFile()]), true);
     });
 
     it('rejects an array containing a non-file', () => {
-      expect(new YupFile().isType([fakeFile(), 'not a file'])).toBe(false);
+      assert.strictEqual(
+        new YupFile().isType([fakeFile(), 'not a file']),
+        false,
+      );
     });
 
     it('rejects a value that is not an array', () => {
-      expect(new YupFile().isType('nope')).toBe(false);
+      assert.strictEqual(new YupFile().isType('nope'), false);
     });
   });
 });

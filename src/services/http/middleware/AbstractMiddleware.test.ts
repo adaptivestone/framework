@@ -1,6 +1,9 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type { Response } from 'express';
-import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { assertCalledTimes } from '../../../tests/assertions.ts';
+import { mockImplementation } from '../../../tests/mocks.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
@@ -15,31 +18,32 @@ describe('AbstractMiddleware base behavior', () => {
   it('default middleware warns and calls next() (request never dropped)', async () => {
     class Bare extends AbstractMiddleware {}
     const mw = new Bare(appInstance);
-    const warn = vi
-      .spyOn(mw.logger, 'warn')
-      .mockImplementation(() => mw.logger);
-    const next = vi.fn();
+    const warn = mockImplementation(
+      mock.method(mw.logger, 'warn'),
+      () => mw.logger,
+    );
+    const next = mock.fn();
     await mw.middleware({} as FrameworkRequest, {} as Response, next);
-    expect(next).toHaveBeenCalledOnce();
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
+    assertCalledTimes(next, 1);
+    assertCalledTimes(warn, 1);
+    warn.mock.restore();
   });
 
   it('getMiddleware returns the handler bound to the instance', async () => {
     class Bare extends AbstractMiddleware {}
     const mw = new Bare(appInstance);
     const bound = mw.getMiddleware();
-    expect(typeof bound).toBe('function');
-    const next = vi.fn();
+    assert.strictEqual(typeof bound, 'function');
+    const next = mock.fn();
     // `this` is preserved even when called detached (as Express does).
     await (bound as (...a: unknown[]) => Promise<unknown>)({}, {}, next);
-    expect(next).toHaveBeenCalledOnce();
+    assertCalledTimes(next, 1);
   });
 
   it('exposes overridable defaults', () => {
-    expect(AbstractMiddleware.description).toContain('Please provide');
-    expect(AbstractMiddleware.relatedQueryParameters).toBeNull();
-    expect(AbstractMiddleware.relatedRequestParameters).toBeNull();
-    expect(AbstractMiddleware.loggerGroup).toBe('middleware');
+    assert.ok(AbstractMiddleware.description.includes('Please provide'));
+    assert.strictEqual(AbstractMiddleware.relatedQueryParameters, null);
+    assert.strictEqual(AbstractMiddleware.relatedRequestParameters, null);
+    assert.strictEqual(AbstractMiddleware.loggerGroup, 'middleware');
   });
 });

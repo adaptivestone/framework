@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { assertCalledWith } from '../tests/assertions.ts';
+import { mockImplementation } from '../tests/mocks.ts';
 import { consoleLogger, levels, noopLogger } from './logger.ts';
 
 /**
@@ -10,33 +13,36 @@ import { consoleLogger, levels, noopLogger } from './logger.ts';
 describe('noopLogger', () => {
   it('exposes every level the framework calls, as silent no-ops', () => {
     for (const level of levels) {
-      expect(noopLogger[level]('msg')).toBeUndefined();
+      assert.strictEqual(noopLogger[level]('msg'), undefined);
     }
-    expect(noopLogger.verbose('msg')).toBeUndefined();
+    assert.strictEqual(noopLogger.verbose('msg'), undefined);
   });
 
   it('child() returns the same no-op logger so deep chaining stays safe', () => {
-    expect(noopLogger.child({ label: 'x' })).toBe(noopLogger);
-    expect(noopLogger.child({}).child({}).info('still fine')).toBeUndefined();
+    assert.strictEqual(noopLogger.child({ label: 'x' }), noopLogger);
+    assert.strictEqual(
+      noopLogger.child({}).child({}).info('still fine'),
+      undefined,
+    );
   });
 });
 
 describe('consoleLogger', () => {
   it('routes to the matching console method', () => {
-    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const spy = mockImplementation(mock.method(console, 'warn'), () => {});
     consoleLogger('warn', 'hello');
-    expect(spy).toHaveBeenCalledWith('hello');
-    spy.mockRestore();
+    assertCalledWith(spy, 'hello');
+    spy.mock.restore();
   });
 
   it('falls back to console.log when that console method is unavailable', () => {
     const orig = console.info;
     // Simulate a runtime whose console lacks `.info` → the else branch.
     (console as { info?: unknown }).info = undefined;
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = mockImplementation(mock.method(console, 'log'), () => {});
     consoleLogger('info', 'fallback');
-    expect(log).toHaveBeenCalledWith('fallback');
+    assertCalledWith(log, 'fallback');
     console.info = orig;
-    log.mockRestore();
+    log.mock.restore();
   });
 });

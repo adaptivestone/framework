@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { z } from 'zod';
+import { assertMatchObject } from '../../../tests/assertions.ts';
 import { defineSchema } from '../defineSchema.ts';
 import type { StandardSchemaV1 } from '../types.ts';
 import { standardSchemaDriver } from './StandardSchemaDriver.ts';
@@ -16,17 +18,17 @@ describe('standardSchemaDriver.toJsonSchema', () => {
 
     const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
 
-    expect(json.type).toBe('object');
-    expect(json.properties.email).toMatchObject({
+    assert.strictEqual(json.type, 'object');
+    assertMatchObject(json.properties.email, {
       type: 'string',
       format: 'email',
     });
-    expect(json.properties.age).toMatchObject({
+    assertMatchObject(json.properties.age, {
       type: 'integer',
       minimum: 0,
       maximum: 120,
     });
-    expect(json.required).toEqual(['email']);
+    assert.deepStrictEqual(json.required, ['email']);
   });
 
   it('exports request input shapes for transforms', async () => {
@@ -36,7 +38,7 @@ describe('standardSchemaDriver.toJsonSchema', () => {
 
     const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
 
-    expect(json.properties.count).toEqual({ type: 'string' });
+    assert.deepStrictEqual(json.properties.count, { type: 'string' });
   });
 
   it('exports coerced dates as date-time strings', async () => {
@@ -44,7 +46,7 @@ describe('standardSchemaDriver.toJsonSchema', () => {
 
     const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
 
-    expect(json.properties.startsAt).toEqual({
+    assert.deepStrictEqual(json.properties.startsAt, {
       type: 'string',
       format: 'date-time',
     });
@@ -55,7 +57,7 @@ describe('standardSchemaDriver.toJsonSchema', () => {
 
     const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
 
-    expect(json.properties.payload).toEqual({});
+    assert.deepStrictEqual(json.properties.payload, {});
   });
 
   it('prefers a native .toJsonSchema() method when present (arktype-style)', async () => {
@@ -71,7 +73,7 @@ describe('standardSchemaDriver.toJsonSchema', () => {
 
     const json = await standardSchemaDriver.toJsonSchema?.(schema);
 
-    expect(json).toBe(sentinel);
+    assert.strictEqual(json, sentinel);
   });
 
   it('exports an explicit JSON Schema from defineSchema as a defensive copy', async () => {
@@ -85,12 +87,12 @@ describe('standardSchemaDriver.toJsonSchema', () => {
 
     const json = (await standardSchemaDriver.toJsonSchema?.(schema)) as AnyJson;
 
-    expect(json).toEqual(sentinel);
-    expect(json).not.toBe(sentinel);
+    assert.deepStrictEqual(json, sentinel);
+    assert.notStrictEqual(json, sentinel);
 
     json.properties.page.type = 'mutated';
     const fresh = await standardSchemaDriver.toJsonSchema?.(schema);
-    expect(fresh).toEqual(sentinel);
+    assert.deepStrictEqual(fresh, sentinel);
   });
 
   it('returns null for a vendor with no introspection (e.g. valibot-like)', async () => {
@@ -102,6 +104,6 @@ describe('standardSchemaDriver.toJsonSchema', () => {
       },
     } as unknown as StandardSchemaV1;
 
-    expect(await standardSchemaDriver.toJsonSchema?.(schema)).toBeNull();
+    assert.strictEqual(await standardSchemaDriver.toJsonSchema?.(schema), null);
   });
 });

@@ -1,6 +1,14 @@
+import assert from 'node:assert/strict';
+import { afterEach, describe, it, mock } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import Transport from 'winston-transport';
+import {
+  assertCalledTimes,
+  assertCalledWith,
+  assertTextMatch,
+  pattern,
+} from '../tests/assertions.ts';
+import { mockImplementation, mockResolvedValue } from '../tests/mocks.ts';
 import { serverInstance } from '../tests/testHelpers.ts';
 import BaseCli from './BaseCli.ts';
 
@@ -50,46 +58,45 @@ describe('BaseCli.run — a thrown command resolves false', () => {
     const transport = new CaptureTransport(captured);
     serverInstance.app.logger.add(transport);
     try {
-      await expect(run('throwcmd')).resolves.toBe(false);
+      await assert.strictEqual(await run('throwcmd'), false);
     } finally {
       serverInstance.app.logger.remove(transport);
     }
-    expect(captured.join('\n')).toContain('boom from fixture command');
+    assert.ok(captured.join('\n').includes('boom from fixture command'));
   });
 
   it('resolves true when run() succeeds', async () => {
-    await expect(run('okcmd')).resolves.toBe(true);
+    await assert.strictEqual(await run('okcmd'), true);
   });
 });
 
 describe('BaseCli command discovery and help', () => {
   afterEach(() => {
-    vi.restoreAllMocks();
+    mock.restoreAll();
   });
 
   it('discovers supported files and keeps the first duplicate command', async () => {
     const cli = new BaseCli(serverInstance);
     const firstPath = commandPath('OkCommand');
     const duplicatePath = commandPath('ThrowingCommand');
-    vi.spyOn(cli, 'getFilesPathWithInheritance').mockResolvedValue([
+    mockResolvedValue(mock.method(cli, 'getFilesPathWithInheritance'), [
       { file: 'Alpha.ts', path: firstPath },
       { file: 'alpha.js', path: duplicatePath },
       { file: 'README.md', path: '/ignored/README.md' },
     ]);
-    const warn = vi
-      .spyOn(cli.logger, 'warn')
-      .mockImplementation(() => cli.logger);
-    vi.spyOn(console, 'info').mockImplementation(() => {});
-    vi.spyOn(console, 'time').mockImplementation(() => {});
-    vi.spyOn(console, 'timeEnd').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-
-    await expect(cli.loadCommands()).resolves.toBe(true);
-
-    expect(cli.commands).toEqual({ alpha: firstPath });
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('already exists'),
+    const warn = mockImplementation(
+      mock.method(cli.logger, 'warn'),
+      () => cli.logger,
     );
+    mockImplementation(mock.method(console, 'info'), () => {});
+    mockImplementation(mock.method(console, 'time'), () => {});
+    mockImplementation(mock.method(console, 'timeEnd'), () => {});
+    mockImplementation(mock.method(console, 'log'), () => {});
+
+    await assert.strictEqual(await cli.loadCommands(), true);
+
+    assert.deepStrictEqual(cli.commands, { alpha: firstPath });
+    assertCalledWith(warn, pattern.stringContaining('already exists'));
   });
 
   it('prints commands alphabetically with their descriptions', async () => {
@@ -98,30 +105,30 @@ describe('BaseCli command discovery and help', () => {
       zulu: commandPath('ThrowingCommand'),
       alpha: commandPath('OkCommand'),
     };
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = mockImplementation(mock.method(console, 'log'), () => {});
 
     await cli.printCommandTable();
 
     const output = log.mock.calls
-      .map(([message]) => String(message))
+      .map(({ arguments: [message] }) => String(message))
       .join('\n');
-    expect(output.indexOf('alpha')).toBeLessThan(output.indexOf('zulu'));
-    expect(output).toContain('Fixture command that always succeeds');
-    expect(output).toContain('Usage');
+    assert.ok(output.indexOf('alpha') < output.indexOf('zulu'));
+    assert.ok(output.includes('Fixture command that always succeeds'));
+    assert.ok(output.includes('Usage'));
   });
 
   it('returns false and prints the command table for absent command names', async () => {
     const cli = new BaseCli(serverInstance);
     cli.commands = { okcmd: commandPath('OkCommand') };
-    const printCommandTable = vi
-      .spyOn(cli, 'printCommandTable')
-      .mockResolvedValue();
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const printCommandTable = mockResolvedValue(
+      mock.method(cli, 'printCommandTable'),
+    );
+    mockImplementation(mock.method(console, 'log'), () => {});
 
-    await expect(cli.run('')).resolves.toBe(false);
-    await expect(cli.run('missing')).resolves.toBe(false);
+    await assert.strictEqual(await cli.run(''), false);
+    await assert.strictEqual(await cli.run('missing'), false);
 
-    expect(printCommandTable).toHaveBeenCalledTimes(2);
+    assertCalledTimes(printCommandTable, 2);
   });
 });
 
@@ -136,31 +143,32 @@ describe('BaseCli model-aware command lifecycle', () => {
     } else {
       process.env.MONGO_APP_NAME = originalMongoAppName;
     }
-    vi.restoreAllMocks();
+    mock.restoreAll();
   });
 
   it('loads model paths, waits for models, and preserves an operator app name', async () => {
     const cli = new BaseCli(serverInstance);
     cli.commands = { modelcmd: commandPath('ModelCommand') };
-    const getModelPaths = vi
-      .spyOn(serverInstance, 'getModelFilesPathsWithInheritance')
-      .mockResolvedValue([]);
-    const initAllModels = vi
-      .spyOn(serverInstance, 'initAllModels')
-      .mockResolvedValue();
-    vi.spyOn(console, 'info').mockImplementation(() => {});
+    const getModelPaths = mockResolvedValue(
+      mock.method(serverInstance, 'getModelFilesPathsWithInheritance'),
+      [],
+    );
+    const initAllModels = mockResolvedValue(
+      mock.method(serverInstance, 'initAllModels'),
+    );
+    mockImplementation(mock.method(console, 'info'), () => {});
     process.argv = ['node', 'cli.ts', 'modelcmd'];
 
     delete process.env.MONGO_APP_NAME;
-    await expect(cli.run('modelcmd')).resolves.toBe(true);
-    expect(process.env.MONGO_APP_NAME).toMatch(/^CLI: modelcmd /);
+    await assert.strictEqual(await cli.run('modelcmd'), true);
+    assertTextMatch(process.env.MONGO_APP_NAME, /^CLI: modelcmd /);
 
     process.env.MONGO_APP_NAME = 'operator-supplied-name';
-    await expect(cli.run('modelcmd')).resolves.toBe(true);
+    await assert.strictEqual(await cli.run('modelcmd'), true);
 
-    expect(process.env.MONGO_APP_NAME).toBe('operator-supplied-name');
-    expect(getModelPaths).toHaveBeenCalledTimes(2);
-    expect(initAllModels).toHaveBeenCalledTimes(2);
-    expect(initAllModels).toHaveBeenCalledWith({ waitForConnection: true });
+    assert.strictEqual(process.env.MONGO_APP_NAME, 'operator-supplied-name');
+    assertCalledTimes(getModelPaths, 2);
+    assertCalledTimes(initAllModels, 2);
+    assertCalledWith(initAllModels, { waitForConnection: true });
   });
 });

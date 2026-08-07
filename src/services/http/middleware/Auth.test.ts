@@ -1,5 +1,6 @@
+import assert from 'node:assert/strict';
+import { before, describe, it } from 'node:test';
 import type { Response } from 'express';
-import { beforeAll, describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import Auth from './Auth.ts';
@@ -10,18 +11,15 @@ type AuthRequest = FrameworkRequest & GetUserByTokenAppInfo;
 describe('atuh middleware methods', () => {
   let middleware: Auth;
 
-  beforeAll(() => {
+  before(() => {
     middleware = new Auth(appInstance);
   });
 
   it('have description fields', async () => {
-    expect.assertions(1);
-    expect(Auth.description).toBeDefined();
+    assert.notStrictEqual(Auth.description, undefined);
   });
 
   it('middleware pass when user presented', async () => {
-    expect.assertions(1);
-
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -37,12 +35,10 @@ describe('atuh middleware methods', () => {
       nextFunction,
     );
 
-    expect(isCalled).toBeTruthy();
+    assert.ok(isCalled);
   });
 
   it('middleware NOT pass when user NOT presented', async () => {
-    expect.assertions(3);
-
     let isCalled = false;
     let status = 0;
     let isSend = false;
@@ -67,8 +63,8 @@ describe('atuh middleware methods', () => {
       nextFunction,
     );
 
-    expect(isCalled).toBeFalsy();
-    expect(status).toBe(401);
-    expect(isSend).toBeTruthy();
+    assert.ok(!isCalled);
+    assert.strictEqual(status, 401);
+    assert.ok(isSend);
   });
 });

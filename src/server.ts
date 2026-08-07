@@ -112,9 +112,8 @@ try {
 
 // Process-global guard so signal handlers register at most once even if
 // startServer runs more than once in a process (a process runs a single Server,
-// but be defensive). This does NOT dedupe across vitest test files — each gets a
-// fresh module graph that resets this — but that's moot: registration is skipped
-// entirely under VITEST.
+// but be defensive). Tests skip registration because the runner owns process
+// signals and each test file gets an isolated module graph.
 let signalHandlersRegistered = false;
 
 /**
@@ -279,12 +278,11 @@ class Server {
    * the process dies even if draining or a teardown hook hangs.
    *
    * Registered here (after HTTP is up), never at import time, so importing the
-   * framework for tests/codegen has no process-level side effects. Skipped
-   * under vitest so these handlers don't intercept the signals vitest uses to
-   * manage its workers.
+   * framework for tests/codegen has no process-level side effects. Skipped in
+   * framework test processes so these handlers don't intercept runner signals.
    */
   #registerShutdownSignals(): void {
-    if (process.env.VITEST || signalHandlersRegistered) {
+    if (process.env.FRAMEWORK_TEST || signalHandlersRegistered) {
       return;
     }
     signalHandlersRegistered = true;
@@ -688,8 +686,8 @@ class Server {
       // After an uncaught exception the process state is undefined — a
       // crash-looping process under an orchestrator is visible and recovers
       // cleanly, whereas one that keeps serving from a corrupted state is not.
-      // (Skipped under vitest so a stray test-time throw doesn't kill the run.)
-      if (!process.env.VITEST) {
+      // (Skipped in tests so a stray assertion failure doesn't kill the run.)
+      if (!process.env.FRAMEWORK_TEST) {
         process.exit(1);
       }
     });

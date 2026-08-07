@@ -7,18 +7,20 @@
  * the binding/specifier come from the import node, not the live class).
  */
 
+import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { after, before, describe, it } from 'node:test';
+import { assertContainEqual, assertTextMatch } from '../tests/assertions.ts';
 import { resolveController } from './astResolve.ts';
 
 let dir: string;
 
-beforeAll(async () => {
+before(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'ast-resolve-'));
 });
-afterAll(async () => {
+after(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -46,11 +48,11 @@ export default class Child extends Parent {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.needsBoot).toBe(false);
-    expect(r.middleware).toEqual([
+    assert.strictEqual(r.needsBoot, false);
+    assert.deepStrictEqual(r.middleware, [
       { scope: '/{*splat}', bindings: ['SomeMW'] },
     ]);
-    expect(r.imports).toEqual([
+    assert.deepStrictEqual(r.imports, [
       {
         binding: 'SomeMW',
         kind: 'default',
@@ -69,8 +71,10 @@ export default class Own extends Whatever {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.middleware).toEqual([{ scope: '/{*splat}', bindings: ['OwnMW'] }]);
-    expect(r.imports).toEqual([
+    assert.deepStrictEqual(r.middleware, [
+      { scope: '/{*splat}', bindings: ['OwnMW'] },
+    ]);
+    assert.deepStrictEqual(r.imports, [
       { binding: 'OwnMW', kind: 'default', specifier: './OwnMW.js' },
     ]);
   });
@@ -87,7 +91,7 @@ export default class Guarded extends Base {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.imports).toEqual([
+    assert.deepStrictEqual(r.imports, [
       { binding: 'Auth', kind: 'default', specifier: './AuthMw.js' },
     ]);
   });
@@ -110,7 +114,7 @@ export default class CrossDir extends Parent {
     const r = await resolveController(child);
     // Parent imports `../middleware/SomeMW.js` (relative to `sub/`); from the
     // child's gen file one dir up that resolves as `./middleware/SomeMW.js`.
-    expect(r.imports).toEqual([
+    assert.deepStrictEqual(r.imports, [
       {
         binding: 'SomeMW',
         kind: 'default',
@@ -129,9 +133,11 @@ export default class Dyn extends Base {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.needsBoot).toBe(true);
-    expect(r.reason).toMatch(/routes getter/);
-    expect(r.middleware).toEqual([{ scope: '/{*splat}', bindings: ['OwnMW'] }]);
+    assert.strictEqual(r.needsBoot, true);
+    assertTextMatch(r.reason, /routes getter/);
+    assert.deepStrictEqual(r.middleware, [
+      { scope: '/{*splat}', bindings: ['OwnMW'] },
+    ]);
   });
 
   it('throws (needsBoot) on a dynamic ANCESTOR middleware Map — never silently empty', async () => {
@@ -152,9 +158,9 @@ export default class ChildOfDynBase extends DynBase {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.needsBoot).toBe(true);
-    expect(r.reason).toMatch(/ancestor/);
-    expect(r.middleware).toEqual([]); // not emitted as a "valid" empty chain
+    assert.strictEqual(r.needsBoot, true);
+    assertTextMatch(r.reason, /ancestor/);
+    assert.deepStrictEqual(r.middleware, []); // not emitted as a "valid" empty chain
   });
 });
 
@@ -193,10 +199,10 @@ export default class Consumer extends AbstractController {
     );
 
     const r = await resolveController(consumer);
-    expect(r.middleware).toEqual([
+    assert.deepStrictEqual(r.middleware, [
       { scope: '/{*splat}', bindings: ['GetUserByToken', 'Auth'] },
     ]);
-    expect(r.imports).toEqual([
+    assert.deepStrictEqual(r.imports, [
       {
         binding: 'GetUserByToken',
         kind: 'default',
@@ -222,8 +228,8 @@ export default class OrphanChild extends Missing {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.needsBoot).toBe(true);
-    expect(r.reason).toContain('./DoesNotExist.ts');
+    assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason.includes('./DoesNotExist.ts'));
   });
 
   it('flags an unresolvable bare-package `extends` ancestor', async () => {
@@ -235,8 +241,8 @@ export default class BareChild extends Missing {
 }`,
     );
     const r = await resolveController(child);
-    expect(r.needsBoot).toBe(true);
-    expect(r.reason).toContain('@nope/not-installed/Base.js');
+    assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason.includes('@nope/not-installed/Base.js'));
   });
 
   it('keeps a locally-declared EXPORTED middleware, importing from the own module', async () => {
@@ -249,8 +255,8 @@ export default class LocalExported {
 }`,
     );
     const r = await resolveController(ctrl);
-    expect(r.needsBoot).toBe(false);
-    expect(r.imports).toContainEqual({
+    assert.strictEqual(r.needsBoot, false);
+    assertContainEqual(r.imports, {
       binding: 'LocalMw',
       kind: 'named',
       specifier: './LocalExported.ts',
@@ -267,8 +273,8 @@ export default class LocalUnexported {
 }`,
     );
     const r = await resolveController(ctrl);
-    expect(r.needsBoot).toBe(true);
-    expect(r.reason).toContain('LocalMw');
-    expect(r.reason).toContain('not exported');
+    assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason.includes('LocalMw'));
+    assert.ok(r.reason.includes('not exported'));
   });
 });

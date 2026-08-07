@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { array, number, object, string } from 'yup';
 import { appInstance } from '../../helpers/appInstance.ts';
+import { assertRejectsLike, assertThrowsLike } from '../../tests/assertions.ts';
 import { standardSchemaDriver } from './drivers/StandardSchemaDriver.ts';
 import { yupDriver } from './drivers/YupDriver.ts';
 import type { StandardSchemaV1, ValidatorDriver } from './types.ts';
@@ -10,12 +12,12 @@ import { ValidationError } from './ValidationError.ts';
 describe('ValidateService', () => {
   describe('resolve', () => {
     it('returns null when schema is missing', () => {
-      expect(ValidateService.resolve(null)).toBeNull();
+      assert.strictEqual(ValidateService.resolve(null), null);
     });
 
     it('routes a yup schema to yupDriver', () => {
       const schema = object().shape({ name: string() });
-      expect(ValidateService.resolve(schema)).toBe(yupDriver);
+      assert.strictEqual(ValidateService.resolve(schema), yupDriver);
     });
 
     it('returns null for legacy {validate, cast} plain objects (no driver matches)', () => {
@@ -23,7 +25,7 @@ describe('ValidateService', () => {
         validate: async () => {},
         cast: async (data: unknown) => data,
       };
-      expect(ValidateService.resolve(schema)).toBeNull();
+      assert.strictEqual(ValidateService.resolve(schema), null);
     });
 
     it('routes a vendor-neutral Standard Schema to standardSchemaDriver', () => {
@@ -36,21 +38,21 @@ describe('ValidateService', () => {
           },
         },
       };
-      expect(ValidateService.resolve(schema)).toBe(standardSchemaDriver);
+      assert.strictEqual(ValidateService.resolve(schema), standardSchemaDriver);
     });
   });
 
   describe('validate', () => {
     it('passes data through when no schema is set', async () => {
       const svc = new ValidateService(appInstance, null);
-      await expect(svc.validate({ a: 1 })).resolves.toEqual({ a: 1 });
+      await assert.deepStrictEqual(await svc.validate({ a: 1 }), { a: 1 });
     });
 
     it('validates + casts + strips unknown for yup schemas', async () => {
       const schema = object().shape({ name: string() });
       const svc = new ValidateService(appInstance, schema);
       const result = await svc.validate({ name: 'alice', extra: 'leak' });
-      expect(result).toEqual({ name: 'alice' });
+      assert.deepStrictEqual(result, { name: 'alice' });
     });
 
     it('throws ValidationError on yup failure', async () => {
@@ -58,7 +60,8 @@ describe('ValidateService', () => {
         email: string().email().required(),
       });
       const svc = new ValidateService(appInstance, schema);
-      await expect(svc.validate({ email: 'not-email' })).rejects.toBeInstanceOf(
+      await assertRejectsLike(
+        svc.validate({ email: 'not-email' }),
         ValidationError,
       );
     });
@@ -78,9 +81,12 @@ describe('ValidateService', () => {
         },
       };
       const svc = new ValidateService(appInstance, schema);
-      await expect(svc.validate({ ok: true, extra: 'x' })).resolves.toEqual({
-        ok: true,
-      });
+      await assert.deepStrictEqual(
+        await svc.validate({ ok: true, extra: 'x' }),
+        {
+          ok: true,
+        },
+      );
     });
 
     it('throws ValidationError on Standard Schema failure', async () => {
@@ -94,7 +100,7 @@ describe('ValidateService', () => {
         },
       };
       const svc = new ValidateService(appInstance, schema);
-      await expect(svc.validate({})).rejects.toBeInstanceOf(ValidationError);
+      await assertRejectsLike(svc.validate({}), ValidationError);
     });
 
     it('throws with migration message when given a legacy {validate, cast} schema', () => {
@@ -102,14 +108,16 @@ describe('ValidateService', () => {
         validate: async () => {},
         cast: async (data: unknown) => data,
       };
-      expect(() => new ValidateService(appInstance, schema)).toThrow(
+      assertThrowsLike(
+        () => new ValidateService(appInstance, schema),
         /legacy `\{validate, cast\}` plain object/,
       );
     });
 
     it('throws with generic message when no driver matches', () => {
       const schema = { random: 'shape' };
-      expect(() => new ValidateService(appInstance, schema)).toThrow(
+      assertThrowsLike(
+        () => new ValidateService(appInstance, schema),
         /must implement Standard Schema/,
       );
     });
@@ -132,9 +140,9 @@ describe('ValidateService', () => {
       try {
         const schema = object().shape({ name: string() });
         const svc = new ValidateService(appInstance, schema);
-        expect(svc.driver).toBe(customDriver);
+        assert.strictEqual(svc.driver, customDriver);
         await svc.validate({ name: 'x' });
-        expect(calls).toEqual(['custom']);
+        assert.deepStrictEqual(calls, ['custom']);
       } finally {
         // Cleanup: remove the driver we just registered
         const idx = ValidateService.drivers.indexOf(customDriver);
@@ -155,10 +163,11 @@ describe('ValidateService', () => {
       const before = ValidateService.drivers.length;
       ValidateService.register(lastDriver, 'last');
       try {
-        expect(ValidateService.drivers).toHaveLength(before + 1);
-        expect(
+        assert.strictEqual(ValidateService.drivers.length, before + 1);
+        assert.strictEqual(
           ValidateService.drivers[ValidateService.drivers.length - 1],
-        ).toBe(lastDriver);
+          lastDriver,
+        );
       } finally {
         const idx = ValidateService.drivers.indexOf(lastDriver);
         if (idx >= 0) {
@@ -185,11 +194,11 @@ describe('ValidateService', () => {
           caught = err;
         }
       }
-      expect(caught).not.toBeNull();
-      expect(caught?.message).toEqual({
+      assert.notStrictEqual(caught, null);
+      assert.deepStrictEqual(caught?.message, {
         email: ['Email must be provided'],
       });
-      expect(caught?.issues[0]?.message).toBe('Email must be provided');
+      assert.strictEqual(caught?.issues[0]?.message, 'Email must be provided');
     });
 
     it('leaves raw keys when no i18n is passed', async () => {
@@ -206,7 +215,7 @@ describe('ValidateService', () => {
           caught = err;
         }
       }
-      expect(caught?.message).toEqual({
+      assert.deepStrictEqual(caught?.message, {
         email: ['auth.emailProvided'],
       });
     });
@@ -230,7 +239,7 @@ describe('ValidateService', () => {
           caught = err;
         }
       }
-      expect(caught?.message).toEqual({
+      assert.deepStrictEqual(caught?.message, {
         password: ['Password must be at least 8 characters'],
       });
     });
@@ -255,9 +264,9 @@ describe('ValidateService', () => {
       }
       const message = caught?.issues[0]?.message ?? '';
       // The nesting token survives unresolved …
-      expect(message).toContain('$t(auth.emailProvided)');
+      assert.ok(message.includes('$t(auth.emailProvided)'));
       // … and the key it points at was NOT substituted in.
-      expect(message).not.toContain('Email must be provided');
+      assert.ok(!message.includes('Email must be provided'));
     });
   });
 
@@ -279,11 +288,11 @@ describe('ValidateService', () => {
         }
       }
       // yup serializes the offending element as `tags[1]` in path
-      expect(caught?.message).toEqual({
+      assert.deepStrictEqual(caught?.message, {
         'tags[1]': ['tag too short'],
       });
-      expect(caught?.issues).toHaveLength(1);
-      expect(caught?.issues[0]?.path).toEqual(['tags[1]']);
+      assert.strictEqual(caught?.issues.length, 1);
+      assert.deepStrictEqual(caught?.issues[0]?.path, ['tags[1]']);
     });
 
     it('aggregates multiple errors per field', async () => {
@@ -307,10 +316,10 @@ describe('ValidateService', () => {
         }
       }
       // YupDriver runs with abortEarly:false → both errors land on `password`
-      expect(caught?.message).toEqual({
+      assert.deepStrictEqual(caught?.message, {
         password: ['min8', 'startUpper'],
       });
-      expect(caught?.issues).toHaveLength(2);
+      assert.strictEqual(caught?.issues.length, 2);
     });
 
     it('aggregates errors from multiple fields', async () => {
@@ -328,7 +337,7 @@ describe('ValidateService', () => {
           caught = err;
         }
       }
-      expect(caught?.message).toEqual({
+      assert.deepStrictEqual(caught?.message, {
         email: ['emailReq'],
         age: ['tooYoung'],
       });

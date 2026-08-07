@@ -3,13 +3,13 @@
  *
  * Mongo is started ONCE by the global-setup entry module
  * (`globalSetupNodeTest.ts`, wired via `--test-global-setup` — see the
- * `test:node` script). This file never touches Mongo init; it only boots a
+ * native test script). This file never touches Mongo init; it only boots a
  * per-suite `Server` against the shared instance (via the shipped
  * `setupNodeTest.ts` glue) and exercises the full stack: a live HTTP request and
  * a Mongo write/read round-trip.
  *
- * Runs as part of `npm run test:node` (it shares one Mongo with the other
- * `*.node-test.ts` files). The `.node-test.ts` suffix keeps vitest's glob away.
+ * Runs as part of the native suite and shares one Mongo with the other
+ * `*.node-test.ts` files.
  */
 import './setupNodeTest.ts';
 import assert from 'node:assert/strict';
@@ -19,7 +19,8 @@ import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
 import type Server from '../server.ts';
 import {
-  createDefaultTestUser,
+  defaultAuthToken,
+  defaultUser,
   ensureTestServerReady,
   getTestServerURL,
   serverInstance,
@@ -57,9 +58,8 @@ describe('node:test: server boot + Mongo round-trip', () => {
   });
 
   it('round-trips through Mongo (create + read a user via the model)', async () => {
-    const result = await createDefaultTestUser();
-    assert.ok(result, 'default user should be created');
-    assert.ok(result.token, 'an auth token should be generated');
+    assert.ok(defaultUser, 'default user should be created');
+    assert.ok(defaultAuthToken, 'an auth token should be generated');
 
     const User = appInstance.getModel('User') as unknown as TUser;
     const found = await User.findOne({ email: 'test@test.com' });

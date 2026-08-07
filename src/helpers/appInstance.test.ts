@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import Server from '../server.ts';
+import { assertThrowsLike } from '../tests/assertions.ts';
 import {
   appInstance,
   getAppInstance,
@@ -21,8 +23,9 @@ const minimalFolders = {
 
 describe('appInstance singleton (doc 27)', () => {
   it('throws a guided error when a second Server is constructed', () => {
-    // setupVitest already created one Server, so the singleton is set.
-    expect(() => new Server(minimalFolders)).toThrow(
+    // The native test preload already created one Server, so the singleton is set.
+    assertThrowsLike(
+      () => new Server(minimalFolders),
       /only one Server per process/,
     );
   });
@@ -31,7 +34,7 @@ describe('appInstance singleton (doc 27)', () => {
     const original = appInstance;
     resetAppInstance();
     try {
-      expect(() => new Server(minimalFolders)).not.toThrow();
+      assert.doesNotThrow(() => new Server(minimalFolders));
     } finally {
       // Restore so the rest of the suite keeps the original app.
       resetAppInstance();
@@ -42,17 +45,17 @@ describe('appInstance singleton (doc 27)', () => {
 
 describe('getAppInstance()', () => {
   it('throws before set, returns the exact instance after set, throws again after reset', () => {
-    // setupVitest already constructed a Server, so the singleton starts set.
+    // The native test preload constructed a Server, so the singleton starts set.
     const original = appInstance;
     try {
       resetAppInstance();
-      expect(() => getAppInstance()).toThrow(/not initialized yet/);
+      assertThrowsLike(() => getAppInstance(), /not initialized yet/);
 
       setAppInstance(original);
-      expect(getAppInstance()).toBe(original);
+      assert.strictEqual(getAppInstance(), original);
 
       resetAppInstance();
-      expect(() => getAppInstance()).toThrow(/not initialized yet/);
+      assertThrowsLike(() => getAppInstance(), /not initialized yet/);
     } finally {
       // Restore so the rest of the suite keeps the original app.
       resetAppInstance();

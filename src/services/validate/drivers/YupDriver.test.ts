@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { array, boolean, date, number, object, string } from 'yup';
 import { yupDriver } from './YupDriver.ts';
 
@@ -15,7 +16,7 @@ describe('yupDriver.toJsonSchema', () => {
 
     const json = yupDriver.toJsonSchema?.(schema);
 
-    expect(json).toEqual({
+    assert.deepStrictEqual(json, {
       type: 'object',
       properties: {
         name: { type: 'string' },
@@ -34,11 +35,11 @@ describe('yupDriver.toJsonSchema', () => {
 
     const json = yupDriver.toJsonSchema?.(schema) as AnyJson;
 
-    expect(json.properties.tags).toEqual({
+    assert.deepStrictEqual(json.properties.tags, {
       type: 'array',
       items: { type: 'string' },
     });
-    expect(json.properties.role).toEqual({
+    assert.deepStrictEqual(json.properties.role, {
       type: 'string',
       enum: ['admin', 'user'],
     });
@@ -52,11 +53,11 @@ describe('yupDriver.toJsonSchema', () => {
 
     const json = yupDriver.toJsonSchema?.(schema) as AnyJson;
 
-    expect(json.properties.created).toEqual({
+    assert.deepStrictEqual(json.properties.created, {
       type: 'string',
       format: 'date-time',
     });
-    expect(json.properties.name.description).toBe('the name');
+    assert.strictEqual(json.properties.name.description, 'the name');
   });
 
   it('represents nullable as a [type, null] union by default (OAS 3.1)', () => {
@@ -64,10 +65,10 @@ describe('yupDriver.toJsonSchema', () => {
 
     const json = yupDriver.toJsonSchema?.(schema) as AnyJson;
 
-    expect(json.properties.nick.type).toEqual(['string', 'null']);
+    assert.deepStrictEqual(json.properties.nick.type, ['string', 'null']);
   });
 
   it('returns null for a non-yup value (no describe)', () => {
-    expect(yupDriver.toJsonSchema?.({})).toBeNull();
+    assert.strictEqual(yupDriver.toJsonSchema?.({}), null);
   });
 });

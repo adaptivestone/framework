@@ -1,11 +1,12 @@
+import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 import type { NextFunction, Response } from 'express';
 import { PersistentFile } from 'formidable';
-import { describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
@@ -99,16 +100,12 @@ const postToParser = ({
 
 describe('reqest parser limiter methods', () => {
   it('have description fields', async () => {
-    expect.assertions(1);
-
     // const middleware = new RequestParser(appInstance);
 
-    expect(RequestParser.description).toBeDefined();
+    assert.notStrictEqual(RequestParser.description, undefined);
   });
 
   it('middleware that works', async () => {
-    expect.assertions(4);
-
     await new Promise<boolean>((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
 
@@ -126,15 +123,13 @@ describe('reqest parser limiter methods', () => {
           // pass the real response so the cleanup hooks (res.once) attach
           res as unknown as Response,
           ((err?: Error) => {
-            expect(err).toBeUndefined();
+            assert.strictEqual(err, undefined);
 
             // Get the body once to avoid linting issues
             const reqBody = (req as unknown as FrameworkRequest).body;
-            expect(reqBody.title).toBeDefined();
-            expect(reqBody.multipleFiles).toBeDefined();
-            expect(
-              reqBody.multipleFiles[0] instanceof PersistentFile,
-            ).toBeTruthy();
+            assert.notStrictEqual(reqBody.title, undefined);
+            assert.notStrictEqual(reqBody.multipleFiles, undefined);
+            assert.ok(reqBody.multipleFiles[0] instanceof PersistentFile);
 
             res.writeHead(200);
             res.end('ok');
@@ -182,8 +177,6 @@ d\r
   });
 
   it('middleware with a problem', async () => {
-    expect.assertions(1);
-
     await new Promise<boolean>((done) => {
       // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
 
@@ -214,7 +207,7 @@ d\r
           (() => {}) as NextFunction,
         );
 
-        expect(status).toBe(400);
+        assert.strictEqual(status, 400);
         // expect(err).toBeDefined();
 
         res.writeHead(200);
@@ -252,7 +245,7 @@ d\r
       });
       const upload = body.upload as { filepath: string }[];
       const filepath = upload[0].filepath;
-      expect(filepath).toBeTruthy();
+      assert.ok(filepath);
       // cleanup unlinks asynchronously on 'finish'; poll for removal.
       await waitFor(() => !existsSync(filepath));
     });
@@ -265,7 +258,7 @@ d\r
           contentType: multipartCT,
           params: { maxFileSize: 2, uploadDir: dir },
         });
-        expect(status).toBe(413);
+        assert.strictEqual(status, 413);
         await waitFor(() => readdirSync(dir).length === 0);
       } finally {
         rmSync(dir, { recursive: true, force: true });
@@ -277,7 +270,7 @@ d\r
         body: 'token=abc',
         contentType: 'application/x-www-form-urlencoded',
       });
-      expect(body.token).toBe('abc'); // scalar, not ['abc']
+      assert.strictEqual(body.token, 'abc'); // scalar, not ['abc']
     });
 
     it('keeps repeated urlencoded keys as arrays', async () => {
@@ -285,7 +278,7 @@ d\r
         body: 'tags=a&tags=b',
         contentType: 'application/x-www-form-urlencoded',
       });
-      expect(body.tags).toEqual(['a', 'b']);
+      assert.deepStrictEqual(body.tags, ['a', 'b']);
     });
 
     it('leaves json bodies untouched (single-element arrays not collapsed)', async () => {
@@ -293,8 +286,8 @@ d\r
         body: JSON.stringify({ token: 'abc', tags: ['x'] }),
         contentType: 'application/json',
       });
-      expect(body.token).toBe('abc');
-      expect(body.tags).toEqual(['x']);
+      assert.strictEqual(body.token, 'abc');
+      assert.deepStrictEqual(body.tags, ['x']);
     });
   });
 });

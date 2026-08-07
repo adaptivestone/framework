@@ -1,6 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { appInstance } from '../helpers/appInstance.ts';
 import { noopLogger } from '../helpers/logger.ts';
+import { assertCalledTimes } from '../tests/assertions.ts';
+import { mockImplementation } from '../tests/mocks.ts';
 import Base from './Base.ts';
 
 /**
@@ -11,30 +14,30 @@ import Base from './Base.ts';
  */
 describe('Base', () => {
   it('getConstructorName returns the (possibly subclassed) class name', () => {
-    expect(new Base(appInstance).getConstructorName()).toBe('Base');
+    assert.strictEqual(new Base(appInstance).getConstructorName(), 'Base');
     class Child extends Base {}
-    expect(new Child(appInstance).getConstructorName()).toBe('Child');
+    assert.strictEqual(new Child(appInstance).getConstructorName(), 'Child');
   });
 
   it('lazily builds a real child logger and caches it', () => {
     const base = new Base(appInstance);
     const logger = base.logger;
-    expect(typeof logger.info).toBe('function');
-    expect(logger).not.toBe(noopLogger);
-    expect(base.logger).toBe(logger); // memoized on #realLogger, not rebuilt
+    assert.strictEqual(typeof logger.info, 'function');
+    assert.notStrictEqual(logger, noopLogger);
+    assert.strictEqual(base.logger, logger); // memoized on #realLogger, not rebuilt
   });
 
   it('degrades to the no-op logger (and warns) when read off a non-Base `this`', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = mockImplementation(mock.method(console, 'warn'), () => {});
     const get = Object.getOwnPropertyDescriptor(Base.prototype, 'logger')
       ?.get as () => unknown;
     // `{}` has no `#realLogger` private field → the read throws → catch branch.
-    expect(get.call({})).toBe(noopLogger);
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
+    assert.strictEqual(get.call({}), noopLogger);
+    assertCalledTimes(warn, 1);
+    warn.mock.restore();
   });
 
   it('exposes an overridable loggerGroup default', () => {
-    expect(Base.loggerGroup).toBe('Base_please_overwrite_');
+    assert.strictEqual(Base.loggerGroup, 'Base_please_overwrite_');
   });
 });

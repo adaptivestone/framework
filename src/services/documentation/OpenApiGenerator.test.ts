@@ -1,6 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { object, string } from 'yup';
 import { z } from 'zod';
+import {
+  assertCalled,
+  assertCalledWith,
+  assertContainEqual,
+  assertMatches,
+  assertMatchObject,
+  assertNotCalled,
+  assertTextMatch,
+  pattern,
+} from '../../tests/assertions.ts';
 import Pagination from '../http/middleware/Pagination.ts';
 import type { FlatRoute, MiddlewareEntry } from '../http/routing/RouteNode.ts';
 import { generateOpenApi } from './OpenApiGenerator.ts';
@@ -66,12 +77,12 @@ describe('generateOpenApi', () => {
       servers: [{ url: 'http://localhost:3300', description: 'Localhost' }],
     });
 
-    expect(doc.openapi).toBe('3.1.0');
-    expect(doc.info).toEqual({ title: 'My API', version: '1.2.3' });
-    expect(doc.servers).toEqual([
+    assert.strictEqual(doc.openapi, '3.1.0');
+    assert.deepStrictEqual(doc.info, { title: 'My API', version: '1.2.3' });
+    assert.deepStrictEqual(doc.servers, [
       { url: 'http://localhost:3300', description: 'Localhost' },
     ]);
-    expect(doc.paths).toEqual({});
+    assert.deepStrictEqual(doc.paths, {});
   });
 
   it('converts :id to {id} and emits a path parameter', async () => {
@@ -91,9 +102,9 @@ describe('generateOpenApi', () => {
     );
 
     const op = (doc as AnyDoc).paths['/{id}'].get;
-    expect(op.operationId).toBe('Items_getItem');
-    expect(op.tags).toEqual(['Items']);
-    expect(op.parameters).toContainEqual({
+    assert.strictEqual(op.operationId, 'Items_getItem');
+    assert.deepStrictEqual(op.tags, ['Items']);
+    assertContainEqual(op.parameters, {
       name: 'id',
       in: 'path',
       required: true,
@@ -120,9 +131,9 @@ describe('generateOpenApi', () => {
     const schema = (doc as AnyDoc).paths['/'].post.requestBody.content[
       'application/json'
     ].schema;
-    expect(schema.type).toBe('object');
-    expect(schema.properties.name).toEqual({ type: 'string' });
-    expect(schema.required).toEqual(['name']);
+    assert.strictEqual(schema.type, 'object');
+    assert.deepStrictEqual(schema.properties.name, { type: 'string' });
+    assert.deepStrictEqual(schema.required, ['name']);
   });
 
   it('emits one media type per content-type map key', async () => {
@@ -145,7 +156,7 @@ describe('generateOpenApi', () => {
     );
 
     const content = (doc as AnyDoc).paths['/upload'].post.requestBody.content;
-    expect(Object.keys(content).sort()).toEqual([
+    assert.deepStrictEqual(Object.keys(content).sort(), [
       'application/json',
       'multipart/form-data',
     ]);
@@ -170,12 +181,12 @@ describe('generateOpenApi', () => {
     const params = (doc as AnyDoc).paths['/'].get.parameters;
     const page = params.find((p: AnyDoc) => p.name === 'page');
     const q = params.find((p: AnyDoc) => p.name === 'q');
-    expect(page).toMatchObject({ in: 'query', required: true });
-    expect(q).toMatchObject({ in: 'query', required: false });
+    assertMatchObject(page, { in: 'query', required: true });
+    assertMatchObject(q, { in: 'query', required: false });
   });
 
   it('emits Pagination page and limit parameters without an introspection warning', async () => {
-    const onWarning = vi.fn();
+    const onWarning = mock.fn();
     const doc = await generateOpenApi(
       [
         route({
@@ -192,23 +203,24 @@ describe('generateOpenApi', () => {
     );
 
     const params = (doc as AnyDoc).paths['/'].get.parameters;
-    expect(params).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
+    assertMatches(
+      params,
+      pattern.arrayContaining([
+        pattern.objectContaining({
           name: 'page',
           in: 'query',
           required: false,
-          schema: expect.objectContaining({ type: 'number' }),
+          schema: pattern.objectContaining({ type: 'number' }),
         }),
-        expect.objectContaining({
+        pattern.objectContaining({
           name: 'limit',
           in: 'query',
           required: false,
-          schema: expect.objectContaining({ type: 'number' }),
+          schema: pattern.objectContaining({ type: 'number' }),
         }),
       ]),
     );
-    expect(onWarning).not.toHaveBeenCalled();
+    assertNotCalled(onWarning);
   });
 
   it('dedups a (name, in) collision between route and middleware query, route wins', async () => {
@@ -234,9 +246,9 @@ describe('generateOpenApi', () => {
       (p: AnyDoc) => p.name === 'limit' && p.in === 'query',
     );
     // Exactly one `(limit, query)` entry — OpenAPI 3.1 forbids duplicates.
-    expect(limits).toHaveLength(1);
+    assert.strictEqual(limits.length, 1);
     // The survivor is the route's own schema (number), not the middleware's.
-    expect(limits[0].schema).toEqual({ type: 'number' });
+    assert.deepStrictEqual(limits[0].schema, { type: 'number' });
   });
 
   it('dedups the same middleware contributed at two mount scopes', async () => {
@@ -262,7 +274,7 @@ describe('generateOpenApi', () => {
     const limits = params.filter(
       (p: AnyDoc) => p.name === 'limit' && p.in === 'query',
     );
-    expect(limits).toHaveLength(1);
+    assert.strictEqual(limits.length, 1);
   });
 
   it('collects security schemes from middleware static auth params', async () => {
@@ -281,19 +293,22 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' } },
     );
 
-    expect((doc as AnyDoc).components.securitySchemes.Authorization).toEqual({
-      type: 'apiKey',
-      name: 'Authorization',
-      in: 'header',
-      description: 'token auth',
-    });
-    expect((doc as AnyDoc).paths['/me'].get.security).toEqual([
+    assert.deepStrictEqual(
+      (doc as AnyDoc).components.securitySchemes.Authorization,
+      {
+        type: 'apiKey',
+        name: 'Authorization',
+        in: 'header',
+        description: 'token auth',
+      },
+    );
+    assert.deepStrictEqual((doc as AnyDoc).paths['/me'].get.security, [
       { Authorization: [] },
     ]);
   });
 
   it('degrades to a placeholder + warning for an un-introspectable schema', async () => {
-    const onWarning = vi.fn();
+    const onWarning = mock.fn();
     const opaque = {
       '~standard': {
         version: 1,
@@ -320,13 +335,13 @@ describe('generateOpenApi', () => {
     const schema = (doc as AnyDoc).paths['/'].post.requestBody.content[
       'application/json'
     ].schema;
-    expect(schema.type).toBe('object');
-    expect(schema.description).toMatch(/introspection unavailable/i);
-    expect(onWarning).toHaveBeenCalled();
+    assert.strictEqual(schema.type, 'object');
+    assertTextMatch(schema.description, /introspection unavailable/i);
+    assertCalled(onWarning);
   });
 
   it('contains a throwing schema exporter to its route and keeps exporting', async () => {
-    const onWarning = vi.fn();
+    const onWarning = mock.fn();
     const broken = {
       '~standard': {
         version: 1,
@@ -362,28 +377,31 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' }, onWarning },
     );
 
-    expect(
+    assertMatchObject(
       (doc as AnyDoc).paths['/broken'].post.requestBody.content[
         'application/json'
       ].schema,
-    ).toMatchObject({
-      type: 'object',
-      description: expect.stringMatching(/introspection unavailable/i),
-    });
-    expect(
+      {
+        type: 'object',
+        description: pattern.stringMatching(/introspection unavailable/i),
+      },
+    );
+    assert.deepStrictEqual(
       (doc as AnyDoc).paths['/healthy'].post.requestBody.content[
         'application/json'
       ].schema.properties.name,
-    ).toEqual({ type: 'string' });
-    expect(onWarning).toHaveBeenCalledWith(
-      expect.stringMatching(
+      { type: 'string' },
+    );
+    assertCalledWith(
+      onWarning,
+      pattern.stringMatching(
         /POST \/broken body: schema conversion failed.*deliberately unrepresentable/i,
       ),
     );
   });
 
   it('approximates a splat as a path parameter and warns', async () => {
-    const onWarning = vi.fn();
+    const onWarning = mock.fn();
     const doc = await generateOpenApi(
       [
         route({
@@ -399,8 +417,11 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' }, onWarning },
     );
 
-    expect((doc as AnyDoc).paths['/files/{rest}'].get).toBeDefined();
-    expect(onWarning).toHaveBeenCalledWith(expect.stringMatching(/catch-all/i));
+    assert.notStrictEqual(
+      (doc as AnyDoc).paths['/files/{rest}'].get,
+      undefined,
+    );
+    assertCalledWith(onWarning, pattern.stringMatching(/catch-all/i));
   });
 
   it('namespaces operationIds by controller and keeps them unique', async () => {
@@ -426,13 +447,18 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' } },
     );
 
-    expect((doc as AnyDoc).paths['/items'].get.operationId).toBe(
+    assert.strictEqual(
+      (doc as AnyDoc).paths['/items'].get.operationId,
       'Items_getList',
     );
-    expect((doc as AnyDoc).paths['/users'].get.operationId).toBe(
+    assert.strictEqual(
+      (doc as AnyDoc).paths['/users'].get.operationId,
       'Users_getList',
     );
-    expect(operationIds(doc)).toHaveLength(new Set(operationIds(doc)).size);
+    assert.strictEqual(
+      operationIds(doc).length,
+      new Set(operationIds(doc)).size,
+    );
   });
 
   it('disambiguates deterministically when a controller+method maps to multiple routes', async () => {
@@ -466,11 +492,11 @@ describe('generateOpenApi', () => {
 
     const doc = await generateOpenApi(routes, opts);
     const ids = operationIds(doc);
-    expect(ids).toHaveLength(new Set(ids).size); // all unique
+    assert.strictEqual(ids.length, new Set(ids).size); // all unique
 
     // Deterministic across runs.
     const again = operationIds(await generateOpenApi(routes, opts));
-    expect(again).toEqual(ids);
+    assert.deepStrictEqual(again, ids);
   });
 
   it('adds numeric suffixes after repeated operationId verb collisions', async () => {
@@ -485,18 +511,19 @@ describe('generateOpenApi', () => {
       }),
     );
 
-    expect(
+    assert.deepStrictEqual(
       operationIds(
         await generateOpenApi(routes, {
           info: { title: 't', version: '1' },
         }),
       ),
-    ).toEqual([
-      'Reports_list',
-      'Reports_list_get',
-      'Reports_list_get_2',
-      'Reports_list_get_3',
-    ]);
+      [
+        'Reports_list',
+        'Reports_list_get',
+        'Reports_list_get_2',
+        'Reports_list_get_3',
+      ],
+    );
   });
 
   it('derives operationIds from the method and path when handler metadata is absent', async () => {
@@ -508,11 +535,11 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' } },
     );
 
-    expect(operationIds(doc)).toEqual(['get_root', 'post_files_id']);
+    assert.deepStrictEqual(operationIds(doc), ['get_root', 'post_files_id']);
   });
 
   it('warns and uses safe fallbacks for opaque query and content-map schemas', async () => {
-    const onWarning = vi.fn();
+    const onWarning = mock.fn();
     const opaque = {
       '~standard': {
         version: 1,
@@ -537,17 +564,16 @@ describe('generateOpenApi', () => {
     );
 
     const operation = (doc as AnyDoc).paths['/opaque'].post;
-    expect(operation.parameters).toBeUndefined();
-    expect(
+    assert.strictEqual(operation.parameters, undefined);
+    assertMatchObject(
       operation.requestBody.content['application/custom'].schema,
-    ).toMatchObject({
-      type: 'object',
-      description: expect.stringMatching(/introspection unavailable/i),
-    });
-    expect(onWarning).toHaveBeenCalledWith(expect.stringContaining('query'));
-    expect(onWarning).toHaveBeenCalledWith(
-      expect.stringContaining('application/custom'),
+      {
+        type: 'object',
+        description: pattern.stringMatching(/introspection unavailable/i),
+      },
     );
+    assertCalledWith(onWarning, pattern.stringContaining('query'));
+    assertCalledWith(onWarning, pattern.stringContaining('application/custom'));
   });
 
   it('passes through custom middleware security scheme types', async () => {
@@ -581,15 +607,21 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' } },
     );
 
-    expect((doc as AnyDoc).components.securitySchemes.PartnerOAuth).toEqual({
-      type: 'oauth2',
-      description: 'Partner authorization',
-    });
-    expect((doc as AnyDoc).components.securitySchemes.BearerAuth).toEqual({
-      type: 'http',
-      scheme: 'bearer',
-      description: 'Bearer authorization',
-    });
+    assert.deepStrictEqual(
+      (doc as AnyDoc).components.securitySchemes.PartnerOAuth,
+      {
+        type: 'oauth2',
+        description: 'Partner authorization',
+      },
+    );
+    assert.deepStrictEqual(
+      (doc as AnyDoc).components.securitySchemes.BearerAuth,
+      {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'Bearer authorization',
+      },
+    );
   });
 
   it('merges introspectable middleware body fields and ignores opaque ones', async () => {
@@ -628,7 +660,7 @@ describe('generateOpenApi', () => {
 
     const schema = (doc as AnyDoc).paths['/middleware-body'].post.requestBody
       .content['application/json'].schema;
-    expect(schema.properties).toMatchObject({
+    assertMatchObject(schema.properties, {
       name: { type: 'string' },
       traceId: { type: 'string' },
     });
@@ -653,6 +685,6 @@ describe('generateOpenApi', () => {
       { info: { title: 't', version: '1' } },
     );
 
-    expect((doc as AnyDoc).paths['/'].get.summary).toBe('The homepage');
+    assert.strictEqual((doc as AnyDoc).paths['/'].get.summary, 'The homepage');
   });
 });

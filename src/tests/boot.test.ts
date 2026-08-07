@@ -1,6 +1,8 @@
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { assertTextMatch } from './assertions.ts';
 
 // Boot-policy scenarios (docs 25/26) run in spawned children: the shared test
 // server boots with Mongo + AUTH_SALT, so these failure permutations need
@@ -11,9 +13,7 @@ const fixture = fileURLToPath(
 
 const baseEnv = () => {
   const env = { ...process.env } as NodeJS.ProcessEnv;
-  env.VITEST = undefined;
-  env.VITEST_WORKER_ID = undefined;
-  env.VITEST_POOL_ID = undefined;
+  env.FRAMEWORK_TEST = undefined;
   env.LOGGER_CONSOLE_LEVEL = 'error';
   return env;
 };
@@ -45,8 +45,8 @@ describe('boot policy (docs 25 + 26)', () => {
     const env = baseEnv();
     env.AUTH_SALT = undefined;
     const { code, out } = await runBoot(env);
-    expect(code).toBe(1);
-    expect(out).toMatch(/No Mongo connection configured/);
+    assert.strictEqual(code, 1);
+    assertTextMatch(out, /No Mongo connection configured/);
   }, 40000);
 
   it('fails boot when AUTH_SALT is missing', async () => {
@@ -54,9 +54,9 @@ describe('boot policy (docs 25 + 26)', () => {
     env.BOOT_MONGO = '1';
     env.AUTH_SALT = undefined;
     const { code, out } = await runBoot(env);
-    expect(code).toBe(1);
-    expect(out).toMatch(/AUTH_SALT/);
-    expect(out).toMatch(/generateRandomBytes/);
+    assert.strictEqual(code, 1);
+    assertTextMatch(out, /AUTH_SALT/);
+    assertTextMatch(out, /generateRandomBytes/);
   }, 40000);
 
   it('fails boot and names the model when a model fails to initialize', async () => {
@@ -65,8 +65,8 @@ describe('boot policy (docs 25 + 26)', () => {
     env.BOOT_BROKEN_MODEL = '1';
     env.AUTH_SALT = 'set-so-the-salt-check-passes';
     const { code, out } = await runBoot(env);
-    expect(code).toBe(1);
-    expect(out).toMatch(/Failed to initialize model 'BrokenModel'/);
+    assert.strictEqual(code, 1);
+    assertTextMatch(out, /Failed to initialize model 'BrokenModel'/);
   }, 40000);
 
   it('fails boot with a dedupe diagnostic when a model extends BaseModel from a different framework copy', async () => {
@@ -75,8 +75,8 @@ describe('boot policy (docs 25 + 26)', () => {
     env.BOOT_DUP_COPY = '1';
     env.AUTH_SALT = 'set-so-the-salt-check-passes';
     const { code, out } = await runBoot(env);
-    expect(code).toBe(1);
-    expect(out).toMatch(/DIFFERENT copy of @adaptivestone\/framework/);
-    expect(out).toMatch(/npm ls @adaptivestone\/framework/);
+    assert.strictEqual(code, 1);
+    assertTextMatch(out, /DIFFERENT copy of @adaptivestone\/framework/);
+    assertTextMatch(out, /npm ls @adaptivestone\/framework/);
   }, 40000);
 });

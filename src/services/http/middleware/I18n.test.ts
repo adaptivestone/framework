@@ -1,22 +1,20 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { before, describe, it } from 'node:test';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import I18n from './I18n.ts';
 
 describe('i18n middleware methods', () => {
   let middleware: I18n;
 
-  beforeAll(() => {
+  before(() => {
     middleware = new I18n(appInstance);
   });
 
   it('have description fields', async () => {
-    expect.assertions(1);
-    expect(middleware.constructor.description).toBeDefined();
+    assert.notStrictEqual(middleware.constructor.description, undefined);
   });
 
   it('detectors should works correctly', async () => {
-    expect.assertions(6);
-
     const request: {
       get: () => string;
       query?: {
@@ -36,7 +34,7 @@ describe('i18n middleware methods', () => {
     };
     let lang = await middleware.detectLang(request);
 
-    expect(lang).toBe('en');
+    assert.strictEqual(lang, 'en');
 
     request.appInfo = {
       user: {
@@ -45,33 +43,31 @@ describe('i18n middleware methods', () => {
     };
     lang = await middleware.detectLang(request);
 
-    expect(lang).toBe('en');
+    assert.strictEqual(lang, 'en');
 
     request.get = () => null as unknown as string;
     lang = await middleware.detectLang(request);
 
-    expect(lang).toBe('es');
+    assert.strictEqual(lang, 'es');
 
     request.query = undefined;
     lang = await middleware.detectLang(request);
 
-    expect(lang).toBe('be');
+    assert.strictEqual(lang, 'be');
 
     request.query = {
       [middleware.lookupQuerystring]: 'en-GB',
     };
     lang = await middleware.detectLang(request);
 
-    expect(lang).toBe('en');
+    assert.strictEqual(lang, 'en');
 
     lang = await middleware.detectLang(request, false);
 
-    expect(lang).toBe('en-GB');
+    assert.strictEqual(lang, 'en-GB');
   });
 
   it('middleware that works', async () => {
-    expect.assertions(6);
-
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -93,11 +89,11 @@ describe('i18n middleware methods', () => {
     };
     await middleware.middleware(req, {}, nextFunction);
 
-    expect(isCalled).toBeTruthy();
-    expect(req.appInfo.i18n).toBeDefined();
-    expect(req.appInfo.i18n?.language).toBe('en');
-    expect(req.appInfo.i18n?.t('aaaaa')).toBe('aaaaa');
-    expect(req.i18n?.t('aaaaa')).toBe('aaaaa'); // proxy test
+    assert.ok(isCalled);
+    assert.notStrictEqual(req.appInfo.i18n, undefined);
+    assert.strictEqual(req.appInfo.i18n?.language, 'en');
+    assert.strictEqual(req.appInfo.i18n?.t('aaaaa'), 'aaaaa');
+    assert.strictEqual(req.i18n?.t('aaaaa'), 'aaaaa'); // proxy test
 
     const req2: {
       get: () => string;
@@ -113,12 +109,10 @@ describe('i18n middleware methods', () => {
 
     await middleware.middleware(req2, {}, nextFunction);
 
-    expect(req2.appInfo.i18n?.language).toBe('en');
+    assert.strictEqual(req2.appInfo.i18n?.language, 'en');
   });
 
   it('middleware disabled', async () => {
-    expect.assertions(4);
-
     appInstance.updateConfig('i18n', { enabled: false });
     middleware = new I18n(appInstance);
 
@@ -144,10 +138,10 @@ describe('i18n middleware methods', () => {
     };
     await middleware.middleware(req, {}, nextFunction);
 
-    expect(isCalled).toBeTruthy();
-    expect(req.appInfo.i18n).toBeDefined();
-    expect(req.appInfo.i18n?.t('aaaaa')).toBe('aaaaa');
-    expect(req.i18n?.t('aaaaa')).toBe('aaaaa'); // proxy test
+    assert.ok(isCalled);
+    assert.notStrictEqual(req.appInfo.i18n, undefined);
+    assert.strictEqual(req.appInfo.i18n?.t('aaaaa'), 'aaaaa');
+    assert.strictEqual(req.i18n?.t('aaaaa'), 'aaaaa'); // proxy test
 
     appInstance.updateConfig('i18n', { enabled: true });
   });

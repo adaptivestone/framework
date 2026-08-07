@@ -1,7 +1,8 @@
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { afterEach, describe, it, mock } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import mongoose from 'mongoose';
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import Cli from './Cli.ts';
 import folderConfig from './folderConfig.ts';
 import {
@@ -10,11 +11,13 @@ import {
   setAppInstance,
 } from './helpers/appInstance.ts';
 import Server from './server.ts';
+import { assertMatchObject } from './tests/assertions.ts';
 import {
   receivedArgs,
   resetArgsCommand,
   runCount,
 } from './tests/fixtures/commands/ArgsCommand.ts';
+import { mockImplementation } from './tests/mocks.ts';
 
 const commandPath = (name: string) =>
   fileURLToPath(
@@ -28,8 +31,8 @@ describe('Cli construction', () => {
     resetAppInstance();
     try {
       const cli = new Cli(folderConfig);
-      expect(cli.server).toBeInstanceOf(Server);
-      expect(mongoose.get('autoIndex')).toBe(false);
+      assert.ok(cli.server instanceof Server);
+      assert.strictEqual(mongoose.get('autoIndex'), false);
     } finally {
       mongoose.set('autoIndex', originalAutoIndex);
       resetAppInstance();
@@ -66,11 +69,11 @@ describe('Cli.run — returns the command result', () => {
   };
 
   it('resolves false when the command run() rejects', async () => {
-    await expect(run('throwcmd')).resolves.toBe(false);
+    await assert.strictEqual(await run('throwcmd'), false);
   });
 
   it('resolves true when the command run() succeeds', async () => {
-    await expect(run('okcmd')).resolves.toBe(true);
+    await assert.strictEqual(await run('okcmd'), true);
   });
 });
 
@@ -80,7 +83,7 @@ describe('Cli.run — argument validation', () => {
   afterEach(() => {
     process.argv = originalArgv;
     resetArgsCommand();
-    vi.restoreAllMocks();
+    mock.restoreAll();
   });
 
   const run = (args: string[]) => {
@@ -97,40 +100,53 @@ describe('Cli.run — argument validation', () => {
   };
 
   it('shows help without executing the command', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = mockImplementation(mock.method(console, 'log'), () => {});
 
-    await expect(run(['--help'])).resolves.toBe(true);
+    await assert.strictEqual(await run(['--help']), true);
 
-    expect(runCount).toBe(0);
-    expect(log.mock.calls.flat().join('\n')).toContain('Name to process');
+    assert.strictEqual(runCount, 0);
+    assert.ok(
+      log.mock.calls
+        .flatMap((call) => call.arguments)
+        .join('\n')
+        .includes('Name to process'),
+    );
   });
 
   it('rejects an unknown option without executing the command', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = mockImplementation(mock.method(console, 'log'), () => {});
 
-    await expect(run(['--unknown'])).resolves.toBe(false);
+    await assert.strictEqual(await run(['--unknown']), false);
 
-    expect(runCount).toBe(0);
-    expect(log.mock.calls.flat().join('\n')).toContain('Unknown option');
+    assert.strictEqual(runCount, 0);
+    assert.ok(
+      log.mock.calls
+        .flatMap((call) => call.arguments)
+        .join('\n')
+        .includes('Unknown option'),
+    );
   });
 
   it('rejects a missing required option without executing the command', async () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = mockImplementation(mock.method(console, 'log'), () => {});
 
-    await expect(run([])).resolves.toBe(false);
+    await assert.strictEqual(await run([]), false);
 
-    expect(runCount).toBe(0);
-    expect(log.mock.calls.flat().join('\n')).toContain(
-      'Please provide "name" argument',
+    assert.strictEqual(runCount, 0);
+    assert.ok(
+      log.mock.calls
+        .flatMap((call) => call.arguments)
+        .join('\n')
+        .includes('Please provide "name" argument'),
     );
   });
 
   it('accepts an explicitly empty required string', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    mockImplementation(mock.method(console, 'log'), () => {});
 
-    await expect(run(['--name='])).resolves.toBe(true);
+    await assert.strictEqual(await run(['--name=']), true);
 
-    expect(runCount).toBe(1);
-    expect(receivedArgs).toMatchObject({ name: '', mode: 'safe' });
+    assert.strictEqual(runCount, 1);
+    assertMatchObject(receivedArgs, { name: '', mode: 'safe' });
   });
 });

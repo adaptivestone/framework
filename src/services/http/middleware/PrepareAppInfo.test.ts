@@ -1,21 +1,18 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { Response } from 'express';
-import { describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import PrepareAppInfo from './PrepareAppInfo.ts';
 
 describe('prepareAppInfo methods', () => {
   it('have description fields', async () => {
-    expect.assertions(1);
-
     // const middleware = new PrepareAppInfo(appInstance);
 
-    expect(PrepareAppInfo.description).toBeDefined();
+    assert.notStrictEqual(PrepareAppInfo.description, undefined);
   });
 
   it('middleware that works', async () => {
-    expect.assertions(3);
-
     const middleware = new PrepareAppInfo(appInstance);
     let isCalled = false;
     const nextFunction = () => {
@@ -32,8 +29,8 @@ describe('prepareAppInfo methods', () => {
       nextFunction,
     );
 
-    expect(isCalled).toBeTruthy();
-    expect(req.appInfo).toBeDefined();
+    assert.ok(isCalled);
+    assert.notStrictEqual(req.appInfo, undefined);
 
     if (req.appInfo) {
       req.appInfo.test = 5;
@@ -45,12 +42,10 @@ describe('prepareAppInfo methods', () => {
       nextFunction,
     );
 
-    expect(req.appInfo?.test).toBe(5);
+    assert.strictEqual(req.appInfo?.test, 5);
   });
 
   it('initializes request and query to {} so schema-less routes can read them', async () => {
-    expect.assertions(2);
-
     // The declared `appInfo.request`/`.query` types are non-optional, but a
     // route without schemas never has them assigned by the validation wrapper.
     // `PrepareAppInfo` must seed both so a handler reading them can't crash.
@@ -62,7 +57,7 @@ describe('prepareAppInfo methods', () => {
       () => {},
     );
 
-    expect(req.appInfo?.request).toStrictEqual({});
-    expect(req.appInfo?.query).toStrictEqual({});
+    assert.deepStrictEqual(req.appInfo?.request, {});
+    assert.deepStrictEqual(req.appInfo?.query, {});
   });
 });

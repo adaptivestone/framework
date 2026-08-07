@@ -4,10 +4,12 @@
  * registry stand-in + `skipWrap`), then asserts the rendered tree. ANSI colours
  * are stripped before matching.
  */
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import ControllerManager from '../../../controllers/index.ts';
 import AbstractController from '../../../modules/AbstractController.ts';
 import type { IApp } from '../../../server.ts';
+import { assertTextMatch } from '../../../tests/assertions.ts';
 import AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import { formatRouteTree } from './formatTree.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
@@ -53,13 +55,13 @@ describe('formatRouteTree', () => {
 
     const out = stripAnsi(formatRouteTree(registry));
 
-    expect(out).toContain('Registered routes:');
-    expect(out).toContain('widgets');
-    expect(out).toMatch(/GET\s+\/widgets\b/);
-    expect(out).toMatch(/GET\s+\/widgets\/:id\b/);
-    expect(out).toMatch(/POST\s+\/widgets\b/);
-    expect(out).toContain(':id'); // param segment rendered verbatim
-    expect(out).toContain('mw: Guard'); // route-level middleware surfaces
-    expect(out).toMatch(/3 route\(s\) across \d+ node\(s\)/);
+    assert.ok(out.includes('Registered routes:'));
+    assert.ok(out.includes('widgets'));
+    assertTextMatch(out, /GET\s+\/widgets\b/);
+    assertTextMatch(out, /GET\s+\/widgets\/:id\b/);
+    assertTextMatch(out, /POST\s+\/widgets\b/);
+    assert.ok(out.includes(':id')); // param segment rendered verbatim
+    assert.ok(out.includes('mw: Guard')); // route-level middleware surfaces
+    assertTextMatch(out, /3 route\(s\) across \d+ node\(s\)/);
   });
 });

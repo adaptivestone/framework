@@ -1,11 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TMigration } from './Migration.ts';
 
 describe('migration model', () => {
   it('migrationFile should be uniqe', async () => {
-    expect.assertions(1);
-
     let errorCode: number | undefined;
     const MigrationModel = appInstance.getModel(
       'Migration',
@@ -25,6 +24,6 @@ describe('migration model', () => {
       errorCode = e.code;
     });
 
-    expect(errorCode).toBe(11000);
+    assert.strictEqual(errorCode, 11000);
   });
 });

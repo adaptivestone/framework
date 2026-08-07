@@ -1,55 +1,68 @@
-import { describe, expect, it, vi } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import {
+  assertCalledTimes,
+  assertCalledWith,
+  assertRejectsLike,
+  pattern,
+} from '../../tests/assertions.ts';
 import { appInstance } from '../appInstance.ts';
 
-const mockedRedis = vi.hoisted(() => {
+const mockedRedis = (() => {
   const handlers = new Map<string, (...args: unknown[]) => void>();
   const client = {
-    connect: vi.fn(() => Promise.reject(new Error('connect down'))),
-    on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+    connect: mock.fn(() => Promise.reject(new Error('connect down'))),
+    on: mock.fn((event: string, handler: (...args: unknown[]) => void) => {
       handlers.set(event, handler);
       return client;
     }),
-    quit: vi.fn(() => Promise.resolve()),
+    quit: mock.fn(() => Promise.resolve()),
     isOpen: false,
   };
-  return { client, handlers, createClient: vi.fn(() => client) };
+  return { client, handlers, createClient: mock.fn(() => client) };
+})();
+
+mock.module('@redis/client', {
+  exports: { createClient: mockedRedis.createClient },
 });
 
-vi.mock('@redis/client', () => ({
-  createClient: mockedRedis.createClient,
-}));
-
-import { getRedisClient, getRedisClientSync } from './redisConnection.ts';
+const { getRedisClient, getRedisClientSync } = await import(
+  './redisConnection.ts'
+);
 
 describe('redisConnection failure recovery', () => {
   it('clears a failed client, logs sync failures, and forwards client errors', async () => {
-    const logError = vi
-      .spyOn(appInstance.logger, 'error')
-      .mockImplementation(() => appInstance.logger);
+    const logError = mock.method(
+      appInstance.logger,
+      'error',
+      () => appInstance.logger,
+    );
     try {
-      await expect(getRedisClient()).rejects.toThrow('connect down');
+      await assertRejectsLike(getRedisClient(), 'connect down');
       await Promise.resolve();
 
-      await expect(getRedisClient()).rejects.toThrow('connect down');
-      expect(mockedRedis.createClient).toHaveBeenCalledTimes(2);
+      await assertRejectsLike(getRedisClient(), 'connect down');
+      assertCalledTimes(mockedRedis.createClient, 2);
       await Promise.resolve();
 
-      expect(getRedisClientSync()).toBe(mockedRedis.client);
+      assert.strictEqual(getRedisClientSync(), mockedRedis.client);
       await Promise.resolve();
       await Promise.resolve();
-      expect(logError).toHaveBeenCalledWith(
-        expect.stringContaining('Redis connect failed'),
+      assertCalledWith(
+        logError,
+        pattern.stringContaining('Redis connect failed'),
       );
 
       mockedRedis.handlers.get('error')?.('socket down', 'extra-a', 'extra-b');
-      expect(logError).toHaveBeenCalledWith(
+      assertCalledWith(
+        logError,
         'Redis Client Error',
         'socket down',
         'extra-a',
         'extra-b',
       );
     } finally {
-      logError.mockRestore();
+      logError.mock.restore();
     }
   });
 });

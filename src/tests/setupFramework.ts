@@ -1,10 +1,8 @@
 /**
  * Runner-agnostic test setup. Plain async functions with **no test-runner
- * import** (no vitest, no `node:test`) so the framework's test lifecycle can be
- * driven from either runner — or programmatically.
- *
- * - vitest glue: `setupVitest.ts` (per-file) + `globalSetupVitest.ts` (once).
- * - node:test glue: `setupNodeTest.ts`.
+ * import** (no `node:test` or vitest) so the framework's test lifecycle can
+ * also be driven programmatically. `setupNodeTest.ts` and `setupVitest.ts`
+ * supply their respective runner hooks.
  *
  * Lifecycle pieces:
  * - `startTestMongo` / `stopTestMongo` — once per run; spins up an in-memory

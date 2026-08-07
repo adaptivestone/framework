@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { testEach } from '../../tests/parameterized.ts';
 import {
   BadRequestError,
   ConflictError,
@@ -11,33 +13,37 @@ import {
 describe('httpErrors', () => {
   it('base HttpError carries status, message and optional body', () => {
     const err = new HttpError(422, 'Unprocessable', { errors: { csv: 'bad' } });
-    expect(err).toBeInstanceOf(Error);
-    expect(err.status).toBe(422);
-    expect(err.message).toBe('Unprocessable');
-    expect(err.body).toEqual({ errors: { csv: 'bad' } });
-    expect(err.name).toBe('HttpError');
+    assert.ok(err instanceof Error);
+    assert.strictEqual(err.status, 422);
+    assert.strictEqual(err.message, 'Unprocessable');
+    assert.deepStrictEqual(err.body, { errors: { csv: 'bad' } });
+    assert.strictEqual(err.name, 'HttpError');
   });
 
-  it.each([
-    [BadRequestError, 400, 'Bad request'],
-    [UnauthorizedError, 401, 'Unauthorized'],
-    [ForbiddenError, 403, 'Forbidden'],
-    [NotFoundError, 404, 'Not found'],
-    [ConflictError, 409, 'Conflict'],
-  ] as const)('subclass fixes status %#', (Cls, status, defaultMessage) => {
-    const err = new Cls();
-    expect(err).toBeInstanceOf(HttpError);
-    expect(err.status).toBe(status);
-    expect(err.message).toBe(defaultMessage);
-    expect(err.body).toBeUndefined();
-    expect(err.name).toBe(Cls.name);
-  });
+  testEach(
+    [
+      [BadRequestError, 400, 'Bad request'],
+      [UnauthorizedError, 401, 'Unauthorized'],
+      [ForbiddenError, 403, 'Forbidden'],
+      [NotFoundError, 404, 'Not found'],
+      [ConflictError, 409, 'Conflict'],
+    ] as const,
+    'subclass fixes status %#',
+    (Cls, status, defaultMessage) => {
+      const err = new Cls();
+      assert.ok(err instanceof HttpError);
+      assert.strictEqual(err.status, status);
+      assert.strictEqual(err.message, defaultMessage);
+      assert.strictEqual(err.body, undefined);
+      assert.strictEqual(err.name, Cls.name);
+    },
+  );
 
   it('subclasses accept a custom message and body', () => {
     const err = new NotFoundError('Boat not found', { code: 'BOAT_MISSING' });
-    expect(err.status).toBe(404);
-    expect(err.message).toBe('Boat not found');
-    expect(err.body).toEqual({ code: 'BOAT_MISSING' });
+    assert.strictEqual(err.status, 404);
+    assert.strictEqual(err.message, 'Boat not found');
+    assert.deepStrictEqual(err.body, { code: 'BOAT_MISSING' });
   });
 
   it('a consumer subclass keeps the instanceof chain and its own name', () => {
@@ -47,8 +53,8 @@ describe('httpErrors', () => {
       }
     }
     const err = new PaymentRequiredError();
-    expect(err).toBeInstanceOf(HttpError);
-    expect(err.status).toBe(402);
-    expect(err.name).toBe('PaymentRequiredError');
+    assert.ok(err instanceof HttpError);
+    assert.strictEqual(err.status, 402);
+    assert.strictEqual(err.name, 'PaymentRequiredError');
   });
 });

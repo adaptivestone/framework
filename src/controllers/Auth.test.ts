@@ -1,10 +1,24 @@
+import assert from 'node:assert/strict';
+import { before, describe, it, mock } from 'node:test';
 import type { Response } from 'express';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
 import type { IApp } from '../server.ts';
+import {
+  assertCalledTimes,
+  assertCalledWith,
+  assertNotCalled,
+  assertRejectsValue,
+  pattern,
+} from '../tests/assertions.ts';
+import {
+  mockImplementation,
+  mockRejectedValue,
+  mockResolvedValue,
+} from '../tests/mocks.ts';
+import { testEach } from '../tests/parameterized.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
 import Auth from './Auth.ts';
 
@@ -41,55 +55,64 @@ describe('auth route schemas', () => {
     return route.request['~standard'].validate(value);
   };
 
-  it.each([
-    [{}, ['auth.emailProvided', 'auth.passwordProvided']],
+  testEach(
     [
-      { email: 'valid@example.com', password: 'contains a space' },
-      ['auth.passwordValid'],
+      [{}, ['auth.emailProvided', 'auth.passwordProvided']],
+      [
+        { email: 'valid@example.com', password: 'contains a space' },
+        ['auth.passwordValid'],
+      ],
+      [
+        { email: 'valid@example.com', password: 'valid123', nickName: '' },
+        ['auth.nickNameValid'],
+      ],
+      [
+        {
+          email: 'valid@example.com',
+          password: 'valid123',
+          firstName: {},
+          lastName: [],
+        },
+        ['auth.nameValid', 'auth.nameValid'],
+      ],
     ],
-    [
-      { email: 'valid@example.com', password: 'valid123', nickName: '' },
-      ['auth.nickNameValid'],
-    ],
-    [
-      {
-        email: 'valid@example.com',
-        password: 'valid123',
-        firstName: {},
-        lastName: [],
-      },
-      ['auth.nameValid', 'auth.nameValid'],
-    ],
-  ])('validates registration input %#', async (input, expectedMessages) => {
-    const result = await validate('/register', input);
-    expect(
-      'issues' in result ? result.issues?.map((issue) => issue.message) : [],
-    ).toEqual(expectedMessages);
-  });
-
-  it.each([
-    [{}, ['auth.passwordProvided', 'auth.passwordRecoveryTokenProvided']],
-    [
-      { password: 'contains a space', passwordRecoveryToken: 'token' },
-      ['auth.passwordValid'],
-    ],
-  ])(
-    'validates password recovery input %#',
+    'validates registration input %#',
     async (input, expectedMessages) => {
-      const result = await validate('/recover-password', input);
-      expect(
+      const result = await validate('/register', input);
+      assert.deepStrictEqual(
         'issues' in result ? result.issues?.map((issue) => issue.message) : [],
-      ).toEqual(expectedMessages);
+        expectedMessages,
+      );
     },
   );
 
-  it.each(['/send-recovery-email', '/send-verification'])(
+  testEach(
+    [
+      [{}, ['auth.passwordProvided', 'auth.passwordRecoveryTokenProvided']],
+      [
+        { password: 'contains a space', passwordRecoveryToken: 'token' },
+        ['auth.passwordValid'],
+      ],
+    ],
+    'validates password recovery input %#',
+    async (input, expectedMessages) => {
+      const result = await validate('/recover-password', input);
+      assert.deepStrictEqual(
+        'issues' in result ? result.issues?.map((issue) => issue.message) : [],
+        expectedMessages,
+      );
+    },
+  );
+
+  testEach(
+    ['/send-recovery-email', '/send-verification'],
     'requires an email for %s',
     async (path) => {
       const result = await validate(path, {});
-      expect(
+      assert.deepStrictEqual(
         'issues' in result ? result.issues?.map((issue) => issue.message) : [],
-      ).toEqual(['auth.emailProvided']);
+        ['auth.emailProvided'],
+      );
     },
   );
 });
@@ -98,11 +121,11 @@ describe('auth controller failure paths', () => {
   const response = () => {
     const state: { status?: number; body?: unknown } = {};
     const res = {
-      status: vi.fn((status: number) => {
+      status: mock.fn((status: number) => {
         state.status = status;
         return res;
       }),
-      json: vi.fn((body?: unknown) => {
+      json: mock.fn((body?: unknown) => {
         state.body = body;
         return res;
       }),
@@ -113,12 +136,12 @@ describe('auth controller failure paths', () => {
   const fakeApp = (
     User: Record<string, unknown>,
     authConfig: Record<string, unknown> = {},
-    error = vi.fn(),
+    error = mock.fn(),
   ) =>
     ({
       getModel: () => User,
       getConfig: () => authConfig,
-      logger: { child: () => ({ error, debug: vi.fn() }) },
+      logger: { child: () => ({ error, debug: mock.fn() }) },
     }) as unknown as IApp;
 
   const request = (app: IApp, values: Record<string, unknown>) =>
@@ -132,16 +155,17 @@ describe('auth controller failure paths', () => {
     }) as never;
 
   it('honors the legacy verification-flow key and warns only once', async () => {
-    const sendVerificationEmail = vi.fn().mockResolvedValue(undefined);
+    const sendVerificationEmail = mockResolvedValue(mock.fn(), undefined);
     const User = {
-      getUserByEmail: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue({ sendVerificationEmail }),
+      getUserByEmail: mockResolvedValue(mock.fn(), null),
+      create: mockResolvedValue(mock.fn(), { sendVerificationEmail }),
     };
     const app = fakeApp(User, { isAuthWithVefificationFlow: false });
     const auth = new Auth(app, '');
-    const emitWarning = vi
-      .spyOn(process, 'emitWarning')
-      .mockImplementation(() => {});
+    const emitWarning = mockImplementation(
+      mock.method(process, 'emitWarning'),
+      () => {},
+    );
     try {
       for (const email of [
         'legacy-one@example.com',
@@ -152,28 +176,30 @@ describe('auth controller failure paths', () => {
           request(app, { email, password: 'valid123' }),
           res,
         );
-        expect(state.status).toBe(201);
+        assert.strictEqual(state.status, 201);
       }
 
-      expect(emitWarning).toHaveBeenCalledTimes(1);
-      expect(emitWarning).toHaveBeenCalledWith(
-        expect.stringContaining('isAuthWithVefificationFlow'),
-        expect.objectContaining({ code: 'ASF_DEP_AUTH_VERIFICATION_KEY' }),
+      assertCalledTimes(emitWarning, 1);
+      assertCalledWith(
+        emitWarning,
+        pattern.stringContaining('isAuthWithVefificationFlow'),
+        pattern.objectContaining({ code: 'ASF_DEP_AUTH_VERIFICATION_KEY' }),
       );
-      expect(sendVerificationEmail).not.toHaveBeenCalled();
+      assertNotCalled(sendVerificationEmail);
     } finally {
-      emitWarning.mockRestore();
+      emitWarning.mock.restore();
     }
   });
 
   it('logs a registration verification-email failure and still returns 201', async () => {
-    const error = vi.fn();
+    const error = mock.fn();
     const User = {
-      getUserByEmail: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockResolvedValue({
-        sendVerificationEmail: vi
-          .fn()
-          .mockRejectedValue(new Error('verification mail down')),
+      getUserByEmail: mockResolvedValue(mock.fn(), null),
+      create: mockResolvedValue(mock.fn(), {
+        sendVerificationEmail: mockRejectedValue(
+          mock.fn(),
+          new Error('verification mail down'),
+        ),
       }),
     };
     const app = fakeApp(User, {}, error);
@@ -188,21 +214,22 @@ describe('auth controller failure paths', () => {
       res,
     );
 
-    expect(state.status).toBe(201);
-    expect(error).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'verification mail down' }),
+    assert.strictEqual(state.status, 201);
+    assertCalledWith(
+      error,
+      pattern.objectContaining({ message: 'verification mail down' }),
     );
   });
 
   it('rethrows a non-object user-create failure unchanged', async () => {
     const User = {
-      getUserByEmail: vi.fn().mockResolvedValue(null),
-      create: vi.fn().mockRejectedValue('primitive failure'),
+      getUserByEmail: mockResolvedValue(mock.fn(), null),
+      create: mockRejectedValue(mock.fn(), 'primitive failure'),
     };
     const app = fakeApp(User);
     const auth = new Auth(app, '');
 
-    await expect(
+    await assertRejectsValue(
       auth.postRegister(
         request(app, {
           email: 'primitive-failure@example.com',
@@ -210,13 +237,14 @@ describe('auth controller failure paths', () => {
         }),
         response().res,
       ),
-    ).rejects.toBe('primitive failure');
+      'primitive failure',
+    );
   });
 
   it('keeps recovery and verification lookup failures on uniform 200 responses', async () => {
-    const error = vi.fn();
+    const error = mock.fn();
     const User = {
-      getUserByEmail: vi.fn().mockRejectedValue(new Error('database down')),
+      getUserByEmail: mockRejectedValue(mock.fn(), new Error('database down')),
     };
     const app = fakeApp(User, {}, error);
     const auth = new Auth(app, '');
@@ -232,22 +260,24 @@ describe('auth controller failure paths', () => {
       verification.res,
     );
 
-    expect(recovery.state.status).toBe(200);
-    expect(verification.state.status).toBe(200);
-    expect(error).toHaveBeenCalledTimes(2);
+    assert.strictEqual(recovery.state.status, 200);
+    assert.strictEqual(verification.state.status, 200);
+    assertCalledTimes(error, 2);
   });
 
   it('logs asynchronous mail failures after returning uniform responses', async () => {
-    const error = vi.fn();
+    const error = mock.fn();
     const user = {
-      sendPasswordRecoveryEmail: vi
-        .fn()
-        .mockRejectedValue(new Error('recovery mail down')),
-      sendVerificationEmail: vi
-        .fn()
-        .mockRejectedValue(new Error('verification mail down')),
+      sendPasswordRecoveryEmail: mockRejectedValue(
+        mock.fn(),
+        new Error('recovery mail down'),
+      ),
+      sendVerificationEmail: mockRejectedValue(
+        mock.fn(),
+        new Error('verification mail down'),
+      ),
     };
-    const User = { getUserByEmail: vi.fn().mockResolvedValue(user) };
+    const User = { getUserByEmail: mockResolvedValue(mock.fn(), user) };
     const app = fakeApp(User, {}, error);
     const auth = new Auth(app, '');
 
@@ -261,12 +291,12 @@ describe('auth controller failure paths', () => {
     );
     await Promise.resolve();
 
-    expect(error).toHaveBeenCalledTimes(2);
+    assertCalledTimes(error, 2);
   });
 
   it('returns 400 when verification lookup resolves without a user', async () => {
     const User = {
-      getUserByVerificationToken: vi.fn().mockResolvedValue(null),
+      getUserByVerificationToken: mockResolvedValue(mock.fn(), null),
     };
     const app = fakeApp(User);
     const auth = new Auth(app, '');
@@ -274,8 +304,8 @@ describe('auth controller failure paths', () => {
 
     await auth.verifyUser(request(app, {}), res);
 
-    expect(state.status).toBe(400);
-    expect(state.body).toEqual({
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, {
       message: 'email.alreadyVerifiedOrWrongToken',
     });
   });
@@ -284,8 +314,6 @@ describe('auth controller failure paths', () => {
 describe('auth', () => {
   describe('registration', () => {
     it('code NOT able to create user with wrong email', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(getTestServerURL('/auth/register'), {
         method: 'POST',
         headers: {
@@ -298,18 +326,16 @@ describe('auth', () => {
         }),
       }).catch(() => ({ status: 500 }));
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
 
     it('translates i18n keys in validation error response', async () => {
-      expect.assertions(3);
-
       const response = await fetch(getTestServerURL('/auth/login'), {
         method: 'POST',
         headers: { 'Content-type': 'application/json' },
         body: JSON.stringify({}),
       });
-      expect(response.status).toBe(400);
+      assert.strictEqual(response.status, 400);
 
       const body = (await response.json()) as {
         errors: Record<string, string | string[]>;
@@ -317,13 +343,13 @@ describe('auth', () => {
       // Schema declares messages as i18n keys (`auth.emailProvided`,
       // `auth.passwordProvided`); framework auto-translates via the
       // request's i18n.t before sending the response.
-      expect(body.errors.email).toEqual(['Email must be provided']);
-      expect(body.errors.password).toEqual(['Password must be provided']);
+      assert.deepStrictEqual(body.errors.email, ['Email must be provided']);
+      assert.deepStrictEqual(body.errors.password, [
+        'Password must be provided',
+      ]);
     });
 
     it('can create user', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(getTestServerURL('/auth/register'), {
         method: 'POST',
         headers: {
@@ -336,12 +362,10 @@ describe('auth', () => {
         }),
       });
 
-      expect(status).toBe(201);
+      assert.strictEqual(status, 201);
     });
 
     it('can  not create user with the same nickname', async () => {
-      expect.assertions(1);
-
       await fetch(getTestServerURL('/auth/register'), {
         method: 'POST',
         headers: {
@@ -366,12 +390,10 @@ describe('auth', () => {
         }),
       }).catch(() => ({ status: 500 }));
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
 
     it('can NOT create SAME user', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(getTestServerURL('/auth/register'), {
         method: 'POST',
         headers: {
@@ -384,14 +406,12 @@ describe('auth', () => {
         }),
       });
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
   });
 
   describe('login', () => {
     it('can NOT login with normal creds and not verified email', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(getTestServerURL('/auth/login'), {
         method: 'POST',
         headers: {
@@ -403,12 +423,10 @@ describe('auth', () => {
         }),
       }).catch(() => ({ status: 500 }));
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
 
     it('can NOT login with WRONG creds', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(getTestServerURL('/auth/login'), {
         method: 'POST',
         headers: {
@@ -420,23 +438,20 @@ describe('auth', () => {
         }),
       }).catch(() => ({ status: 500 }));
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
 
     it('rejects a non-string password with 400 (not 500)', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(getTestServerURL('/auth/login'), {
         method: 'POST',
         headers: { 'Content-type': 'application/json' },
         body: JSON.stringify({ email: 'a@b.com', password: ['x'] }),
       }).catch(() => ({ status: 500 }));
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
 
     it('can login with normal creds and verified email', async () => {
-      expect.assertions(3);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.findOne({
@@ -460,15 +475,14 @@ describe('auth', () => {
 
       const responseBody = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(responseBody.data).toBeDefined();
-      expect(responseBody.data.token).toBeDefined();
+      assert.strictEqual(response.status, 200);
+      assert.notStrictEqual(responseBody.data, undefined);
+      assert.notStrictEqual(responseBody.data.token, undefined);
     });
   });
 
   describe('isAuthWithVerificationFlow auth option', () => {
     it('can verify user', async () => {
-      expect.assertions(2);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.create({
@@ -494,12 +508,11 @@ describe('auth', () => {
         email: 'Test@gmail.com',
       }).orFail();
 
-      expect(status).toBe(200);
-      expect(isVerified).toBeTruthy();
+      assert.strictEqual(status, 200);
+      assert.ok(isVerified);
     });
 
     it('can not verify user with wrong token', async () => {
-      expect.assertions(2);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.create({
@@ -529,13 +542,11 @@ describe('auth', () => {
         email: 'Test423@gmail.com',
       }).orFail();
 
-      expect(status).toBe(400);
-      expect(isVerified).toBeFalsy();
+      assert.strictEqual(status, 400);
+      assert.ok(!isVerified);
     });
 
     it('send-recovery-email is identical for known and unknown emails (no enumeration, doc 19)', async () => {
-      expect.assertions(2);
-
       const post = (email: string) =>
         fetch(getTestServerURL('/auth/send-recovery-email'), {
           method: 'POST',
@@ -546,13 +557,11 @@ describe('auth', () => {
       const known = await post(userEmail);
       const unknown = await post('notExists@gmail.com');
 
-      expect(unknown.status).toBe(known.status);
-      expect(await unknown.text()).toBe(await known.text());
+      assert.strictEqual(unknown.status, known.status);
+      assert.strictEqual(await unknown.text(), await known.text());
     });
 
     it('can send recovery to exist email', async () => {
-      expect.assertions(1);
-
       const { status } = await fetch(
         getTestServerURL('/auth/send-recovery-email'),
         {
@@ -566,11 +575,10 @@ describe('auth', () => {
         },
       );
 
-      expect(status).toBe(200);
+      assert.strictEqual(status, 200);
     });
 
     it('send-recovery-email still creates a recovery token for a known user (doc 19)', async () => {
-      expect.assertions(1);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
       const email = 'rec-token@example.com';
       await UserModel.create({
@@ -595,11 +603,10 @@ describe('auth', () => {
           await new Promise((r) => setTimeout(r, 20));
         }
       }
-      expect(count).toBeGreaterThan(0);
+      assert.ok(count > 0);
     });
 
     it('does not log the password hash during recovery (doc 20)', async () => {
-      expect.assertions(2);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
       const created = await UserModel.create({
         email: 'logleak@example.com',
@@ -627,12 +634,11 @@ describe('auth', () => {
       }
 
       const all = captured.join('\n');
-      expect(all).not.toContain(hash);
-      expect(all).not.toContain(token);
+      assert.ok(!all.includes(hash));
+      assert.ok(!all.includes(token));
     });
 
     it('can recover password', async () => {
-      expect.assertions(1);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.create({
@@ -662,11 +668,10 @@ describe('auth', () => {
         },
       );
 
-      expect(status).toBe(200);
+      assert.strictEqual(status, 200);
     });
 
     it('can not recover password with wrong token', async () => {
-      expect.assertions(1);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.create({
@@ -697,12 +702,10 @@ describe('auth', () => {
         },
       );
 
-      expect(status).toBe(400);
+      assert.strictEqual(status, 400);
     });
 
     it('can login with normal creds and NOT verifyed email if option isAuthWithVerificationFlow is set', async () => {
-      expect.assertions(4);
-
       const { status } = await fetch(getTestServerURL('/auth/register'), {
         method: 'POST',
         headers: {
@@ -742,16 +745,14 @@ describe('auth', () => {
 
       const responseBody3 = await response3.json();
 
-      expect(status).toBe(201);
-      expect(status2).toBe(400);
-      expect(response3.status).toBe(200);
-      expect(responseBody3.data.token).toBeDefined();
+      assert.strictEqual(status, 201);
+      assert.strictEqual(status2, 400);
+      assert.strictEqual(response3.status, 200);
+      assert.notStrictEqual(responseBody3.data.token, undefined);
     });
   });
 
   it('can user send verification', async () => {
-    expect.assertions(1);
-
     const { status } = await fetch(
       getTestServerURL('/auth/send-verification'),
       {
@@ -765,12 +766,10 @@ describe('auth', () => {
       },
     );
 
-    expect(status).toBe(200);
+    assert.strictEqual(status, 200);
   });
 
   it('send-verification is identical for known and unknown emails (no enumeration, doc 19)', async () => {
-    expect.assertions(2);
-
     const post = (email: string) =>
       fetch(getTestServerURL('/auth/send-verification'), {
         method: 'POST',
@@ -781,13 +780,12 @@ describe('auth', () => {
     const known = await post(userEmail2);
     const unknown = await post('wrong@gmail.com');
 
-    expect(unknown.status).toBe(known.status);
-    expect(await unknown.text()).toBe(await known.text());
+    assert.strictEqual(unknown.status, known.status);
+    assert.strictEqual(await unknown.text(), await known.text());
   });
 
   describe('logout', () => {
     it('can logout', async () => {
-      expect.assertions(3);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       // 1. Create and verify user
@@ -815,7 +813,7 @@ describe('auth', () => {
       const hasToken = userInDb?.sessionTokens?.some(
         (t) => t.token === hashToken(token),
       );
-      expect(hasToken).toBeTruthy();
+      assert.ok(hasToken);
 
       // 4. Logout
       const logoutResponse = await fetch(getTestServerURL('/auth/logout'), {
@@ -824,18 +822,17 @@ describe('auth', () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      expect(logoutResponse.status).toBe(200);
+      assert.strictEqual(logoutResponse.status, 200);
 
       // 5. Verify token removed
       userInDb = await UserModel.findOne({ email: 'logout@test.com' });
       const hasTokenAfter = userInDb?.sessionTokens?.some(
         (t) => t.token === hashToken(token),
       );
-      expect(hasTokenAfter).toBeFalsy();
+      assert.ok(!hasTokenAfter);
     });
 
     it('can logout with token in the body', async () => {
-      expect.assertions(3);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.create({
@@ -852,24 +849,23 @@ describe('auth', () => {
       const hasToken = userInDb?.sessionTokens?.some(
         (t) => t.token === hashToken(token),
       );
-      expect(hasToken).toBeTruthy();
+      assert.ok(hasToken);
 
       const logoutResponse = await fetch(getTestServerURL('/auth/logout'), {
         method: 'POST',
         headers: { 'Content-type': 'application/json' },
         body: JSON.stringify({ token }),
       });
-      expect(logoutResponse.status).toBe(200);
+      assert.strictEqual(logoutResponse.status, 200);
 
       userInDb = await UserModel.findOne({ email: 'logout-body@test.com' });
       const hasTokenAfter = userInDb?.sessionTokens?.some(
         (t) => t.token === hashToken(token),
       );
-      expect(hasTokenAfter).toBeFalsy();
+      assert.ok(!hasTokenAfter);
     });
 
     it('revokes the body (authenticated) token when both body and header tokens are present', async () => {
-      expect.assertions(3);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
 
       const user = await UserModel.create({
@@ -891,34 +887,31 @@ describe('auth', () => {
         },
         body: JSON.stringify({ token: bodyToken }),
       });
-      expect(logoutResponse.status).toBe(200);
+      assert.strictEqual(logoutResponse.status, 200);
 
       const userInDb = await UserModel.findOne({
         email: 'logout-both@test.com',
       });
-      expect(
-        userInDb?.sessionTokens?.some((t) => t.token === hashToken(bodyToken)),
-      ).toBeFalsy();
-      expect(
+      assert.ok(
+        !userInDb?.sessionTokens?.some((t) => t.token === hashToken(bodyToken)),
+      );
+      assert.ok(
         userInDb?.sessionTokens?.some(
           (t) => t.token === hashToken(headerToken),
         ),
-      ).toBeTruthy();
+      );
     });
 
     it('can logout without token', async () => {
-      expect.assertions(1);
       const response = await fetch(getTestServerURL('/auth/logout'), {
         method: 'POST',
       });
-      expect(response.status).toBe(200);
+      assert.strictEqual(response.status, 200);
     });
   });
 
   describe('rate limiter', () => {
     it('should receive 429 on rate limit exceeded', async () => {
-      expect.assertions(1);
-
       const requests = Array.from({ length: 11 }, () =>
         fetch(getTestServerURL('/auth/logout'), {
           method: 'POST',
@@ -928,7 +921,7 @@ describe('auth', () => {
       const responses = await Promise.all(requests);
       const statusCodes = responses.map((response) => response.status);
 
-      expect(statusCodes).toContain(429);
+      assert.ok(statusCodes.includes(429));
     });
   });
 
@@ -939,7 +932,7 @@ describe('auth', () => {
   describe('concurrent duplicate registration (finding #9)', () => {
     // E11000 only fires when the unique indexes actually exist; boot does not
     // build them in the test DB, so create them explicitly first.
-    beforeAll(async () => {
+    before(async () => {
       const UserModel = appInstance.getModel('User') as unknown as {
         syncIndexes: () => Promise<unknown>;
       };
@@ -953,16 +946,16 @@ describe('auth', () => {
     };
 
     it('maps a raced duplicate-email create to 400, not 500', async () => {
-      expect.assertions(2);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
       const email = 'race-dup-email@test.com';
       await UserModel.create({ email, password: userPassword });
 
       // The existence check reports "free" though the row exists, so `create`
       // reaches the unique email index and throws E11000.
-      const spy = vi
-        .spyOn(UserModel as unknown as SpyableUser, 'getUserByEmail')
-        .mockResolvedValue(null);
+      const spy = mockResolvedValue(
+        mock.method(UserModel as unknown as SpyableUser, 'getUserByEmail'),
+        null,
+      );
       try {
         const response = await fetch(getTestServerURL('/auth/register'), {
           method: 'POST',
@@ -970,15 +963,17 @@ describe('auth', () => {
           body: JSON.stringify({ email, password: userPassword }),
         });
         const body = (await response.json()) as { message?: string };
-        expect(response.status).toBe(400);
-        expect(body.message).toBe('User with such an email already registered');
+        assert.strictEqual(response.status, 400);
+        assert.strictEqual(
+          body.message,
+          'User with such an email already registered',
+        );
       } finally {
-        spy.mockRestore();
+        spy.mock.restore();
       }
     });
 
     it('maps a raced duplicate-nick create to 400, not 500', async () => {
-      expect.assertions(2);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
       const nickName = 'raceDupNick';
       await UserModel.create({
@@ -989,9 +984,10 @@ describe('auth', () => {
 
       // `findOne` backs both existence checks; mocking it null lets a genuinely
       // new email through while the pre-existing nick still collides in `create`.
-      const spy = vi
-        .spyOn(UserModel as unknown as SpyableUser, 'findOne')
-        .mockResolvedValue(null);
+      const spy = mockResolvedValue(
+        mock.method(UserModel as unknown as SpyableUser, 'findOne'),
+        null,
+      );
       try {
         const response = await fetch(getTestServerURL('/auth/register'), {
           method: 'POST',
@@ -1003,15 +999,17 @@ describe('auth', () => {
           }),
         });
         const body = (await response.json()) as { message?: string };
-        expect(response.status).toBe(400);
-        expect(body.message).toBe('User with such nickname already exists');
+        assert.strictEqual(response.status, 400);
+        assert.strictEqual(
+          body.message,
+          'User with such nickname already exists',
+        );
       } finally {
-        spy.mockRestore();
+        spy.mock.restore();
       }
     });
 
     it('does NOT swallow a duplicate on any other index (stays 500)', async () => {
-      expect.assertions(1);
       const UserModel = appInstance.getModel('User') as unknown as TUser;
       // A future unique index (not email/nick) is not one of the register form's
       // known conflicts, so its E11000 must propagate to the generic 500 — never
@@ -1021,12 +1019,14 @@ describe('auth', () => {
         keyPattern: { tenantId: 1 },
         keyValue: { tenantId: 'acme' },
       });
-      const emailSpy = vi
-        .spyOn(UserModel as unknown as SpyableUser, 'getUserByEmail')
-        .mockResolvedValue(null);
-      const createSpy = vi
-        .spyOn(UserModel as unknown as SpyableUser, 'create')
-        .mockRejectedValue(foreignDup);
+      const emailSpy = mockResolvedValue(
+        mock.method(UserModel as unknown as SpyableUser, 'getUserByEmail'),
+        null,
+      );
+      const createSpy = mockRejectedValue(
+        mock.method(UserModel as unknown as SpyableUser, 'create'),
+        foreignDup,
+      );
       try {
         const response = await fetch(getTestServerURL('/auth/register'), {
           method: 'POST',
@@ -1036,10 +1036,10 @@ describe('auth', () => {
             password: userPassword,
           }),
         });
-        expect(response.status).toBe(500);
+        assert.strictEqual(response.status, 500);
       } finally {
-        emailSpy.mockRestore();
-        createSpy.mockRestore();
+        emailSpy.mock.restore();
+        createSpy.mock.restore();
       }
     });
   });

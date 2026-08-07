@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import {
+  assertMatches,
+  assertThrowsLike,
+  pattern,
+} from '../../../tests/assertions.ts';
 import type { HandlerEntry, MiddlewareEntry, RouteNode } from './RouteNode.ts';
 import { createNode, RouteRegistry } from './RouteRegistry.ts';
 
@@ -17,15 +23,15 @@ describe('RouteRegistry — case-folded static segments (doc 23)', () => {
     r.registerRoute('GET', '/Admin', { handler: noop });
     r.registerRoute('POST', '/admin', { handler: noop2 });
 
-    expect(r.root.children.size).toBe(1); // one node, not two
-    expect(r.match('GET', '/admin')?.entry?.handler).toBe(noop);
-    expect(r.match('POST', '/Admin')?.entry?.handler).toBe(noop2);
+    assert.strictEqual(r.root.children.size, 1); // one node, not two
+    assert.strictEqual(r.match('GET', '/admin')?.entry?.handler, noop);
+    assert.strictEqual(r.match('POST', '/Admin')?.entry?.handler, noop2);
   });
 
   it('throws when the same method is registered under a case-only-different segment', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/Admin', { handler: noop });
-    expect(() => r.registerRoute('GET', '/admin', { handler: noop })).toThrow();
+    assertThrowsLike(() => r.registerRoute('GET', '/admin', { handler: noop }));
   });
 });
 
@@ -33,27 +39,30 @@ describe('RouteRegistry — registerRoute', () => {
   it('registers a flat route and matches it', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users', { handler: noop });
-    expect(r.match('GET', '/users')?.entry?.handler).toBe(noop);
+    assert.strictEqual(r.match('GET', '/users')?.entry?.handler, noop);
   });
 
   it('throws on duplicate method+path', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users', { handler: noop });
-    expect(() => r.registerRoute('GET', '/users', { handler: noop })).toThrow();
+    assertThrowsLike(() => r.registerRoute('GET', '/users', { handler: noop }));
   });
 
   it('different methods on the same path coexist', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users', { handler: noop });
     r.registerRoute('POST', '/users', { handler: noop });
-    expect(r.match('GET', '/users')?.entry?.handler).toBe(noop);
-    expect(r.match('POST', '/users')?.entry?.handler).toBe(noop);
+    assert.strictEqual(r.match('GET', '/users')?.entry?.handler, noop);
+    assert.strictEqual(r.match('POST', '/users')?.entry?.handler, noop);
   });
 
   it('builds intermediate nodes when path is deep', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/admin/users/profile', { handler: noop });
-    expect(r.match('GET', '/admin/users/profile')?.entry?.handler).toBe(noop);
+    assert.strictEqual(
+      r.match('GET', '/admin/users/profile')?.entry?.handler,
+      noop,
+    );
   });
 });
 
@@ -77,7 +86,7 @@ describe('RouteRegistry — registerSubtree', () => {
     };
     r.registerSubtree('/auth', subtree);
 
-    expect(r.match('POST', '/auth/login')?.entry?.handler).toBe(noop);
+    assert.strictEqual(r.match('POST', '/auth/login')?.entry?.handler, noop);
   });
 
   it('accumulates middlewares from root → subtree → leaf', () => {
@@ -104,12 +113,10 @@ describe('RouteRegistry — registerSubtree', () => {
     r.registerSubtree('/auth', subtree);
 
     const m = r.match('POST', '/auth/login');
-    expect(m?.middlewares.map((entry) => entry.Class.name)).toEqual([
-      'Global',
-      'Subtree',
-      'Leaf',
-      'HandlerLevel',
-    ]);
+    assert.deepStrictEqual(
+      m?.middlewares.map((entry) => entry.Class.name),
+      ['Global', 'Subtree', 'Leaf', 'HandlerLevel'],
+    );
   });
 
   it('merges into existing node when prefix already has a registration', () => {
@@ -133,11 +140,12 @@ describe('RouteRegistry — registerSubtree', () => {
     };
     r.registerSubtree('/admin', adminSub);
 
-    expect(r.match('GET', '/admin/users')?.entry?.handler).toBe(noop);
-    expect(r.match('GET', '/admin/settings')?.entry?.handler).toBe(noop);
-    expect(
+    assert.strictEqual(r.match('GET', '/admin/users')?.entry?.handler, noop);
+    assert.strictEqual(r.match('GET', '/admin/settings')?.entry?.handler, noop);
+    assert.deepStrictEqual(
       r.match('GET', '/admin/settings')?.middlewares.map((m) => m.Class.name),
-    ).toEqual(['AdminAuth']);
+      ['AdminAuth'],
+    );
   });
 
   it('ad-hoc registerRoute then registerSubtree on overlapping prefix — subtree mw applies to the prior route', () => {
@@ -154,9 +162,10 @@ describe('RouteRegistry — registerSubtree', () => {
     };
     r.registerSubtree('/admin', adminSub);
 
-    expect(
+    assert.deepStrictEqual(
       r.match('GET', '/admin/users')?.middlewares.map((m) => m.Class.name),
-    ).toEqual(['AdminAuth']);
+      ['AdminAuth'],
+    );
   });
 
   it('throws on conflicting handler on the same node', () => {
@@ -178,15 +187,15 @@ describe('RouteRegistry — registerSubtree', () => {
         ],
       ]),
     };
-    expect(() => r.registerSubtree('/', conflict)).toThrow();
+    assertThrowsLike(() => r.registerSubtree('/', conflict));
   });
 
   it('throws on conflicting param segment names (same method)', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users/:id', { handler: noop });
-    expect(() =>
+    assertThrowsLike(() =>
       r.registerRoute('GET', '/users/:userId', { handler: noop }),
-    ).toThrow();
+    );
   });
 
   it('different param names for different methods at the same position', () => {
@@ -198,10 +207,10 @@ describe('RouteRegistry — registerSubtree', () => {
     r.registerRoute('POST', '/:event', { handler: postHandler });
 
     const putMatch = r.match('PUT', '/my-value');
-    expect(putMatch?.params).toEqual({ slug: 'my-value' });
+    assert.deepStrictEqual(putMatch?.params, { slug: 'my-value' });
 
     const postMatch = r.match('POST', '/my-value');
-    expect(postMatch?.params).toEqual({ event: 'my-value' });
+    assert.deepStrictEqual(postMatch?.params, { event: 'my-value' });
   });
 
   it('flatten gives BOTH differently-named param siblings the accumulated chain', () => {
@@ -233,8 +242,8 @@ describe('RouteRegistry — registerSubtree', () => {
         .flatten()
         .map((f) => [f.method, f.middlewares.map((m) => m.Class.name)]),
     );
-    expect(byMethod.PUT).toEqual(['GetUserByToken', 'Auth']);
-    expect(byMethod.POST).toEqual(['GetUserByToken', 'Auth']);
+    assert.deepStrictEqual(byMethod.PUT, ['GetUserByToken', 'Auth']);
+    assert.deepStrictEqual(byMethod.POST, ['GetUserByToken', 'Auth']);
   });
 
   it('different param names at multiple depths', () => {
@@ -247,10 +256,10 @@ describe('RouteRegistry — registerSubtree', () => {
     });
 
     const putMatch = r.match('PUT', '/foo/bar');
-    expect(putMatch?.params).toEqual({ model: 'foo', slug: 'bar' });
+    assert.deepStrictEqual(putMatch?.params, { model: 'foo', slug: 'bar' });
 
     const postMatch = r.match('POST', '/foo/bar');
-    expect(postMatch?.params).toEqual({ type: 'foo', event: 'bar' });
+    assert.deepStrictEqual(postMatch?.params, { type: 'foo', event: 'bar' });
   });
 
   it('prepends mount params through static, param, and splat descendants', () => {
@@ -287,19 +296,24 @@ describe('RouteRegistry — registerSubtree', () => {
 
     r.registerSubtree('/:tenant', subtree);
 
-    expect(r.match('GET', '/acme/fixed')?.params).toEqual({
+    assert.deepStrictEqual(r.match('GET', '/acme/fixed')?.params, {
       tenant: 'acme',
       fixedId: undefined,
     });
-    expect(r.match('POST', '/acme/widget')?.params).toEqual({
+    assert.deepStrictEqual(r.match('POST', '/acme/widget')?.params, {
       tenant: 'acme',
       item: 'widget',
     });
-    expect(r.match('PUT', '/acme/a/b')?.params).toEqual({
+    assert.deepStrictEqual(r.match('PUT', '/acme/a/b')?.params, {
       tenant: 'acme',
       rest: 'a/b',
     });
-    expect(r.flatten().map((entry) => entry.path)).toContain('/:tenant/*rest');
+    assert.ok(
+      r
+        .flatten()
+        .map((entry) => entry.path)
+        .includes('/:tenant/*rest'),
+    );
   });
 
   it('merges splat subtrees and ignores sparse method entries', () => {
@@ -344,10 +358,13 @@ describe('RouteRegistry — registerSubtree', () => {
 
     r.registerSubtree('/api', subtree);
 
-    expect(r.match('GET', '/api/one')?.entry.handler).toBe(noop);
-    expect(r.match('POST', '/api/one')?.entry.handler).toBe(noop);
-    expect(r.match('GET', '/api/sparse')?.entry.handler).toBe(noop);
-    expect(r.flatten().some((entry) => entry.method === 'DELETE')).toBe(false);
+    assert.strictEqual(r.match('GET', '/api/one')?.entry.handler, noop);
+    assert.strictEqual(r.match('POST', '/api/one')?.entry.handler, noop);
+    assert.strictEqual(r.match('GET', '/api/sparse')?.entry.handler, noop);
+    assert.strictEqual(
+      r.flatten().some((entry) => entry.method === 'DELETE'),
+      false,
+    );
   });
 });
 
@@ -359,8 +376,8 @@ describe('RouteRegistry — flatten', () => {
     r.registerRoute('GET', '/posts', { handler: noop });
 
     const flat = r.flatten();
-    expect(flat).toHaveLength(3);
-    expect(flat.map((f) => `${f.method} ${f.path}`).sort()).toEqual([
+    assert.strictEqual(flat.length, 3);
+    assert.deepStrictEqual(flat.map((f) => `${f.method} ${f.path}`).sort(), [
       'GET /posts',
       'GET /users',
       'POST /users',
@@ -389,11 +406,11 @@ describe('RouteRegistry — flatten', () => {
     r.registerSubtree('/admin', subtree);
 
     const flat = r.flatten();
-    expect(flat).toHaveLength(1);
-    expect(flat[0]?.middlewares.map((m) => m.Class.name)).toEqual([
-      'Global',
-      'Admin',
-    ]);
+    assert.strictEqual(flat.length, 1);
+    assert.deepStrictEqual(
+      flat[0]?.middlewares.map((m) => m.Class.name),
+      ['Global', 'Admin'],
+    );
   });
 
   it('inherits bodyParsing leaf-wins', () => {
@@ -417,7 +434,7 @@ describe('RouteRegistry — flatten', () => {
     r.registerSubtree('/webhooks', subtree);
 
     const flat = r.flatten();
-    expect(flat[0]?.bodyParsing).toBe('raw');
+    assert.strictEqual(flat[0]?.bodyParsing, 'raw');
   });
 });
 
@@ -431,8 +448,9 @@ describe('RouteRegistry — walk', () => {
     r.walk((_node, fullPath) => {
       visited.push(fullPath);
     });
-    expect(visited).toEqual(
-      expect.arrayContaining(['/', '/admin', '/admin/users', '/admin/posts']),
+    assertMatches(
+      visited,
+      pattern.arrayContaining(['/', '/admin', '/admin/users', '/admin/posts']),
     );
   });
 
@@ -445,8 +463,9 @@ describe('RouteRegistry — walk', () => {
     r.walk((_node, fullPath) => {
       visited.push(fullPath);
     });
-    expect(visited).toEqual(
-      expect.arrayContaining(['/users', '/users/:id', '/api', '/api/*rest']),
+    assertMatches(
+      visited,
+      pattern.arrayContaining(['/users', '/users/:id', '/api', '/api/*rest']),
     );
   });
 });
@@ -457,27 +476,28 @@ describe('RouteRegistry — registerRoute with splat / param syntax', () => {
     r.registerRoute('GET', '/api/*rest', { handler: noop });
 
     const m = r.match('GET', '/api/v1/users/42');
-    expect(m?.entry?.handler).toBe(noop);
-    expect(m?.params).toEqual({ rest: 'v1/users/42' });
+    assert.strictEqual(m?.entry?.handler, noop);
+    assert.deepStrictEqual(m?.params, { rest: 'v1/users/42' });
   });
 
   it('registers OPTIONS handler', () => {
     const r = new RouteRegistry();
     r.registerRoute('OPTIONS', '/users', { handler: noop });
-    expect(r.match('OPTIONS', '/users')?.entry?.handler).toBe(noop);
+    assert.strictEqual(r.match('OPTIONS', '/users')?.entry?.handler, noop);
   });
 
   it('a path more specific than registered returns null (404)', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users/me', { handler: noop });
-    expect(r.match('GET', '/users/me/extra')).toBeNull();
+    assert.strictEqual(r.match('GET', '/users/me/extra'), null);
   });
 
   it('throws when registering routes nested under a splat segment', () => {
     const r = new RouteRegistry();
-    expect(() =>
-      r.registerRoute('GET', '/api/*rest/foo', { handler: noop }),
-    ).toThrow(/cannot register a child segment.*under a splat segment/);
+    assertThrowsLike(
+      () => r.registerRoute('GET', '/api/*rest/foo', { handler: noop }),
+      /cannot register a child segment.*under a splat segment/,
+    );
   });
 });
 
@@ -500,15 +520,12 @@ describe('RouteRegistry — subtree composition (the P1b test plan check)', () =
     r.registerSubtree('/admin', adminSubtree);
 
     const m = r.match('GET', '/admin/users/123');
-    expect(m).not.toBeNull();
-    expect(m?.params).toEqual({ id: '123' });
-    expect(m?.middlewares.map((entry) => entry.Class.name)).toEqual([
-      'GlobalA',
-      'GlobalB',
-      'AdminAuth',
-      'UsersScope',
-      'PerHandler',
-    ]);
+    assert.notStrictEqual(m, null);
+    assert.deepStrictEqual(m?.params, { id: '123' });
+    assert.deepStrictEqual(
+      m?.middlewares.map((entry) => entry.Class.name),
+      ['GlobalA', 'GlobalB', 'AdminAuth', 'UsersScope', 'PerHandler'],
+    );
   });
 });
 
@@ -540,12 +557,12 @@ describe('RouteRegistry — per-method paramNames via registerSubtree + mergeNod
     r.registerSubtree('/api', subtreeB);
 
     const getMatch = r.match('GET', '/api/hello');
-    expect(getMatch?.entry?.handler).toBe(getHandler);
-    expect(getMatch?.params).toEqual({ id: 'hello' });
+    assert.strictEqual(getMatch?.entry?.handler, getHandler);
+    assert.deepStrictEqual(getMatch?.params, { id: 'hello' });
 
     const postMatch = r.match('POST', '/api/hello');
-    expect(postMatch?.entry?.handler).toBe(postHandler);
-    expect(postMatch?.params).toEqual({ slug: 'hello' });
+    assert.strictEqual(postMatch?.entry?.handler, postHandler);
+    assert.deepStrictEqual(postMatch?.params, { slug: 'hello' });
   });
 
   it('two subtrees with different param names at depth 1, different static children at depth 2', () => {
@@ -581,12 +598,12 @@ describe('RouteRegistry — per-method paramNames via registerSubtree + mergeNod
     r.registerSubtree('/api', subtreeB);
 
     const putMatch = r.match('PUT', '/api/my-article/details');
-    expect(putMatch?.entry?.handler).toBe(putHandler);
-    expect(putMatch?.params).toEqual({ slug: 'my-article' });
+    assert.strictEqual(putMatch?.entry?.handler, putHandler);
+    assert.deepStrictEqual(putMatch?.params, { slug: 'my-article' });
 
     const postMatch = r.match('POST', '/api/my-event/info');
-    expect(postMatch?.entry?.handler).toBe(postHandler);
-    expect(postMatch?.params).toEqual({ event: 'my-event' });
+    assert.strictEqual(postMatch?.entry?.handler, postHandler);
+    assert.deepStrictEqual(postMatch?.params, { event: 'my-event' });
   });
 
   it('merged param nodes: 405 still lists all methods from both controllers', () => {
@@ -610,9 +627,10 @@ describe('RouteRegistry — per-method paramNames via registerSubtree + mergeNod
 
     // DELETE should 405 with allowed methods listing both GET and POST
     const deleteMatch = r.match('DELETE', '/api/hello');
-    expect(deleteMatch?.entry).toBeNull();
-    expect(deleteMatch?.allowedMethods).toEqual(
-      expect.arrayContaining(['GET', 'POST']),
+    assert.strictEqual(deleteMatch?.entry, null);
+    assertMatches(
+      deleteMatch?.allowedMethods,
+      pattern.arrayContaining(['GET', 'POST']),
     );
   });
 });

@@ -11,7 +11,9 @@
  *     constructs simply aren't class/import nodes, so nothing can mistake them.
  */
 
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertTextMatch } from '../tests/assertions.ts';
 import { extractController } from './astExtract.ts';
 
 const extract = (src: string) => extractController(src, 'Ctrl.ts');
@@ -25,70 +27,81 @@ import type { T } from './t.js';
 import { type TO } from './n.js';
 export default class C extends Def {}
 `);
-    expect(ex.imports.Def).toEqual({ specifier: './d.js', kind: 'default' });
-    expect(ex.imports.Named).toEqual({ specifier: './n.js', kind: 'named' });
-    expect(ex.imports.Alias).toEqual({
+    assert.deepStrictEqual(ex.imports.Def, {
+      specifier: './d.js',
+      kind: 'default',
+    });
+    assert.deepStrictEqual(ex.imports.Named, {
+      specifier: './n.js',
+      kind: 'named',
+    });
+    assert.deepStrictEqual(ex.imports.Alias, {
       specifier: './n.js',
       kind: 'named',
       orig: 'Orig',
     });
-    expect(ex.imports.NS).toEqual({ specifier: './ns.js', kind: 'namespace' });
-    expect(ex.imports.T).toBeUndefined(); // type-only import
-    expect(ex.imports.TO).toBeUndefined(); // inline type-only specifier
+    assert.deepStrictEqual(ex.imports.NS, {
+      specifier: './ns.js',
+      kind: 'namespace',
+    });
+    assert.strictEqual(ex.imports.T, undefined); // type-only import
+    assert.strictEqual(ex.imports.TO, undefined); // inline type-only specifier
   });
 });
 
 describe('astExtract — exported class + extends', () => {
   it('resolves `export default class X extends Y`', () => {
     const ex = extract('export default class Ctrl extends Base {}');
-    expect(ex.className).toBe('Ctrl');
-    expect(ex.extendsName).toBe('Base');
+    assert.strictEqual(ex.className, 'Ctrl');
+    assert.strictEqual(ex.extendsName, 'Base');
   });
 
   it('resolves `class X extends Y {}` then `export default X`', () => {
     const ex = extract('class Ctrl extends Base {}\nexport default Ctrl;');
-    expect(ex.extendsName).toBe('Base');
+    assert.strictEqual(ex.extendsName, 'Base');
   });
 
   it('resolves `export class X extends Y`', () => {
     const ex = extract('export class Ctrl extends Base {}');
-    expect(ex.extendsName).toBe('Base');
+    assert.strictEqual(ex.extendsName, 'Base');
   });
 
   it('returns null when the exported class has no extends', () => {
     const ex = extract('export default class Ctrl {}');
-    expect(ex.extendsName).toBeNull();
+    assert.strictEqual(ex.extendsName, null);
   });
 
   it('follows the EXPORTED class, not a helper declared first', () => {
     const ex = extract(`class Helper extends Wrong {}
 export default class Ctrl extends Right {}`);
-    expect(ex.extendsName).toBe('Right');
+    assert.strictEqual(ex.extendsName, 'Right');
   });
 
   it('follows `export { Ctrl as default }`, not a trailing helper class', () => {
     const ex = extract(`class Ctrl extends Right {}
 class Helper extends Wrong {}
 export { Ctrl as default };`);
-    expect(ex.className).toBe('Ctrl');
-    expect(ex.extendsName).toBe('Right');
+    assert.strictEqual(ex.className, 'Ctrl');
+    assert.strictEqual(ex.extendsName, 'Right');
   });
 
   it('follows the string-literal form `export { Ctrl as "default" }` (ES2022)', () => {
     const ex = extract(`class Ctrl extends Right {}
 class Helper extends Wrong {}
 export { Ctrl as "default" };`);
-    expect(ex.className).toBe('Ctrl');
-    expect(ex.extendsName).toBe('Right');
+    assert.strictEqual(ex.className, 'Ctrl');
+    assert.strictEqual(ex.extendsName, 'Right');
   });
 
   it('returns null for a qualified / mixin parent (documented residual)', () => {
-    expect(
+    assert.strictEqual(
       extract('export default class C extends ns.Base {}').extendsName,
-    ).toBeNull();
-    expect(
+      null,
+    );
+    assert.strictEqual(
       extract('export default class C extends mixin(Base) {}').extendsName,
-    ).toBeNull();
+      null,
+    );
   });
 });
 
@@ -101,14 +114,20 @@ describe('astExtract — routes', () => {
       const ex = extract(`export default class C extends B {
   get routes() { return { get: { '/ping': this.ping } } ${wrap}; }
 }`);
-      expect(ex.ok, wrap).toBe(true);
-      expect(ex.routes.map((r) => r.path)).toEqual(['/ping']);
+      assert.strictEqual(ex.ok, true, wrap);
+      assert.deepStrictEqual(
+        ex.routes.map((r) => r.path),
+        ['/ping'],
+      );
     }
     const paren = extract(`export default class C extends B {
   get routes() { return ({ get: { '/ping': this.ping } }); }
 }`);
-    expect(paren.ok).toBe(true);
-    expect(paren.routes.map((r) => r.path)).toEqual(['/ping']);
+    assert.strictEqual(paren.ok, true);
+    assert.deepStrictEqual(
+      paren.routes.map((r) => r.path),
+      ['/ping'],
+    );
   });
 
   it('reads bare-handler, request, and query route entries', () => {
@@ -123,8 +142,8 @@ describe('astExtract — routes', () => {
     };
   }
 }`);
-    expect(ex.ok).toBe(true);
-    expect(ex.routes).toEqual([
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(ex.routes, [
       {
         method: 'post',
         path: '/login',
@@ -157,9 +176,9 @@ describe('astExtract — routes', () => {
     };
   }
 }`);
-    expect(ex.ok).toBe(true);
-    expect(ex.routes[0]?.hasRequest).toBe(true);
-    expect(ex.routes[0]?.requestContentTypes).toEqual([
+    assert.strictEqual(ex.ok, true);
+    assert.strictEqual(ex.routes[0]?.hasRequest, true);
+    assert.deepStrictEqual(ex.routes[0]?.requestContentTypes, [
       'application/json',
       'multipart/form-data',
     ]);
@@ -169,8 +188,8 @@ describe('astExtract — routes', () => {
     const ex = extract(`export default class C extends B {
   get routes() { return { get: { '/': { handler: this.r, middleware: [Mw, [Other, { x: 1 }]] } } }; }
 }`);
-    expect(ex.ok).toBe(true);
-    expect(ex.routes[0]?.middleware).toEqual(['Mw', 'Other']);
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(ex.routes[0]?.middleware, ['Mw', 'Other']);
   });
 
   it('allows initialized const config reads before a literal route return', () => {
@@ -188,8 +207,8 @@ describe('astExtract — routes', () => {
   }
 }`);
 
-    expect(ex.ok).toBe(true);
-    expect(ex.routes).toEqual([
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(ex.routes, [
       {
         method: 'post',
         path: '/',
@@ -209,8 +228,8 @@ describe('astExtract — routes', () => {
   }
 }`);
 
-    expect(ex.ok).toBe(false);
-    expect(ex.reason).toMatch(/optional `const` setup/);
+    assert.strictEqual(ex.ok, false);
+    assertTextMatch(ex.reason, /optional `const` setup/);
   });
 
   it('still rejects non-const setup statements before a literal route return', () => {
@@ -226,8 +245,8 @@ describe('astExtract — routes', () => {
     return { post: { '/': this.create } };
   }
 }`);
-      expect(ex.ok, setup).toBe(false);
-      expect(ex.reason, setup).toMatch(/optional `const` setup/);
+      assert.strictEqual(ex.ok, false, setup);
+      assertTextMatch(ex.reason, /optional `const` setup/, setup);
     }
   });
 
@@ -246,13 +265,16 @@ describe('astExtract — routes', () => {
     return { post: { '/message': { handler: this.message, middleware: ${middleware} } } };
   }
 }`);
-      expect(
+      assert.strictEqual(
         ex.ok,
+        true,
         `${middleware}: ${ex.reason ?? 'no extraction error'}`,
-      ).toBe(true);
-      expect(ex.routes[0]?.middleware, middleware).toEqual([
-        middleware === '[Auth]' ? 'Auth' : 'RateLimiter',
-      ]);
+      );
+      assert.deepStrictEqual(
+        ex.routes[0]?.middleware,
+        [middleware === '[Auth]' ? 'Auth' : 'RateLimiter'],
+        middleware,
+      );
     }
   });
 
@@ -261,9 +283,11 @@ describe('astExtract — routes', () => {
       const ex = extract(`export default class C extends B {
   get routes() { return { get: { '/': { handler: this.r, middleware: ${middleware} } } }; }
 }`);
-      expect(ex.ok, middleware).toBe(false);
-      expect(ex.reason, middleware).toMatch(
+      assert.strictEqual(ex.ok, false, middleware);
+      assertTextMatch(
+        ex.reason,
         /unanalyzable route-level middleware/,
+        middleware,
       );
     }
   });
@@ -272,17 +296,17 @@ describe('astExtract — routes', () => {
     const ex = extract(`export default class C extends B {
   get routes() { return { post: { '/x': { handler: this.x, request: { a: s() } } } }; }
 }`);
-    expect(ex.ok).toBe(true);
-    expect(ex.routes[0]?.hasRequest).toBe(true);
-    expect(ex.routes[0]?.requestContentTypes).toBeUndefined();
+    assert.strictEqual(ex.ok, true);
+    assert.strictEqual(ex.routes[0]?.hasRequest, true);
+    assert.strictEqual(ex.routes[0]?.requestContentTypes, undefined);
   });
 
   it('flags a request map with computed keys as unanalyzable', () => {
     const ex = extract(`export default class C extends B {
   get routes() { return { post: { '/x': { handler: this.x, request: { [k]: s() } } } }; }
 }`);
-    expect(ex.ok).toBe(false);
-    expect(ex.reason).toMatch(/computed\/spread/);
+    assert.strictEqual(ex.ok, false);
+    assertTextMatch(ex.reason, /computed\/spread/);
   });
 
   it('rejects a route with no identifiable handler (shorthand / optional chain / absent)', () => {
@@ -296,8 +320,8 @@ describe('astExtract — routes', () => {
       const ex = extract(`export default class C extends B {
   get routes() { return { get: { '/x': ${entry} } }; }
 }`);
-      expect(ex.ok, entry).toBe(false);
-      expect(ex.reason, entry).toMatch(/no identifiable handler/);
+      assert.strictEqual(ex.ok, false, entry);
+      assertTextMatch(ex.reason, /no identifiable handler/, entry);
     }
   });
 
@@ -305,8 +329,8 @@ describe('astExtract — routes', () => {
     const ex = extract(`export default class C extends B {
   get routes() { return { get: { '/x': { ...defaults, handler: this.x } } }; }
 }`);
-    expect(ex.ok).toBe(false);
-    expect(ex.reason).toMatch(/spread in the route entry/);
+    assert.strictEqual(ex.ok, false);
+    assertTextMatch(ex.reason, /spread in the route entry/);
   });
 
   it('flags a dynamic routes getter as needsBoot but still extracts middleware', () => {
@@ -320,9 +344,11 @@ describe('astExtract — routes', () => {
     return new Map([['/{*splat}', [Mw]]]);
   }
 }`);
-    expect(ex.ok).toBe(false);
-    expect(ex.reason).toMatch(/routes getter not a literal/);
-    expect(ex.middleware).toEqual([{ scope: '/{*splat}', bindings: ['Mw'] }]);
+    assert.strictEqual(ex.ok, false);
+    assertTextMatch(ex.reason, /routes getter not a literal/);
+    assert.deepStrictEqual(ex.middleware, [
+      { scope: '/{*splat}', bindings: ['Mw'] },
+    ]);
   });
 });
 
@@ -333,7 +359,7 @@ describe('astExtract — middleware', () => {
     return new Map([['/{*splat}', [GetUserByToken, Auth]], ['POST/', [RateLimiter]]]);
   }
 }`);
-    expect(ex.middleware).toEqual([
+    assert.deepStrictEqual(ex.middleware, [
       { scope: '/{*splat}', bindings: ['GetUserByToken', 'Auth'] },
       { scope: 'POST/', bindings: ['RateLimiter'] },
     ]);
@@ -343,15 +369,15 @@ describe('astExtract — middleware', () => {
     const ex = extract(`export default class C extends B {
   static get middleware() { return new Map(); }
 }`);
-    expect(ex.ok).toBe(true);
-    expect(ex.middleware).toEqual([]);
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(ex.middleware, []);
   });
 
   it('reads a `[Mw, params]` tuple as its binding', () => {
     const ex = extract(`export default class C extends B {
   static get middleware() { return new Map([['/{*splat}', [[RateLimiter, { max: 5 }]]]]); }
 }`);
-    expect(ex.middleware).toEqual([
+    assert.deepStrictEqual(ex.middleware, [
       { scope: '/{*splat}', bindings: ['RateLimiter'] },
     ]);
   });
@@ -368,8 +394,8 @@ describe('astExtract — middleware', () => {
     ] as const));
   }
 }`);
-    expect(ex.ok).toBe(true);
-    expect(ex.middleware).toEqual([
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(ex.middleware, [
       {
         scope: '/{*splat}',
         bindings: ['Auth', 'RateLimiter', 'Other'],
@@ -392,8 +418,8 @@ describe('astExtract — middleware', () => {
       const ex = extract(`export default class C extends B {
   static get middleware() { return new Map([['/', ${list}]]); }
 }`);
-      expect(ex.ok, list).toBe(false);
-      expect(ex.reason, list).toMatch(reason);
+      assert.strictEqual(ex.ok, false, list);
+      assertTextMatch(ex.reason, reason, list);
     }
   });
 
@@ -401,21 +427,21 @@ describe('astExtract — middleware', () => {
     const ex = extract(
       'export default class C extends B { get routes() { return {}; } }',
     );
-    expect(ex.ok).toBe(true);
-    expect(ex.middleware).toBeUndefined();
+    assert.strictEqual(ex.ok, true);
+    assert.strictEqual(ex.middleware, undefined);
     // No getter here → NOT dynamic (so the walk keeps inheriting from above).
-    expect(ex.middlewareDynamic).toBe(false);
+    assert.strictEqual(ex.middlewareDynamic, false);
   });
 
   it('flags a dynamic middleware getter as needsBoot + sets middlewareDynamic', () => {
     const ex = extract(`export default class C extends B {
   static get middleware() { return buildMap(); }
 }`);
-    expect(ex.ok).toBe(false);
-    expect(ex.reason).toMatch(/middleware getter not a literal Map/);
+    assert.strictEqual(ex.ok, false);
+    assertTextMatch(ex.reason, /middleware getter not a literal Map/);
     // The flag lets the extends-walk tell "non-literal getter here" apart from
     // "no getter here" (which inherits) — see astResolve's ancestor handling.
-    expect(ex.middlewareDynamic).toBe(true);
+    assert.strictEqual(ex.middlewareDynamic, true);
   });
 });
 
@@ -424,7 +450,7 @@ describe('astExtract — lexical robustness (free with a real parser)', () => {
     const ex = extract(`import Right from './r.js';
 const re = /export default class Z extends Wrong/;
 export default class Ctrl extends Right {}`);
-    expect(ex.extendsName).toBe('Right');
+    assert.strictEqual(ex.extendsName, 'Right');
   });
 
   it('a commented-out import never enters the import map', () => {
@@ -432,16 +458,16 @@ export default class Ctrl extends Right {}`);
 // import Decoy from './decoy.js';
 /** @example import Decoy from './jsdoc.js'; */
 export default class Ctrl extends Real {}`);
-    expect(ex.imports.Real).toBeDefined();
-    expect(ex.imports.Decoy).toBeUndefined();
+    assert.notStrictEqual(ex.imports.Real, undefined);
+    assert.strictEqual(ex.imports.Decoy, undefined);
   });
 
   it('semicolon-less (ASI) imports are all parsed', () => {
     const ex = extract(`import A from './a.js'
 import B from './b.js'
 export default class Ctrl extends A {}`);
-    expect(ex.imports.A?.specifier).toBe('./a.js');
-    expect(ex.imports.B?.specifier).toBe('./b.js');
+    assert.strictEqual(ex.imports.A?.specifier, './a.js');
+    assert.strictEqual(ex.imports.B?.specifier, './b.js');
   });
 });
 
@@ -450,25 +476,25 @@ describe('astExtract — silent-wrong-type guards (doc 07)', () => {
     const ex = extract(
       `export default class Ctrl { get routes() { return { gett: { '/x': this.h } }; } }`,
     );
-    expect(ex.ok).toBe(false);
-    expect(ex.reason).toContain('unknown HTTP verb "gett"');
+    assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason.includes('unknown HTTP verb "gett"'));
   });
 
   it('treats `request: null` as no schema (not InferOutput<null>)', () => {
     const ex = extract(
       `export default class Ctrl { get routes() { return { post: { '/x': { handler: this.h, request: null } } }; } }`,
     );
-    expect(ex.ok).toBe(true);
-    expect(ex.routes[0]?.hasRequest).toBe(false);
+    assert.strictEqual(ex.ok, true);
+    assert.strictEqual(ex.routes[0]?.hasRequest, false);
   });
 
   it('dedupes duplicate route keys last-wins (no duplicate push)', () => {
     const ex = extract(
       `export default class Ctrl { get routes() { return { get: { '/x': { handler: this.first }, '/x': { handler: this.second } } }; } }`,
     );
-    expect(ex.ok).toBe(true);
-    expect(ex.routes).toHaveLength(1);
-    expect(ex.routes[0]?.handler).toBe('second');
+    assert.strictEqual(ex.ok, true);
+    assert.strictEqual(ex.routes.length, 1);
+    assert.strictEqual(ex.routes[0]?.handler, 'second');
   });
 
   it('records local class declarations and their export status', () => {
@@ -477,8 +503,8 @@ describe('astExtract — silent-wrong-type guards (doc 07)', () => {
 export class ExportedMw {}
 export default class Ctrl { get routes() { return { get: { '/': this.h } }; } }`,
     );
-    expect(ex.localClasses.LocalMw).toBe(false);
-    expect(ex.localClasses.ExportedMw).toBe(true);
-    expect(ex.localClasses.Ctrl).toBe(true);
+    assert.strictEqual(ex.localClasses.LocalMw, false);
+    assert.strictEqual(ex.localClasses.ExportedMw, true);
+    assert.strictEqual(ex.localClasses.Ctrl, true);
   });
 });

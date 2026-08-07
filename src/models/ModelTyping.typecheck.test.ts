@@ -2,7 +2,7 @@
  * tsc-gate for the model-typing guarantees that keep a consuming project's
  * call sites cast-free.
  *
- * Vitest strips types (never type-checks), and `check:types` excludes
+ * Node's type stripping never type-checks, and `check:types` excludes
  * `*.test.ts` — so a type-level guarantee can only be enforced by shelling out
  * to a real `tsc`. This compiles the whole `__fixtures__` dir, each file
  * pinning one fix:
@@ -49,10 +49,12 @@
  * helper or re-surfaces a narrow `this`, those calls fail with TS2684, and this
  * test goes red — guarding the migration's most-repeated casts.
  */
+
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '../..');
@@ -73,8 +75,8 @@ describe('Model typing — compile-time fixture gate', () => {
       output = `${e.stdout?.toString() ?? ''}${e.stderr?.toString() ?? ''}`;
       ok = false;
     }
-    expect(output).toBe('');
-    expect(ok).toBe(true);
+    assert.strictEqual(output, '');
+    assert.strictEqual(ok, true);
     // Generous ceiling (CPU-bound, synchronous tsc contends with parallel
     // workers); a real regression fails fast with TS errors.
   }, 240_000);

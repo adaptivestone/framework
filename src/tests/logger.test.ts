@@ -1,6 +1,8 @@
+import assert from 'node:assert/strict';
 import { type ChildProcess, spawn } from 'node:child_process';
+import { afterEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { assertTextNotMatch } from './assertions.ts';
 
 // #createLogger's custom-transport branch can only be exercised on a freshly
 // created logger, but the logger is memoized and a process allows a single
@@ -16,9 +18,7 @@ const cjsWrapFixture = fileURLToPath(
 
 const childEnv = () => {
   const env = { ...process.env } as NodeJS.ProcessEnv;
-  env.VITEST = undefined;
-  env.VITEST_WORKER_ID = undefined;
-  env.VITEST_POOL_ID = undefined;
+  env.FRAMEWORK_TEST = undefined;
   env.AUTH_SALT ||= 'test-logger-salt';
   env.LOGGER_CONSOLE_LEVEL = 'error';
   return env;
@@ -89,7 +89,7 @@ describe('custom winston transport loading (doc 13)', () => {
     const { child, getOutput } = spawnFixture(transportFixture);
     running.push(child);
     await waitForMarker(child, getOutput, /FIXTURE_TRANSPORT_LOADED/);
-    expect(getOutput()).not.toMatch(/not a constructor/);
+    assertTextNotMatch(getOutput(), /not a constructor/);
   }, 40000);
 
   it('loads a CJS-interop double-wrapped transport', async () => {
@@ -106,6 +106,6 @@ describe('custom winston transport loading (doc 13)', () => {
     // If the import rejection were unhandled the child would crash before this
     // marker appears; seeing it (child still alive) proves the .catch handled it.
     await waitForMarker(child, getOutput, /Failed to load logger transport/);
-    expect(child.exitCode).toBeNull();
+    assert.strictEqual(child.exitCode, null);
   }, 40000);
 });

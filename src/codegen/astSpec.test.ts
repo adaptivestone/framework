@@ -6,11 +6,12 @@
  * the runtime uses, with synthetic stubs carrying the binding names.
  */
 
+import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildSubtreeFromSpec } from '../controllers/index.ts';
 import type { FlatRoute } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
@@ -20,10 +21,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const fixtures = path.join(here, '__fixtures__/controllers');
 
 let dir: string;
-beforeAll(async () => {
+before(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'ast-spec-'));
 });
-afterAll(async () => {
+after(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -54,7 +55,7 @@ export default class Own extends Base {
       'utf8',
     );
     const { flat } = await flattenOne(file, '/own');
-    expect(chainNames(flat)).toEqual(['GetUserByToken', 'Auth']);
+    assert.deepStrictEqual(chainNames(flat), ['GetUserByToken', 'Auth']);
   });
 
   it('reproduces the chain + emittable imports for the real `File` fixture', async () => {
@@ -62,18 +63,21 @@ export default class Own extends Base {
       path.join(fixtures, 'File.ts'),
       '/file',
     );
-    expect(chainNames(flat)).toEqual(['GetUserByToken', 'Auth']);
+    assert.deepStrictEqual(chainNames(flat), ['GetUserByToken', 'Auth']);
     // The emittable imports come straight from the AST (binding → specifier),
     // no live class / identity matching. `Auth` is the binding (the module
     // default-exports `AuthMiddleware`).
-    expect(resolved.imports.map((i) => i.binding)).toEqual([
-      'GetUserByToken',
-      'Auth',
-    ]);
-    expect(resolved.imports.map((i) => i.specifier)).toEqual([
-      '../../../services/http/middleware/GetUserByToken.ts',
-      '../../../services/http/middleware/Auth.ts',
-    ]);
+    assert.deepStrictEqual(
+      resolved.imports.map((i) => i.binding),
+      ['GetUserByToken', 'Auth'],
+    );
+    assert.deepStrictEqual(
+      resolved.imports.map((i) => i.specifier),
+      [
+        '../../../services/http/middleware/GetUserByToken.ts',
+        '../../../services/http/middleware/Auth.ts',
+      ],
+    );
   });
 
   it('inherits middleware through the extends-walk (`Inherited` fixture)', async () => {
@@ -82,10 +86,10 @@ export default class Own extends Base {
       '/inherited',
     );
     // Inherited declares no own middleware → inherits AbstractController's.
-    expect(resolved.middleware.flatMap((s) => s.bindings)).toEqual([
-      'GetUserByToken',
-      'Auth',
-    ]);
-    expect(chainNames(flat)).toEqual(['GetUserByToken', 'Auth']);
+    assert.deepStrictEqual(
+      resolved.middleware.flatMap((s) => s.bindings),
+      ['GetUserByToken', 'Auth'],
+    );
+    assert.deepStrictEqual(chainNames(flat), ['GetUserByToken', 'Auth']);
   });
 });

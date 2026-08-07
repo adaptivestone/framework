@@ -4,17 +4,18 @@
  * aliased, indirect (one level up), and legacy (non-BaseModel) cases.
  */
 
+import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { after, before, describe, it } from 'node:test';
 import { isBaseModelSource } from './astModel.ts';
 
 let dir: string;
-beforeAll(async () => {
+before(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'ast-model-'));
 });
-afterAll(async () => {
+after(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -31,7 +32,7 @@ describe('isBaseModelSource', () => {
       `import { BaseModel } from '../modules/BaseModel.ts';
 export default class User extends BaseModel {}`,
     );
-    expect(await isBaseModelSource(file)).toBe(true);
+    assert.strictEqual(await isBaseModelSource(file), true);
   });
 
   it('detects an aliased BaseModel import via the specifier', async () => {
@@ -40,7 +41,7 @@ export default class User extends BaseModel {}`,
       `import { BaseModel as BM } from '@adaptivestone/framework/modules/BaseModel.js';
 export default class Aliased extends BM {}`,
     );
-    expect(await isBaseModelSource(file)).toBe(true);
+    assert.strictEqual(await isBaseModelSource(file), true);
   });
 
   it('returns false for a legacy (non-BaseModel) model', async () => {
@@ -51,7 +52,7 @@ export default class Legacy {
   get mongooseModel() { return mongoose.model('Legacy', schema); }
 }`,
     );
-    expect(await isBaseModelSource(file)).toBe(false);
+    assert.strictEqual(await isBaseModelSource(file), false);
   });
 
   it('detects indirect inheritance through a relative parent', async () => {
@@ -65,7 +66,7 @@ export default class MyBase extends BaseModel {}`,
       `import MyBase from './MyBase.ts';
 export default class Derived extends MyBase {}`,
     );
-    expect(await isBaseModelSource(file)).toBe(true);
+    assert.strictEqual(await isBaseModelSource(file), true);
   });
 
   it('serves a repeated lookup from the cache', async () => {
@@ -75,14 +76,15 @@ export default class Derived extends MyBase {}`,
 export default class Cached extends BaseModel {}`,
     );
     const cache = new Map<string, boolean>();
-    expect(await isBaseModelSource(file, 0, cache)).toBe(true);
-    expect(cache.get(file)).toBe(true);
+    assert.strictEqual(await isBaseModelSource(file, 0, cache), true);
+    assert.strictEqual(cache.get(file), true);
     // Second call short-circuits on the cached value (no re-read/parse).
-    expect(await isBaseModelSource(file, 0, cache)).toBe(true);
+    assert.strictEqual(await isBaseModelSource(file, 0, cache), true);
   });
 
   it('returns false for an unreadable / missing file', async () => {
-    expect(await isBaseModelSource(path.join(dir, 'no-such-model.ts'))).toBe(
+    assert.strictEqual(
+      await isBaseModelSource(path.join(dir, 'no-such-model.ts')),
       false,
     );
   });
@@ -93,12 +95,12 @@ export default class Cached extends BaseModel {}`,
       'NoImport.ts',
       `export default class X extends BaseModel {}`,
     );
-    expect(await isBaseModelSource(yes)).toBe(true);
+    assert.strictEqual(await isBaseModelSource(yes), true);
     const no = await write(
       'NoImportOther.ts',
       `export default class Y extends SomethingElse {}`,
     );
-    expect(await isBaseModelSource(no)).toBe(false);
+    assert.strictEqual(await isBaseModelSource(no), false);
   });
 
   it('returns false when a bare-package ancestor cannot be resolved', async () => {
@@ -107,6 +109,6 @@ export default class Cached extends BaseModel {}`,
       `import SomeBase from 'totally-nonexistent-pkg-xyz';
 export default class X extends SomeBase {}`,
     );
-    expect(await isBaseModelSource(file)).toBe(false);
+    assert.strictEqual(await isBaseModelSource(file), false);
   });
 });

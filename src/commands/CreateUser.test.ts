@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import CreateUser from './CreateUser.ts';
@@ -18,8 +19,6 @@ class CaptureTransport extends Transport {
 
 describe('CreateUser command (doc 20)', () => {
   it('logs the email but not the password hash or session tokens', async () => {
-    expect.assertions(2);
-
     const email = 'createusertest@example.com';
     const captured: string[] = [];
     const transport = new CaptureTransport(captured);
@@ -36,8 +35,8 @@ describe('CreateUser command (doc 20)', () => {
     }
 
     const all = captured.join('\n');
-    expect(all).toContain(email); // identifier kept for debuggability
-    expect(all).not.toContain('sessionTokens'); // whole document not serialized
+    assert.ok(all.includes(email)); // identifier kept for debuggability
+    assert.ok(!all.includes('sessionTokens')); // whole document not serialized
   });
 });
 
@@ -46,33 +45,39 @@ describe('CreateUser command — input validation guards', () => {
     new CreateUser(appInstance, {}, args).run();
 
   it('fails when neither email nor id is given', async () => {
-    await expect(run({})).resolves.toBe(false);
+    await assert.strictEqual(await run({}), false);
   });
 
   it('fails to create a new user without a password', async () => {
-    await expect(run({ email: 'cu-nopass@example.com' })).resolves.toBe(false);
+    await assert.strictEqual(
+      await run({ email: 'cu-nopass@example.com' }),
+      false,
+    );
   });
 
   it('fails when looked up by a missing id with no email to create from', async () => {
-    await expect(
-      run({ id: '000000000000000000000000', password: 'x' }),
-    ).resolves.toBe(false);
+    await assert.strictEqual(
+      await run({ id: '000000000000000000000000', password: 'x' }),
+      false,
+    );
   });
 
   it('refuses to overwrite an existing user without `update`', async () => {
     const email = 'cu-existing@example.com';
-    await expect(run({ email, password: 'pw1', update: true })).resolves.toBe(
+    await assert.strictEqual(
+      await run({ email, password: 'pw1', update: true }),
       true,
     ); // first run creates it
-    await expect(run({ email, password: 'pw2' })).resolves.toBe(false); // exists, no update
+    await assert.strictEqual(await run({ email, password: 'pw2' }), false); // exists, no update
   });
 
   it('creates a user, splitting comma-separated roles', async () => {
     const email = 'cu-roles@example.com';
-    await expect(
-      run({ email, password: 'pw', roles: 'user,admin' }),
-    ).resolves.toBe(true);
+    await assert.strictEqual(
+      await run({ email, password: 'pw', roles: 'user,admin' }),
+      true,
+    );
     const user = await appInstance.getModel('User').findOne({ email });
-    expect(user?.roles).toEqual(['user', 'admin']);
+    assert.deepStrictEqual(user?.roles, ['user', 'admin']);
   });
 });

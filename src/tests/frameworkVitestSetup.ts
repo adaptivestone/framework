@@ -6,5 +6,5 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // do seomthing
+  // Reserved for framework-only Vitest compatibility teardown.
 });

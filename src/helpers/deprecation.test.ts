@@ -1,13 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
+import { assertCalledTimes, assertNthCalledWith } from '../tests/assertions.ts';
+import { mockImplementation } from '../tests/mocks.ts';
 import { makeOncePerClassWarner } from './deprecation.ts';
 
 describe('makeOncePerClassWarner', () => {
   it('warns once per class while allowing a different class', () => {
     class First {}
     class Second {}
-    const emitWarning = vi
-      .spyOn(process, 'emitWarning')
-      .mockImplementation(() => {});
+    const emitWarning = mockImplementation(
+      mock.method(process, 'emitWarning'),
+      () => {},
+    );
     const warn = makeOncePerClassWarner(
       'TEST_DEPRECATION',
       (name, error) => `${name}: ${String(error)}`,
@@ -17,17 +20,17 @@ describe('makeOncePerClassWarner', () => {
       warn(First, 'ignored');
       warn(Second, 'other');
 
-      expect(emitWarning).toHaveBeenCalledTimes(2);
-      expect(emitWarning).toHaveBeenNthCalledWith(1, 'First: reason', {
+      assertCalledTimes(emitWarning, 2);
+      assertNthCalledWith(emitWarning, 1, 'First: reason', {
         type: 'DeprecationWarning',
         code: 'TEST_DEPRECATION',
       });
-      expect(emitWarning).toHaveBeenNthCalledWith(2, 'Second: other', {
+      assertNthCalledWith(emitWarning, 2, 'Second: other', {
         type: 'DeprecationWarning',
         code: 'TEST_DEPRECATION',
       });
     } finally {
-      emitWarning.mockRestore();
+      emitWarning.mock.restore();
     }
   });
 });

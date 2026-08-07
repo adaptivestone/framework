@@ -1,6 +1,8 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type { Response } from 'express';
-import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { assertCalledTimes } from '../../../tests/assertions.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import Pagination, { type PaginationMiddlewareAppInfo } from './Pagination.ts';
@@ -27,29 +29,32 @@ const runMiddleware = async (
   const mw = new Pagination(appInstance, params);
   const req = { query, appInfo: {} } as unknown as FrameworkRequest &
     PaginationMiddlewareAppInfo;
-  const next = vi.fn();
+  const next = mock.fn();
   await mw.middleware(req, {} as Response, next);
-  expect(next).toHaveBeenCalledOnce();
+  assertCalledTimes(next, 1);
   return req.appInfo.pagination;
 };
 
 describe('Pagination — relatedQueryParameters schema', () => {
   it('coerces numeric strings to numbers', async () => {
-    expect(await validateQuery({ page: '2', limit: '25' })).toEqual({
+    assert.deepStrictEqual(await validateQuery({ page: '2', limit: '25' }), {
       value: { page: 2, limit: 25 },
     });
   });
 
   it('skips empty/undefined/null params', async () => {
-    expect(await validateQuery({ page: '', limit: undefined })).toEqual({
-      value: {},
-    });
-    expect(await validateQuery(undefined)).toEqual({ value: {} });
+    assert.deepStrictEqual(
+      await validateQuery({ page: '', limit: undefined }),
+      {
+        value: {},
+      },
+    );
+    assert.deepStrictEqual(await validateQuery(undefined), { value: {} });
   });
 
   it('reports an issue for a non-numeric value', async () => {
     const res = await validateQuery({ limit: 'abc' });
-    expect(res).toEqual({
+    assert.deepStrictEqual(res, {
       issues: [{ message: 'limit must be a number', path: ['limit'] }],
     });
   });
@@ -57,17 +62,21 @@ describe('Pagination — relatedQueryParameters schema', () => {
 
 describe('Pagination — middleware clamping', () => {
   it('uses the configured default when no query is given', async () => {
-    expect(await runMiddleware({ limit: 10, maxLimit: 100 }, {})).toEqual({
-      page: 1,
-      limit: 10,
-      skip: 0,
-    });
+    assert.deepStrictEqual(
+      await runMiddleware({ limit: 10, maxLimit: 100 }, {}),
+      {
+        page: 1,
+        limit: 10,
+        skip: 0,
+      },
+    );
   });
 
   it('honors a valid ?limit within maxLimit', async () => {
-    expect(
+    assert.deepStrictEqual(
       await runMiddleware({ limit: 10, maxLimit: 100 }, { limit: '20' }),
-    ).toEqual({ page: 1, limit: 20, skip: 0 });
+      { page: 1, limit: 20, skip: 0 },
+    );
   });
 
   it('clamps ?limit above maxLimit down to maxLimit', async () => {
@@ -75,7 +84,7 @@ describe('Pagination — middleware clamping', () => {
       { limit: 10, maxLimit: 50 },
       { limit: '9999' },
     );
-    expect(p.limit).toBe(50);
+    assert.strictEqual(p.limit, 50);
   });
 
   it('falls back to default (never 0) for a zero/negative/NaN limit', async () => {
@@ -84,23 +93,24 @@ describe('Pagination — middleware clamping', () => {
         { limit: 10, maxLimit: 100 },
         { limit: bad },
       );
-      expect(p.limit).toBe(10); // default, NOT 0 — the Mongoose "no limit" footgun
+      assert.strictEqual(p.limit, 10); // default, NOT 0 — the Mongoose "no limit" footgun
     }
   });
 
   it('computes skip from page and limit, defaulting page to 1', async () => {
-    expect(
+    assert.deepStrictEqual(
       await runMiddleware(
         { limit: 10, maxLimit: 100 },
         { page: '3', limit: '10' },
       ),
-    ).toEqual({ page: 3, limit: 10, skip: 20 });
+      { page: 3, limit: 10, skip: 20 },
+    );
   });
 
   it('clamps a non-positive page to 1', async () => {
     const p = await runMiddleware({ limit: 10, maxLimit: 100 }, { page: '0' });
-    expect(p.page).toBe(1);
-    expect(p.skip).toBe(0);
+    assert.strictEqual(p.page, 1);
+    assert.strictEqual(p.skip, 0);
   });
 
   it('accepts string-typed params (parseInt path) and applies their defaults', async () => {
@@ -110,6 +120,6 @@ describe('Pagination — middleware clamping', () => {
       { limit: '5', maxLimit: '40' },
       { limit: '999' },
     );
-    expect(p.limit).toBe(40);
+    assert.strictEqual(p.limit, 40);
   });
 });

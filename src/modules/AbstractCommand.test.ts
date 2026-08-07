@@ -1,6 +1,9 @@
+import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
 import { appInstance } from '../helpers/appInstance.ts';
+import { assertCalledTimes } from '../tests/assertions.ts';
+import { mockImplementation } from '../tests/mocks.ts';
 import AbstractCommand from './AbstractCommand.ts';
 
 /**
@@ -11,13 +14,14 @@ import AbstractCommand from './AbstractCommand.ts';
  */
 describe('AbstractCommand.getMongoConnectionName', () => {
   it('returns the readable name verbatim when it is short', () => {
-    expect(AbstractCommand.getMongoConnectionName('seed', { n: 1 })).toBe(
+    assert.strictEqual(
+      AbstractCommand.getMongoConnectionName('seed', { n: 1 }),
       'CLI: seed {"n":1}',
     );
   });
 
   it('hashes (and warns) when the name reaches 64 chars', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const warn = mockImplementation(mock.method(console, 'warn'), () => {});
     const args = { veryLongArgumentNameThatPushesPastSixtyFourChars: true };
     const name = AbstractCommand.getMongoConnectionName('migrate', args);
 
@@ -25,23 +29,23 @@ describe('AbstractCommand.getMongoConnectionName', () => {
       .update(JSON.stringify(args))
       .digest('hex')
       .substring(0, 32);
-    expect(name).toBe(`CLI: migrate ${expectedHash}`);
-    expect(name.length).toBeLessThan(64);
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
+    assert.strictEqual(name, `CLI: migrate ${expectedHash}`);
+    assert.ok(name.length < 64);
+    assertCalledTimes(warn, 1);
+    warn.mock.restore();
   });
 });
 
 describe('AbstractCommand defaults', () => {
   it('exposes overridable static defaults', () => {
-    expect(AbstractCommand.description).toContain('PLEASE PROVIDE IT');
-    expect(AbstractCommand.commandArguments).toEqual({});
-    expect(AbstractCommand.loggerGroup).toBe('command');
-    expect(AbstractCommand.isShouldInitModels).toBe(true);
+    assert.ok(AbstractCommand.description.includes('PLEASE PROVIDE IT'));
+    assert.deepStrictEqual(AbstractCommand.commandArguments, {});
+    assert.strictEqual(AbstractCommand.loggerGroup, 'command');
+    assert.strictEqual(AbstractCommand.isShouldInitModels, true);
   });
 
   it('run() warns and resolves false until a subclass overrides it', async () => {
     const cmd = new AbstractCommand(appInstance, {}, {});
-    await expect(cmd.run()).resolves.toBe(false);
+    await assert.strictEqual(await cmd.run(), false);
   });
 });

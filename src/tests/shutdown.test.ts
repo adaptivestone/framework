@@ -1,7 +1,9 @@
+import assert from 'node:assert/strict';
 import { type ChildProcess, spawn } from 'node:child_process';
 import net from 'node:net';
+import { afterEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { assertTextMatch } from './assertions.ts';
 
 // These tests spawn a real server in a child process: only there can a real
 // SIGTERM (problem 1) and a real EADDRINUSE (problem 2) be observed via exit
@@ -12,11 +14,8 @@ const fixture = fileURLToPath(
 
 const childEnv = () => {
   const env = { ...process.env } as NodeJS.ProcessEnv;
-  // The fixture is a production-shaped server; strip vitest markers so it runs
-  // the real signal-registration path (which is skipped under VITEST).
-  env.VITEST = undefined;
-  env.VITEST_WORKER_ID = undefined;
-  env.VITEST_POOL_ID = undefined;
+  // The fixture is production-shaped, so run the real signal-registration path.
+  env.FRAMEWORK_TEST = undefined;
   env.AUTH_SALT ||= 'test-shutdown-salt';
   // Boot asserts a Mongo DSN is configured (server.ts #assertBootConfig). The
   // fixture never opens a connection — it skips model init — so any truthy DSN
@@ -120,8 +119,8 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     child.kill('SIGTERM');
 
     const { code } = await waitForExit(child, getOutput);
-    expect(code).toBe(0);
-    expect(getOutput()).toMatch(/SHUTDOWN_EVENT_FIRED/);
+    assert.strictEqual(code, 0);
+    assertTextMatch(getOutput(), /SHUTDOWN_EVENT_FIRED/);
   }, 40000);
 
   it('a second server on a taken port exits non-zero (no zombie)', async () => {
@@ -133,6 +132,6 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     const second = spawnFixture(port);
     running.push(second.child);
     const { code } = await waitForExit(second.child, second.getOutput);
-    expect(code).toBe(1);
+    assert.strictEqual(code, 1);
   }, 40000);
 });

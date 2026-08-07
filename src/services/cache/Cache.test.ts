@@ -1,7 +1,10 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
-import { describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../helpers/appInstance.ts';
 import type { IApp } from '../../server.ts';
+import { assertRejectsLike } from '../../tests/assertions.ts';
+import { mockRejectedValueOnce, mockResolvedValue } from '../../tests/mocks.ts';
 import Cache from './Cache.ts';
 import MemoryDriver from './drivers/MemoryDriver.ts';
 import RedisDriver from './drivers/RedisDriver.ts';
@@ -11,9 +14,9 @@ describe('cache', () => {
 
   it('accepts an injected driver and selects redis only when configured', () => {
     const injected = {
-      get: vi.fn().mockResolvedValue(null),
-      set: vi.fn().mockResolvedValue(undefined),
-      del: vi.fn().mockResolvedValue(0),
+      get: mockResolvedValue(mock.fn(), null),
+      set: mockResolvedValue(mock.fn(), undefined),
+      del: mockResolvedValue(mock.fn(), 0),
     };
     const app = (driver: unknown) =>
       ({
@@ -21,17 +24,15 @@ describe('cache', () => {
           name === 'cache' ? { driver } : { namespace: 'unit' },
       }) as unknown as IApp;
 
-    expect(new Cache(app(injected)).driver).toBe(injected);
-    expect(new Cache(app('redis')).driver).toBeInstanceOf(RedisDriver);
+    assert.strictEqual(new Cache(app(injected)).driver, injected);
+    assert.ok(new Cache(app('redis')).driver instanceof RedisDriver);
   });
 
   it('defaults to the in-memory driver (redis is optional)', () => {
-    expect.assertions(1);
-    expect(appInstance.cache.driver).toBeInstanceOf(MemoryDriver);
+    assert.ok(appInstance.cache.driver instanceof MemoryDriver);
   });
 
   it('a zero storeTime skips the cache and recomputes every call (issue #10)', async () => {
-    expect.assertions(3);
     const { cache } = appInstance;
     let counter = 0;
     const compute = async () => {
@@ -42,13 +43,12 @@ describe('cache', () => {
     const first = await cache.getSetValue('ZERO_TTL', compute, 0);
     const second = await cache.getSetValue('ZERO_TTL', compute, 0);
 
-    expect(first).toBe(1);
-    expect(second).toBe(2); // not served from cache
-    expect(counter).toBe(2);
+    assert.strictEqual(first, 1);
+    assert.strictEqual(second, 2); // not served from cache
+    assert.strictEqual(counter, 2);
   });
 
   it('a negative storeTime skips the cache and recomputes every call (issue #10)', async () => {
-    expect.assertions(3);
     const { cache } = appInstance;
     let counter = 0;
     const compute = async () => {
@@ -61,54 +61,46 @@ describe('cache', () => {
     const first = await cache.getSetValue('NEG_TTL', compute, -5);
     const second = await cache.getSetValue('NEG_TTL', compute, -5);
 
-    expect(first).toBe(1);
-    expect(second).toBe(2); // recomputed, not served from a stale entry
-    expect(counter).toBe(2);
+    assert.strictEqual(first, 1);
+    assert.strictEqual(second, 2); // recomputed, not served from a stale entry
+    assert.strictEqual(counter, 2);
   });
 
   it('can get set values', async () => {
-    expect.assertions(2);
-
     const { cache } = appInstance;
 
     const res = await cache.getSetValue('TEST_TIME', async () => time);
 
-    expect(res).toStrictEqual(time);
+    assert.deepStrictEqual(res, time);
 
     const res2 = await cache.getSetValue('TEST_TIME', async () => '123');
 
-    expect(res2).toStrictEqual(time);
+    assert.deepStrictEqual(res2, time);
   });
 
   it('can delete values', async () => {
-    expect.assertions(1);
-
     const { cache } = appInstance;
 
     await cache.removeKey('TEST_TIME');
 
     const res2 = await cache.getSetValue('TEST_TIME', async () => '123');
 
-    expect(res2).toBe('123');
+    assert.strictEqual(res2, '123');
   });
 
   it('can works with big int', async () => {
-    expect.assertions(2);
-
     const { cache } = appInstance;
 
     const res = await cache.getSetValue('BIN_INT', async () => 1n);
 
-    expect(res).toBe(1n);
+    assert.strictEqual(res, 1n);
 
     const res2 = await cache.getSetValue('BIN_INT', async () => '1111');
 
-    expect(res2).toBe(1n);
+    assert.strictEqual(res2, 1n);
   });
 
   it('can execute only one request per time', async () => {
-    expect.assertions(3);
-
     const { cache } = appInstance;
     let counter = 0;
 
@@ -123,15 +115,13 @@ describe('cache', () => {
       cache.getSetValue('T', f),
     ]);
 
-    expect(counter).toBe(1);
+    assert.strictEqual(counter, 1);
 
-    expect(res).toBe(1);
-    expect(res1).toBe(1);
+    assert.strictEqual(res, 1);
+    assert.strictEqual(res1, 1);
   });
 
   it('can handle problems on onNotFound', async () => {
-    expect.assertions(1);
-
     const getAsyncThrow = async () => {
       throw new Error('err');
     };
@@ -148,7 +138,7 @@ describe('cache', () => {
       err = e as Error;
     }
 
-    expect(err?.message).toBe('err');
+    assert.strictEqual(err?.message, 'err');
   });
 
   describe('failure paths (doc 09)', () => {
@@ -159,21 +149,24 @@ describe('cache', () => {
 
       const result = await cache.getSetValue('CORRUPT', async () => 'repaired');
 
-      expect(result).toBe('repaired');
-      expect(await cache.driver.get(key)).toBe(JSON.stringify('repaired'));
+      assert.strictEqual(result, 'repaired');
+      assert.strictEqual(
+        await cache.driver.get(key),
+        JSON.stringify('repaired'),
+      );
     });
 
     it('falls back to onNotFound on a driver read failure, without deadlocking the key', async () => {
-      expect.assertions(2);
       const { cache } = appInstance;
-      const spy = vi
-        .spyOn(cache.driver, 'get')
-        .mockRejectedValueOnce(new Error('cache down'));
+      const spy = mockRejectedValueOnce(
+        mock.method(cache.driver, 'get'),
+        new Error('cache down'),
+      );
 
       // Cache outage degrades to computing the value, not failing the request.
       const first = await cache.getSetValue('DEADLOCK', async () => 'computed');
-      expect(first).toBe('computed');
-      spy.mockRestore();
+      assert.strictEqual(first, 'computed');
+      spy.mock.restore();
 
       // The in-flight mapping cleared (finally), so a later call isn't stuck on a
       // forever-pending promise — it recomputes and succeeds.
@@ -181,48 +174,48 @@ describe('cache', () => {
         'DEADLOCK',
         async () => 'recovered',
       );
-      expect(second).toBe('recovered');
+      assert.strictEqual(second, 'recovered');
     });
 
     it('a single-caller onNotFound failure causes no unhandled rejection', async () => {
-      expect.assertions(1);
       const { cache } = appInstance;
-      // vitest fails the run on an unhandled rejection; the no-op `.catch` on the
+      // node:test fails the run on an unhandled rejection; the no-op `.catch` on the
       // in-flight promise is what keeps this single-caller failure clean.
-      await expect(
+      await assertRejectsLike(
         cache.getSetValue('SINGLE_THROW', async () => {
           throw new Error('boom');
         }),
-      ).rejects.toThrow('boom');
+        'boom',
+      );
     });
 
     it('a failed cache write still returns the computed value', async () => {
-      expect.assertions(1);
       const { cache } = appInstance;
-      const spy = vi
-        .spyOn(cache.driver, 'set')
-        .mockRejectedValueOnce(new Error('set down'));
+      const spy = mockRejectedValueOnce(
+        mock.method(cache.driver, 'set'),
+        new Error('set down'),
+      );
 
       const res = await cache.getSetValue('SET_FAIL', async () => 'computed');
-      expect(res).toBe('computed');
-      spy.mockRestore();
+      assert.strictEqual(res, 'computed');
+      spy.mock.restore();
     });
 
     it('onNotFound returning undefined does not crash (skips the write)', async () => {
-      expect.assertions(1);
       const { cache } = appInstance;
       const res = await cache.getSetValue('UNDEF', async () => undefined);
-      expect(res).toBeUndefined();
+      assert.strictEqual(res, undefined);
     });
 
     it('returns zero when cache invalidation fails', async () => {
       const { cache } = appInstance;
-      const del = vi
-        .spyOn(cache.driver, 'del')
-        .mockRejectedValueOnce(new Error('delete down'));
+      const del = mockRejectedValueOnce(
+        mock.method(cache.driver, 'del'),
+        new Error('delete down'),
+      );
 
-      await expect(cache.removeKey('DELETE_FAIL')).resolves.toBe(0);
-      del.mockRestore();
+      await assert.strictEqual(await cache.removeKey('DELETE_FAIL'), 0);
+      del.mock.restore();
     });
   });
 });

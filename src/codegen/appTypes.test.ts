@@ -1,6 +1,8 @@
+import assert from 'node:assert/strict';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { assertTextMatch } from '../tests/assertions.ts';
 import { parseDiagnostics } from './__fixtures__/parseDiagnostics.ts';
 import { getTemplate } from './appTypes.ts';
 
@@ -22,12 +24,14 @@ describe('appTypes — config type emission (shape-derived)', () => {
       port: 3300,
       cors: true,
     });
-    expect(out).toContain(
-      `getConfig(configName: 'http'): { "hostname": string; "port": number; "cors": boolean };`,
+    assert.ok(
+      out.includes(
+        `getConfig(configName: 'http'): { "hostname": string; "port": number; "cors": boolean };`,
+      ),
     );
     // no leaked literal value
-    expect(out).not.toContain('0.0.0.0');
-    expect(out).not.toContain('3300');
+    assert.ok(!out.includes('0.0.0.0'));
+    assert.ok(!out.includes('3300'));
   });
 
   it('widens homogeneous primitive, nested, and object arrays', async () => {
@@ -43,11 +47,13 @@ describe('appTypes — config type emission (shape-derived)', () => {
         { hostname: 'two.example', secure: false },
       ],
     });
-    expect(out).toContain(
-      `getConfig(configName: 'collections'): { "domains": string[]; "retries": number[]; "dimensions": number[][]; "endpoints": { "hostname": string; "secure": boolean }[] };`,
+    assert.ok(
+      out.includes(
+        `getConfig(configName: 'collections'): { "domains": string[]; "retries": number[]; "dimensions": number[][]; "endpoints": { "hostname": string; "secure": boolean }[] };`,
+      ),
     );
-    expect(out).not.toContain('one.example');
-    expect(out).not.toContain('1080');
+    assert.ok(!out.includes('one.example'));
+    assert.ok(!out.includes('1080'));
   });
 
   it('keeps heterogeneous arrays as tuples so per-element types survive', async () => {
@@ -58,17 +64,19 @@ describe('appTypes — config type emission (shape-derived)', () => {
         { 'example.net': 'de' },
       ],
     });
-    expect(out).toContain(
-      `getConfig(configName: 'siteMap'): { "domains": [{ "example.com": string }, { "example.org": string }, { "example.net": string }] };`,
+    assert.ok(
+      out.includes(
+        `getConfig(configName: 'siteMap'): { "domains": [{ "example.com": string }, { "example.org": string }, { "example.net": string }] };`,
+      ),
     );
-    expect(out).not.toContain("'en'");
-    expect(out).not.toContain(': "en"');
+    assert.ok(!out.includes("'en'"));
+    assert.ok(!out.includes(': "en"'));
   });
 
   it('drops keys whose value is undefined at gen time (no source given)', async () => {
     const out = await get('mongo', { connectionString: undefined, pool: 5 });
-    expect(out).toContain(
-      `getConfig(configName: 'mongo'): { "pool": number };`,
+    assert.ok(
+      out.includes(`getConfig(configName: 'mongo'): { "pool": number };`),
     );
   });
 
@@ -86,10 +94,10 @@ describe('appTypes — config type emission (shape-derived)', () => {
       [],
       new Map<string, string[]>([['auth', [authSrc]]]),
     );
-    expect(out).toContain('"saltSecret": string | undefined');
-    expect(out).toContain('"hashRounds": number');
+    assert.ok(out.includes('"saltSecret": string | undefined'));
+    assert.ok(out.includes('"hashRounds": number'));
     // still a type, never the value
-    expect(out).not.toContain('AUTH_SALT');
+    assert.ok(!out.includes('AUTH_SALT'));
   });
 
   it('types an env-only key deterministically even when set at gen time', async () => {
@@ -107,21 +115,23 @@ describe('appTypes — config type emission (shape-derived)', () => {
       [],
       new Map<string, string[]>([['auth', [authSrc]]]),
     );
-    expect(out).toContain('"saltSecret": string | undefined');
+    assert.ok(out.includes('"saltSecret": string | undefined'));
     // the concrete secret value is never serialized into the type
-    expect(out).not.toContain('super-secret-from-env');
+    assert.ok(!out.includes('super-secret-from-env'));
   });
 
   it('emits no import() — the type is fully inline (compiler-robust)', async () => {
     const out = await get('auth', { secret: 'shh', salt: 10 });
-    expect(out).not.toContain('import(');
-    expect(out).not.toContain('shh');
+    assert.ok(!out.includes('import('));
+    assert.ok(!out.includes('shh'));
   });
 
   it('handles empty objects / arrays and exotic values', async () => {
     const out = await get('misc', { empty: {}, list: [], when: new Date() });
-    expect(out).toContain(
-      `getConfig(configName: 'misc'): { "empty": {}; "list": unknown[]; "when": unknown };`,
+    assert.ok(
+      out.includes(
+        `getConfig(configName: 'misc'): { "empty": {}; "list": unknown[]; "when": unknown };`,
+      ),
     );
   });
 
@@ -131,15 +141,19 @@ describe('appTypes — config type emission (shape-derived)', () => {
       big: 10n,
       fn: () => 1,
     });
-    expect(out).toContain(
-      `getConfig(configName: 'kinds'): { "n": null; "big": bigint; "fn": ((...args: any[]) => any) };`,
+    assert.ok(
+      out.includes(
+        `getConfig(configName: 'kinds'): { "n": null; "big": bigint; "fn": ((...args: any[]) => any) };`,
+      ),
     );
   });
 
   it('keeps an `undefined` element inside a tuple (arrays are not filtered)', async () => {
     const out = await get('tuple', { list: ['a', undefined, 1] });
-    expect(out).toContain(
-      `getConfig(configName: 'tuple'): { "list": [string, undefined, number] };`,
+    assert.ok(
+      out.includes(
+        `getConfig(configName: 'tuple'): { "list": [string, undefined, number] };`,
+      ),
     );
   });
 });
@@ -158,25 +172,27 @@ describe('appTypes — appInfo.user binding', () => {
     const out = await getTemplate(new Map(), [
       { file: 'User', path: userModelPath },
     ]);
-    expect(out).toContain(
-      "declare module '@adaptivestone/framework/models/User.js'",
+    assert.ok(
+      out.includes("declare module '@adaptivestone/framework/models/User.js'"),
     );
-    expect(out).toContain('export interface AppModels {');
-    expect(out).toMatch(
+    assert.ok(out.includes('export interface AppModels {'));
+    assertTextMatch(
+      out,
       /'User': GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>/,
     );
     // `appInfo.user` is the hydrated DOCUMENT, so the binding must be wrapped in
     // `InstanceType<…>` — emitting the bare Model class (as the AppModelTypes
     // entry uses) inverts the type so `user.id` / `user.email` stop type-checking.
-    expect(out).toMatch(
+    assertTextMatch(
+      out,
       /User: InstanceType<GetModelTypeFromClass<typeof import\('[^']*User[^']*'\)\.default>>/,
     );
   });
 
   it('emits no AppModels augmentation when there is no User model', async () => {
     const out = await getTemplate(new Map(), []);
-    expect(out).not.toContain(
-      "declare module '@adaptivestone/framework/models/User.js'",
+    assert.ok(
+      !out.includes("declare module '@adaptivestone/framework/models/User.js'"),
     );
   });
 });
@@ -197,10 +213,10 @@ describe('appTypes — name escaping in emitted string literals (finding #20)', 
       ]),
       [],
     );
-    expect(out).toContain("getConfig(configName: 'us\\'er')");
-    expect(out).toContain("getConfig(configName: 'back\\\\slash')");
+    assert.ok(out.includes("getConfig(configName: 'us\\'er')"));
+    assert.ok(out.includes("getConfig(configName: 'back\\\\slash')"));
     // The emitted module still parses — an unescaped `'` leaves it unterminated.
-    expect(parseDiagnostics(out)).toEqual([]);
+    assert.deepStrictEqual(parseDiagnostics(out), []);
   });
 
   it('escapes a model name and relPath containing an apostrophe or backslash', async () => {
@@ -209,8 +225,8 @@ describe('appTypes — name escaping in emitted string literals (finding #20)', 
     // backslash into the `import('…')` string literal.
     const weird = path.join(process.cwd(), "src/models/wei'rd\\Model.ts");
     const out = await getTemplate(new Map(), [{ file: "Mo'del", path: weird }]);
-    expect(out).toContain("'Mo\\'del': import(");
-    expect(out).toContain("wei\\'rd\\\\Model.ts");
-    expect(parseDiagnostics(out)).toEqual([]);
+    assert.ok(out.includes("'Mo\\'del': import("));
+    assert.ok(out.includes("wei\\'rd\\\\Model.ts"));
+    assert.deepStrictEqual(parseDiagnostics(out), []);
   });
 });

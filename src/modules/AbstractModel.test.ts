@@ -1,9 +1,10 @@
+import assert from 'node:assert/strict';
+import { after, describe, it } from 'node:test';
 import mongoose from 'mongoose';
-import { afterAll, describe, expect, it } from 'vitest';
 import { appInstance } from '../helpers/appInstance.ts';
 import AbstractModel from './AbstractModel.ts';
 
-afterAll(() => {
+after(() => {
   if (mongoose.modelNames().includes('AbstractModel')) {
     mongoose.deleteModel('AbstractModel');
   }
@@ -19,10 +20,10 @@ describe('AbstractModel defaults', () => {
       getSuper: () => AbstractModel;
     };
 
-    expect(wrapper.modelSchema).toEqual({});
-    expect(wrapper.modelSchemaOptions).toEqual({});
-    expect(AbstractModel.loggerGroup).toBe('model');
-    expect(Model.getSuper()).toBe(wrapper);
-    expect(document.getSuper()).toBe(wrapper);
+    assert.deepStrictEqual(wrapper.modelSchema, {});
+    assert.deepStrictEqual(wrapper.modelSchemaOptions, {});
+    assert.strictEqual(AbstractModel.loggerGroup, 'model');
+    assert.strictEqual(Model.getSuper(), wrapper);
+    assert.strictEqual(document.getSuper(), wrapper);
   });
 });

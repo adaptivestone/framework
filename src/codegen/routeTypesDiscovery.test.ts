@@ -8,6 +8,7 @@
  * merged discovery, and conflict reporting.
  */
 
+import assert from 'node:assert/strict';
 import {
   mkdir,
   mkdtemp,
@@ -18,7 +19,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, it, mock } from 'node:test';
 import { noopLogger } from '../helpers/logger.ts';
 import {
   controllerOverridePath,
@@ -26,6 +27,13 @@ import {
   defaultControllerHttpPath,
 } from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
+import {
+  assertMatches,
+  assertRejectsLike,
+  assertTextMatch,
+  pattern,
+} from '../tests/assertions.ts';
+import { mockReturnValue } from '../tests/mocks.ts';
 import { generateRouteTypesViaAst } from './astEmit.ts';
 import { specFromExtracted } from './astSpec.ts';
 import { generateAll } from './index.ts';
@@ -85,41 +93,61 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
    * the last segment — keep `User.ts` + `class User` aligned in real apps.
    */
   it('defaultControllerHttpPath includes the folder prefix', () => {
-    expect.assertions(8);
-    expect(defaultControllerHttpPath('', 'Users')).toBe('/users');
-    expect(defaultControllerHttpPath('admin', 'Users')).toBe('/admin/users');
-    expect(defaultControllerHttpPath('admin/sub', 'Users')).toBe(
+    assert.strictEqual(defaultControllerHttpPath('', 'Users'), '/users');
+    assert.strictEqual(
+      defaultControllerHttpPath('admin', 'Users'),
+      '/admin/users',
+    );
+    assert.strictEqual(
+      defaultControllerHttpPath('admin/sub', 'Users'),
       '/admin/sub/users',
     );
     // Same final basename (User.ts) under different folders → different mounts.
-    expect(defaultControllerHttpPath('admin', 'User')).toBe('/admin/user');
-    expect(defaultControllerHttpPath('moderator', 'User')).toBe(
+    assert.strictEqual(
+      defaultControllerHttpPath('admin', 'User'),
+      '/admin/user',
+    );
+    assert.strictEqual(
+      defaultControllerHttpPath('moderator', 'User'),
       '/moderator/user',
     );
     // CamelCase folder + compound class name — both lowercased as whole path.
-    expect(defaultControllerHttpPath('someFolder', 'UserAdmin')).toBe(
+    assert.strictEqual(
+      defaultControllerHttpPath('someFolder', 'UserAdmin'),
       '/somefolder/useradmin',
     );
-    expect(defaultControllerHttpPath('someFolder', 'SomeBigName')).toBe(
+    assert.strictEqual(
+      defaultControllerHttpPath('someFolder', 'SomeBigName'),
       '/somefolder/somebigname',
     );
-    expect(defaultControllerHttpPath('a/b/c', 'SomeBigName')).toBe(
+    assert.strictEqual(
+      defaultControllerHttpPath('a/b/c', 'SomeBigName'),
       '/a/b/c/somebigname',
     );
   });
 
   it('omits parenthesized route-group segments from default paths', () => {
-    expect(controllerRoutePrefix('(group)')).toBe('');
-    expect(controllerRoutePrefix('(group)/admin')).toBe('admin');
-    expect(controllerRoutePrefix('api/(internal)/reports')).toBe('api/reports');
-    expect(controllerRoutePrefix('(group)\\admin')).toBe('admin');
-    expect(defaultControllerHttpPath('(group)', 'Reports')).toBe('/reports');
-    expect(defaultControllerHttpPath('(group)/admin', 'Settings')).toBe(
+    assert.strictEqual(controllerRoutePrefix('(group)'), '');
+    assert.strictEqual(controllerRoutePrefix('(group)/admin'), 'admin');
+    assert.strictEqual(
+      controllerRoutePrefix('api/(internal)/reports'),
+      'api/reports',
+    );
+    assert.strictEqual(controllerRoutePrefix('(group)\\admin'), 'admin');
+    assert.strictEqual(
+      defaultControllerHttpPath('(group)', 'Reports'),
+      '/reports',
+    );
+    assert.strictEqual(
+      defaultControllerHttpPath('(group)/admin', 'Settings'),
       '/admin/settings',
     );
-    expect(controllerOverridePath('(group)/Auth.ts')).toBe('Auth.ts');
-    expect(controllerOverridePath('api/(group)/Auth.ts')).toBe('api/Auth.ts');
-    expect(controllerOverridePath('(group)\\Auth.ts')).toBe('Auth.ts');
+    assert.strictEqual(controllerOverridePath('(group)/Auth.ts'), 'Auth.ts');
+    assert.strictEqual(
+      controllerOverridePath('api/(group)/Auth.ts'),
+      'api/Auth.ts',
+    );
+    assert.strictEqual(controllerOverridePath('(group)\\Auth.ts'), 'Auth.ts');
   });
 
   it('a grouped same-name controller overrides the framework controller during codegen', async () => {
@@ -135,16 +163,16 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
 
     await generateRouteTypesViaAst(appFor(dir), logger);
 
-    expect(await readdir(path.join(dir, '(group)'))).toContain(
-      'Auth.routes.gen.ts',
+    assert.ok(
+      (await readdir(path.join(dir, '(group)'))).includes('Auth.routes.gen.ts'),
     );
-    expect(logs.join('\n')).toMatch(
+    assertTextMatch(
+      logs.join('\n'),
       /Skipping register INTERNAL file 'Auth\.[jt]s'/,
     );
   });
 
   it('a nested controller mounts under its folder prefix', async () => {
-    expect.assertions(1);
     const dir = await makeControllers({
       'nested/Items.ts': ctrl('Items', 'get', '/list'),
     });
@@ -152,7 +180,7 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       path.join(dir, 'nested/Items.ts'),
       'nested',
     );
-    expect(resolved.urlPrefix).toBe('/nested/items');
+    assert.strictEqual(resolved.urlPrefix, '/nested/items');
   });
 
   it('AST codegen keeps route groups in the file layout but not the URL', async () => {
@@ -171,18 +199,21 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       '(group)/admin',
     );
 
-    expect(reports.resolved.urlPrefix).toBe('/reports');
-    expect(settings.resolved.urlPrefix).toBe('/admin/settings');
-    expect(await readdir(path.join(dir, '(group)'))).toContain(
-      'Reports.routes.gen.ts',
+    assert.strictEqual(reports.resolved.urlPrefix, '/reports');
+    assert.strictEqual(settings.resolved.urlPrefix, '/admin/settings');
+    assert.ok(
+      (await readdir(path.join(dir, '(group)'))).includes(
+        'Reports.routes.gen.ts',
+      ),
     );
-    expect(await readdir(path.join(dir, '(group)/admin'))).toContain(
-      'Settings.routes.gen.ts',
+    assert.ok(
+      (await readdir(path.join(dir, '(group)/admin'))).includes(
+        'Settings.routes.gen.ts',
+      ),
     );
   });
 
   it('same final file (User.ts) in multiple folders resolve distinct mounts', async () => {
-    expect.assertions(1);
     const dir = await makeControllers({
       'admin/User.ts': ctrl('User', 'get', '/'),
       'moderator/User.ts': ctrl('User', 'get', '/'),
@@ -204,7 +235,7 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       }),
     );
     // Same class + basename; only the folder prefix separates the mounts.
-    expect(mounts).toEqual([
+    assert.deepStrictEqual(mounts, [
       '/admin/user',
       '/moderator/user',
       '/somefolder/user',
@@ -212,7 +243,6 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
   });
 
   it('compound class name SomeBigName under a folder mounts lowercased', async () => {
-    expect.assertions(1);
     const dir = await makeControllers({
       'someFolder/SomeBigName.ts': ctrl('SomeBigName', 'get', '/list'),
     });
@@ -220,38 +250,35 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       path.join(dir, 'someFolder/SomeBigName.ts'),
       'someFolder',
     );
-    expect(resolved.urlPrefix).toBe('/somefolder/somebigname');
+    assert.strictEqual(resolved.urlPrefix, '/somefolder/somebigname');
   });
 
   it('emits gen files for nested AND digit-prefixed controllers', async () => {
-    expect.assertions(2);
     const dir = await makeControllers({
       'nested/Items.ts': ctrl('Items', 'get', '/list'),
       // The old `/^[A-Z]/` filter dropped this; the runtime loader accepts it.
       '2FA.ts': ctrl('TwoFactor', 'get', '/verify'),
     });
     await generateRouteTypesViaAst(appFor(dir), noopLogger);
-    expect(await readdir(path.join(dir, 'nested'))).toContain(
-      'Items.routes.gen.ts',
+    assert.ok(
+      (await readdir(path.join(dir, 'nested'))).includes('Items.routes.gen.ts'),
     );
-    expect(await readdir(dir)).toContain('2FA.routes.gen.ts');
+    assert.ok((await readdir(dir)).includes('2FA.routes.gen.ts'));
   });
 
   it('root and nested controllers of the same name both mount (no conflict)', async () => {
-    expect.assertions(2);
     const dir = await makeControllers({
       'Users.ts': ctrl('Users', 'get', '/list'),
       'nested/Users.ts': ctrl('Users', 'get', '/list'),
     });
     await generateRouteTypesViaAst(appFor(dir), noopLogger);
-    expect(await readdir(dir)).toContain('Users.routes.gen.ts');
-    expect(await readdir(path.join(dir, 'nested'))).toContain(
-      'Users.routes.gen.ts',
+    assert.ok((await readdir(dir)).includes('Users.routes.gen.ts'));
+    assert.ok(
+      (await readdir(path.join(dir, 'nested'))).includes('Users.routes.gen.ts'),
     );
   });
 
   it('multiple folders with the same basename emit sibling gen files without conflict', async () => {
-    expect.assertions(6);
     const dir = await makeControllers({
       // Same final path segment User.ts — mounts differ by folder prefix only.
       'admin/User.ts': ctrl('User', 'get', '/'),
@@ -262,14 +289,17 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     });
     await generateRouteTypesViaAst(appFor(dir), noopLogger);
 
-    expect(await readdir(path.join(dir, 'admin'))).toContain(
-      'User.routes.gen.ts',
+    assert.ok(
+      (await readdir(path.join(dir, 'admin'))).includes('User.routes.gen.ts'),
     );
-    expect(await readdir(path.join(dir, 'moderator'))).toContain(
-      'User.routes.gen.ts',
+    assert.ok(
+      (await readdir(path.join(dir, 'moderator'))).includes(
+        'User.routes.gen.ts',
+      ),
     );
-    expect(await readdir(path.join(dir, 'someFolder'))).toEqual(
-      expect.arrayContaining([
+    assertMatches(
+      await readdir(path.join(dir, 'someFolder')),
+      pattern.arrayContaining([
         'SomeBigName.routes.gen.ts',
         'UserAdmin.routes.gen.ts',
       ]),
@@ -288,26 +318,23 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
       path.join(dir, 'someFolder/SomeBigName.ts'),
       'someFolder',
     );
-    expect(admin.resolved.urlPrefix).toBe('/admin/user');
-    expect(moderator.resolved.urlPrefix).toBe('/moderator/user');
-    expect(big.resolved.urlPrefix).toBe('/somefolder/somebigname');
+    assert.strictEqual(admin.resolved.urlPrefix, '/admin/user');
+    assert.strictEqual(moderator.resolved.urlPrefix, '/moderator/user');
+    assert.strictEqual(big.resolved.urlPrefix, '/somefolder/somebigname');
   });
 
   it('two controllers mounting at the same path fail, naming both files', async () => {
-    expect.assertions(1);
     const dir = await makeControllers({
       'ConflictA.ts': ctrl('CtrlA', 'get', '/x', '/dup'),
       'ConflictB.ts': ctrl('CtrlB', 'get', '/x', '/dup'),
     });
-    await expect(
+    await assertRejectsLike(
       generateRouteTypesViaAst(appFor(dir), noopLogger),
-    ).rejects.toThrow(
       /ConflictA\.ts[\s\S]*ConflictB\.ts|ConflictB\.ts[\s\S]*ConflictA\.ts/,
     );
   });
 
   it('deletes orphan gen files (no sibling source) while writing current ones (doc 08)', async () => {
-    expect.assertions(2);
     const dir = await makeControllers({
       'Widget.ts': ctrl('Widget', 'get', '/list'),
       // A leftover gen file from a deleted/renamed controller — would break the
@@ -316,12 +343,11 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     });
     await generateRouteTypesViaAst(appFor(dir), noopLogger);
     const files = await readdir(dir);
-    expect(files).toContain('Widget.routes.gen.ts');
-    expect(files).not.toContain('Ghost.routes.gen.ts');
+    assert.ok(files.includes('Widget.routes.gen.ts'));
+    assert.ok(!files.includes('Ghost.routes.gen.ts'));
   });
 
   it('degrades a schema-bearing .js controller with no .d.ts (no untyped self-import)', async () => {
-    expect.assertions(5);
     const withSchema = (name: string, route: string) =>
       `class ${name} {\n  get routes() { return { post: { '${route}': { handler: this.h, request: {} } } }; }\n  h() {}\n}\nexport default ${name};\n`;
     const dir = await makeControllers({
@@ -337,16 +363,15 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     const boat = await readFile(path.join(dir, 'Boat.routes.gen.ts'), 'utf8');
     const typed = await readFile(path.join(dir, 'Typed.routes.gen.ts'), 'utf8');
     // Untyped .js → degraded: no self-import, no schema navigation, has the note.
-    expect(boat).not.toContain("from './Boat.js'");
-    expect(boat).not.toContain('InferOutput');
-    expect(boat).toMatch(/no type declaration/);
+    assert.ok(!boat.includes("from './Boat.js'"));
+    assert.ok(!boat.includes('InferOutput'));
+    assertTextMatch(boat, /no type declaration/);
     // .js with a sibling .d.ts → importable → precise navigation preserved.
-    expect(typed).toContain("from './Typed.js'");
-    expect(typed).toContain('InferOutput');
+    assert.ok(typed.includes("from './Typed.js'"));
+    assert.ok(typed.includes('InferOutput'));
   });
 
   it('drops an untyped .js middleware from the provides chain (no TS7016 import)', async () => {
-    expect.assertions(4);
     const guardedCtrl = (name: string, route: string, mwImport: string) =>
       `import Guard from '${mwImport}';\nclass ${name} {\n  get routes() { return { get: { '${route}': { handler: this.h } } }; }\n  h() {}\n  static get middleware() { return new Map([['/{*splat}', [Guard]]]); }\n}\nexport default ${name};\n`;
     const mwSrc = (name: string) =>
@@ -363,45 +388,45 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     const payJs = await readFile(path.join(dir, 'PayJs.routes.gen.ts'), 'utf8');
     const payTs = await readFile(path.join(dir, 'PayTs.routes.gen.ts'), 'utf8');
     // Untyped .js middleware → dropped from BOTH the import and the tuple.
-    expect(payJs).not.toContain("from './GuardJs.js'");
-    expect(payJs).not.toContain('typeof Guard');
+    assert.ok(!payJs.includes("from './GuardJs.js'"));
+    assert.ok(!payJs.includes('typeof Guard'));
     // .ts middleware → kept.
-    expect(payTs).toContain("from './GuardTs.ts'");
-    expect(payTs).toContain('typeof Guard');
+    assert.ok(payTs.includes("from './GuardTs.ts'"));
+    assert.ok(payTs.includes('typeof Guard'));
   });
 });
 
 describe('generateAll — atomicity & --check (doc 08)', () => {
   it('--check passes when up to date and fails (drift) when a gen file changes', async () => {
-    expect.assertions(2);
     const dir = await makeControllers({
       'Widget.ts': ctrl('Widget', 'get', '/list'),
     });
     // genTypes.d.ts is written to process.cwd() — point it at the temp dir.
-    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(dir);
+    const cwdSpy = mockReturnValue(mock.method(process, 'cwd'), dir);
     try {
       const app = appFor(dir);
       await generateAll(app, noopLogger); // write everything
       // Clean tree → --check resolves.
-      await expect(
-        generateAll(app, noopLogger, { check: true }),
-      ).resolves.toBeUndefined();
+      await assert.strictEqual(
+        await generateAll(app, noopLogger, { check: true }),
+        undefined,
+      );
       // Tamper a gen file → --check throws naming the stale file.
       await writeFile(
         path.join(dir, 'Widget.routes.gen.ts'),
         'tampered\n',
         'utf8',
       );
-      await expect(
+      await assertRejectsLike(
         generateAll(app, noopLogger, { check: true }),
-      ).rejects.toThrow(/out of date[\s\S]*Widget\.routes\.gen\.ts/);
+        /out of date[\s\S]*Widget\.routes\.gen\.ts/,
+      );
     } finally {
-      cwdSpy.mockRestore();
+      cwdSpy.mock.restore();
     }
   });
 
   it('skips a non-analyzable controller (warning) and still writes the rest', async () => {
-    expect.assertions(4);
     const dir = await makeControllers({
       'Good.ts': ctrl('Good', 'get', '/list'),
       // Non-literal `routes` getter (computed method key) → needsBoot. A
@@ -418,21 +443,23 @@ describe('generateAll — atomicity & --check (doc 08)', () => {
       warn: (m: string) => warnings.push(m),
       error() {},
     };
-    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(dir);
+    const cwdSpy = mockReturnValue(mock.method(process, 'cwd'), dir);
     try {
       // Does not throw — the analyzable controller is generated, the other skipped.
-      await expect(generateAll(appFor(dir), logger)).resolves.toBeUndefined();
+      await assert.strictEqual(
+        await generateAll(appFor(dir), logger),
+        undefined,
+      );
       const files = await readdir(dir);
-      expect(files).toContain('Good.routes.gen.ts'); // analyzable → written
-      expect(files).not.toContain('Dynamic.routes.gen.ts'); // skipped, not written
-      expect(warnings.join('\n')).toMatch(/skipped[\s\S]*Dynamic\.ts/); // warned + named
+      assert.ok(files.includes('Good.routes.gen.ts')); // analyzable → written
+      assert.ok(!files.includes('Dynamic.routes.gen.ts')); // skipped, not written
+      assertTextMatch(warnings.join('\n'), /skipped[\s\S]*Dynamic\.ts/); // warned + named
     } finally {
-      cwdSpy.mockRestore();
+      cwdSpy.mock.restore();
     }
   });
 
   it('escalates to an error when a skipped controller leaves a stale gen file', async () => {
-    expect.assertions(3);
     const dir = await makeControllers({
       // Was analyzable once (its gen file exists), now it isn't — the routine
       // skip warning alone would let the stale types rot silently.
@@ -448,14 +475,20 @@ describe('generateAll — atomicity & --check (doc 08)', () => {
       warn() {},
       error: (m: string) => errors.push(m),
     };
-    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(dir);
+    const cwdSpy = mockReturnValue(mock.method(process, 'cwd'), dir);
     try {
-      await expect(generateAll(appFor(dir), logger)).resolves.toBeUndefined();
+      await assert.strictEqual(
+        await generateAll(appFor(dir), logger),
+        undefined,
+      );
       // Deleting it would break consumer imports mid-edit — leave it, but shout.
-      expect(await readdir(dir)).toContain('Dynamic.routes.gen.ts');
-      expect(errors.join('\n')).toMatch(/stale[\s\S]*Dynamic\.routes\.gen\.ts/);
+      assert.ok((await readdir(dir)).includes('Dynamic.routes.gen.ts'));
+      assertTextMatch(
+        errors.join('\n'),
+        /stale[\s\S]*Dynamic\.routes\.gen\.ts/,
+      );
     } finally {
-      cwdSpy.mockRestore();
+      cwdSpy.mock.restore();
     }
   });
 });

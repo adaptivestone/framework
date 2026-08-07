@@ -1,5 +1,6 @@
+import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, it } from 'node:test';
 import RedisDriver from './RedisDriver.ts';
 
 // Exercises the lazy redis path end-to-end: `whenReady` performs the dynamic
@@ -7,14 +8,13 @@ import RedisDriver from './RedisDriver.ts';
 // framework test environment runs redis (see RateLimiter redis tests).
 describe('RedisDriver', () => {
   it('lazy-connects and round-trips set/get/del', async () => {
-    expect.assertions(3);
     const driver = new RedisDriver();
     await driver.whenReady;
 
     const key = `RD_${crypto.randomUUID()}`;
     await driver.set(key, JSON.stringify('value'), 60);
-    expect(await driver.get(key)).toBe(JSON.stringify('value'));
-    expect(await driver.del(key)).toBe(1);
-    expect(await driver.get(key)).toBeNull();
+    assert.strictEqual(await driver.get(key), JSON.stringify('value'));
+    assert.strictEqual(await driver.del(key), 1);
+    assert.strictEqual(await driver.get(key), null);
   });
 });

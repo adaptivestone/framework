@@ -1,17 +1,12 @@
+import assert from 'node:assert/strict';
+import { after, before, beforeEach, describe, it, mock } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
 import { appInstance } from '../../helpers/appInstance.ts';
 import type { TLock } from '../../models/Lock.ts';
 import type { TMigration } from '../../models/Migration.ts';
+import { assertCalledTimes } from '../../tests/assertions.ts';
 import { migrationRunLog } from '../../tests/fixtures/migrationRecorder.ts';
+import { mockImplementation } from '../../tests/mocks.ts';
 import Migrate from './Migrate.ts';
 
 const fixtureMigrations = fileURLToPath(
@@ -33,14 +28,14 @@ describe('Migrate command (doc 15)', () => {
   let Lock: TLock;
   let originalMigrationsFolder: string;
 
-  beforeAll(() => {
+  before(() => {
     Migration = appInstance.getModel('Migration') as unknown as TMigration;
     Lock = appInstance.getModel('Lock') as unknown as TLock;
     originalMigrationsFolder = appInstance.foldersConfig.migrations;
     appInstance.foldersConfig.migrations = fixtureMigrations;
   });
 
-  afterAll(() => {
+  after(() => {
     appInstance.foldersConfig.migrations = originalMigrationsFolder;
   });
 
@@ -70,10 +65,10 @@ describe('Migrate command (doc 15)', () => {
 
     const result = await runMigrate();
 
-    expect(result).toBe(true);
-    expect(migrationRunLog).toEqual(['100_a.ts']); // ran, despite older stamp
+    assert.strictEqual(result, true);
+    assert.deepStrictEqual(migrationRunLog, ['100_a.ts']); // ran, despite older stamp
     const applied = await Migration.distinct('migrationFile');
-    expect(applied.sort()).toEqual(['100_a.ts', '200_b.ts']);
+    assert.deepStrictEqual(applied.sort(), ['100_a.ts', '200_b.ts']);
   });
 
   it('runs nothing when every migration is already applied', async () => {
@@ -82,13 +77,13 @@ describe('Migrate command (doc 15)', () => {
 
     await runMigrate();
 
-    expect(migrationRunLog).toEqual([]);
+    assert.deepStrictEqual(migrationRunLog, []);
   });
 
   it('runs all pending migrations in filename-timestamp order', async () => {
     await runMigrate();
 
-    expect(migrationRunLog).toEqual(['100_a.ts', '200_b.ts']);
+    assert.deepStrictEqual(migrationRunLog, ['100_a.ts', '200_b.ts']);
   });
 
   it('orders a subfolder migration by its basename timestamp, not its path', async () => {
@@ -96,15 +91,20 @@ describe('Migrate command (doc 15)', () => {
     // path. Ordering by the basename prefix must slot it between 1000 and 3000.
     const result = await runMigrateFrom(fixtureOrdering);
 
-    expect(result).toBe(true);
-    expect(migrationRunLog).toEqual(['1000_a.ts', '2000_x.ts', '3000_b.ts']);
+    assert.strictEqual(result, true);
+    assert.deepStrictEqual(migrationRunLog, [
+      '1000_a.ts',
+      '2000_x.ts',
+      '3000_b.ts',
+    ]);
   });
 
   it('refuses the whole run when a pending migration name has no timestamp prefix', async () => {
     const migrate = new Migrate(appInstance, {}, {});
-    const errorSpy = vi
-      .spyOn(migrate.logger, 'error')
-      .mockImplementation(() => migrate.logger);
+    const errorSpy = mockImplementation(
+      mock.method(migrate.logger, 'error'),
+      () => migrate.logger,
+    );
     const previous = appInstance.foldersConfig.migrations;
     appInstance.foldersConfig.migrations = fixtureMalformed;
 
@@ -115,12 +115,12 @@ describe('Migrate command (doc 15)', () => {
       appInstance.foldersConfig.migrations = previous;
     }
 
-    expect(result).toBe(false);
+    assert.strictEqual(result, false);
     // Nothing runs — not even the well-named sibling — and nothing is journaled.
-    expect(migrationRunLog).toEqual([]);
-    expect(await Migration.distinct('migrationFile')).toEqual([]);
-    expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(errorSpy.mock.calls[0][0]).toContain('AddIndex.ts');
+    assert.deepStrictEqual(migrationRunLog, []);
+    assert.deepStrictEqual(await Migration.distinct('migrationFile'), []);
+    assertCalledTimes(errorSpy, 1);
+    assert.ok(errorSpy.mock.calls[0].arguments[0].includes('AddIndex.ts'));
   });
 
   it('skips (returns true) when another run holds the migrations lock', async () => {
@@ -130,8 +130,8 @@ describe('Migrate command (doc 15)', () => {
 
     const result = await runMigrate();
 
-    expect(result).toBe(true);
-    expect(migrationRunLog).toEqual([]);
+    assert.strictEqual(result, true);
+    assert.deepStrictEqual(migrationRunLog, []);
 
     await Lock.releaseLock('migrations');
   });

@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertRejectsLike } from '../tests/assertions.ts';
 import { appInstance } from './appInstance.ts';
 import { hashPassword, verifyPassword } from './crypto.ts';
 
@@ -8,7 +10,8 @@ describe('crypto failure guards', () => {
     const original = auth.saltSecret;
     auth.saltSecret = '';
     try {
-      await expect(hashPassword('password')).rejects.toThrow(
+      await assertRejectsLike(
+        hashPassword('password'),
         'AUTH_SALT is not defined',
       );
     } finally {
@@ -23,15 +26,16 @@ describe('crypto failure guards', () => {
     const original = auth.scrypt;
     auth.scrypt = { ln: 40, r: 8, p: 1 };
     try {
-      await expect(hashPassword('password')).rejects.toBeInstanceOf(Error);
+      await assertRejectsLike(hashPassword('password'), Error);
     } finally {
       auth.scrypt = original;
     }
   });
 
   it('rejects a v2 hash with an unsupported algorithm', async () => {
-    await expect(
-      verifyPassword('password', 'v2:argon:ln=1,r=1,p=1:AA:AA'),
-    ).resolves.toEqual({ valid: false, needsRehash: false });
+    await assert.deepStrictEqual(
+      await verifyPassword('password', 'v2:argon:ln=1,r=1,p=1:AA:AA'),
+      { valid: false, needsRehash: false },
+    );
   });
 });

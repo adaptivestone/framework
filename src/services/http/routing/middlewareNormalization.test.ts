@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertThrowsLike } from '../../../tests/assertions.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import {
   type MiddlewareSpec,
@@ -19,8 +21,8 @@ describe('normalizeMiddleware', () => {
   it('handles bare class form (no params)', () => {
     // biome-ignore lint/suspicious/noExplicitAny: synthetic stand-in for a real middleware class
     const entry = normalizeMiddleware(FakeMw as any);
-    expect(entry.Class).toBe(FakeMw);
-    expect(entry.params).toBeUndefined();
+    assert.strictEqual(entry.Class, FakeMw);
+    assert.strictEqual(entry.params, undefined);
   });
 
   it('handles tuple form [Class, params]', () => {
@@ -28,46 +30,58 @@ describe('normalizeMiddleware', () => {
       // biome-ignore lint/suspicious/noExplicitAny: synthetic stand-in
       [FakeMw as any, { max: 5 }] as any,
     );
-    expect(entry.Class).toBe(FakeMw);
-    expect(entry.params).toEqual({ max: 5 });
+    assert.strictEqual(entry.Class, FakeMw);
+    assert.deepStrictEqual(entry.params, { max: 5 });
   });
 
   it('throws TypeError on tuple with non-class first element', () => {
-    expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
-      normalizeMiddleware(['not-a-class' as any, {}] as any),
-    ).toThrow(TypeError);
+    assertThrowsLike(
+      () =>
+        // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
+        normalizeMiddleware(['not-a-class' as any, {}] as any),
+      TypeError,
+    );
   });
 
   it('throws TypeError when tuple length is not exactly two', () => {
-    expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
-      normalizeMiddleware([FakeMw as any] as any),
-    ).toThrow('expected exactly [Class, params]');
+    assertThrowsLike(
+      () =>
+        // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+        normalizeMiddleware([FakeMw as any] as any),
+      'expected exactly [Class, params]',
+    );
 
-    expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
-      normalizeMiddleware([FakeMw as any, {}, 'extra'] as any),
-    ).toThrow('expected exactly [Class, params]');
+    assertThrowsLike(
+      () =>
+        // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+        normalizeMiddleware([FakeMw as any, {}, 'extra'] as any),
+      'expected exactly [Class, params]',
+    );
   });
 
   it('throws TypeError when tuple params are not a plain object shape', () => {
-    expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
-      normalizeMiddleware([FakeMw as any, null] as any),
-    ).toThrow('expected a params object');
+    assertThrowsLike(
+      () =>
+        // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+        normalizeMiddleware([FakeMw as any, null] as any),
+      'expected a params object',
+    );
 
-    expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
-      normalizeMiddleware([FakeMw as any, []] as any),
-    ).toThrow('expected a params object');
+    assertThrowsLike(
+      () =>
+        // biome-ignore lint/suspicious/noExplicitAny: deliberate malformed runtime input
+        normalizeMiddleware([FakeMw as any, []] as any),
+      'expected a params object',
+    );
   });
 
   it('throws TypeError on plain non-class, non-tuple input', () => {
-    expect(() =>
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
-      normalizeMiddleware('plain-string' as any),
-    ).toThrow(TypeError);
+    assertThrowsLike(
+      () =>
+        // biome-ignore lint/suspicious/noExplicitAny: deliberate bad input
+        normalizeMiddleware('plain-string' as any),
+      TypeError,
+    );
   });
 });
 
@@ -81,14 +95,14 @@ describe('normalizeMiddlewares', () => {
     ];
     const out = normalizeMiddlewares(specs);
 
-    expect(out).toHaveLength(2);
-    expect(out[0]?.Class).toBe(FakeMw);
-    expect(out[0]?.params).toBeUndefined();
-    expect(out[1]?.Class).toBe(FakeMw);
-    expect(out[1]?.params).toEqual({ x: 1 });
+    assert.strictEqual(out.length, 2);
+    assert.strictEqual(out[0]?.Class, FakeMw);
+    assert.strictEqual(out[0]?.params, undefined);
+    assert.strictEqual(out[1]?.Class, FakeMw);
+    assert.deepStrictEqual(out[1]?.params, { x: 1 });
   });
 
   it('empty input → empty output', () => {
-    expect(normalizeMiddlewares([])).toEqual([]);
+    assert.deepStrictEqual(normalizeMiddlewares([]), []);
   });
 });

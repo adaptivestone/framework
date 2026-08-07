@@ -24,13 +24,15 @@
  * `astResolve.test.ts` (it can't run end-to-end inside this repo).
  */
 
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
 import { noopLogger } from '../helpers/logger.ts';
 import type { IApp } from '../server.ts';
+import { assertTextMatch } from '../tests/assertions.ts';
 import { generateRouteTypesViaAst } from './astEmit.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -72,10 +74,10 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       'utf8',
     );
     for (const gen of [fileGen, inheritedGen]) {
-      expect(gen).toMatch(/UnionAppInfoProvides<readonly \[[^\]]+\]>/);
-      expect(gen).toMatch(/typeof GetUserByToken\b/);
-      expect(gen).toMatch(/typeof Auth\b/);
-      expect(gen).not.toContain('AuthMiddleware');
+      assertTextMatch(gen, /UnionAppInfoProvides<readonly \[[^\]]+\]>/);
+      assertTextMatch(gen, /typeof GetUserByToken\b/);
+      assertTextMatch(gen, /typeof Auth\b/);
+      assert.ok(!gen.includes('AuthMiddleware'));
     }
 
     // Param-sibling name collision: `PUT /:slug`, `POST /:event`, and
@@ -87,9 +89,10 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       path.join(controllersDir, 'ParamSiblings.routes.gen.ts'),
       'utf8',
     );
-    expect(paramSiblingsGen).not.toContain('UnionAppInfoProvides<readonly []>');
+    assert.ok(!paramSiblingsGen.includes('UnionAppInfoProvides<readonly []>'));
     for (const t of ['DuplicateRequest', 'UpdateRequest', 'YachtsRequest']) {
-      expect(paramSiblingsGen).toMatch(
+      assertTextMatch(
+        paramSiblingsGen,
         new RegExp(
           `${t} =[^;]*UnionAppInfoProvides<readonly \\[typeof GetUserByToken, typeof Auth\\]>`,
         ),
@@ -106,18 +109,22 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       path.join(controllersDir, 'NamedGuards.routes.gen.ts'),
       'utf8',
     );
-    expect(namedGuardsGen).toContain(
-      "import type { NamedGuard } from '../middleware/Guards.ts';",
+    assert.ok(
+      namedGuardsGen.includes(
+        "import type { NamedGuard } from '../middleware/Guards.ts';",
+      ),
     );
-    expect(namedGuardsGen).toContain(
-      "import type { RoleGuard as Guard } from '../middleware/Guards.ts';",
+    assert.ok(
+      namedGuardsGen.includes(
+        "import type { RoleGuard as Guard } from '../middleware/Guards.ts';",
+      ),
     );
 
     // The real gate: the handlers read `req.appInfo.user` with no guard, so a
     // regression in any of the bugs above makes this `tsc` run fail.
     const result = runTsc();
-    expect(result.output).toBe('');
-    expect(result.ok).toBe(true);
+    assert.strictEqual(result.output, '');
+    assert.strictEqual(result.ok, true);
     // Generous ceiling, NOT the expected runtime: this test shells out to a
     // CPU-bound `tsc` via synchronous execFileSync (uninterruptible), which
     // contends with the rest of the suite's parallel workers — ~18s in

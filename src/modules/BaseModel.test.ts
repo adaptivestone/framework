@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { BaseModel, isBaseModelSubclassShape } from './BaseModel.ts';
 
 /**
@@ -9,18 +10,18 @@ import { BaseModel, isBaseModelSubclassShape } from './BaseModel.ts';
  */
 describe('BaseModel default getters', () => {
   it('return empty shapes when not overridden', () => {
-    expect(BaseModel.modelSchema).toEqual({});
-    expect(BaseModel.schemaOptions).toEqual({});
-    expect(BaseModel.modelInstanceMethods).toEqual({});
-    expect(BaseModel.modelVirtuals).toEqual({});
-    expect(BaseModel.modelStatics).toEqual({});
+    assert.deepStrictEqual(BaseModel.modelSchema, {});
+    assert.deepStrictEqual(BaseModel.schemaOptions, {});
+    assert.deepStrictEqual(BaseModel.modelInstanceMethods, {});
+    assert.deepStrictEqual(BaseModel.modelVirtuals, {});
+    assert.deepStrictEqual(BaseModel.modelStatics, {});
   });
 
   it('initHooks default is a no-op (no throw without a hook override)', () => {
-    expect(() =>
+    assert.doesNotThrow(() =>
       // biome-ignore lint/suspicious/noExplicitAny: only the no-op default is under test
       BaseModel.initHooks({} as any),
-    ).not.toThrow();
+    );
   });
 
   it('passes schema-level lean defaults to the runtime Mongoose schema', () => {
@@ -36,7 +37,7 @@ describe('BaseModel default getters', () => {
 
     const Model = LeanDefaultOptionRecord.initialize();
     try {
-      expect(Model.schema.options.lean).toBe(true);
+      assert.strictEqual(Model.schema.options.lean, true);
     } finally {
       Model.db.deleteModel(Model.modelName);
     }
@@ -55,7 +56,7 @@ describe('isBaseModelSubclassShape (duplicate-copy discriminator)', () => {
         return { name: { type: String } } as const;
       }
     }
-    expect(isBaseModelSubclassShape(RealModel)).toBe(true);
+    assert.strictEqual(isBaseModelSubclassShape(RealModel), true);
   });
 
   it('is true for a BaseModel-shaped class from a different copy (not instanceof)', () => {
@@ -70,8 +71,11 @@ describe('isBaseModelSubclassShape (duplicate-copy discriminator)', () => {
         );
       }
     }
-    expect(DuplicateCopyModel.prototype instanceof BaseModel).toBe(false);
-    expect(isBaseModelSubclassShape(DuplicateCopyModel)).toBe(true);
+    assert.strictEqual(
+      DuplicateCopyModel.prototype instanceof BaseModel,
+      false,
+    );
+    assert.strictEqual(isBaseModelSubclassShape(DuplicateCopyModel), true);
   });
 
   it('is false for a legacy AbstractModel-style model (routes to the legacy branch)', () => {
@@ -81,7 +85,7 @@ describe('isBaseModelSubclassShape (duplicate-copy discriminator)', () => {
         return {};
       }
     }
-    expect(isBaseModelSubclassShape(LegacyModel)).toBe(false);
+    assert.strictEqual(isBaseModelSubclassShape(LegacyModel), false);
   });
 
   it('is false for a class with only one of the two markers', () => {
@@ -95,14 +99,17 @@ describe('isBaseModelSubclassShape (duplicate-copy discriminator)', () => {
         return {};
       }
     }
-    expect(isBaseModelSubclassShape(OnlyInitialize)).toBe(false);
-    expect(isBaseModelSubclassShape(OnlyModelSchema)).toBe(false);
+    assert.strictEqual(isBaseModelSubclassShape(OnlyInitialize), false);
+    assert.strictEqual(isBaseModelSubclassShape(OnlyModelSchema), false);
   });
 
   it('is false for non-class values', () => {
-    expect(isBaseModelSubclassShape(undefined)).toBe(false);
-    expect(isBaseModelSubclassShape(null)).toBe(false);
-    expect(isBaseModelSubclassShape({})).toBe(false);
-    expect(isBaseModelSubclassShape(() => {})).toBe(false);
+    assert.strictEqual(isBaseModelSubclassShape(undefined), false);
+    assert.strictEqual(isBaseModelSubclassShape(null), false);
+    assert.strictEqual(isBaseModelSubclassShape({}), false);
+    assert.strictEqual(
+      isBaseModelSubclassShape(() => {}),
+      false,
+    );
   });
 });

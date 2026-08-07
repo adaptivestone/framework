@@ -9,7 +9,7 @@
  *
  * The per-file server lifecycle comes from the shipped `setupNodeTest.ts` glue
  * (it wires the idempotent server-readiness hook but never touches Mongo init). Runs as
- * part of `npm run test:node`.
+ * part of the native test suite.
  */
 import './setupNodeTest.ts';
 import assert from 'node:assert/strict';

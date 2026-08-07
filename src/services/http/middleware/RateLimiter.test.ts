@@ -1,15 +1,17 @@
+import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { after, before, describe, it, mock } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import type { Response } from 'express';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { mockRejectedValue } from '../../../tests/mocks.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import RateLimiter from './RateLimiter.ts';
 
 let mongoRateLimiter: RateLimiter;
 
 describe('rate limiter methods', () => {
-  beforeAll(async () => {
+  before(async () => {
     await setTimeout(20);
 
     mongoRateLimiter = new RateLimiter(appInstance, {
@@ -20,46 +22,38 @@ describe('rate limiter methods', () => {
     });
   });
 
-  afterAll(async () => {
+  after(async () => {
     // we need to wait because redis mongo ask mongo to create indexes
     await setTimeout(200);
   });
 
   it('have description fields', async () => {
-    expect.assertions(1);
-
     // const middleware = new RateLimiter(appInstance, {
     //   driver: 'redis',
     // });
 
-    expect(RateLimiter.description).toBeDefined();
+    assert.notStrictEqual(RateLimiter.description, undefined);
   });
 
   it('can create redis rateLimiter', async () => {
-    expect.assertions(1);
-
     const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
     // The redis limiter builds lazily (it dynamic-imports `@redis/client`).
     await redisRateLimiter.whenReady;
 
-    expect(redisRateLimiter.limiter).toBeDefined();
+    assert.notStrictEqual(redisRateLimiter.limiter, undefined);
   });
 
   it('can not create rateLimiter with unknown driver', async () => {
-    expect.assertions(1);
-
     const rateLimiter = new RateLimiter(appInstance, {
       driver: 'unknown',
     });
 
-    expect(rateLimiter.limiter).toBeUndefined();
+    assert.strictEqual(rateLimiter.limiter, undefined);
   });
 
   it('generateConsumeKey works correctly', async () => {
-    expect.assertions(1);
-
     const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
@@ -73,12 +67,10 @@ describe('rate limiter methods', () => {
       },
     } as unknown as FrameworkRequest);
 
-    expect(res).toBe('192.168.0.0__someId');
+    assert.strictEqual(res, '192.168.0.0__someId');
   });
 
   it('generateConsumeKey with request works correctly', async () => {
-    expect.assertions(1);
-
     const redisRateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
       consumeKeyComponents: {
@@ -95,12 +87,10 @@ describe('rate limiter methods', () => {
       },
     } as FrameworkRequest);
 
-    expect(res).toBe('192.168.0.0__foo@example.com');
+    assert.strictEqual(res, '192.168.0.0__foo@example.com');
   });
 
   it('middleware without driver should fail', async () => {
-    expect.assertions(2);
-
     const rateLimiter = new RateLimiter(appInstance, {
       driver: 'unknown',
     });
@@ -126,8 +116,8 @@ describe('rate limiter methods', () => {
       () => {},
     );
 
-    expect(status).toBe(500);
-    expect(isSend).toBeTruthy();
+    assert.strictEqual(status, 500);
+    assert.ok(isSend);
   });
 
   const makeOneRequest = async ({
@@ -174,41 +164,33 @@ describe('rate limiter methods', () => {
   };
 
   it('middleware should works with a mongo drivers', async () => {
-    expect.assertions(1);
-
     const { isNextCalled } = await makeOneRequest({
       rateLimiter: mongoRateLimiter,
       request: { ip: '10.10.0.1' },
     });
 
-    expect(isNextCalled).toBeTruthy();
+    assert.ok(isNextCalled);
   });
 
   it('middleware should works with a memory drivers', async () => {
-    expect.assertions(1);
-
     const { isNextCalled } = await makeOneRequest({
       driver: 'memory',
       request: { ip: '10.10.0.1' },
     });
 
-    expect(isNextCalled).toBeTruthy();
+    assert.ok(isNextCalled);
   });
 
   it('middleware should works with a redis drivers', async () => {
-    expect.assertions(1);
-
     const { isNextCalled } = await makeOneRequest({
       driver: 'redis',
       request: { ip: '10.10.0.1' },
     });
 
-    expect(isNextCalled).toBeTruthy();
+    assert.ok(isNextCalled);
   });
 
   it('middleware should rate limits for us. mongo driver', async () => {
-    expect.assertions(2);
-
     const middlewares = Array.from({ length: 20 }, () =>
       makeOneRequest({ rateLimiter: mongoRateLimiter }),
     );
@@ -218,13 +200,11 @@ describe('rate limiter methods', () => {
     const status = data.find((obj) => obj.status === 429);
     const isSend = data.find((obj) => obj.isSend);
 
-    expect(status?.status).toBe(429);
-    expect(isSend?.isSend).toBeTruthy();
+    assert.strictEqual(status?.status, 429);
+    assert.ok(isSend?.isSend);
   });
 
   it('middleware should rate limits for us. memory driver', async () => {
-    expect.assertions(2);
-
     const rateLimiter = new RateLimiter(appInstance, {
       driver: 'memory',
     });
@@ -238,13 +218,11 @@ describe('rate limiter methods', () => {
     const status = data.find((obj) => obj.status === 429);
     const isSend = data.find((obj) => obj.isSend);
 
-    expect(status?.status).toBe(429);
-    expect(isSend?.isSend).toBeTruthy();
+    assert.strictEqual(status?.status, 429);
+    assert.ok(isSend?.isSend);
   });
 
   it('middleware should rate limits for us. redis driver', async () => {
-    expect.assertions(2);
-
     const rateLimiter = new RateLimiter(appInstance, {
       driver: 'redis',
     });
@@ -258,29 +236,28 @@ describe('rate limiter methods', () => {
     const status = data.find((obj) => obj.status === 429);
     const isSend = data.find((obj) => obj.isSend);
 
-    expect(status?.status).toBe(429);
-    expect(isSend?.isSend).toBeTruthy();
+    assert.strictEqual(status?.status, 429);
+    assert.ok(isSend?.isSend);
   });
 
   describe('store failure handling (doc 10)', () => {
     it('a store failure (consume rejects with an Error) fails OPEN, not 429', async () => {
-      expect.assertions(2);
       const rateLimiter = new RateLimiter(appInstance, { driver: 'memory' });
-      vi.spyOn(rateLimiter.limiter, 'consume').mockRejectedValue(
+      mockRejectedValue(
+        mock.method(rateLimiter.limiter, 'consume'),
         new Error('store down'),
       );
       const { status, isNextCalled } = await makeOneRequest({
         rateLimiter,
         request: { ip: '10.10.0.2' },
       });
-      expect(isNextCalled).toBe(true);
-      expect(status).not.toBe(429);
+      assert.strictEqual(isNextCalled, true);
+      assert.notStrictEqual(status, 429);
     });
 
     it('a real limit hit (consume rejects with RateLimiterRes) → 429 + Retry-After', async () => {
-      expect.assertions(2);
       const rateLimiter = new RateLimiter(appInstance, { driver: 'memory' });
-      vi.spyOn(rateLimiter.limiter, 'consume').mockRejectedValue({
+      mockRejectedValue(mock.method(rateLimiter.limiter, 'consume'), {
         msBeforeNext: 5000,
       } as never);
 
@@ -304,21 +281,23 @@ describe('rate limiter methods', () => {
         () => {},
       );
 
-      expect(status).toBe(429);
-      expect(retryAfter).toBe('5');
+      assert.strictEqual(status, 429);
+      assert.strictEqual(retryAfter, '5');
     });
 
     it('keeps limiting via the memory insurance when the redis store fails', async () => {
-      expect.assertions(2);
       const rateLimiter = new RateLimiter(appInstance, { driver: 'redis' });
       await rateLimiter.whenReady; // redis limiter builds lazily
       // Force every redis store write to fail so rate-limiter-flexible falls back
       // to the insurance limiter. `_upsert` is the library's store-write hook
       // (RateLimiterStoreAbstract) — if it ever renames, this test breaks loudly.
-      vi.spyOn(
-        rateLimiter.limiter as unknown as { _upsert: () => Promise<unknown> },
-        '_upsert',
-      ).mockRejectedValue(new Error('store down'));
+      mockRejectedValue(
+        mock.method(
+          rateLimiter.limiter as unknown as { _upsert: () => Promise<unknown> },
+          '_upsert',
+        ),
+        new Error('store down'),
+      );
 
       // Same shape as the real redis-limit test, but with the store broken: the
       // memory insurance (same limiterOptions) must still enforce the limit.
@@ -328,8 +307,14 @@ describe('rate limiter methods', () => {
         ),
       );
 
-      expect(data.some((r) => r.status === 429)).toBe(true); // insurance limits
-      expect(data.some((r) => r.isNextCalled)).toBe(true); // and some pass
+      assert.strictEqual(
+        data.some((r) => r.status === 429),
+        true,
+      ); // insurance limits
+      assert.strictEqual(
+        data.some((r) => r.isNextCalled),
+        true,
+      ); // and some pass
     });
   });
 });

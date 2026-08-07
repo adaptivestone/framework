@@ -1,7 +1,9 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { Response } from 'express';
-import { describe, expect, it } from 'vitest';
 import Transport from 'winston-transport';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { assertThrowsLike } from '../../../tests/assertions.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import Cors from './Cors.ts';
 
@@ -20,39 +22,31 @@ class CaptureTransport extends Transport {
 
 describe('cors middleware methods', () => {
   it('have description fields', async () => {
-    expect.assertions(1);
-
     // const middleware = new Cors(appInstance, { origins: ['something'] });
 
-    expect(Cors.description).toBeDefined();
+    assert.notStrictEqual(Cors.description, undefined);
   });
 
   it('should throw without origns', async () => {
-    expect.assertions(1);
     // @ts-expect-error we not pass options
-    expect(() => new Cors(appInstance)).toThrow();
+    assertThrowsLike(() => new Cors(appInstance));
   });
 
   it('should throw with empty options', async () => {
-    expect.assertions(1);
     // @ts-expect-error we are passong wrong option
-    expect(() => new Cors(appInstance, {})).toThrow();
+    assertThrowsLike(() => new Cors(appInstance, {}));
   });
 
   it('should throw with empty origins', async () => {
-    expect.assertions(1);
-    expect(() => new Cors(appInstance, { origins: [] })).toThrow();
+    assertThrowsLike(() => new Cors(appInstance, { origins: [] }));
   });
 
   it('should throw with empty origins not array', async () => {
-    expect.assertions(1);
     // @ts-expect-error we passing not an Array
-    expect(() => new Cors(appInstance, { origins: 'origins' })).toThrow();
+    assertThrowsLike(() => new Cors(appInstance, { origins: 'origins' }));
   });
 
   it('non options should be different', async () => {
-    expect.assertions(2);
-
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -78,13 +72,11 @@ describe('cors middleware methods', () => {
       nextFunction,
     );
 
-    expect(isCalled).toBeTruthy();
-    expect(map.get('Vary')).toBe('Origin');
+    assert.ok(isCalled);
+    assert.strictEqual(map.get('Vary'), 'Origin');
   });
 
   it('host the not match origin', async () => {
-    expect.assertions(1);
-
     let isCalled = false;
     const nextFunction = () => {
       isCalled = true;
@@ -103,7 +95,7 @@ describe('cors middleware methods', () => {
       nextFunction,
     );
 
-    expect(isCalled).toBeTruthy();
+    assert.ok(isCalled);
   });
 
   it('continues safely if origins are unavailable at request time', async () => {
@@ -124,12 +116,10 @@ describe('cors middleware methods', () => {
       },
     );
 
-    expect(isCalled).toBe(true);
+    assert.strictEqual(isCalled, true);
   });
 
   it('string domain match', async () => {
-    expect.assertions(5);
-
     let isEndCalled = false;
     const map = new Map();
     const req = {
@@ -158,20 +148,26 @@ describe('cors middleware methods', () => {
       () => {},
     );
 
-    expect(isEndCalled).toBeTruthy();
-    expect(map.get('Vary')).toBe('Origin, Access-Control-Request-Headers');
-    expect(map.get('Access-Control-Allow-Headers')).toBe(
+    assert.ok(isEndCalled);
+    assert.strictEqual(
+      map.get('Vary'),
+      'Origin, Access-Control-Request-Headers',
+    );
+    assert.strictEqual(
+      map.get('Access-Control-Allow-Headers'),
       'someAccessControlRequestHeaders',
     );
-    expect(map.get('Access-Control-Allow-Origin')).toBe('https://localhost');
-    expect(map.get('Access-Control-Allow-Methods')).toBe(
+    assert.strictEqual(
+      map.get('Access-Control-Allow-Origin'),
+      'https://localhost',
+    );
+    assert.strictEqual(
+      map.get('Access-Control-Allow-Methods'),
       'GET,HEAD,PUT,PATCH,POST,DELETE',
     );
   });
 
   it('regexp domain match', async () => {
-    expect.assertions(5);
-
     let isEndCalled = false;
     const map = new Map();
     const req = {
@@ -204,20 +200,26 @@ describe('cors middleware methods', () => {
       () => {},
     );
 
-    expect(isEndCalled).toBeTruthy();
-    expect(map.get('Vary')).toBe('Origin, Access-Control-Request-Headers');
-    expect(map.get('Access-Control-Allow-Headers')).toBe(
+    assert.ok(isEndCalled);
+    assert.strictEqual(
+      map.get('Vary'),
+      'Origin, Access-Control-Request-Headers',
+    );
+    assert.strictEqual(
+      map.get('Access-Control-Allow-Headers'),
       'someAccessControlRequestHeaders',
     );
-    expect(map.get('Access-Control-Allow-Origin')).toBe('https://localhost');
-    expect(map.get('Access-Control-Allow-Methods')).toBe(
+    assert.strictEqual(
+      map.get('Access-Control-Allow-Origin'),
+      'https://localhost',
+    );
+    assert.strictEqual(
+      map.get('Access-Control-Allow-Methods'),
       'GET,HEAD,PUT,PATCH,POST,DELETE',
     );
   });
 
   it('an unanchored regex matches unintended origins; an anchored one does not (doc 21)', async () => {
-    expect.assertions(2);
-
     const reflect = async (origins: (string | RegExp)[], origin: string) => {
       const map = new Map();
       await new Cors(appInstance, { origins }).middleware(
@@ -229,21 +231,21 @@ describe('cors middleware methods', () => {
     };
 
     // Footgun: `/example\.com/` (unanchored) reflects an attacker origin.
-    expect(await reflect([/example\.com/], 'https://evil-example.com')).toBe(
+    assert.strictEqual(
+      await reflect([/example\.com/], 'https://evil-example.com'),
       'https://evil-example.com',
     );
     // Anchored regex does not.
-    expect(
+    assert.strictEqual(
       await reflect(
         [/^https:\/\/([a-z0-9-]+\.)?example\.com$/],
         'https://evil-example.com',
       ),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('warns at construction for an unanchored CORS regex only (doc 21)', async () => {
-    expect.assertions(2);
-
     const captured: string[] = [];
     const transport = new CaptureTransport(captured);
     appInstance.logger.add(transport);
@@ -257,7 +259,7 @@ describe('cors middleware methods', () => {
     }
 
     const all = captured.join('\n');
-    expect(all).toContain('not anchored');
-    expect((all.match(/not anchored/g) ?? []).length).toBe(1);
+    assert.ok(all.includes('not anchored'));
+    assert.strictEqual((all.match(/not anchored/g) ?? []).length, 1);
   });
 });

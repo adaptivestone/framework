@@ -70,7 +70,10 @@ await runCluster(() => process.exit(0), {
 });
 console.log('  ✓ packed runCluster started one worker and observed its clean exit');
 
-// 2. Public subpath that pulls a dev dep (vitest): resolve only, don't execute.
+// 2. Public runner preloads: resolve only, don't execute hooks here. Vitest is
+// an optional peer and is deliberately absent from this scratch install.
+import.meta.resolve('@adaptivestone/framework/tests/setupNodeTest.js');
+console.log('  ✓ resolve @adaptivestone/framework/tests/setupNodeTest.js');
 import.meta.resolve('@adaptivestone/framework/tests/setupVitest.js');
 console.log('  ✓ resolve @adaptivestone/framework/tests/setupVitest.js');
 

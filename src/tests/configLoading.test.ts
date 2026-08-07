@@ -1,6 +1,8 @@
+import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { assertTextMatch, assertTextNotMatch } from './assertions.ts';
 
 // Config loading is exercised in a spawned child so NODE_ENV can be set per
 // scenario (it's process-global, and the in-process test server already owns a
@@ -45,31 +47,31 @@ const parseConfigs = (out: string): Record<string, unknown> => {
 describe('config loading — env-only config (finding #11)', () => {
   it('loads an env-only config (no base file) when NODE_ENV matches its env segment', async () => {
     const { code, out } = await runInit('production');
-    expect(code).toBe(0);
+    assert.strictEqual(code, 0);
     const configs = parseConfigs(out);
     // envOnly.production.ts is the only file for this config — its values load
     // directly instead of crashing boot with `import(undefined)`.
-    expect(configs.envOnly).toEqual({
+    assert.deepStrictEqual(configs.envOnly, {
       marker: 'env-only-production-value',
       fromEnv: 42,
     });
     // A normal base+env config still merges byte-identically: env overrides base.
-    expect(configs.withBase).toEqual({ a: 1, b: 'prod', c: 3 });
+    assert.deepStrictEqual(configs.withBase, { a: 1, b: 'prod', c: 3 });
   }, 40000);
 
   it('treats an env-only config as absent (like an unknown config) when NODE_ENV does not match, naming the config and missing base', async () => {
     const { code, out } = await runInit('test');
-    expect(code).toBe(0);
+    assert.strictEqual(code, 0);
     // No applicable file for NODE_ENV=test → same as a config that was never
     // defined: getConfig returns {}.
     const configs = parseConfigs(out);
-    expect(configs.envOnly).toEqual({});
+    assert.deepStrictEqual(configs.envOnly, {});
     // Base-only config still loads its base (env override does not apply).
-    expect(configs.withBase).toEqual({ a: 1, b: 'base' });
+    assert.deepStrictEqual(configs.withBase, { a: 1, b: 'base' });
     // Clear diagnostic names the config and the missing base file — never the
     // bare `Cannot find package 'undefined'`.
-    expect(out).toMatch(/envOnly/);
-    expect(out).toMatch(/envOnly\.ts/);
-    expect(out).not.toMatch(/Cannot find package 'undefined'/);
+    assertTextMatch(out, /envOnly/);
+    assertTextMatch(out, /envOnly\.ts/);
+    assertTextNotMatch(out, /Cannot find package 'undefined'/);
   }, 40000);
 });

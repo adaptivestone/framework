@@ -1,7 +1,8 @@
+import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { after, before, describe, it } from 'node:test';
 import {
   envShapeToType,
   extractConfigEnvShape,
@@ -22,10 +23,10 @@ describe('astConfig — env-only key extraction', () => {
     return p;
   };
 
-  beforeAll(async () => {
+  before(async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'astconfig-'));
   });
-  afterAll(async () => {
+  after(async () => {
     await rm(dir, { recursive: true, force: true });
   });
 
@@ -34,7 +35,7 @@ describe('astConfig — env-only key extraction', () => {
       'a.ts',
       `export default { connectionString: process.env.MONGO_DSN };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {
       connectionString: 'string | undefined',
     });
   });
@@ -44,7 +45,7 @@ describe('astConfig — env-only key extraction', () => {
       'b.ts',
       `export default { apiKey: process.env['HUBSPOT_API_KEY'] };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {
       apiKey: 'string | undefined',
     });
   });
@@ -59,12 +60,12 @@ describe('astConfig — env-only key extraction', () => {
         n: 5,
       };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({});
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {});
   });
 
   it('treats `process.env.X!` as asserted `string`', async () => {
     const p = await write('d.ts', `export default { s: process.env.SECRET! };`);
-    expect(await extractConfigEnvShape(p)).toEqual({ s: 'string' });
+    assert.deepStrictEqual(await extractConfigEnvShape(p), { s: 'string' });
   });
 
   it('recurses into nested objects, keeping only env keys', async () => {
@@ -75,7 +76,7 @@ describe('astConfig — env-only key extraction', () => {
         empty: { a: 1, b: 'x' },
       };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {
       hubspot: { apiKey: 'string | undefined' },
     });
   });
@@ -85,13 +86,16 @@ describe('astConfig — env-only key extraction', () => {
       'f.ts',
       `const cfg = { token: process.env.TOK } as const;\nexport default cfg;`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {
       token: 'string | undefined',
     });
   });
 
   it('returns {} for an unreadable / unparsable file', async () => {
-    expect(await extractConfigEnvShape(path.join(dir, 'nope.ts'))).toEqual({});
+    assert.deepStrictEqual(
+      await extractConfigEnvShape(path.join(dir, 'nope.ts')),
+      {},
+    );
   });
 
   it('skips spread elements and methods, keeps sibling env reads', async () => {
@@ -103,7 +107,7 @@ describe('astConfig — env-only key extraction', () => {
         apiKey: process.env.KEY,
       };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {
       apiKey: 'string | undefined',
     });
   });
@@ -113,7 +117,7 @@ describe('astConfig — env-only key extraction', () => {
       'h.ts',
       `export default { 'api-key': process.env.KEY };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {
       'api-key': 'string | undefined',
     });
   });
@@ -123,7 +127,7 @@ describe('astConfig — env-only key extraction', () => {
       'i.ts',
       `const k = 'dynamic';\nexport default { [k]: process.env.KEY };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({});
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {});
   });
 
   it('returns {} when there is no default export', async () => {
@@ -131,25 +135,25 @@ describe('astConfig — env-only key extraction', () => {
       'j.ts',
       `export const config = { token: process.env.TOK };`,
     );
-    expect(await extractConfigEnvShape(p)).toEqual({});
+    assert.deepStrictEqual(await extractConfigEnvShape(p), {});
   });
 
   it('returns {} when the default export is not an object', async () => {
     // a function declaration default
     const fn = await write('k.ts', `export default function make() {};`);
-    expect(await extractConfigEnvShape(fn)).toEqual({});
+    assert.deepStrictEqual(await extractConfigEnvShape(fn), {});
     // an identifier resolving to a non-object init
     const ident = await write(
       'l.ts',
       `const factory = () => ({ token: process.env.TOK });\nexport default factory;`,
     );
-    expect(await extractConfigEnvShape(ident)).toEqual({});
+    assert.deepStrictEqual(await extractConfigEnvShape(ident), {});
     // an identifier that can't be resolved to a local var (imported)
     const imported = await write(
       'm.ts',
       `import cfg from './base.js';\nexport default cfg;`,
     );
-    expect(await extractConfigEnvShape(imported)).toEqual({});
+    assert.deepStrictEqual(await extractConfigEnvShape(imported), {});
   });
 });
 
@@ -159,7 +163,7 @@ describe('astConfig — merge + render helpers', () => {
       { a: 'string | undefined', nested: { x: 'string | undefined' } },
       { b: 'string', nested: { y: 'string' } },
     ]);
-    expect(merged).toEqual({
+    assert.deepStrictEqual(merged, {
       a: 'string | undefined',
       b: 'string',
       nested: { x: 'string | undefined', y: 'string' },
@@ -167,8 +171,9 @@ describe('astConfig — merge + render helpers', () => {
   });
 
   it('renders a shape to a TS type literal', () => {
-    expect(
+    assert.strictEqual(
       envShapeToType({ apiKey: 'string | undefined', nest: { t: 'string' } }),
-    ).toBe(`{ "apiKey": string | undefined; "nest": { "t": string } }`);
+      `{ "apiKey": string | undefined; "nest": { "t": string } }`,
+    );
   });
 });

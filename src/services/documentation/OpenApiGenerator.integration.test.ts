@@ -6,11 +6,17 @@
  * security, and the `description`/`controllerClass` meta threading.
  */
 
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { object, string } from 'yup';
 import ControllerManager from '../../controllers/index.ts';
 import AbstractController from '../../modules/AbstractController.ts';
 import type { IApp } from '../../server.ts';
+import {
+  assertContainEqual,
+  assertMatchObject,
+  pattern,
+} from '../../tests/assertions.ts';
 import AbstractMiddleware from '../http/middleware/AbstractMiddleware.ts';
 import { RouteRegistry } from '../http/routing/RouteRegistry.ts';
 import { generateOpenApi } from './OpenApiGenerator.ts';
@@ -76,36 +82,35 @@ describe('generateOpenApi over a real ControllerManager registry', () => {
 
     // POST /items — body merges route schema (name, note) + middleware (token).
     const post = paths['/items'].post;
-    expect(post.summary).toBe('Create an item');
-    expect(post.operationId).toBe('Items_create');
-    expect(post.tags).toEqual(['Items']);
+    assert.strictEqual(post.summary, 'Create an item');
+    assert.strictEqual(post.operationId, 'Items_create');
+    assert.deepStrictEqual(post.tags, ['Items']);
     const body = post.requestBody.content['application/json'].schema;
-    expect(Object.keys(body.properties).sort()).toEqual([
+    assert.deepStrictEqual(Object.keys(body.properties).sort(), [
       'name',
       'note',
       'token',
     ]);
-    expect(body.required).toEqual(['name']);
+    assert.deepStrictEqual(body.required, ['name']);
     // bearerAuth comes from our route middleware; the controller's default
     // chain (GetUserByToken) may add more — assert presence, not exclusivity.
-    expect(post.security).toContainEqual({ bearerAuth: [] });
-    expect((doc.components as AnyDoc).securitySchemes.bearerAuth).toMatchObject(
-      {
-        type: 'http',
-        scheme: 'bearer',
-      },
-    );
+    assertContainEqual(post.security, { bearerAuth: [] });
+    assertMatchObject((doc.components as AnyDoc).securitySchemes.bearerAuth, {
+      type: 'http',
+      scheme: 'bearer',
+    });
 
     // GET /items/{id} — path param + query param.
     const get = paths['/items/{id}'].get;
-    expect(get.parameters).toContainEqual({
+    assertContainEqual(get.parameters, {
       name: 'id',
       in: 'path',
       required: true,
       schema: { type: 'string' },
     });
-    expect(get.parameters).toContainEqual(
-      expect.objectContaining({ name: 'verbose', in: 'query' }),
+    assertContainEqual(
+      get.parameters,
+      pattern.objectContaining({ name: 'verbose', in: 'query' }),
     );
   });
 });

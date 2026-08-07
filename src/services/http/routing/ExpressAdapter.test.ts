@@ -1,6 +1,16 @@
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
 import type { IApp } from '../../../server.ts';
+import {
+  assertCalled,
+  assertCalledTimes,
+  assertCalledWith,
+  assertNotCalled,
+  assertNotCalledWith,
+  assertTextMatch,
+  pattern,
+} from '../../../tests/assertions.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
 
@@ -65,7 +75,7 @@ const makeReq = (method: string, path: string) =>
 
 // App stub exposing a spyable logger so tests can assert what gets logged.
 const makeAppWithLogger = () => {
-  const error = vi.fn();
+  const error = mock.fn();
   const app = {
     getConfig: () => ({}),
     logger: { error },
@@ -84,9 +94,9 @@ describe('createExpressAdapter — 404 fallthrough', () => {
     r.registerRoute('GET', '/users', { handler: async () => {} });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    const next = vi.fn();
+    const next = mock.fn();
     await adapter(makeReq('GET', '/missing'), makeRes(), next);
-    expect(next).toHaveBeenCalledWith();
+    assertCalledWith(next);
   });
 });
 
@@ -98,17 +108,17 @@ describe('createExpressAdapter — 405 with Allow', () => {
 
     const adapter = createExpressAdapter(r, fakeApp);
     const res = makeRes();
-    await adapter(makeReq('DELETE', '/users'), res, vi.fn());
-    expect(res.statusCode).toBe(405);
+    await adapter(makeReq('DELETE', '/users'), res, mock.fn());
+    assert.strictEqual(res.statusCode, 405);
     const allow = res.getHeader('allow');
-    expect(allow).toMatch(/GET/);
-    expect(allow).toMatch(/POST/);
+    assertTextMatch(allow, /GET/);
+    assertTextMatch(allow, /POST/);
   });
 });
 
 describe('createExpressAdapter — successful match', () => {
   it('invokes the handler with req and res', async () => {
-    const handler = vi.fn(async (_req, res) => {
+    const handler = mock.fn(async (_req, res) => {
       res.json({ ok: true });
     });
     const r = new RouteRegistry();
@@ -116,9 +126,9 @@ describe('createExpressAdapter — successful match', () => {
 
     const adapter = createExpressAdapter(r, fakeApp);
     const res = makeRes();
-    await adapter(makeReq('GET', '/users'), res, vi.fn());
-    expect(handler).toHaveBeenCalled();
-    expect(res.body).toEqual({ ok: true });
+    await adapter(makeReq('GET', '/users'), res, mock.fn());
+    assertCalled(handler);
+    assert.deepStrictEqual(res.body, { ok: true });
   });
 
   it('populates req.params with matched params', async () => {
@@ -132,8 +142,8 @@ describe('createExpressAdapter — successful match', () => {
     });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    await adapter(makeReq('GET', '/users/42'), makeRes(), vi.fn());
-    expect(captured).toEqual({ id: '42' });
+    await adapter(makeReq('GET', '/users/42'), makeRes(), mock.fn());
+    assert.deepStrictEqual(captured, { id: '42' });
   });
 
   it('attaches routeMeta with bodyParsing and handler meta', async () => {
@@ -150,8 +160,8 @@ describe('createExpressAdapter — successful match', () => {
     });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    await adapter(makeReq('POST', '/webhook'), makeRes(), vi.fn());
-    expect(captured).toEqual({
+    await adapter(makeReq('POST', '/webhook'), makeRes(), mock.fn());
+    assert.deepStrictEqual(captured, {
       bodyParsing: 'raw',
       methodName: 'webhookHandler',
     });
@@ -197,8 +207,8 @@ describe('createExpressAdapter — middleware order + short-circuit', () => {
     });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    await adapter(makeReq('GET', '/x'), makeRes(), vi.fn());
-    expect(order).toEqual(['first', 'second', 'handler']);
+    await adapter(makeReq('GET', '/x'), makeRes(), mock.fn());
+    assert.deepStrictEqual(order, ['first', 'second', 'handler']);
   });
 
   it('short-circuits when a middleware ends the response', async () => {
@@ -226,9 +236,9 @@ describe('createExpressAdapter — middleware order + short-circuit', () => {
 
     const adapter = createExpressAdapter(r, fakeApp);
     const res = makeRes();
-    await adapter(makeReq('GET', '/protected'), res, vi.fn());
-    expect(order).toEqual(['mw']); // handler did NOT run
-    expect(res.statusCode).toBe(401);
+    await adapter(makeReq('GET', '/protected'), res, mock.fn());
+    assert.deepStrictEqual(order, ['mw']); // handler did NOT run
+    assert.strictEqual(res.statusCode, 401);
   });
 });
 
@@ -242,10 +252,13 @@ describe('createExpressAdapter — error propagation', () => {
     });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    const next = vi.fn();
+    const next = mock.fn();
     await adapter(makeReq('GET', '/boom'), makeRes(), next);
-    expect(next).toHaveBeenCalledWith(expect.any(Error));
-    expect(next.mock.calls[0]?.[0]?.message).toBe('handler exploded');
+    assertCalledWith(next, pattern.any(Error));
+    assert.strictEqual(
+      next.mock.calls[0]?.arguments[0]?.message,
+      'handler exploded',
+    );
   });
 
   it('passes middleware errors to next(err)', async () => {
@@ -264,10 +277,13 @@ describe('createExpressAdapter — error propagation', () => {
     r.registerRoute('GET', '/x', { handler: async () => {} });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    const next = vi.fn();
+    const next = mock.fn();
     await adapter(makeReq('GET', '/x'), makeRes(), next);
-    expect(next).toHaveBeenCalledWith(expect.any(Error));
-    expect(next.mock.calls[0]?.[0]?.message).toBe('mw exploded');
+    assertCalledWith(next, pattern.any(Error));
+    assert.strictEqual(
+      next.mock.calls[0]?.arguments[0]?.message,
+      'mw exploded',
+    );
   });
 });
 
@@ -278,8 +294,8 @@ describe('createExpressAdapter — malformed URL', () => {
 
     const adapter = createExpressAdapter(r, fakeApp);
     const res = makeRes();
-    await adapter(makeReq('GET', '/users/%'), res, vi.fn());
-    expect(res.statusCode).toBe(400);
+    await adapter(makeReq('GET', '/users/%'), res, mock.fn());
+    assert.strictEqual(res.statusCode, 400);
   });
 });
 
@@ -309,11 +325,11 @@ describe('createExpressAdapter — middleware instance caching', () => {
     });
 
     const adapter = createExpressAdapter(r, fakeApp);
-    await adapter(makeReq('GET', '/x'), makeRes(), vi.fn());
-    await adapter(makeReq('GET', '/x'), makeRes(), vi.fn());
-    await adapter(makeReq('GET', '/x'), makeRes(), vi.fn());
+    await adapter(makeReq('GET', '/x'), makeRes(), mock.fn());
+    await adapter(makeReq('GET', '/x'), makeRes(), mock.fn());
+    await adapter(makeReq('GET', '/x'), makeRes(), mock.fn());
 
-    expect(constructCount).toBe(1);
+    assert.strictEqual(constructCount, 1);
   });
 
   it('shares one instance across concurrent requests (no double-construct)', async () => {
@@ -345,11 +361,11 @@ describe('createExpressAdapter — middleware instance caching', () => {
     const adapter = createExpressAdapter(r, fakeApp);
     await Promise.all(
       Array.from({ length: 10 }, () =>
-        adapter(makeReq('GET', '/x'), makeRes(), vi.fn()),
+        adapter(makeReq('GET', '/x'), makeRes(), mock.fn()),
       ),
     );
 
-    expect(constructCount).toBe(1);
+    assert.strictEqual(constructCount, 1);
   });
 });
 
@@ -379,18 +395,18 @@ describe('createExpressAdapter — late middleware rejection', () => {
     const { app, error } = makeAppWithLogger();
     const adapter = createExpressAdapter(r, app);
     const res = makeRes();
-    const next = vi.fn();
+    const next = mock.fn();
     await adapter(makeReq('GET', '/x'), res, next);
     await flush();
 
     // The late rejection is surfaced, not swallowed…
-    expect(error).toHaveBeenCalledTimes(1);
-    const logged = String(error.mock.calls[0]?.[0]);
-    expect(logged).toContain('late boom');
-    expect(logged).toContain('LateRejectMw');
+    assertCalledTimes(error, 1);
+    const logged = String(error.mock.calls[0]?.arguments[0]);
+    assert.ok(logged.includes('late boom'));
+    assert.ok(logged.includes('LateRejectMw'));
     // …but the already-advanced request still completed normally.
-    expect(res.writableEnded).toBe(true);
-    expect(next).not.toHaveBeenCalledWith(expect.any(Error));
+    assert.strictEqual(res.writableEnded, true);
+    assertNotCalledWith(next, pattern.any(Error));
   });
 
   it('stays silent on a benign double next() with no error', async () => {
@@ -417,11 +433,11 @@ describe('createExpressAdapter — late middleware rejection', () => {
     const { app, error } = makeAppWithLogger();
     const adapter = createExpressAdapter(r, app);
     const res = makeRes();
-    await adapter(makeReq('GET', '/x'), res, vi.fn());
+    await adapter(makeReq('GET', '/x'), res, mock.fn());
     await flush();
 
-    expect(error).not.toHaveBeenCalled();
-    expect(res.writableEnded).toBe(true);
+    assertNotCalled(error);
+    assert.strictEqual(res.writableEnded, true);
   });
 });
 
@@ -436,8 +452,8 @@ describe('createExpressAdapter — match throws non-MalformedPathError', () => {
     };
 
     const adapter = createExpressAdapter(r, fakeApp);
-    const next = vi.fn();
+    const next = mock.fn();
     await adapter(makeReq('GET', '/users'), makeRes(), next);
-    expect(next).toHaveBeenCalledWith(explosion);
+    assertCalledWith(next, explosion);
   });
 });

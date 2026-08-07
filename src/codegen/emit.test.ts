@@ -13,9 +13,10 @@
  * shared `__fixtures__/*.routes.gen.ts` the golden test writes.
  */
 
+import assert from 'node:assert/strict';
 import path from 'node:path';
+import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
 import { parseDiagnostics } from './__fixtures__/parseDiagnostics.ts';
 import type { RouteMeta } from './collectMetadata.ts';
 import { type RenderInput, renderGenFile } from './emit.ts';
@@ -52,16 +53,16 @@ describe('renderGenFile — path-param robustness (finding #17)', () => {
     );
     // Runtime does `seg.slice(1)`: `order-id` and `1st` reach `req.params`
     // verbatim. Neither is a valid TS identifier → single-quoted keys.
-    expect(out).toContain("params: { 'order-id': string }");
-    expect(out).toContain("params: { '1st': string }");
+    assert.ok(out.includes("params: { 'order-id': string }"));
+    assert.ok(out.includes("params: { '1st': string }"));
     // Sanity: the emitted module still parses (quoting keeps the key valid TS).
-    expect(parseDiagnostics(out)).toEqual([]);
+    assert.deepStrictEqual(parseDiagnostics(out), []);
   });
 
   it('leaves valid-identifier params unquoted (byte-identical output)', () => {
     const out = renderGenFile(inputFor([route('get', '/user/:id', 'getUser')]));
-    expect(out).toContain('params: { id: string }');
-    expect(out).not.toContain("'id'");
+    assert.ok(out.includes('params: { id: string }'));
+    assert.ok(!out.includes("'id'"));
   });
 });
 
@@ -69,8 +70,8 @@ describe('renderGenFile — JSDoc escaping (finding #19)', () => {
   it('escapes `*/` in a route path so the doc comment stays intact', () => {
     const out = renderGenFile(inputFor([route('get', '/a*/b', 'thing')]));
     // The doc comment renders the escaped form (`*\/`), not a raw `*/`.
-    expect(out).toContain('GET /a*\\/b');
+    assert.ok(out.includes('GET /a*\\/b'));
     // The whole module parses — an unescaped `*/` ends the comment early.
-    expect(parseDiagnostics(out)).toEqual([]);
+    assert.deepStrictEqual(parseDiagnostics(out), []);
   });
 });

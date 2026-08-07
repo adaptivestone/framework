@@ -1,6 +1,7 @@
+import assert from 'node:assert/strict';
 import type { IncomingMessage } from 'node:http';
+import { describe, it } from 'node:test';
 import type { Response } from 'express';
-import { describe, expect, it } from 'vitest';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import IpDetector from './IpDetector.ts';
@@ -118,14 +119,11 @@ const testVectors = [
 
 describe('ipDetector methods', () => {
   it('have description fields', async () => {
-    expect.assertions(1);
     // const middleware = new IpDetector(appInstance);
-    expect(IpDetector.description).toBeDefined();
+    assert.notStrictEqual(IpDetector.description, undefined);
   });
 
   it('middleware that works', async () => {
-    expect.hasAssertions();
-
     const nextFunction = () => {};
     for (const vector of testVectors) {
       appInstance.updateConfig('ipDetector', {
@@ -150,7 +148,10 @@ describe('ipDetector methods', () => {
           nextFunction,
         );
 
-        expect(req.appInfo.ip).toBe(test.matches ? '203.0.113.7' : test.ip);
+        assert.strictEqual(
+          req.appInfo.ip,
+          test.matches ? '203.0.113.7' : test.ip,
+        );
       }
     }
   });
@@ -177,44 +178,39 @@ describe('getIpAdressFromIncomingMessage trusted-hop walk', () => {
   };
 
   it('returns the right-most untrusted hop, not the spoofable left-most', () => {
-    expect.assertions(1);
     // Client spoofs `1.2.3.4`; the proxy appends the real `203.0.113.7`.
     const ip = detector().getIpAdressFromIncomingMessage(
       makeReq('127.0.0.1', '1.2.3.4, 203.0.113.7'),
     );
-    expect(ip).toBe('203.0.113.7');
+    assert.strictEqual(ip, '203.0.113.7');
   });
 
   it('skips trailing trusted-proxy hops to find the client', () => {
-    expect.assertions(1);
     const ip = detector().getIpAdressFromIncomingMessage(
       makeReq('127.0.0.1', '203.0.113.7, 10.0.0.5'),
     );
-    expect(ip).toBe('203.0.113.7');
+    assert.strictEqual(ip, '203.0.113.7');
   });
 
   it('ignores the header when the socket peer is not trusted', () => {
-    expect.assertions(1);
     const ip = detector().getIpAdressFromIncomingMessage(
       makeReq('203.0.113.9', '1.2.3.4'),
     );
-    expect(ip).toBe('203.0.113.9');
+    assert.strictEqual(ip, '203.0.113.9');
   });
 
   it('falls back to the left-most when the whole chain is trusted', () => {
-    expect.assertions(1);
     const ip = detector().getIpAdressFromIncomingMessage(
       makeReq('127.0.0.1', '10.1.1.1, 10.0.0.5'),
     );
-    expect(ip).toBe('10.1.1.1');
+    assert.strictEqual(ip, '10.1.1.1');
   });
 
   it('does not return a garbage entry to the left of the real client', () => {
-    expect.assertions(2);
     const ip = detector().getIpAdressFromIncomingMessage(
       makeReq('127.0.0.1', 'evil, 203.0.113.7'),
     );
-    expect(ip).toBe('203.0.113.7');
-    expect(ip).not.toBe('evil');
+    assert.strictEqual(ip, '203.0.113.7');
+    assert.notStrictEqual(ip, 'evil');
   });
 });

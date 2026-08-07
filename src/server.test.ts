@@ -1,5 +1,6 @@
+import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, it, mock } from 'node:test';
 import folderConfig from './folderConfig.ts';
 import {
   appInstance,
@@ -8,6 +9,15 @@ import {
 } from './helpers/appInstance.ts';
 import BaseCli from './modules/BaseCli.ts';
 import Server from './server.ts';
+import {
+  assertCalledTimes,
+  assertCalledWith,
+  assertHasProperty,
+  assertNthCalledWith,
+  assertThrowsLike,
+  pattern,
+} from './tests/assertions.ts';
+import { mockImplementation, mockResolvedValue } from './tests/mocks.ts';
 import { serverInstance } from './tests/testHelpers.ts';
 
 /**
@@ -19,57 +29,66 @@ import { serverInstance } from './tests/testHelpers.ts';
  */
 describe('Server lookups — DX guards', () => {
   it('getModel warns and returns false for an unknown model', () => {
-    const warn = vi
-      .spyOn(appInstance.logger, 'warn')
-      .mockImplementation(() => appInstance.logger);
-    expect(serverInstance.getModel('NoSuchModel')).toBe(false);
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
+    const warn = mockImplementation(
+      mock.method(appInstance.logger, 'warn'),
+      () => appInstance.logger,
+    );
+    assert.strictEqual(serverInstance.getModel('NoSuchModel'), false);
+    assertCalledTimes(warn, 1);
+    warn.mock.restore();
   });
 
   it('getModel warns about a plural model name', () => {
-    const warn = vi
-      .spyOn(appInstance.logger, 'warn')
-      .mockImplementation(() => appInstance.logger);
+    const warn = mockImplementation(
+      mock.method(appInstance.logger, 'warn'),
+      () => appInstance.logger,
+    );
     serverInstance.getModel('Users'); // plural → nudge + (also unknown) → false
-    expect(warn.mock.calls.some(([m]) => String(m).includes('plural'))).toBe(
+    assert.strictEqual(
+      warn.mock.calls.some(({ arguments: [message] }) =>
+        String(message).includes('plural'),
+      ),
       true,
     );
-    warn.mockRestore();
+    warn.mock.restore();
   });
 
   it('getModel returns a real model for a known name', () => {
-    expect(appInstance.getModel('User')).toBeTruthy();
+    assert.ok(appInstance.getModel('User'));
   });
 
   it('getModelOrThrow returns a real model for a known name', () => {
-    expect(appInstance.getModelOrThrow('User')).toBe(
+    assert.strictEqual(
+      appInstance.getModelOrThrow('User'),
       appInstance.getModel('User'),
     );
   });
 
   it('getModelOrThrow throws for an unknown runtime name', () => {
-    const warn = vi
-      .spyOn(appInstance.logger, 'warn')
-      .mockImplementation(() => appInstance.logger);
-    expect(() => appInstance.getModelOrThrow('NoSuchModel')).toThrow(
+    const warn = mockImplementation(
+      mock.method(appInstance.logger, 'warn'),
+      () => appInstance.logger,
+    );
+    assertThrowsLike(
+      () => appInstance.getModelOrThrow('NoSuchModel'),
       "Model 'NoSuchModel' is not available",
     );
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
+    assertCalledTimes(warn, 1);
+    warn.mock.restore();
   });
 
   it('getConfig warns and returns {} for an unknown config', () => {
-    const warn = vi
-      .spyOn(appInstance.logger, 'warn')
-      .mockImplementation(() => appInstance.logger);
-    expect(appInstance.getConfig('noSuchConfig')).toEqual({});
-    expect(warn).toHaveBeenCalledOnce();
-    warn.mockRestore();
+    const warn = mockImplementation(
+      mock.method(appInstance.logger, 'warn'),
+      () => appInstance.logger,
+    );
+    assert.deepStrictEqual(appInstance.getConfig('noSuchConfig'), {});
+    assertCalledTimes(warn, 1);
+    warn.mock.restore();
   });
 
   it('getConfig returns the cached config for a known name', () => {
-    expect(appInstance.getConfig('auth')).toHaveProperty('hashRounds');
+    assertHasProperty(appInstance.getConfig('auth'), 'hashRounds');
   });
 
   it('fails clearly when config/model lookups happen before init', () => {
@@ -77,21 +96,24 @@ describe('Server lookups — DX guards', () => {
     resetAppInstance();
     try {
       const server = new Server(folderConfig);
-      const error = vi.fn();
+      const error = mock.fn();
       Object.defineProperty(server.app, 'logger', {
-        value: { error, warn: vi.fn() },
+        value: { error, warn: mock.fn() },
       });
 
-      expect(server.getModel('Uninitialized')).toBe(false);
-      expect(() => server.getModelOrThrow('Uninitialized')).toThrow(
+      assert.strictEqual(server.getModel('Uninitialized'), false);
+      assertThrowsLike(
+        () => server.getModelOrThrow('Uninitialized'),
         "Model 'Uninitialized' is not available",
       );
-      expect(error).toHaveBeenCalledWith(
-        expect.objectContaining({
+      assertCalledWith(
+        error,
+        pattern.objectContaining({
           message: 'You should call Server.init() before using getModel',
         }),
       );
-      expect(() => server.getConfig('missing')).toThrow(
+      assertThrowsLike(
+        () => server.getConfig('missing'),
         'You should call Server.init() before using getConfig',
       );
     } finally {
@@ -103,19 +125,25 @@ describe('Server lookups — DX guards', () => {
 
 describe('Server.runCliCommand', () => {
   it('lazily creates one CLI and delegates subsequent commands to it', async () => {
-    const run = vi.spyOn(BaseCli.prototype, 'run').mockResolvedValue(true);
+    const run = mockResolvedValue(mock.method(BaseCli.prototype, 'run'), true);
     serverInstance.cli = null;
     try {
-      await expect(serverInstance.runCliCommand('first')).resolves.toBe(true);
+      await assert.strictEqual(
+        await serverInstance.runCliCommand('first'),
+        true,
+      );
       const cli = serverInstance.cli;
-      await expect(serverInstance.runCliCommand('second')).resolves.toBe(true);
+      await assert.strictEqual(
+        await serverInstance.runCliCommand('second'),
+        true,
+      );
 
-      expect(cli).toBeInstanceOf(BaseCli);
-      expect(serverInstance.cli).toBe(cli);
-      expect(run).toHaveBeenNthCalledWith(1, 'first');
-      expect(run).toHaveBeenNthCalledWith(2, 'second');
+      assert.ok(cli instanceof BaseCli);
+      assert.strictEqual(serverInstance.cli, cli);
+      assertNthCalledWith(run, 1, 'first');
+      assertNthCalledWith(run, 2, 'second');
     } finally {
-      run.mockRestore();
+      run.mock.restore();
       serverInstance.cli = null;
     }
   });
@@ -131,13 +159,13 @@ describe('Server.runCliCommand', () => {
 describe('Filesystem paths from import.meta.url are decoded, not percent-encoded', () => {
   it('folderConfig folders exist on disk and are not percent-encoded', () => {
     for (const folder of Object.values(folderConfig.folders)) {
-      expect(folder).not.toContain('%');
-      expect(existsSync(folder)).toBe(true);
+      assert.ok(!folder.includes('%'));
+      assert.strictEqual(existsSync(folder), true);
     }
   });
 
   it('app.frameworkFolder exists on disk and is not percent-encoded', () => {
-    expect(appInstance.frameworkFolder).not.toContain('%');
-    expect(existsSync(appInstance.frameworkFolder)).toBe(true);
+    assert.ok(!appInstance.frameworkFolder.includes('%'));
+    assert.strictEqual(existsSync(appInstance.frameworkFolder), true);
   });
 });

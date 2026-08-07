@@ -1,19 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { appInstance } from '../helpers/appInstance.ts';
 import SomeController from '../tests/fixtures/controllers/SomeController.ts';
 import AbstractController from './AbstractController.ts';
 
 describe('abstract controller methods', () => {
   it('can get routes', async () => {
-    expect.assertions(2);
-
     const controller = new AbstractController(appInstance, '');
     const childController = new SomeController(appInstance, '');
 
     const { routes } = controller;
     const { routes: childRoutes } = childController;
 
-    expect(routes).toStrictEqual({});
-    expect(childRoutes).toBeDefined();
+    assert.deepStrictEqual(routes, {});
+    assert.notStrictEqual(childRoutes, undefined);
   });
 });

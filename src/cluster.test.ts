@@ -1,10 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type ClusterEvent, runCluster } from './clusterRunner.ts';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import type { ClusterEvent } from './clusterRunner.ts';
+import {
+  assertCalledTimes,
+  assertMatchObject,
+  assertRejectsLike,
+} from './tests/assertions.ts';
 
 interface FakeWorker {
   id: number;
   process: { pid: number };
-  kill: ReturnType<typeof vi.fn>;
+  kill: ReturnType<typeof mock.fn>;
 }
 
 type ExitListener = (
@@ -13,48 +19,58 @@ type ExitListener = (
   signal: string | null,
 ) => void;
 
-const clusterState = vi.hoisted(() => ({
+const clusterState = {
   isPrimary: true,
   parallelism: 2,
   nextWorkerId: 1,
   workers: new Map<number, FakeWorker>(),
   exitListeners: new Set<ExitListener>(),
-}));
+};
 
-vi.mock('node:os', () => ({
-  availableParallelism: () => clusterState.parallelism,
-}));
+mock.module('node:os', {
+  exports: { availableParallelism: () => clusterState.parallelism },
+});
 
-vi.mock('node:cluster', () => ({
-  default: {
-    get isPrimary() {
-      return clusterState.isPrimary;
-    },
-    fork() {
-      const id = clusterState.nextWorkerId++;
-      const worker: FakeWorker = {
-        id,
-        process: { pid: 10_000 + id },
-        kill: vi.fn(),
-      };
-      clusterState.workers.set(id, worker);
-      return worker;
-    },
-    on(event: string, listener: ExitListener) {
-      if (event === 'exit') {
-        clusterState.exitListeners.add(listener);
-      }
-    },
-    off(event: string, listener: ExitListener) {
-      if (event === 'exit') {
-        clusterState.exitListeners.delete(listener);
-      }
+mock.module('node:cluster', {
+  exports: {
+    default: {
+      get isPrimary() {
+        return clusterState.isPrimary;
+      },
+      fork() {
+        const id = clusterState.nextWorkerId++;
+        const worker: FakeWorker = {
+          id,
+          process: { pid: 10_000 + id },
+          kill: mock.fn(),
+        };
+        clusterState.workers.set(id, worker);
+        return worker;
+      },
+      on(event: string, listener: ExitListener) {
+        if (event === 'exit') {
+          clusterState.exitListeners.add(listener);
+        }
+      },
+      off(event: string, listener: ExitListener) {
+        if (event === 'exit') {
+          clusterState.exitListeners.delete(listener);
+        }
+      },
     },
   },
-}));
+});
+
+const { runCluster } = await import('./clusterRunner.ts');
 
 const signalListeners = new Map<NodeJS.Signals, () => void>();
 let originalExitCode: typeof process.exitCode;
+let timers: typeof mock.timers;
+
+async function advanceTimers(milliseconds: number): Promise<void> {
+  timers.tick(milliseconds);
+  await Promise.resolve();
+}
 
 function events(target: ClusterEvent[] = []) {
   return { onEvent: (event: ClusterEvent) => target.push(event) };
@@ -83,8 +99,9 @@ function emitSignal(signal: NodeJS.Signals): void {
   signalListeners.get(signal)?.();
 }
 
-beforeEach(() => {
-  vi.useFakeTimers({ now: 0 });
+beforeEach((context) => {
+  timers = context.mock.timers;
+  timers.enable({ now: 0 });
   clusterState.isPrimary = true;
   clusterState.parallelism = 2;
   clusterState.nextWorkerId = 1;
@@ -93,14 +110,14 @@ beforeEach(() => {
   signalListeners.clear();
   originalExitCode = process.exitCode;
   process.exitCode = undefined;
-  vi.spyOn(process, 'once').mockImplementation(((
+  context.mock.method(process, 'once', ((
     signal: NodeJS.Signals,
     listener: () => void,
   ) => {
     signalListeners.set(signal, listener);
     return process;
   }) as typeof process.once);
-  vi.spyOn(process, 'off').mockImplementation(((
+  context.mock.method(process, 'off', ((
     signal: NodeJS.Signals,
     listener: () => void,
   ) => {
@@ -113,28 +130,26 @@ beforeEach(() => {
 
 afterEach(() => {
   process.exitCode = originalExitCode;
-  vi.restoreAllMocks();
-  vi.useRealTimers();
 });
 
 describe('runCluster', () => {
   it('runs the callback only in a worker process', async () => {
     clusterState.isPrimary = false;
-    const startWorker = vi.fn(async () => undefined);
+    const startWorker = mock.fn(async () => undefined);
 
     await runCluster(startWorker, events());
 
-    expect(startWorker).toHaveBeenCalledOnce();
-    expect(clusterState.workers.size).toBe(0);
+    assertCalledTimes(startWorker, 1);
+    assert.strictEqual(clusterState.workers.size, 0);
   });
 
   it('forks one worker per available parallelism in auto mode', async () => {
     clusterState.parallelism = 3;
     const received: ClusterEvent[] = [];
-    const done = runCluster(vi.fn(), events(received));
+    const done = runCluster(mock.fn(), events(received));
 
-    expect(clusterState.workers.size).toBe(3);
-    expect(received[0]).toMatchObject({
+    assert.strictEqual(clusterState.workers.size, 3);
+    assertMatchObject(received[0], {
       type: 'primary:start',
     });
 
@@ -142,99 +157,102 @@ describe('runCluster', () => {
       emitExit(value, 0);
     }
     await done;
-    expect(process.exitCode).toBe(0);
+    assert.strictEqual(process.exitCode, 0);
   });
 
   it('does not restart a worker that exits cleanly', async () => {
-    const done = runCluster(vi.fn(), { workers: 1, ...events() });
+    const done = runCluster(mock.fn(), { workers: 1, ...events() });
 
     emitExit(worker(1), 0);
     await done;
 
-    expect(clusterState.nextWorkerId).toBe(2);
-    expect(process.exitCode).toBe(0);
+    assert.strictEqual(clusterState.nextWorkerId, 2);
+    assert.strictEqual(process.exitCode, 0);
   });
 
   it('restarts an abnormal exit after the fixed safety delay', async () => {
     const received: ClusterEvent[] = [];
-    const done = runCluster(vi.fn(), { workers: 1, ...events(received) });
+    const done = runCluster(mock.fn(), { workers: 1, ...events(received) });
 
     emitExit(worker(1), 1);
-    expect(received.at(-1)).toMatchObject({
+    assertMatchObject(received.at(-1), {
       type: 'worker:exit',
       level: 'warn',
     });
-    await vi.advanceTimersByTimeAsync(1_000);
+    await advanceTimers(1_000);
     emitExit(worker(2), 0);
     await done;
 
-    expect(clusterState.nextWorkerId).toBe(3);
+    assert.strictEqual(clusterState.nextWorkerId, 3);
   });
 
   it('stops after the fixed rolling restart limit', async () => {
     const received: ClusterEvent[] = [];
-    const done = runCluster(vi.fn(), { workers: 1, ...events(received) });
+    const done = runCluster(mock.fn(), { workers: 1, ...events(received) });
 
     for (let id = 1; id <= 5; id += 1) {
       emitExit(worker(id), 1);
-      await vi.advanceTimersByTimeAsync(1_000);
+      await advanceTimers(1_000);
     }
     emitExit(worker(6), 1);
     await done;
 
-    expect(process.exitCode).toBe(1);
-    expect(received.some((event) => /restart limit/.test(event.message))).toBe(
+    assert.strictEqual(process.exitCode, 1);
+    assert.strictEqual(
+      received.some((event) => /restart limit/.test(event.message)),
       true,
     );
   });
 
   it('forgets restarts outside the fixed rolling window', async () => {
-    const done = runCluster(vi.fn(), { workers: 1, ...events() });
+    const done = runCluster(mock.fn(), { workers: 1, ...events() });
 
     for (let id = 1; id <= 5; id += 1) {
       emitExit(worker(id), 1);
-      await vi.advanceTimersByTimeAsync(1_000);
+      await advanceTimers(1_000);
     }
-    vi.setSystemTime(65_001);
+    timers.setTime(65_001);
     emitExit(worker(6), 1);
-    await vi.advanceTimersByTimeAsync(1_000);
+    await advanceTimers(1_000);
     emitExit(worker(7), 0);
     await done;
 
-    expect(process.exitCode).toBe(0);
+    assert.strictEqual(process.exitCode, 0);
   });
 
   it('forwards shutdown signals and never resurrects workers', async () => {
-    const done = runCluster(vi.fn(), { workers: 2, ...events() });
+    const done = runCluster(mock.fn(), { workers: 2, ...events() });
     const workers = [...clusterState.workers.values()];
 
     emitSignal('SIGTERM');
-    expect(workers.map((value) => value.kill.mock.calls)).toEqual([
-      [['SIGTERM']],
-      [['SIGTERM']],
-    ]);
+    assert.deepStrictEqual(
+      workers.map((value) =>
+        value.kill.mock.calls.map((call) => call.arguments),
+      ),
+      [[['SIGTERM']], [['SIGTERM']]],
+    );
     for (const value of workers) {
       emitExit(value, 0, 'SIGTERM');
     }
     await done;
 
-    expect(clusterState.nextWorkerId).toBe(3);
-    expect(process.exitCode).toBe(0);
+    assert.strictEqual(clusterState.nextWorkerId, 3);
+    assert.strictEqual(process.exitCode, 0);
   });
 
   it('cancels a pending restart when shutdown begins', async () => {
-    const done = runCluster(vi.fn(), { workers: 1, ...events() });
+    const done = runCluster(mock.fn(), { workers: 1, ...events() });
 
     emitExit(worker(1), 1);
     emitSignal('SIGTERM');
     await done;
-    await vi.advanceTimersByTimeAsync(1_000);
+    await advanceTimers(1_000);
 
-    expect(clusterState.nextWorkerId).toBe(2);
+    assert.strictEqual(clusterState.nextWorkerId, 2);
   });
 
   it('force-terminates stuck workers after the shutdown timeout', async () => {
-    const done = runCluster(vi.fn(), {
+    const done = runCluster(mock.fn(), {
       workers: 1,
       shutdownTimeoutMs: 250,
       ...events(),
@@ -242,20 +260,25 @@ describe('runCluster', () => {
     const value = worker(1);
 
     emitSignal('SIGINT');
-    await vi.advanceTimersByTimeAsync(250);
-    expect(value.kill.mock.calls).toEqual([['SIGINT'], ['SIGKILL']]);
+    await advanceTimers(250);
+    assert.deepStrictEqual(
+      value.kill.mock.calls.map((call) => call.arguments),
+      [['SIGINT'], ['SIGKILL']],
+    );
     emitExit(value, 0, 'SIGKILL');
     await done;
 
-    expect(process.exitCode).toBe(1);
+    assert.strictEqual(process.exitCode, 1);
   });
 
   it('rejects invalid worker and timeout settings', async () => {
-    await expect(runCluster(vi.fn(), { workers: 0 })).rejects.toThrow(
+    await assertRejectsLike(
+      runCluster(mock.fn(), { workers: 0 }),
       /positive integer/,
     );
-    await expect(
-      runCluster(vi.fn(), { shutdownTimeoutMs: Number.NaN }),
-    ).rejects.toThrow(/shutdownTimeoutMs/);
+    await assertRejectsLike(
+      runCluster(mock.fn(), { shutdownTimeoutMs: Number.NaN }),
+      /shutdownTimeoutMs/,
+    );
   });
 });
