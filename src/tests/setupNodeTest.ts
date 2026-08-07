@@ -8,7 +8,6 @@ import {
   setTestRedisNamespace,
   stopTestServer,
 } from './setupFramework.ts';
-import { createDefaultTestUser } from './testHelpers.ts';
 
 process.env.FRAMEWORK_TEST = '1';
 
@@ -21,7 +20,6 @@ before(async () => {
     return;
   }
   await ensureTestServerReady();
-  await createDefaultTestUser();
 });
 beforeEach(() => {
   if (!isFrameworkSetupSkipped) {
