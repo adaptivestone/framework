@@ -150,6 +150,7 @@ describe('astExtract — routes', () => {
         handler: 'login',
         hasRequest: true,
         hasQuery: false,
+        hasParams: false,
       },
       {
         method: 'post',
@@ -157,6 +158,7 @@ describe('astExtract — routes', () => {
         handler: 'logout',
         hasRequest: false,
         hasQuery: false,
+        hasParams: false,
       },
       {
         method: 'get',
@@ -164,8 +166,36 @@ describe('astExtract — routes', () => {
         handler: 'list',
         hasRequest: false,
         hasQuery: true,
+        hasParams: false,
       },
     ]);
+  });
+
+  it('flags a route-level params schema, ignoring an explicit nullish one', () => {
+    const ex = extract(`export default class C extends B {
+  get routes() {
+    return {
+      get: {
+        '/typed/:n': { handler: this.typed, params: p() },
+        '/nulled/:n': { handler: this.nulled, params: null },
+        '/undef/:n': { handler: this.undef, params: undefined },
+        '/bare/:n': { handler: this.bare },
+      },
+    };
+  }
+}`);
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(
+      ex.routes.map((r) => [r.path, r.hasParams]),
+      [
+        ['/typed/:n', true],
+        // An explicit nullish schema is skipped by the runtime, so codegen must
+        // not emit `InferOutput<null | undefined>` for it either.
+        ['/nulled/:n', false],
+        ['/undef/:n', false],
+        ['/bare/:n', false],
+      ],
+    );
   });
 
   it('extracts a content-type request map’s media-type keys', () => {
@@ -215,6 +245,7 @@ describe('astExtract — routes', () => {
         handler: 'create',
         hasRequest: false,
         hasQuery: false,
+        hasParams: false,
         middleware: ['RateLimiter'],
       },
     ]);

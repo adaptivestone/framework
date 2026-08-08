@@ -253,6 +253,14 @@ function renderShape(
       `query: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['query']>`,
     );
   }
+  // A `params:` schema types the VALIDATED surface (`appInfo.params`) only. The
+  // raw `params` override above stays `string`-valued — the runtime never
+  // rewrites `req.params`, so the two surfaces are deliberately different types.
+  if (route.hasParamsSchema && navigateSchema) {
+    appInfoOverrides.push(
+      `params: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['params']>`,
+    );
+  }
   const appInfoOverride =
     appInfoOverrides.length > 0 ? ` & { ${appInfoOverrides.join('; ')} }` : '';
 

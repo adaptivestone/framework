@@ -41,6 +41,8 @@ export interface RouteMeta {
   requestContentTypes?: string[];
   /** True when the route entry has a `query` schema. */
   hasQuerySchema: boolean;
+  /** True when the route entry has a `params` schema (validated path params). */
+  hasParamsSchema?: boolean;
 }
 
 /** Aggregate metadata for one controller. */

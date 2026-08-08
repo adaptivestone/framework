@@ -248,6 +248,7 @@ function renderResolved(
     handlerName: r.handler,
     hasSchema: r.hasRequest,
     hasQuerySchema: r.hasQuery,
+    hasParamsSchema: r.hasParams,
     ...(r.requestContentTypes
       ? { requestContentTypes: r.requestContentTypes }
       : {}),

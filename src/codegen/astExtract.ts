@@ -12,7 +12,7 @@
  *                   `AuthMiddleware`) that `importResolution` solved by live-class
  *                   identity matching simply never arises.
  *   - `extendsName`: the EXPORTED class's parent identifier (or `null`).
- *   - `routes`:     method → path → { handler, hasRequest, hasQuery }.
+ *   - `routes`:     method → path → { handler, hasRequest, hasQuery, hasParams }.
  *   - `middleware`: name-tagged `[{ scope, bindings }]`, or `undefined` when the
  *                   controller declares none (inherits its parent's).
  *
@@ -50,6 +50,8 @@ export interface RouteInfo {
   handler: string | null;
   hasRequest: boolean;
   hasQuery: boolean;
+  /** A route-level `params:` schema is declared (validated path params). */
+  hasParams: boolean;
   /** Media-type keys when `request` is a content-type map (`{ 'application/json':
    * … }`); absent for a single-schema request. */
   requestContentTypes?: string[];
@@ -429,6 +431,18 @@ function unanalyzableRoute(init: Node): string | null {
   return null;
 }
 
+/**
+ * Is this schema slot written as an explicit `null`/`undefined`? Both are legal
+ * (the runtime skips validation on a nullish schema — `obj.<slot> != null`), and
+ * neither is a schema, so codegen must not emit `InferOutput<null | undefined>`.
+ */
+function isNullishLiteral(node: Node): boolean {
+  return (
+    (node.type === 'Literal' && node.value === null) ||
+    (node.type === 'Identifier' && node.name === 'undefined')
+  );
+}
+
 function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
   // Bare handler: `'/logout': this.postLogout`
   if (
@@ -441,6 +455,7 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
       handler: init.property?.name ?? null,
       hasRequest: false,
       hasQuery: false,
+      hasParams: false,
     };
   }
   // `{ handler: this.x, request?, query?, middleware? }`
@@ -451,6 +466,7 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
       handler: null,
       hasRequest: false,
       hasQuery: false,
+      hasParams: false,
     };
     for (const prop of init.properties) {
       if (prop.type !== 'Property') {
@@ -460,14 +476,7 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
       if (key === 'handler' && prop.value.type === 'MemberExpression') {
         out.handler = prop.value.property?.name ?? null;
       } else if (key === 'request') {
-        // `request: null`/`request: undefined` are legal (runtime skips
-        // validation when `request` is nullish, `obj.request != null`) — neither
-        // is a schema, so don't emit `InferOutput<null | undefined>`.
-        const isNullLiteral =
-          prop.value.type === 'Literal' && prop.value.value === null;
-        const isUndefinedIdent =
-          prop.value.type === 'Identifier' && prop.value.name === 'undefined';
-        if (!isNullLiteral && !isUndefinedIdent) {
+        if (!isNullishLiteral(prop.value)) {
           out.hasRequest = true; // the VALUE (defineSchema(...)) is never evaluated
           // A content-type map → its media-type keys (mirrors the runtime
           // `isContentTypeRequestMap`: a plain object whose keys all contain `/`).
@@ -478,13 +487,24 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
         }
       } else if (key === 'query') {
         out.hasQuery = true;
+      } else if (key === 'params') {
+        if (!isNullishLiteral(prop.value)) {
+          out.hasParams = true;
+        }
       } else if (key === 'middleware') {
         out.middleware = middlewareBindings(prop.value);
       }
     }
     return out;
   }
-  return { method, path, handler: null, hasRequest: false, hasQuery: false };
+  return {
+    method,
+    path,
+    handler: null,
+    hasRequest: false,
+    hasQuery: false,
+    hasParams: false,
+  };
 }
 
 /** The literal keys of an object expression, or `null` if any is computed/spread. */
