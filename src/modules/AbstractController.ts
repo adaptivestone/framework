@@ -48,6 +48,14 @@ type RouteObject = {
   request?: StandardSchemaV1 | RequestContentTypeMap | null;
   query?: StandardSchemaV1 | null;
   /**
+   * Path-parameter schema. Validates and coerces the `:name` segments the same
+   * way `request` handles the body: the validated output lands on
+   * `req.appInfo.params`, a failure is a 400 with the standard error shape, and
+   * raw `req.params` keeps its Express string values. Route-level only —
+   * middleware do not contribute param schemas.
+   */
+  params?: StandardSchemaV1 | null;
+  /**
    * Per-route body parsing mode. Only `'parsed'` (the default) takes effect
    * today; `'raw'` and `'none'` are reserved for v5.1 and currently do nothing
    * (the parser runs globally). See {@link BodyParsingMode}.

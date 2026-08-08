@@ -384,12 +384,27 @@ class ControllerManager extends Base {
     }
     querySchemas.push(...middlewareQuerySchemas);
 
+    // Path params are route-level only — middleware contribute body/query
+    // schemas but never param schemas, so there is nothing to merge here.
+    const paramsSchema = entry.params;
+
     const wrapped = async (
       req: FrameworkRequest,
       res: Response,
       next: NextFunction,
     ): Promise<unknown> => {
       try {
+        // Params first: a malformed `:id` means the request targets nothing
+        // coherent, so it should decide the 400 before body/query detail does.
+        // Raw `req.params` is left untouched (Express string contract); only
+        // `req.appInfo.params` carries the validated, coerced values.
+        if (paramsSchema) {
+          req.appInfo.params = (await new ValidateService(
+            app,
+            paramsSchema,
+          ).validate(req.params, req.appInfo.i18n)) as Record<string, unknown>;
+        }
+
         const requestSchemas: StandardSchemaV1[] = [];
         let resolvedContentType: string | null = null;
         if (entryRequestMapLookup) {
@@ -635,6 +650,7 @@ function buildHandlerEntry(
     handler?: unknown;
     request?: unknown;
     query?: unknown;
+    params?: unknown;
     middleware?: ReadonlyArray<MiddlewareSpec>;
     bodyParsing?: 'parsed' | 'raw' | 'none';
     description?: unknown;
@@ -662,6 +678,10 @@ function buildHandlerEntry(
   if (obj.query != null) {
     // biome-ignore lint/suspicious/noExplicitAny: Standard Schema validator passthrough
     entry.query = obj.query as any;
+  }
+  if (obj.params != null) {
+    // biome-ignore lint/suspicious/noExplicitAny: Standard Schema validator passthrough
+    entry.params = obj.params as any;
   }
   if (obj.bodyParsing) {
     entry.bodyParsing = obj.bodyParsing;

@@ -64,6 +64,7 @@ export interface HandlerEntry {
   handler: Function;
   request?: StandardSchemaV1 | RequestContentTypeMap;
   query?: StandardSchemaV1;
+  params?: StandardSchemaV1;
   middlewares?: MiddlewareEntry[];
   bodyParsing?: BodyParsingMode;
   paramNames?: string[];

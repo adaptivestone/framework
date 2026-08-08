@@ -36,6 +36,7 @@ import ErrorRegistryController, {
   FakeDriverError,
   HandlerCrashError,
 } from '../tests/fixtures/controllers/ErrorRegistryController.ts';
+import ParamsController from '../tests/fixtures/controllers/ParamsController.ts';
 import SafetyNetController from '../tests/fixtures/controllers/SafetyNetController.ts';
 import ValidationLeakController, {
   LEAK_SECRET,
@@ -1539,5 +1540,82 @@ describe('ControllerManager — validation-phase error leak', () => {
       logsMatching(/No ValidatorDriver/).map((r) => r.level),
       ['error'],
     );
+  });
+});
+
+describe('ControllerManager — route `params:` schema', () => {
+  const base = '/test/paramscontroller';
+  const get = (path: string) => fetch(getTestServerURL(`${base}${path}`));
+  const VALID_ID = '507f1f77bcf86cd799439011';
+
+  before(() => {
+    appInstance.controllerManager?.registerController(ParamsController, 'test');
+  });
+
+  it('a malformed path param is a 400, not a 500', async () => {
+    const res = await get('/id/abc');
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(body.errors, { id: ['must be a valid id'] });
+  });
+
+  it('a well-formed param reaches the handler on appInfo.params', async () => {
+    const res = await get(`/id/${VALID_ID}`);
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(body.data.params, { id: VALID_ID });
+  });
+
+  it('the schema coerces appInfo.params while req.params stays raw strings', async () => {
+    const res = await get('/count/42');
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(body.data.params.n, 42);
+    assert.strictEqual(body.data.types.n, 'number');
+    // The Express contract is untouched — raw params remain strings.
+    assert.strictEqual(body.data.rawParams.n, '42');
+  });
+
+  it('a route without a params schema still exposes an empty appInfo.params', async () => {
+    const res = await get('/bare/anything-at-all');
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(body.data.params, {});
+    // The raw param is still there for a handler that wants it unvalidated.
+    assert.strictEqual(body.data.rawParams.id, 'anything-at-all');
+  });
+
+  it('a client-supplied value Mongoose cannot cast is a 400, not a 500', async () => {
+    const res = await get('/cast/abc');
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    // Named by the PARAM (public, in the URL pattern) — never by the internal
+    // model path (`ref`), and never echoing the rejected value.
+    assert.deepStrictEqual(body, { errors: { id: 'Must be a valid id' } });
+    assert.ok(!JSON.stringify(body).includes('ref'));
+    assert.ok(!JSON.stringify(body).includes('abc'));
+  });
+
+  it('a cast failure on a server-side value stays an honest 500', async () => {
+    const res = await get(`/castInternal/${VALID_ID}`);
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(body, {
+      message: 'Platform error. Please check later or contact support',
+    });
+  });
+
+  it('names the failing param when a multi-param route rejects one', async () => {
+    const res = await get('/multi/zzz/ok-slug');
+    const body = await res.json();
+
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(Object.keys(body.errors), ['group']);
   });
 });

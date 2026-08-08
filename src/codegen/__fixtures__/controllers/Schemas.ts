@@ -3,6 +3,7 @@ import AbstractController from '../../../modules/AbstractController.ts';
 import { defineSchema } from '../../../services/validate/defineSchema.ts';
 import type {
   GetItemRequest,
+  GetTypedParamRequest,
   PostCreateRequest,
 } from './Schemas.routes.gen.ts';
 
@@ -13,10 +14,13 @@ import type {
  *  - a `request:` schema → `req.appInfo.request` typed from the schema output.
  *  - a `query:` schema   → `req.appInfo.query`   typed from the schema output.
  *  - a `:id` path param  → `req.params.id`        typed as `string`.
+ *  - a `params:` schema  → `req.appInfo.params`   typed from the schema output,
+ *    while raw `req.params` stays `string` (the two surfaces must not merge).
  *
  * The assignments to explicitly-typed locals are the gate: if a route's
- * `request`/`query` type falls back to `Record<string, unknown>`, or `params.id`
- * is missing, these lines stop type-checking and the golden test fails.
+ * `request`/`query`/`params` type falls back to `Record<string, unknown>`, or
+ * `params.id` is missing, these lines stop type-checking and the golden test
+ * fails.
  *
  * Uses the zero-dependency `defineSchema` (not yup) deliberately: the codegen
  * path is identical (it reads `StandardSchemaV1.InferOutput`), but defineSchema
@@ -49,6 +53,13 @@ class Schemas extends AbstractController {
             return { value: { q: String(v.q ?? '') } };
           }),
         },
+        '/typed/:n': {
+          handler: this.getTypedParam,
+          params: defineSchema<{ n: number }>((value) => {
+            const v = (value ?? {}) as Record<string, unknown>;
+            return { value: { n: Number(v.n ?? 0) } };
+          }),
+        },
       },
     };
   }
@@ -63,6 +74,14 @@ class Schemas extends AbstractController {
     const id: string = req.params.id;
     const q: string = req.appInfo.query.q;
     return res.json({ id, q });
+  }
+
+  async getTypedParam(req: GetTypedParamRequest, res: Response) {
+    // The validated/coerced surface is a number…
+    const n: number = req.appInfo.params.n;
+    // …while the raw Express param for the same segment stays a string.
+    const raw: string = req.params.n;
+    return res.json({ n, raw });
   }
 }
 

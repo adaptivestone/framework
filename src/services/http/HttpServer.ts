@@ -34,6 +34,7 @@ export interface FrameworkRequest extends Request {
     ip?: string | undefined;
     request: Record<string, unknown>;
     query: Record<string, unknown>;
+    params: Record<string, unknown>;
     i18n?: {
       t: TFunction;
       language: string;

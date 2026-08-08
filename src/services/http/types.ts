@@ -42,6 +42,11 @@ export interface BaseAppInfo {
   i18n: { t: TFunction; language: string };
   request: Record<string, unknown>;
   query: Record<string, unknown>;
+  /**
+   * Validated, coerced path params — populated only when the route declares a
+   * `params:` schema; `{}` otherwise. Raw Express strings stay on `req.params`.
+   */
+  params: Record<string, unknown>;
 }
 
 /**
