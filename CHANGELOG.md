@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.3.1] - Unreleased
+## [5.3.2] - 2026-08-08
+
+### Fixed
+
+- **A controller whose only schema was `params:` got no typed `req.appInfo.params`.** Emitting the generated `routes` type alias — and the controller self-import that makes it resolvable — was gated on some route declaring a `request:` or `query:` schema. A params-only controller therefore produced no alias, and its `appInfo.params` override was silently dropped, degrading the field to the permissive base `Record<string, unknown>` (handlers reading it saw `unknown`). Controllers that also declare a body or query schema were unaffected, which is why 5.3.0's fixtures missed it. Pinned by a new params-only golden fixture.
+
+## [5.3.1] - 2026-08-08
 
 ### Fixed
 

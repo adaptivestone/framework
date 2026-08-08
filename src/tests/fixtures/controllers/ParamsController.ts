@@ -7,6 +7,7 @@ import type {
 } from '../../../modules/AbstractController.ts';
 import AbstractController from '../../../modules/AbstractController.ts';
 import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
+import { NotFoundError } from '../../../services/http/httpErrors.ts';
 
 // A bare Mongoose model whose `ref` path is an ObjectId, so an uncastable
 // string reaching it throws a `CastError` (NOT a `ValidationError`) straight
@@ -55,6 +56,19 @@ class ParamsController extends AbstractController {
         // The uncastable value is a server-side constant the client never sent
         // — a genuine server defect that must stay an honest 500.
         '/castInternal/:id': { handler: this.castFromServer },
+        // Pairs `params:` with a typed HTTP error — the contract the docs
+        // teach, and the one the old in-handler-guard style conflated: a
+        // malformed id is the client's mistake (400, from the schema, before
+        // the handler), a well-formed id with no row is a missing resource
+        // (404, from the handler).
+        '/lookup/:id': {
+          handler: this.lookup,
+          params: object().shape({
+            id: string()
+              .matches(/^[0-9a-fA-F]{24}$/, 'must be a valid id')
+              .required(),
+          }),
+        },
         // Two params, so a failure has to name the right one.
         '/multi/:group/:slug': {
           handler: this.echoParams,
@@ -78,6 +92,15 @@ class ParamsController extends AbstractController {
         ),
       },
     });
+  }
+
+  async lookup(req: FrameworkRequest, res: Response) {
+    const { id } = req.appInfo.params as { id: string };
+    const doc = await ParamCastModel.findById(id);
+    if (!doc) {
+      throw new NotFoundError('Nothing here');
+    }
+    return res.status(200).json({ data: { found: true } });
   }
 
   async castFromParam(req: FrameworkRequest, res: Response) {

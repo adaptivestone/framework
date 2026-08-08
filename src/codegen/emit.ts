@@ -82,8 +82,12 @@ export function renderGenFile(input: RenderInput): string {
     .sort();
 
   const routesAlias = `${controller.className}Routes`;
+  // Must list EVERY schema slot `renderShape` can navigate. A controller whose
+  // only schema is `params:` still needs the `routes` alias and the self-import,
+  // or its override is silently dropped and `appInfo.params` degrades to the
+  // permissive base type.
   const anyRouteHasSchema = controller.routes.some(
-    (r) => r.hasSchema || r.hasQuerySchema,
+    (r) => r.hasSchema || r.hasQuerySchema || r.hasParamsSchema,
   );
   // Only navigate the controller's own `routes` type (which requires importing
   // it) when that import would actually type-check. For an untyped `.js`

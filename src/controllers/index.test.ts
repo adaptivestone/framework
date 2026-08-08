@@ -1611,6 +1611,22 @@ describe('ControllerManager — route `params:` schema', () => {
     });
   });
 
+  it('separates a malformed id (400) from an absent one (404)', async () => {
+    // The schema rejects before the handler runs…
+    const malformed = await get('/lookup/nope');
+    const malformedBody = await malformed.json();
+    assert.strictEqual(malformed.status, 400);
+    assert.deepStrictEqual(malformedBody.errors, {
+      id: ['must be a valid id'],
+    });
+
+    // …while a well-formed id reaches the handler, which owns the 404.
+    const absent = await get(`/lookup/${VALID_ID}`);
+    const absentBody = await absent.json();
+    assert.strictEqual(absent.status, 404);
+    assert.strictEqual(absentBody.message, 'Nothing here');
+  });
+
   it('names the failing param when a multi-param route rejects one', async () => {
     const res = await get('/multi/zzz/ok-slug');
     const body = await res.json();
