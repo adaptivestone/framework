@@ -61,6 +61,15 @@ class Event extends BaseModel {
           }),
         },
       ],
+      // Single-nested subdocument with `_id: false` — the ONLY shape that runs
+      // the `CorrectHydratedSubdocument*` machinery, which re-derives the doc
+      // type from the schema and so must be told which surface it is building.
+      description: {
+        type: {
+          short: localeString({ type: String, required: true, intl: true }),
+        },
+        _id: false,
+      },
     } as const;
   }
 }
@@ -130,6 +139,16 @@ export async function check(M: EventModel) {
     const localizedItemStringGetterState: typeof localizedItem.title =
       'Session';
     doc.localizedSchedule.push(localizedItem);
+    // An `_id: false` single-nested subdoc must expose the HYDRATED override
+    // (`string | IntlText`), exactly like a top-level field — not the raw one.
+    if (doc.description) {
+      const nestedHydratedStringState: typeof doc.description.short = 'Short';
+      const nestedHydratedMapState: typeof doc.description.short = { en: 'S' };
+      const nestedHydratedValue: IntlHydratedValue = doc.description.short;
+      void nestedHydratedStringState;
+      void nestedHydratedMapState;
+      void nestedHydratedValue;
+    }
     void sessionLabel;
     void hydratedStringState;
     void hydratedMapState;
@@ -171,6 +190,17 @@ export async function check(M: EventModel) {
       lean.title;
     const rawTitle: IntlText = lean.localizedTitle;
     const rawScheduleTitle: IntlText = lean.localizedSchedule[0].title;
+    // The same `_id: false` subdoc keeps the RAW override on the lean surface —
+    // the counterpart to the hydrated assertion above. Both must hold: the
+    // hydrated rebuild selects its surface explicitly, and the raw pass unwraps
+    // the single-nested `{ type: … }` definition so its inner keys line up.
+    if (lean.description) {
+      const rawNestedShort: IntlText = lean.description.short;
+      // @ts-expect-error the raw surface must NOT accept the hydrated string state
+      const invalidRawNestedShort: typeof lean.description.short = 'Short';
+      void rawNestedShort;
+      void invalidRawNestedShort;
+    }
     // @ts-expect-error raw/lean values use the stored locale-map surface
     const invalidRawTitle: typeof lean.localizedTitle = 'Title';
     void legacyRawTitle;

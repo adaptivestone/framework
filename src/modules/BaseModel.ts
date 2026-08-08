@@ -181,7 +181,7 @@ export type ApplyTsOverrides<
               :
                   | ApplyTsOverrides<
                       NonNullable<Doc[K]>,
-                      NonNullable<Schema[K]>,
+                      SingleNestedDefinitionOrSelf<NonNullable<Schema[K]>>,
                       Surface
                     >
                   | Exclude<Doc[K], object>
@@ -189,6 +189,25 @@ export type ApplyTsOverrides<
           : Doc[K]
     : Doc[K];
 };
+
+/**
+ * The definition to recurse into for a nested field.
+ *
+ * A single-nested subdocument is declared `{ type: { … }, _id?: false }`, so its
+ * OWN keys are `type`/`_id` — recursing into the wrapper makes every inner key
+ * fail `K extends keyof Schema` and silently drops the override (the inner field
+ * keeps its plain inferred type). Unwrap to the inner definition so the keys line
+ * up with the inferred document. A plain nested path (`organizer: { name: … }`)
+ * has no `type` wrapper and recurses as itself.
+ *
+ * `HasTsOverride` needs no equivalent: it walks every key blindly, so it already
+ * sees markers through the wrapper.
+ */
+type SingleNestedDefinitionOrSelf<S> = [
+  SchemaSingleNestedDefinition<S>,
+] extends [never]
+  ? S
+  : SchemaSingleNestedDefinition<S>;
 
 /**
  * True when a schema carries at least one {@link TsTypeOverride} marker anywhere
@@ -293,9 +312,18 @@ type CorrectRawSubdocumentIds<Doc, Schema> = {
 type CorrectHydratedSubdocumentElement<Raw, Schema> =
   CorrectRawSubdocumentElement<Raw, Schema> extends infer CorrectedRaw
     ? CorrectHydratedSubdocumentIds<
+        // `'hydrated'` is REQUIRED, not decorative: this builder re-derives the
+        // subdocument type from the schema, so it must select the same surface
+        // its callers do. `MaybeApplyOverrides` defaults to `'raw'`, and
+        // omitting the argument here silently gave `_id: false` subdocuments the
+        // RAW override on their hydrated surface (a `TsTypeOverride<Raw, Hyd>`
+        // field resolved to `Raw`). Top-level fields were unaffected because
+        // `OverriddenHydratedDocFromSchema` passes `'hydrated'` explicitly, and
+        // this whole path only runs for `_id: false` schemas.
         MaybeApplyOverrides<
           InferHydratedDocType<MutableSchemaForInference<Schema>>,
-          Schema
+          Schema,
+          'hydrated'
         >,
         Schema
       > extends infer Fields

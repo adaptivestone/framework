@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.3.1] - Unreleased
+
+### Fixed
+
+- **Single-nested subdocuments dropped `TsTypeOverride` on the raw surface entirely.** A field marked `TsTypeOverride<…>` inside a subdocument declared in the `{ type: { … } }` form kept its plain inferred type on raw, lean and create surfaces — `lean.description.short` was `string` rather than the overridden locale map. `ApplyTsOverrides` recursed into the wrapper object, whose own keys are `type`/`_id`, so every inner key failed the `K extends keyof Schema` alignment and fell through unchanged. It now unwraps the single-nested definition before recursing. Plain nested paths (`organizer: { name: … }`, no `type` wrapper) were never affected, which is why this went unnoticed; `HasTsOverride` needed no change, as it walks every key blindly and already saw markers through the wrapper. Independent of `_id: false` — it affected every single-nested subdocument.
+
+- **`_id: false` single-nested subdocuments exposed the RAW type override on their hydrated surface.** A field marked `TsTypeOverride<TRaw, THydrated>` inside a single-nested subdocument declared with `_id: false` resolved to `TRaw` on a hydrated document instead of `THydrated` — e.g. `doc.description.short` typed as the stored locale map rather than `string | LocaleMap`, forcing a cast at every read. `CorrectHydratedSubdocumentElement` re-derives the subdocument type from the schema and called `MaybeApplyOverrides` without a surface argument, which defaults to `'raw'`; it now passes `'hydrated'` explicitly, like the two top-level builders already did. Top-level fields were never affected, and the path only runs for `_id: false` schemas, so nothing else changes. Pinned by a new case in the `tsTypeOverride` tsc-gate fixture.
+
 ## [5.3.0] - 2026-08-08
 
 ### Added
