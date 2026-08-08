@@ -12,9 +12,14 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { redisSkip } from '../../tests/redisAvailability.ts';
 import { getRedisClient, getRedisClientSync } from './redisConnection.ts';
 
-describe('redisConnection (doc 11)', () => {
+// Redis is optional; a checkout without one skips with a reason instead of
+// timing out at 10s per test.
+const skip = await redisSkip();
+
+describe('redisConnection (doc 11)', { skip }, () => {
   it('concurrent calls return the same connected client (shared connect promise)', async () => {
     // Both await the same cached connect promise — no double-connect on a
     // half-built client (the bug the promise cache fixes).

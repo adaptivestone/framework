@@ -13,7 +13,9 @@ jobs:
       contents: read
 
     strategy:
+      fail-fast: false
       matrix:
+        node: ["24", "latest"]
         task: [check, "check:types"]
 
     steps:
@@ -22,9 +24,37 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
-          node-version: "latest"
+          node-version: ${{ matrix.node }}
           cache: "npm"
       - name: npm clean install
         run: npm ci
       - name: Run Task
         run: npm run ${{ matrix.task }}
+
+  # The benchmark fixture lives outside `src/`, so neither `tsc` (include:
+  # src/**) nor the test suite touches it — which is how it silently stopped
+  # booting when `#assertBootConfig` landed, leaving the perf baseline
+  # unmeasurable for three months. This is a BOOT check, not a perf gate:
+  # h2load numbers are far too noisy on shared runners to assert on.
+  benchmark-fixture:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "latest"
+          cache: "npm"
+      - name: npm clean install
+        run: npm ci
+      - name: Boot the benchmark fixture and hit both endpoints
+        run: |
+          npm run dev:bench:realistic &
+          for i in $(seq 1 30); do
+            curl -fsS -m 2 http://127.0.0.1:3300/bench/plaintext >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3300/bench/plaintext | grep -q '"hello":"world"'
+          curl -fsS 'http://127.0.0.1:3300/bench/echo?name=Alice' | grep -q '"name":"Alice"'
+          echo "benchmark fixture boots and serves both endpoints"

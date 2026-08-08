@@ -313,7 +313,7 @@ function dedupeParameters(params: Obj[]): Obj[] {
   const seen = new Set<string>();
   const out: Obj[] = [];
   for (const param of params) {
-    const key = `${String(param.in)} ${String(param.name)}`;
+    const key = `${String(param.in)}\0${String(param.name)}`;
     if (seen.has(key)) {
       continue;
     }
