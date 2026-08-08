@@ -190,9 +190,10 @@ repository; Markdown remains the reviewed source of truth.
 - Model-typing regression coverage for complex schema/document patterns.
 - `defineSchema(validate, { jsonSchema })` — dependency-free explicit OpenAPI shape.
 
-## Next release (5.2.3 or 5.3.0 — **version undecided**) · unreleased
+## 5.3.0 — unreleased
 
-Contains a behavior change, so semver argues for a minor. Decide before publishing.
+Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 400), a new feature
+(`params:`), and a consumer-action item (`oxc-parser`), so a minor is correct.
 
 - ✅ Framework test suite migrated to `node:test`.
 - ✅ [Route `params:` schema](done/params-validation.md) — plus the standalone-`CastError` 400 floor
@@ -206,7 +207,7 @@ Contains a behavior change, so semver argues for a minor. Decide before publishi
 - ✅ Dead `benchmark2` script removed (targeted `https://` + HTTP/2; the framework serves neither, so
   it reported `0.00 req/s` / 10000 errored).
 
-## v5.3 target
+## v5.4 target (was "v5.3") — P1q line
 
 - [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
@@ -216,7 +217,7 @@ Contains a behavior change, so semver argues for a minor. Decide before publishi
 - Small independent items: Node 24 in the CI matrix, Redis tests skipping when Redis is absent,
   the `OpenApiGenerator.ts` NUL byte, deploy-docs TLS/HTTP2 note.
 
-## v5.4 target
+## v5.5 target
 
 - [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
   **Deliberately split from v5.3**: it documents the descriptors P1q invents, and stabilizing a new
