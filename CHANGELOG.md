@@ -6,7 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.2.3] - Unreleased
 
+### Added
+
+- **Routes can now validate and coerce their path params with a `params:` schema.** Path params were the last request input the framework never checked — `request:` covers the body and `query:` the query string, but `:id` segments arrived as raw strings straight from the matcher. A route may now declare `params:` with any Standard Schema validator; it is validated before the handler runs, a failure is a **400** with the framework's usual `{ errors: { <param>: [...] } }` shape, and the validated, coerced result lands on `req.appInfo.params` — parallel to `.request` and `.query`. Raw `req.params` is deliberately untouched and keeps its Express string values, so nothing existing changes: the two surfaces are separate on purpose. Codegen types the validated surface from the schema's output (`req.appInfo.params.n` is a `number` where `req.params.n` is still a `string`); generated output is byte-identical for routes that declare no `params:`. Route-level only — middleware contribute body/query schemas but never param schemas.
+
+  ```ts
+  '/person/:id': {
+    handler: this.getOne,
+    params: z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/) }),
+  }
+  ```
+
+- **The OpenAPI generator now types path parameters from the route's `params:` schema.** Path parameters were emitted from the URL pattern alone, always as `schema: { type: 'string' }`. When a route declares `params:`, each matching parameter now carries that schema's introspected JSON Schema (pattern, numeric bounds, enum, format) through the same `toJsonSchema` driver seam that already documents `request:` and `query:`. Parameters stay `required: true` regardless of the schema's optionality — a path param is part of the URL by construction, and OpenAPI 3.1 forbids an optional one. A param the schema omits, or a schema no driver can introspect, degrades to the previous `string` (with the usual containment warning) rather than dropping the route. A `params:` key with no matching path segment is reported as a warning — it can never be populated at runtime.
+
 ### Changed
+
+- **Behavior change — a Mongoose `CastError` caused by client input is now a 400 instead of a 500.** Passing an unvalidated path param to Mongoose (`findById(req.params.id)` with a malformed id) threw a `CastError`, which — being a sibling of `ValidationError`, not a subclass — the v5.1 validation safety net structurally could not see, so it surfaced as `500 Platform error` and was logged at `error` with a full stack. A standalone `CastError` is now resolved through the error-handler registry: when the rejected value is one the client actually supplied (matched by value against the path params and the validated body/query), it becomes a **400** keyed by that public input name, logged at `warn`. A cast failure on a server-computed value matches nothing and keeps its honest 500 at `error` — a genuine server defect is never blamed on the caller. The message is rebuilt from the cast `kind` (`Must be a valid id`), so neither the rejected value nor the internal model path (`_id`) reaches the response; the `warn` log line is sanitized the same way. Declaring a route `params:` schema still produces a better 400 earlier, with wording you control — this floor only covers the routes that declare none.
 
 - **The framework's own test suite now runs on Node's built-in test runner.** All framework tests, assertions, parameterized cases, timers, spies, and module mocks have moved from Vitest to `node:test`; `npm test` now emits native JUnit and LCOV reports, and the test workflow is pinned to Node 26. Vitest remains an optional peer dependency, and the public `tests/setupVitest.js` / `tests/globalSetupVitest.js` adapters remain available for consumer projects. Native-runner consumers should preload `@adaptivestone/framework/tests/setupNodeTest.js` and use `--test-global-setup=@adaptivestone/framework/tests/globalSetupNodeTest.js`. The published runtime requirement remains Node 24 or newer; Node 26 is the development and CI test runtime.
 

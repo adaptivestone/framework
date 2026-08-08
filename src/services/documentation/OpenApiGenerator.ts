@@ -65,14 +65,13 @@ export async function generateOpenApi(
     const tag = (meta.controllerClass ?? 'default').split('/')[0] as string;
     tagNames.add(tag);
 
-    const parameters: Obj[] = pathParams.map((name) => ({
-      name,
-      in: 'path',
-      required: true,
-      schema: { type: 'string' },
-    }));
-
     const ctx = `${route.method} ${path}`;
+    const parameters: Obj[] = await buildPathParameters(
+      route,
+      pathParams,
+      warn,
+      ctx,
+    );
     parameters.push(...(await buildQueryParameters(route, warn, ctx)));
 
     const operation: Obj = {
@@ -322,6 +321,48 @@ function dedupeParameters(params: Obj[]): Obj[] {
     out.push(param);
   }
   return out;
+}
+
+/**
+ * Path parameters for one route. The URL pattern is the authority on WHICH
+ * params exist; a route-level `params:` schema refines each one's type. Without
+ * that schema a path param stays an opaque `string` — all the pattern alone can
+ * tell us.
+ *
+ * `required` is always `true` whatever the schema says about optionality: a path
+ * param is part of the URL by construction, and OpenAPI 3.1 forbids an optional
+ * one. A schema that fails to introspect degrades to the same `string` fallback
+ * (via `schemaToJson`'s warn + null), so one bad validator never drops the
+ * route's parameters.
+ */
+async function buildPathParameters(
+  route: FlatRoute,
+  pathParams: string[],
+  warn: (m: string) => void,
+  ctx: string,
+): Promise<Obj[]> {
+  let props: Obj = {};
+  if (route.entry.params) {
+    const json = await schemaToJson(route.entry.params, warn, `${ctx} params`);
+    props = (json?.properties as Obj) ?? {};
+    const inPath = new Set(pathParams);
+    for (const name of Object.keys(props)) {
+      if (!inPath.has(name)) {
+        // Almost always a typo. The runtime validates `req.params`, which holds
+        // only the path's own segments, so this key can never be populated —
+        // and if the schema marks it required, every request 400s.
+        warn(
+          `${ctx}: params schema declares "${name}" but the route path has no matching segment — it can never be populated.`,
+        );
+      }
+    }
+  }
+  return pathParams.map((name) => ({
+    name,
+    in: 'path',
+    required: true,
+    schema: props[name] ?? { type: 'string' },
+  }));
 }
 
 async function buildQueryParameters(

@@ -185,6 +185,90 @@ describe('generateOpenApi', () => {
     assertMatchObject(q, { in: 'query', required: false });
   });
 
+  it('refines path parameters from a route params schema', async () => {
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/:id/:n',
+          entry: {
+            handler: () => {},
+            paramNames: ['id', 'n'],
+            params: z.object({
+              id: z.string().regex(/^[0-9a-fA-F]{24}$/),
+              n: z.coerce.number().min(1),
+            }),
+            meta: { methodName: 'getItem', controllerClass: 'Items' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    const params = (doc as AnyDoc).paths['/{id}/{n}'].get.parameters;
+    const id = params.find((p: AnyDoc) => p.name === 'id');
+    const n = params.find((p: AnyDoc) => p.name === 'n');
+
+    // Path params stay `required: true` — they are part of the URL by
+    // construction, whatever the schema says about optionality.
+    assertMatchObject(id, { in: 'path', required: true });
+    assertMatchObject(n, { in: 'path', required: true });
+    // …but the SCHEMA now comes from the params validator, not a hardcoded string.
+    assert.strictEqual(id.schema.pattern, '^[0-9a-fA-F]{24}$');
+    assert.strictEqual(n.schema.type, 'number');
+    assert.strictEqual(n.schema.minimum, 1);
+  });
+
+  it('falls back to string for a path param the params schema omits', async () => {
+    const doc = await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/:id/:extra',
+          entry: {
+            handler: () => {},
+            paramNames: ['id', 'extra'],
+            params: z.object({ id: z.string() }),
+            meta: { methodName: 'getItem', controllerClass: 'Items' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' } },
+    );
+
+    const params = (doc as AnyDoc).paths['/{id}/{extra}'].get.parameters;
+    assertContainEqual(params, {
+      name: 'extra',
+      in: 'path',
+      required: true,
+      schema: { type: 'string' },
+    });
+  });
+
+  it('warns when a params schema declares a key the path has no segment for', async () => {
+    const onWarning = mock.fn();
+    await generateOpenApi(
+      [
+        route({
+          method: 'GET',
+          path: '/:id',
+          entry: {
+            handler: () => {},
+            paramNames: ['id'],
+            params: z.object({ id: z.string(), typo: z.string() }),
+            meta: { methodName: 'getItem', controllerClass: 'Items' },
+          },
+        }),
+      ],
+      { info: { title: 't', version: '1' }, onWarning },
+    );
+
+    assertCalledWith(
+      onWarning,
+      pattern.stringMatching(/params schema declares "typo"/),
+    );
+  });
+
   it('emits Pagination page and limit parameters without an introspection warning', async () => {
     const onWarning = mock.fn();
     const doc = await generateOpenApi(

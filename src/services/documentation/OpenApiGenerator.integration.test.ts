@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { object, string } from 'yup';
+import { number, object, string } from 'yup';
 import ControllerManager from '../../controllers/index.ts';
 import AbstractController from '../../modules/AbstractController.ts';
 import type { IApp } from '../../server.ts';
@@ -62,11 +62,18 @@ class Items extends AbstractController {
           handler: this.getOne,
           query: object({ verbose: string() }),
         },
+        // A declared `params:` schema must refine the emitted path parameter —
+        // `number` here, versus the `string` fallback `/:id` above still gets.
+        '/page/:page': {
+          handler: this.getPage,
+          params: object({ page: number().required() }),
+        },
       },
     };
   }
   async create() {}
   async getOne() {}
+  async getPage() {}
 }
 
 describe('generateOpenApi over a real ControllerManager registry', () => {
@@ -112,5 +119,14 @@ describe('generateOpenApi over a real ControllerManager registry', () => {
       get.parameters,
       pattern.objectContaining({ name: 'verbose', in: 'query' }),
     );
+
+    // GET /items/page/{page} — the params schema types what the URL pattern
+    // alone could only call a string.
+    assertContainEqual(paths['/items/page/{page}'].get.parameters, {
+      name: 'page',
+      in: 'path',
+      required: true,
+      schema: { type: 'number' },
+    });
   });
 });
