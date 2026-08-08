@@ -22,15 +22,18 @@ v5.3 (queued/) ─────→ universal HttpResponse + Express writer
 Bun stable with fix (external) ──→ immediate Bun-support v5.x patch
                                   never waits for v5.3, v6, or native adapters
 
-v5.2.0 (done/) ────→ OpenAPI resilience + route groups + node:test readiness
-v5.2.1 (active/) ──→ adoption fixes + literal-route codegen polish
-                      └──→ patch release before v5.3 implementation starts
+v5.2.0/5.2.1/5.2.2 ─→ shipped
+next release ───────→ params: schema + CastError floor + OpenAPI params
+                      + oxc-parser optional peer + node:test + benchmark repair
+                      └──→ version undecided (behavior change ⇒ minor?) · UNRELEASED
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
-          v5.3 implementation waits for the v5.2.1 patch release
+          v5.3 (P1q) waits on publishing the current unreleased work
+          v5.4 OpenAPI response contracts waits on P1q landing + real usage
           v6 cutover blocked by all v5.1 active + queued work
           Bun runtime support blocked only by Bun shipping the fix in stable
-          node-adapter blocked by v6
+          node-adapter blocked by v6 — and is what unlocks HTTP/2 (stock node:http2,
+            NOT a native-engine payoff; Express as listener is the only blocker)
           drop-express blocked by node-adapter
 ```
 
@@ -38,14 +41,15 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 
 ```mermaid
 flowchart LR
-    Foundation["✅ v5 foundations"] --> Patch["🔄 v5.2.1 adoption fixes"]
+    Foundation["✅ v5 foundations"] --> Patch["✅ 5.2.x shipped"]
+    Patch --> Unreleased["🔄 unreleased: params + CastError floor + oxc optional"]
 
-    Patch --> Responses["⏸ v5.3 universal responses"]
-    Responses --> OpenAPI["⏸ OpenAPI response contracts"]
+    Unreleased --> Responses["⏸ v5.3 universal responses"]
+    Responses --> OpenAPI["⏸ v5.4 OpenAPI response contracts"]
 
     BunRelease["Bun stable release with fix"] --> BunSupport["⏸ Immediate Bun-support v5.x patch"]
 
-    Patch --> I18nV5["⏸ P1y i18n audit + types + runtime"]
+    Unreleased --> I18nV5["⏸ P1y i18n audit + types + runtime"]
     I18nV5 --> I18nV6["◌ v6 namespace + selector defaults"]
 
     Foundation --> Codegen["✅ AST codegen"]
@@ -57,9 +61,9 @@ flowchart LR
     Foundation --> Docs["🔄 docs + LLM skills"]
     Docs --> Publish["◌ publish pipeline"]
 
-    Patch --> Params["⏸ params validation"]
-    Patch --> Metrics["⏸ metrics seam"]
-    Patch --> Logging["⏸ logging facade + Pino"]
+    Unreleased --> Params["✅ params validation"]
+    Unreleased --> Metrics["⏸ metrics seam"]
+    Unreleased --> Logging["⏸ logging facade + Pino"]
     Logging --> Observability["◌ traces + correlation"]
     Metrics --> Observability
 
@@ -86,15 +90,12 @@ repository; Markdown remains the reviewed source of truth.
 | File | Ref | Summary |
 |---|---|---|
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
-| [codegen-literal-prelude](active/codegen-literal-prelude.md) | P1w | **Implemented for 5.2.1.** Route getters may read typed config through initialized `const` declarations before their literal return; dynamic route construction remains excluded. |
-| [v5.2.1-adoption-fixes](active/v5.2.1-adoption-fixes.md) | P1x | **Implemented for 5.2.1.** Grouped same-name controllers retain override identity; `defineSchema` can expose an explicit JSON Schema and Pagination emits `page`/`limit`. |
 
 ### queued/
 
 | File | Ref | Summary |
 |---|---|---|
 | [bun-runtime-support](queued/bun-runtime-support.md) | Runtime | **Stable-fix-gated Bun certification.** Activate immediately when Bun ships `oven-sh/bun#32502` in any stable version; run the existing Express adapter through Bun's Node compatibility layer, require real Mongoose CRUD and packed-consumer CI, then cut an immediate v5.x patch. Never waits for v5.3, v6, or P3/P5; native `BunAdapter` remains separate. |
-| [params-validation](queued/params-validation.md) | P1b+ | **Route `params:` schema.** Validate + coerce path params (`:id`) like `request:`/`query:`, typed on `req.appInfo.params`; malformed param → 400 (today: raw string → Mongoose `CastError` → 500). Additive, reuses the validation runtime; codegen typing is the only new work. Interim docs recipe shipped 2026-06-23. |
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.3 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.3; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
@@ -123,6 +124,9 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [params-validation](done/params-validation.md) | P1b+ | **Implemented 2026-08-07, unreleased.** Route `params:` schema (validate + coerce path params → `req.appInfo.params`, malformed → 400). Grew beyond plan: also a standalone-`CastError` 400 floor and OpenAPI path-parameter typing. |
+| [codegen-literal-prelude](done/codegen-literal-prelude.md) | P1w | **Shipped in 5.2.1.** Initialized `const` config reads may precede a literal route return. |
+| [v5.2.1-adoption-fixes](done/v5.2.1-adoption-fixes.md) | P1x | **Shipped in 5.2.1.** Grouped same-name controller override identity; `defineSchema` explicit JSON Schema; Pagination emits `page`/`limit`. |
 | [openapi-schema-resilience](done/openapi-schema-resilience.md) | P2a-fix | **Shipped in 5.2.0.** Zod input-shape/date export plus per-schema failure containment; one unrepresentable route no longer aborts the document. |
 | [controller-route-groups](done/controller-route-groups.md) | P1u | **Shipped in 5.2.0.** Parenthesized controller folders organize source without contributing URL segments; runtime and AST codegen share path derivation. |
 | [node-test-readiness](done/node-test-readiness.md) | P1v | **Shipped in 5.2.0.** Public idempotent server-readiness helper prevents sibling root hooks from racing node:test bootstrap; regression and migration warnings included. |
@@ -174,20 +178,51 @@ repository; Markdown remains the reviewed source of truth.
 - ✅ [Deterministic node:test readiness](done/node-test-readiness.md) — application root hooks and
   the framework preload await one server-start promise; testing migration traps are documented.
 
-## v5.2.1 target
+## v5.2.1 — released 2026-07-20
 
-- [Literal route-getter setup](active/codegen-literal-prelude.md) — initialized `const` config reads
+- ✅ [Literal route-getter setup](done/codegen-literal-prelude.md) — initialized `const` config reads
   may precede a literal return, keeping route-local typed policy tuples codegen-safe.
-- [5.2.1 adoption fixes](active/v5.2.1-adoption-fixes.md) — Pagination contributes its optional
+- ✅ [5.2.1 adoption fixes](done/v5.2.1-adoption-fixes.md) — Pagination contributes its optional
   `page`/`limit` parameters to OpenAPI, and a grouped same-name controller remains an override.
-- Release the verified patch before starting v5.3 implementation.
+
+## 5.2.2 — released 2026-08-01
+
+- Model-typing regression coverage for complex schema/document patterns.
+- `defineSchema(validate, { jsonSchema })` — dependency-free explicit OpenAPI shape.
+
+## Next release (5.2.3 or 5.3.0 — **version undecided**) · unreleased
+
+Contains a behavior change, so semver argues for a minor. Decide before publishing.
+
+- ✅ Framework test suite migrated to `node:test`.
+- ✅ [Route `params:` schema](done/params-validation.md) — plus the standalone-`CastError` 400 floor
+  (**behavior change**: client-caused cast failures are now 400, not 500) and OpenAPI path-parameter
+  typing.
+- ✅ `oxc-parser` demoted to an **optional peer** — native codegen-only binary out of production
+  installs (27 MB → 24 MB). **Consumer action required**: `npm i -D oxc-parser` to run codegen.
+- ✅ Benchmark fixture repaired — it had not booted since `#assertBootConfig` landed, so nothing was
+  pinned between 2026-05-10 and 2026-08-08. New reference: plaintext 22,144 req/s · realistic
+  18,329 req/s (median of 8, Node 26.5.1). **This is the pre-P1q reference point.**
+- ✅ Dead `benchmark2` script removed (targeted `https://` + HTTP/2; the framework serves neither, so
+  it reported `0.00 req/s` / 10000 errored).
 
 ## v5.3 target
 
-- **Starts after v5.2.1:** [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
-- [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
+- [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
+- **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
+  ResponseWriter is the instrumentation seam, and adding it afterwards means reopening the hot path.
+- Resolve `bodyParsing` — `'raw'`/`'none'` are accepted by the type, do nothing, and the JSDoc still
+  promises v5.1. Implement (the request-side half of P1q's thesis) or remove them from the type.
+- Small independent items: Node 24 in the CI matrix, Redis tests skipping when Redis is absent,
+  the `OpenApiGenerator.ts` NUL byte, deploy-docs TLS/HTTP2 note.
 
-## Unscheduled after v5.2.1
+## v5.4 target
+
+- [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
+  **Deliberately split from v5.3**: it documents the descriptors P1q invents, and stabilizing a new
+  authoring surface *and* a contract derived from it in one release is too much at once.
+
+## Unscheduled
 
 - [Bun runtime support](queued/bun-runtime-support.md) activates as soon as Bun publishes the fix
   in any stable release and immediately cuts a v5.x patch; it does **not** wait for v5.3, v6, the

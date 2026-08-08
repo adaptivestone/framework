@@ -146,6 +146,47 @@ Cross-ecosystem research (13 frameworks across 8 languages) confirmed Express's 
 
 - **Standard Schema does not include JSON Schema export.** Per-vendor adapters live on the driver's optional `toJsonSchema(body)` method. Drivers stub `null` in P1a-runtime; P2a fills in built-ins (zod via native `z.toJSONSchema()`; yup hand-rolled from `schema.describe()`; valibot via `@valibot/to-json-schema` peer; ArkType via `.toJsonSchema()` method). Lazy-load lib-specific deps inside `toJsonSchema`. (Resolves open question #1.)
 
+## Multipart parser choice (resolved 2026-08-08)
+
+Replaces open question #2, whose premise ("formidable is Express-coupled") was disproven.
+All figures measured locally, Apple M1, Node 26.5.1.
+
+**Transport coupling — not a factor.** formidable parsed multipart over raw `node:http2` with no
+Express in the process. It needs a readable stream, nothing more. Express itself is a different
+story: `http2.createServer(expressApp)` **crashes the process** on request #1
+(`TypeError: Cannot read properties of undefined (reading 'readable')`), which is why HTTP/2 is
+gated on the adapter work rather than on the parser.
+
+**Heap — the deciding measurement.** 200 MB upload, peak RSS delta:
+
+| parser | delta | scaling | spools to disk |
+|---|---|---|---|
+| formidable | **+35 MB** | O(1) | yes |
+| Web `Request.formData()` | **+190 MB** | O(payload) | no |
+
+`Request.formData()` is therefore **disqualified for file uploads**: at the shipped
+`maxTotalFileSize: 50MB` it costs ~50 MB RSS per concurrent upload with no backpressure and no
+mid-parse abort — a cheap unauthenticated DoS. A limiting stream can reject an oversized body but
+cannot stop an accepted one from sitting in the heap.
+
+**Throughput — not a factor either.** formidable does ~505–616 MB/s end-to-end *including* the disk
+spool (≈4.4 Gbps on one core). A gigabit link delivers 125 MB/s, so parsing uses ~a quarter of one
+core at line rate. Boundary scanning already bottoms out in `Buffer.indexOf` (native SIMD memchr).
+
+**Decision: prefer `busboy`, on merits that are actually true** — streaming (O(1) heap), byte-precise
+limits, no temp-file lifecycle, and *you own the output shape*, which kills the always-array wart
+independently of the parser (see "Multipart parser is always-array"). Web standards keep a place for
+**non-file bodies** (JSON/urlencoded, capped at `maxFieldsSize: 2MB`) via the `app.parsers` registry.
+
+**Rejected: a native (Rust/C++ napi) parser.** No CPU bottleneck to attack (4× headroom at line
+rate), and it would add a mandatory runtime prebuild matrix to every consumer — the opposite of the
+decision to make `oxc-parser` an optional *dev-time* peer, and incompatible with the edge-compatible
+direction of P3/P5. If a Rust HTTP engine ever clears `http-engine-spike`'s bar, the parser comes
+with it for free and without an N-API crossing; the engine leads, never the parser.
+
+**Docs note:** at the size where any of this matters, the answer is presigned direct-to-storage
+uploads, so the bytes never reach the API.
+
 ## Deferred to v6
 
 These are settled-in-direction but explicitly NOT shipping in v5 — preserving v5's "stay close to today's behavior" promise.

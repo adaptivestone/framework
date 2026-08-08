@@ -60,7 +60,7 @@ Metrics per rung: req/s, p50/p99, **CPU% at fixed pinned RPS** (~70% of rung 0's
 ## Deliverables
 
 1. `benchmark/engines/` — rung servers, conformance script, bench runner, raw results.
-2. Results-and-decision doc: numbers, go/no-go per the rule above, plus consequences for the roadmap — keep/skip P2c, P3 timing, whether a native adapter (uWS or Rust) joins P3/P5's adapter family. If go: productionization sketch (prebuild matrix, automatic JS fallback, adapter-contract integration) and a **"nice features" section** (HTTP/2/3, rustls TLS termination, edge rate-limiting, zero-downtime socket handoff) so the decision weighs features, not just req/s.
+2. Results-and-decision doc: numbers, go/no-go per the rule above, plus consequences for the roadmap — keep/skip P2c, P3 timing, whether a native adapter (uWS or Rust) joins P3/P5's adapter family. If go: productionization sketch (prebuild matrix, automatic JS fallback, adapter-contract integration) and a **"nice features" section** (HTTP/3, rustls TLS termination, edge rate-limiting, zero-downtime socket handoff) so the decision weighs features, not just req/s. **HTTP/2 is deliberately NOT in that list** — stock `node:http2` provides it once the framework owns the top-level listener, so it is a P3/P4 deliverable and must not be counted as a payoff of going native (measured 2026-08-08; see `../later/node-adapter.md`).
 
 ## Out of scope (this spike)
 

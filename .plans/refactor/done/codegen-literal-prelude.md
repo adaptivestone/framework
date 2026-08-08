@@ -1,6 +1,6 @@
 # P1w — Literal route-getter setup
 
-**Status**: 🟢 implemented 2026-07-20 · complete release gate green · awaiting `5.2.1`
+**Status**: ✅ **shipped in 5.2.1** (2026-07-20)
 **Target**: `5.2.1`, additive codegen compatibility
 **Depends on**: shipped declarative OXC route extractor
 

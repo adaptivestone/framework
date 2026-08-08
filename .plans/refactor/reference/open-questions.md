@@ -1,12 +1,12 @@
 # Open questions
 
-12 unresolved trade-offs. Pick one and decide before its affected phase starts.
+11 unresolved trade-offs. Pick one and decide before its affected phase starts.
 
 1. ~~**`defineMiddleware` helper.**~~
    *Resolved 2026-05-09 — rejected for v5*: the class form is already the convention; a parallel function-style API saves only ~5-10 lines for trivial middlewares while requiring users to choose between two shapes and forcing codegen to handle both. The original architectural argument (Pipeline needing a new middleware shape) doesn't apply since `(req, res, next)` stays in v5; `next()` removal is a v6 concern. Revisit alongside the v6 middleware-shape change.
 
-2. **Multipart strategy for Phase 3.** `formidable` is Express-coupled. Swap to `busboy` (cleaner, transport-neutral) or keep formidable behind the adapter (less change, more glue)?
-   *Decision lean*: defer; investigate during P3.
+2. ~~**Multipart strategy for Phase 3.**~~
+   *Resolved 2026-08-08 — the premise was wrong, and measurement changed the answer.* "formidable is Express-coupled" is **false**: it parsed multipart over raw `node:http2` with no Express in the process. It only needs a readable stream. Swap on measured merits instead — see `decisions.md` → "Multipart parser choice (resolved)".
 
 3. ~~**Generator parser.** TS compiler API vs. `oxc-parser`?~~
    *Resolved 2026-05-06*: chose **runtime introspection** over AST entirely. Boot framework, walk `cm.controllers`, extract metadata from already-compiled Express routers. See `decisions.md` → "Codegen architecture". If dev-loop performance becomes painful later, an AST fast-path is an additive optimization, not a replacement.
