@@ -130,6 +130,22 @@ if (!redisAbsent) {
 }
 console.log('  ✓ @redis/client absent (redis stays optional)');
 
+// 4b. codegen-optional guarantee: `oxc-parser` is a native (napi) package used
+//     ONLY by `generatetypes`. It must stay an OPTIONAL peer so a production
+//     install carries no platform binary it will never load.
+let oxcAbsent = false;
+try {
+  require.resolve('oxc-parser');
+} catch (e) {
+  oxcAbsent = e.code === 'MODULE_NOT_FOUND';
+}
+if (!oxcAbsent) {
+  throw new Error(
+    'oxc-parser resolved in a default install — it must stay an optional peer (codegen-only)',
+  );
+}
+console.log('  ✓ oxc-parser absent (codegen parser stays optional)');
+
 const pkgRoot = path.dirname(
   require.resolve('@adaptivestone/framework/package.json'),
 );

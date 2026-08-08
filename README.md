@@ -47,6 +47,16 @@ them with:
 node src/cli.ts generatetypes
 ```
 
+Code generation needs the **optional peer dependency `oxc-parser`** — install it
+as a devDependency in your project:
+
+```sh
+npm i -D oxc-parser
+```
+
+It parses your controller sources and is never loaded at runtime, so it stays
+out of production installs (`npm ci --omit=dev`).
+
 They are gitignored — regenerate after pulling (a fresh checkout is red in the
 editor until the first run). In CI, guard against stale types with
 `node src/cli.ts generatetypes --check`, which writes nothing and exits non-zero

@@ -2,7 +2,19 @@ import path from 'node:path';
 import Server from '../../src/server.ts';
 
 process.env.LOGGER_CONSOLE_LEVEL ||= 'error';
-process.env.MONGO_DSN = '';
+
+// `startServer` asserts both of these (`#assertBootConfig`): a missing Mongo DSN
+// or AUTH_SALT is a hard boot failure. They are SATISFIED here, never used — the
+// explicit `init({ isSkipModelInit: true })` below skips `initAllModels`, which is
+// the only caller of `#mongooseConnect`, so mongoose is never dialed and no DB
+// latency enters the measurement (see `.plans/refactor/done/baseline.md` for why
+// this fixture deliberately excludes mongo). `||=` so a real environment wins.
+//
+// Keep these in step with `#assertBootConfig` — the assertion landing after this
+// fixture was written is exactly what silently broke `npm run dev:bench:realistic`.
+process.env.MONGO_DSN ||=
+  'mongodb://127.0.0.1:27017/framework-bench-never-connected';
+process.env.AUTH_SALT ||= 'benchmark-fixture-salt-not-a-secret';
 
 const basePath = new URL('.', import.meta.url).pathname;
 const srcRoot = path.resolve(basePath, '../../src');

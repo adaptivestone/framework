@@ -28,7 +28,7 @@
 
 import { promises as fs } from 'node:fs';
 import merge from 'deepmerge';
-import { parseSync } from 'oxc-parser';
+import { parseSource } from './parser.ts';
 
 /**
  * Env-derived key types for one config, mirroring its nesting. A string leaf is
@@ -154,7 +154,7 @@ export async function extractConfigEnvShape(
     return {};
   }
   try {
-    const { program } = parseSync(srcPath, source);
+    const { program } = parseSource(srcPath, source);
     const obj = findDefaultExportObject(program.body as Node[]);
     return obj ? shapeOfObject(obj) : {};
   } catch {

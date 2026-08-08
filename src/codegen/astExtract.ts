@@ -23,13 +23,16 @@
  * aspect is flagged via `ok: false` / `reason`; codegen can't statically analyze
  * that controller and the run throws (no boot fallback — declarative-only).
  *
- * oxc, not the TypeScript API: `ts.createSourceFile` is dropped in TS 7's Go port;
- * oxc is a stable in-process napi parser, and codegen needs only syntactic
- * extraction (it emits type expressions; it never resolves types).
+ * oxc, not the TypeScript API: `ts.createSourceFile` is dropped in TS 7's Go port
+ * (its `unstable/ast` replacement exposes a scanner/visitor but no standalone file
+ * parser, and `unstable/sync` is the full Program/Checker API). oxc is a stable
+ * in-process napi parser, and codegen needs only syntactic extraction — it emits
+ * type expressions, it never resolves types. The parser is an OPTIONAL peer loaded
+ * lazily; see `parser.ts`.
  */
 
-import { parseSync } from 'oxc-parser';
 import { HTTP_METHODS } from '../services/http/routing/RouteNode.ts';
+import { parseSource } from './parser.ts';
 
 /** Valid `routes`-getter verbs (upper-case), the single source of truth shared
  * with the runtime loader. A route under any other key never matches at runtime,
@@ -98,7 +101,7 @@ export function extractController(
   src: string,
   fileName: string,
 ): ExtractResult {
-  const { program, errors } = parseSync(fileName, src);
+  const { program, errors } = parseSource(fileName, src);
   if (errors.length) {
     return {
       ok: false,

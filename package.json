@@ -53,7 +53,6 @@
     "routes": "node cliCommand.ts routes",
     "dev:bench:realistic": "node ./benchmark/fixtures/realistic.ts",
     "benchmark": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/",
-    "benchmark2": "h2load -n 10000 -c 50  https://localhost:3300/",
     "benchmark:plaintext": "h2load -n 10000 -c 50 -p 'http/1.1' http://localhost:3300/bench/plaintext",
     "benchmark:realistic": "h2load -n 10000 -c 50 -p 'http/1.1' 'http://localhost:3300/bench/echo?name=Alice'",
     "redis:docker": "docker run --rm  -p 6379:6379 redis"
@@ -67,7 +66,6 @@
     "i18next": "^26.0.1",
     "i18next-fs-backend": "^2.0.0",
     "mongoose": "^9.9.1",
-    "oxc-parser": "^0.142.0",
     "rate-limiter-flexible": "^11.0.0",
     "winston": "^3.3.3",
     "winston-transport": "^4.9.0"
@@ -82,6 +80,7 @@
     "@types/node": "^26.0.0",
     "lefthook": "^2.0.0",
     "mongodb-memory-server": "^11.0.0",
+    "oxc-parser": "^0.142.0",
     "typescript": "^7.0.2",
     "vitest": "^4.0.0",
     "yup": "^1.7.0",
@@ -93,6 +92,7 @@
     "@sentry/core": "^10.34.0",
     "@sentry/node": "^10.34.0",
     "mongodb-memory-server": "^11.0.0",
+    "oxc-parser": "^0.142.0",
     "vitest": "^4.0.0",
     "yup": "^1.7.0",
     "zod": "^3.24.0 || ^4.0.0"
@@ -111,6 +111,9 @@
       "optional": true
     },
     "mongodb-memory-server": {
+      "optional": true
+    },
+    "oxc-parser": {
       "optional": true
     },
     "vitest": {
