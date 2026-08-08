@@ -158,6 +158,19 @@ function safeValidationMessage(error: MongooseFieldError): string {
  * defect, and the developer needs every detail.
  */
 export function toLoggableError(err: unknown): unknown {
+  // A standalone `CastError` ("Cast to ObjectId failed for value \"<input>\"")
+  // embeds the rejected value in its message exactly like a ValidationError, and
+  // a path param can carry PII (an email, a token) just as a body field can.
+  // Rebuild it value-free, keeping the model path — the resolved branch logs at
+  // `warn` into Sentry/retention, and the developer still needs to know WHICH
+  // path failed to cast, which is safe (a field name, never input).
+  if (err instanceof mongoose.Error.CastError) {
+    const sanitized = new Error(
+      `Cast failed at path "${err.path}" (safety net, sanitized): ${safeValidationMessage(err)}`,
+    );
+    sanitized.name = 'CastError';
+    return sanitized;
+  }
   if (!(err instanceof mongoose.Error.ValidationError)) {
     return err;
   }
@@ -218,6 +231,65 @@ export function matchedClientValidationErrors(
   return errors;
 }
 
+/** Is this a primitive we can compare by value? Objects/null are never matched
+ * (`String({})` collapses every object to the same text). Path params, query
+ * values and JSON scalars are all primitives, so nothing real is lost. */
+function isComparablePrimitive(value: unknown): boolean {
+  return value !== null && value !== undefined && typeof value !== 'object';
+}
+
+/**
+ * Client-supplied inputs keyed by the name the CLIENT knows them under: path
+ * params (public — they appear in the route's own URL pattern), plus the
+ * validated body and query keys. The framework-injected `contentType`
+ * discriminant is excluded, as in {@link matchedClientValidationErrors}.
+ */
+function clientInputEntries(req: FrameworkRequest): [string, unknown][] {
+  const out: [string, unknown][] = [];
+  for (const source of [req.params, req.appInfo?.request, req.appInfo?.query]) {
+    if (!source) {
+      continue;
+    }
+    for (const [key, value] of Object.entries(source)) {
+      if (key !== 'contentType') {
+        out.push([key, value]);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Safety net for a STANDALONE Mongoose `CastError` — the shape a path param
+ * produces (`findById(req.params.id)` with a malformed id). A `CastError` is a
+ * sibling of `ValidationError`, not a subclass, so
+ * {@link matchedClientValidationErrors} structurally cannot see it, and its
+ * failing path is an internal model field (`_id`) that must never be echoed.
+ *
+ * Returns `{ <clientKey>: message }` only when the rejected value is one the
+ * client actually supplied — matched by VALUE against the path params and the
+ * validated body/query, then reported under that public input name. A cast
+ * failure on a server-computed value matches nothing and returns `null`, so a
+ * genuine server-side defect keeps its honest 500 instead of being blamed on
+ * the caller. The message comes from {@link safeValidationMessage}, so the
+ * rejected value never rides into the response.
+ */
+export function matchedClientCastError(
+  err: mongoose.Error.CastError,
+  req: FrameworkRequest,
+): Record<string, string> | null {
+  if (!isComparablePrimitive(err.value)) {
+    return null;
+  }
+  const rejected = String(err.value);
+  for (const [key, candidate] of clientInputEntries(req)) {
+    if (isComparablePrimitive(candidate) && String(candidate) === rejected) {
+      return { [key]: safeValidationMessage(err) };
+    }
+  }
+  return null;
+}
+
 /**
  * Framework built-in registry entries, checked AFTER any consumer-registered
  * handlers ("yours win"):
@@ -225,6 +297,10 @@ export function matchedClientValidationErrors(
  *      (deliberate control flow, not a defect).
  *   2. Escaped Mongoose `ValidationError` → the safety net above; `warn`
  *      (signals a route schema missing a constraint the model enforces).
+ *   3. Standalone Mongoose `CastError` → {@link matchedClientCastError}; `warn`
+ *      (signals a path param or input reaching the model unvalidated). Declaring
+ *      a route `params:` schema turns the same failure into a 400 earlier, with
+ *      a message you control.
  */
 export function builtInErrorHandlers(): RegisteredErrorHandler[] {
   return [
@@ -246,6 +322,19 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
       handler: (err, req) => {
         const clientErrors = matchedClientValidationErrors(
           err as mongoose.Error.ValidationError,
+          req,
+        );
+        return clientErrors
+          ? { status: 400, body: { errors: clientErrors } }
+          : null;
+      },
+      logLevel: 'warn',
+    },
+    {
+      errorClass: mongoose.Error.CastError,
+      handler: (err, req) => {
+        const clientErrors = matchedClientCastError(
+          err as mongoose.Error.CastError,
           req,
         );
         return clientErrors

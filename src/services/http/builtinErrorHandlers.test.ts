@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { testEach } from '../../tests/parameterized.ts';
 import {
   builtInErrorHandlers,
+  matchedClientCastError,
   matchedClientValidationErrors,
   toLoggableError,
 } from './builtinErrorHandlers.ts';
@@ -123,6 +124,97 @@ describe('Mongoose validation safety-net messages', () => {
       ),
       null,
     );
+  });
+});
+
+describe('standalone CastError safety net', () => {
+  const castError = (value: unknown, path = '_id', kind = 'ObjectId') =>
+    new mongoose.Error.CastError(kind, value as string, path);
+
+  const reqWith = (over: {
+    params?: Record<string, string>;
+    request?: Record<string, unknown>;
+    query?: Record<string, unknown>;
+  }) =>
+    ({
+      params: over.params ?? {},
+      appInfo: { request: over.request ?? {}, query: over.query ?? {} },
+    }) as unknown as FrameworkRequest;
+
+  it('blames the path param that carried the rejected value', () => {
+    assert.deepStrictEqual(
+      matchedClientCastError(
+        castError('abc'),
+        reqWith({ params: { id: 'abc' } }),
+      ),
+      { id: 'Must be a valid id' },
+    );
+  });
+
+  it('matches a value sourced from the validated body or query too', () => {
+    assert.deepStrictEqual(
+      matchedClientCastError(
+        castError('abc'),
+        reqWith({ query: { ref: 'abc' } }),
+      ),
+      { ref: 'Must be a valid id' },
+    );
+    assert.deepStrictEqual(
+      matchedClientCastError(
+        castError('abc'),
+        reqWith({ request: { ref: 'abc' } }),
+      ),
+      { ref: 'Must be a valid id' },
+    );
+  });
+
+  it('returns null for a server-computed value the client never sent', () => {
+    assert.strictEqual(
+      matchedClientCastError(
+        castError('server-side-constant'),
+        reqWith({ params: { id: 'abc' } }),
+      ),
+      null,
+    );
+  });
+
+  it('never matches on a non-primitive (every object stringifies alike)', () => {
+    assert.strictEqual(
+      matchedClientCastError(castError({}), reqWith({ request: { ref: {} } })),
+      null,
+    );
+  });
+
+  it('ignores the framework-injected contentType discriminant', () => {
+    assert.strictEqual(
+      matchedClientCastError(
+        castError('application/json'),
+        reqWith({ request: { contentType: 'application/json' } }),
+      ),
+      null,
+    );
+  });
+
+  it('reports the cast KIND, never the rejected value', () => {
+    const result = matchedClientCastError(
+      castError('SECRET_INPUT', '_id', 'Number'),
+      reqWith({ params: { id: 'SECRET_INPUT' } }),
+    );
+
+    assert.deepStrictEqual(result, { id: 'Must be a number' });
+    assert.ok(!JSON.stringify(result).includes('SECRET_INPUT'));
+    // The internal model path must not leak either.
+    assert.ok(!JSON.stringify(result).includes('_id'));
+  });
+
+  it('sanitizes a standalone CastError for the log line', () => {
+    const result = toLoggableError(castError('SECRET_INPUT'));
+
+    assert.ok(result instanceof Error);
+    assert.strictEqual((result as Error).name, 'CastError');
+    assert.ok(!(result as Error).message.includes('SECRET_INPUT'));
+    // The model path IS kept — a field name is safe and the developer needs it.
+    assert.ok((result as Error).message.includes('_id'));
   });
 });
 
