@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.3.3] - 2026-08-08
+
+### Added
+
+- **The shipped test bootstrap now accepts project `Server` options, so `bootHttp` runs under test.** `Server` takes exactly two things — `folders` and the `bootHttp` hook — and the test bootstrap passed only the first, hardcoding `new Server({ folders })`. Every project that wires app-wide HTTP behavior in `bootHttp` (error handlers via `registerErrorHandler`, ad-hoc routes, Express middleware) therefore ran its tests against a server that had none of it: a mapped 400 in production showed up as a 500 under test, with nothing reporting the difference. Declare them with `configureTestServer` from `tests/testHelpers.js`, at module scope in the preload that imports the setup glue:
+
+  ```ts
+  import { configureTestServer } from '@adaptivestone/framework/tests/testHelpers.js';
+  import '@adaptivestone/framework/tests/setupNodeTest.js';
+
+  configureTestServer({ bootHttp: (app) => { /* same wiring as production */ } });
+  ```
+
+  `folders` stays owned by the bootstrap (it resolves those from the `TEST_FOLDER_*` env vars). Calling it after the server has booted throws rather than silently doing nothing — a late call cannot retroactively wire the running server, and a silent skip is exactly the failure this fixes. Also closes a coverage hole: `bootHttp` shipped in 5.1 with no test exercising it end to end, for the same reason.
+
+### Fixed
+
+- **Plain nested paths carried a phantom `_id` on hydrated documents.** Mongoose builds a subdocument, and generates an `_id` for it, only for the `{ type: { … } }` spelling; a plain nested object (`name: { first: String, last: String }`) is a path grouping that never gets an `_id` at runtime. `InferHydratedDocType` types both the same way, intersecting `{ _id: ObjectId }` onto nested paths too — so `doc.name._id` compiled for a value that is always `undefined`, and assigning the real runtime shape (`doc.name = { first: 'Ada' }`) was a type error on a property Mongoose will never persist, pushing consumers to `Omit<…, 'name'>` bridges or `unknown` casts at every nested-path call site. The framework's hydrated correction — which already strips the `_id` Mongoose adds to `_id: false` subdocuments — now also drops it from plain nested paths, at any depth, using the same no-`type`-wrapper discriminator the override pass uses. Real single-nested subdocuments keep their `_id`, and the raw/lean/create surfaces are untouched: those already matched runtime exactly. The framework's own `User.name` was affected.
+
 ## [5.3.2] - 2026-08-08
 
 ### Fixed

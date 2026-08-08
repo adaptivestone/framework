@@ -265,6 +265,26 @@ type SchemaSingleNestedDefinition<S> =
             : never
     : never;
 
+/**
+ * True for a *plain nested path* — an object of field definitions with no
+ * `type` key, e.g. `name: { first: String, last: String }`.
+ *
+ * Mongoose groups those paths under a prefix but never builds a subdocument for
+ * them, so they carry no `_id` at runtime (`doc.name._id` is `undefined`); only
+ * the `{ type: { … } }` spelling produces a real subdocument with a generated
+ * id. Anything with a `type` key, a leaf definition, or an array is therefore
+ * excluded here — same discriminator {@link SchemaSingleNestedDefinition} uses.
+ */
+type IsPlainNestedPath<S> = S extends object
+  ? S extends readonly unknown[]
+    ? false
+    : IsLeafFieldDef<S> extends true
+      ? false
+      : 'type' extends keyof S
+        ? false
+        : true
+  : false;
+
 type HasDisabledSubdocumentId<S> = S extends { readonly _id: false }
   ? true
   : S extends object
@@ -340,45 +360,61 @@ type CorrectHydratedSubdocumentElement<Raw, Schema> =
     : never;
 
 /**
- * Preserve Mongoose's hydrated array APIs while respecting inline `_id: false`.
- * Mongoose 9.9.1 otherwise exposes a required `_id: unknown` on those elements.
+ * Preserve Mongoose's hydrated array APIs while respecting inline `_id: false`,
+ * and drop the `_id` Mongoose's hydrated inference adds to plain nested paths.
+ * Mongoose 9.9.1 otherwise exposes a required `_id: unknown` on `_id: false`
+ * subdocument elements, and intersects `{ _id: ObjectId }` onto every nested
+ * path — a field that never exists at runtime, and one that makes assigning the
+ * real runtime shape (`doc.name = { first: 'a' }`) a type error.
  */
 type CorrectHydratedSubdocumentIds<Doc, Schema> = {
   [K in keyof Doc]: K extends keyof Schema
-    ? HasDisabledSubdocumentId<Schema[K]> extends true
-      ? [SchemaArrayElement<Schema[K]>] extends [never]
-        ? [SchemaSingleNestedDefinition<Schema[K]>] extends [never]
-          ? Doc[K]
-          : NonNullable<Doc[K]> extends object
+    ? IsPlainNestedPath<NonNullable<Schema[K]>> extends true
+      ? NonNullable<Doc[K]> extends object
+        ?
+            | Omit<
+                CorrectHydratedSubdocumentIds<
+                  NonNullable<Doc[K]>,
+                  NonNullable<Schema[K]>
+                >,
+                '_id'
+              >
+            | Exclude<Doc[K], object>
+        : Doc[K]
+      : HasDisabledSubdocumentId<Schema[K]> extends true
+        ? [SchemaArrayElement<Schema[K]>] extends [never]
+          ? [SchemaSingleNestedDefinition<Schema[K]>] extends [never]
+            ? Doc[K]
+            : NonNullable<Doc[K]> extends object
+              ?
+                  | CorrectHydratedSubdocumentElement<
+                      InferRawDocType<
+                        MutableSchemaForInference<
+                          SchemaSingleNestedDefinition<Schema[K]>
+                        >
+                      >,
+                      SchemaSingleNestedDefinition<Schema[K]>
+                    >
+                  | Exclude<Doc[K], object>
+              : Doc[K]
+          : NonNullable<Doc[K]> extends mongoose.Types.DocumentArray<
+                infer Raw,
+                infer _Hydrated
+              >
             ?
-                | CorrectHydratedSubdocumentElement<
-                    InferRawDocType<
-                      MutableSchemaForInference<
-                        SchemaSingleNestedDefinition<Schema[K]>
-                      >
+                | mongoose.Types.DocumentArray<
+                    CorrectRawSubdocumentElement<
+                      Raw,
+                      SchemaArrayElement<Schema[K]>
                     >,
-                    SchemaSingleNestedDefinition<Schema[K]>
+                    CorrectHydratedSubdocumentElement<
+                      Raw,
+                      SchemaArrayElement<Schema[K]>
+                    >
                   >
-                | Exclude<Doc[K], object>
+                | Extract<Doc[K], null | undefined>
             : Doc[K]
-        : NonNullable<Doc[K]> extends mongoose.Types.DocumentArray<
-              infer Raw,
-              infer _Hydrated
-            >
-          ?
-              | mongoose.Types.DocumentArray<
-                  CorrectRawSubdocumentElement<
-                    Raw,
-                    SchemaArrayElement<Schema[K]>
-                  >,
-                  CorrectHydratedSubdocumentElement<
-                    Raw,
-                    SchemaArrayElement<Schema[K]>
-                  >
-                >
-              | Extract<Doc[K], null | undefined>
-          : Doc[K]
-      : Doc[K]
+        : Doc[K]
     : Doc[K];
 };
 

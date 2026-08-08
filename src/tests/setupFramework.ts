@@ -11,6 +11,10 @@
  *   framework `Server` against a fresh DB and tears it down.
  * - `setTestRedisNamespace` / `clearTestRedisNamespace` — per test; isolate the
  *   cache/rate-limiter keyspace.
+ *
+ * Project `Server` options (notably the `bootHttp` hook) are declared with
+ * `configureTestServer` from `testHelpers.ts` before the server boots; this
+ * module owns only the `folders` config.
  */
 
 import crypto from 'node:crypto';
@@ -19,7 +23,11 @@ import mongoose from 'mongoose'; // we do not need create indexes on tests
 import type redisConfig from '../config/redis.ts';
 import { clearNamespace } from '../helpers/redis/clearNamespace.ts';
 import Server from '../server.ts';
-import { serverInstance, setServerInstance } from './testHelpers.ts';
+import {
+  serverInstance,
+  setServerInstance,
+  takeTestServerOptions,
+} from './testHelpers.ts';
 
 mongoose.set('autoIndex', false);
 
@@ -65,6 +73,9 @@ async function bootTestServer(): Promise<Server> {
   process.env.LOGGER_CONSOLE_LEVEL = 'error';
   process.env.AUTH_SALT = crypto.randomBytes(16).toString('hex');
   const server = new Server({
+    // Project-declared options (`bootHttp`, …) so the test server wires itself
+    // the same way production does. Folders stay owned by the bootstrap.
+    ...takeTestServerOptions(),
     folders: {
       config:
         process.env.TEST_FOLDER_CONFIG || path.resolve(basePath, '../config'),

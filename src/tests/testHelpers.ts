@@ -3,6 +3,46 @@ import type UserModel from '../models/User.ts';
 import type { TUser } from '../models/User.ts';
 import type { GetModelTypeFromClass } from '../modules/BaseModel.ts';
 import type Server from '../server.ts';
+import type { ServerOptions } from '../server.ts';
+
+/**
+ * Server options a project can declare for the test server the shipped setup
+ * boots. `folders` is excluded — the bootstrap resolves those itself from the
+ * `TEST_FOLDER_*` env vars.
+ */
+export type TestServerOptions = Omit<ServerOptions, 'folders'>;
+
+let testServerOptions: TestServerOptions = {};
+let areTestServerOptionsApplied = false;
+
+/**
+ * Declare `Server` options — notably the `bootHttp` hook — for the test server.
+ * Without this, app-wide HTTP wiring that production does in `bootHttp` is
+ * simply absent under test, so tests see the unwired behavior (a 500 where
+ * production returns the mapped status) with nothing reporting the difference.
+ *
+ * Call it at module scope in the preload that imports the framework setup glue,
+ * before any hook boots the server.
+ */
+export const configureTestServer = (options: TestServerOptions) => {
+  if (areTestServerOptionsApplied) {
+    throw new Error(
+      'configureTestServer() must be called before the test server boots. ' +
+        'Call it at module scope in your test preload (the module that imports ' +
+        '@adaptivestone/framework/tests/setupNodeTest.js), not from a test hook.',
+    );
+  }
+  testServerOptions = { ...testServerOptions, ...options };
+};
+
+/**
+ * Read the declared options and close the window for further configuration.
+ * Called once by the test bootstrap as it constructs the `Server`.
+ */
+export const takeTestServerOptions = (): TestServerOptions => {
+  areTestServerOptionsApplied = true;
+  return testServerOptions;
+};
 
 export let serverInstance!: Server;
 export let defaultUser: InstanceType<GetModelTypeFromClass<typeof UserModel>>;
