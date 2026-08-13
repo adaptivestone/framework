@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.3.3] - 2026-08-08
+## [Unreleased]
+
+### Fixed
+
+- **`configureTestServer` now works in the documented arrangement — the boot no longer beats the preload that declares the options.** node:test runs a root `before()` registered from a `--import` preload immediately, synchronously inside the `before()` call — while the preload's module graph is still evaluating. The shipped setup glue therefore booted the test server, and closed the options window, during its own import; the preload's module body — where the 5.3.3 snippet places the `configureTestServer` call, below its hoisted imports — ran only afterwards, so every test file died on the helper's own "must be called before the test server boots" guard. The glue's `before()` hook now yields one microtask before booting, resuming after the whole preload graph has evaluated, so the documented snippet (setup-glue import above, call at module scope below) works as written. One arrangement remains out of reach: a preload that awaits at top level before calling — deferral cannot outwait arbitrary async work — and the guard's error message now names the fix for it (move the call into a separate module imported before the setup glue). Pinned by a spawned-runner regression test that executes the documented preload arrangement under `--test`.
 
 ### Added
 

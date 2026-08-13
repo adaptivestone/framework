@@ -1,7 +1,7 @@
-# P1q — Universal typed HTTP responses (v5.3 bridge → v6 cutover)
+# P1q — Universal typed HTTP responses (v5.x bridge → v6 cutover)
 
-**Status**: ✅ design direction settled 2026-07-18 · implementation not started  
-**Target**: v5.3, additive; ordinary controller `res` removal is v6
+**Status**: ✅ design direction settled 2026-07-18 · implementation not started · `transformResponse` hook folded in 2026-08-10  
+**Target**: next minor (5.4+), additive; ordinary controller `res` removal is v6
 **Depends on**: [tree-router](../done/tree-router.md) ✅, [error-handler-registry](../done/error-handler-registry.md) ✅  
 **Feeds**: [OpenAPI responses](openapi-responses.md), [async middleware](../later/async-middleware.md), [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
 **Origin**: an authorized file-delivery workaround exposed the immediate stream/file gap. The wider design discussion showed that a file-only helper would preserve the real problem: controllers would still use Express for JSON, statuses, headers, redirects, and errors.
@@ -140,6 +140,40 @@ normalized to `HttpResponse.json(status, body)` internally; a handler may additi
 `HttpResponse` directly when it needs non-default headers/content. The registry's log level and
 first-match/null-fallthrough semantics do not change.
 
+## Response transform hook (`transformResponse`)
+
+**Origin**: wishlist #17 (2026-08-09, consumer envelope adoption on 5.3.3). A project whose wire
+convention is `{ data, message?, errors? }` cannot today wrap framework-emitted bodies (validation
+400, the 404 page, platform 500) without monkey-patching Express `res.json` from `bootHttp` — which
+couples the project to the exact dependency this plan removes. Changing the framework's own wire
+shape was declined (the framework emits `data` in exactly one response; the envelope is the
+project's convention), and per-error-class `registerErrorHandler` can never cover success bodies.
+The right altitude is a project-level whole-response transform, specified here so it is born
+adapter-neutral and ships with the writer instead of being built twice.
+
+- **Contract**: `transformResponse(response, { req }) => HttpResponse` — synchronous, operates on
+  the branded descriptor, never on adapter objects. Projects match on kind: reshape `json`
+  descriptors, pass `stream`/`file`/`redirect`/`empty` through untouched. The registration point
+  (a `Server` option beside `bootHttp` — which would flow through `configureTestServer` for free —
+  vs an `HttpServer` method) is a Phase 0 decision.
+- **Guarantee**: every response the framework renders passes through the hook — validation 400s,
+  the 404 page, the error sink, error-registry results, built-in controllers. This becomes true at
+  Phase 2 (framework responses traverse the writer); the hook must not be advertised before then,
+  or it silently covers only descriptor-returning handlers.
+- **Bridge period (v5.x)**: legacy handlers that call `res.json` directly never reach the writer.
+  If the all-JSON guarantee is wanted before v6, the Express-era implementation is a `res.json`
+  wrap owned internally by `ExpressAdapter`, with `ExpressResponseWriter` sending through the same
+  point so the hook applies exactly once; consumers never see Express. In v6 the writer is the
+  only path and the implementation moves there — the consumer contract does not change.
+- **Failure**: a throwing transform logs at `error` and renders the original response — a broken
+  envelope must not take the API down.
+- **OpenAPI caveat**: a transform makes generated body schemas wrong unless paired with a
+  declarative schema wrapper in Phase 3; until that exists, the docs must state that the export
+  describes untransformed bodies.
+- **Why not standalone/earlier**: before the writer exists the hook could only be body-based
+  (`(body, status) => body`), a public contract Phase 1 would immediately break. Specifying it
+  inside this plan gives it the descriptor signature from birth.
+
 ## Raw response access
 
 ### v5.3
@@ -205,6 +239,8 @@ unhandled `500`. The old unconditional `200/400/401/404` stub set is removed.
 
 - Lock factory names, status restrictions, descriptor branding, header semantics, and public
   exports in type/runtime tests.
+- Settle the `transformResponse` registration point (`Server` option vs `HttpServer` method) and
+  its exact signature.
 - Prove Web stream and async-iterable writing through Express with abort propagation.
 - Measure the semantic type-resolution options for OpenAPI; do not block the runtime layer on it.
 
@@ -219,6 +255,8 @@ unhandled `500`. The old unconditional `200/400/401/404` stub set is removed.
 - Route framework-generated responses and error-registry results through the writer.
 - Migrate `Home`/`Auth` framework controllers to returned descriptors as fixtures for consumers.
 - Keep legacy `{ status, body }` error-handler results accepted.
+- Expose and document `transformResponse` here — the all-responses guarantee only holds once
+  framework responses traverse the writer.
 
 ### Phase 3 — OpenAPI/type integration
 

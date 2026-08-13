@@ -29,7 +29,9 @@ export const configureTestServer = (options: TestServerOptions) => {
     throw new Error(
       'configureTestServer() must be called before the test server boots. ' +
         'Call it at module scope in your test preload (the module that imports ' +
-        '@adaptivestone/framework/tests/setupNodeTest.js), not from a test hook.',
+        '@adaptivestone/framework/tests/setupNodeTest.js), not from a test hook. ' +
+        'If that preload awaits at top level before this call, move the call ' +
+        'into a separate module imported before the setup glue.',
     );
   }
   testServerOptions = { ...testServerOptions, ...options };

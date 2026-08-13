@@ -19,6 +19,13 @@ before(async () => {
   if (isFrameworkSetupSkipped) {
     return;
   }
+  // node:test runs a root `before()` registered from a `--import` preload
+  // immediately — synchronously inside the `before()` call, while the preload
+  // graph is still evaluating. Booting right here would consume the
+  // `configureTestServer` options window before the preload's own module body
+  // (below its hoisted imports) ever ran. Yield one microtask so the boot
+  // starts after the preload finishes evaluating.
+  await null;
   await ensureTestServerReady();
 });
 beforeEach(() => {
