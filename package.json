@@ -79,7 +79,7 @@
     "@types/node": "^26.0.0",
     "lefthook": "^2.0.0",
     "mongodb-memory-server": "^11.0.0",
-    "oxc-parser": "^0.143.0",
+    "oxc-parser": "^0.144.0",
     "typescript": "^7.0.2",
     "vitest": "^4.0.0",
     "yup": "^1.7.0",
@@ -91,7 +91,7 @@
     "@sentry/core": "^10.34.0",
     "@sentry/node": "^10.34.0",
     "mongodb-memory-server": "^11.0.0",
-    "oxc-parser": "^0.143.0",
+    "oxc-parser": "^0.144.0",
     "vitest": "^4.0.0",
     "yup": "^1.7.0",
     "zod": "^3.24.0 || ^4.0.0"
