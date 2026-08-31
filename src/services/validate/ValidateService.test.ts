@@ -3,9 +3,14 @@ import { describe, it } from 'node:test';
 import { array, number, object, string } from 'yup';
 import { appInstance } from '../../helpers/appInstance.ts';
 import { assertRejectsLike, assertThrowsLike } from '../../tests/assertions.ts';
+import { defineSchema } from './defineSchema.ts';
 import { standardSchemaDriver } from './drivers/StandardSchemaDriver.ts';
 import { yupDriver } from './drivers/YupDriver.ts';
-import type { StandardSchemaV1, ValidatorDriver } from './types.ts';
+import type {
+  StandardSchemaV1,
+  ValidationIssue,
+  ValidatorDriver,
+} from './types.ts';
 import ValidateService from './ValidateService.ts';
 import { ValidationError } from './ValidationError.ts';
 
@@ -184,7 +189,9 @@ describe('ValidateService', () => {
       });
       const svc = new ValidateService(appInstance, schema);
       const i18nService = await appInstance.getI18nService();
-      const i18n = await i18nService.getI18nForLang('en');
+      // A key the app's locales DO ship still wins — asserted against `ru`,
+      // which carries the full catalog (`en` now lives in code as defaults).
+      const i18n = await i18nService.getI18nForLang('ru');
 
       let caught: ValidationError | null = null;
       try {
@@ -196,9 +203,67 @@ describe('ValidateService', () => {
       }
       assert.notStrictEqual(caught, null);
       assert.deepStrictEqual(caught?.message, {
+        email: ['Нужно указать Email'],
+      });
+      assert.strictEqual(caught?.issues[0]?.message, 'Нужно указать Email');
+    });
+
+    it('falls back to the in-code defaultValue when the key is missing', async () => {
+      // Framework messages ship their English text as `params.defaultValue`,
+      // so a key absent from every catalog resolves to English instead of
+      // leaking the raw key into the 400 body.
+      const issues: ValidationIssue[] = [
+        {
+          message: 'auth.emailProvided',
+          path: ['email'],
+          params: { defaultValue: 'Email must be provided' },
+        },
+      ];
+      const schema = defineSchema<{ email: string }>(() => ({ issues }));
+      const svc = new ValidateService(appInstance, schema);
+      const i18nService = await appInstance.getI18nService();
+      const i18n = await i18nService.getI18nForLang('en');
+
+      let caught: ValidationError | null = null;
+      try {
+        await svc.validate({}, i18n);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
+      }
+      assert.deepStrictEqual(caught?.message, {
         email: ['Email must be provided'],
       });
-      assert.strictEqual(caught?.issues[0]?.message, 'Email must be provided');
+    });
+
+    it('interpolates params into an in-code defaultValue', async () => {
+      const issues: ValidationIssue[] = [
+        {
+          message: 'framework.test.missingKey',
+          path: ['password'],
+          params: {
+            min: 8,
+            defaultValue: 'Password must be at least {{min}} characters',
+          },
+        },
+      ];
+      const schema = defineSchema<{ password: string }>(() => ({ issues }));
+      const svc = new ValidateService(appInstance, schema);
+      const i18nService = await appInstance.getI18nService();
+      const i18n = await i18nService.getI18nForLang('en');
+
+      let caught: ValidationError | null = null;
+      try {
+        await svc.validate({}, i18n);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          caught = err;
+        }
+      }
+      assert.deepStrictEqual(caught?.message, {
+        password: ['Password must be at least 8 characters'],
+      });
     });
 
     it('leaves raw keys when no i18n is passed', async () => {
@@ -256,7 +321,7 @@ describe('ValidateService', () => {
 
       let caught: ValidationError | null = null;
       try {
-        await svc.validate({ age: 'x-$t(auth.emailProvided)-y' }, i18n);
+        await svc.validate({ age: 'x-$t(auth.messageSome)-y' }, i18n);
       } catch (err) {
         if (err instanceof ValidationError) {
           caught = err;
@@ -264,9 +329,9 @@ describe('ValidateService', () => {
       }
       const message = caught?.issues[0]?.message ?? '';
       // The nesting token survives unresolved …
-      assert.ok(message.includes('$t(auth.emailProvided)'));
+      assert.ok(message.includes('$t(auth.messageSome)'));
       // … and the key it points at was NOT substituted in.
-      assert.ok(!message.includes('Email must be provided'));
+      assert.ok(!message.includes('Some server problem'));
     });
   });
 

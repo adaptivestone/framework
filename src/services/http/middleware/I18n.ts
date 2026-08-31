@@ -77,7 +77,12 @@ class I18n extends AbstractMiddleware {
         continue;
       }
       const i18nService = await this.app.getI18nService();
-      const i18nInstance = await i18nService.getI18nBaseInstance();
+      // Null when the optional i18next packages are absent: there is nothing to
+      // detect against, so the request falls through to the English defaults.
+      const i18nInstance = await i18nService.getI18nBaseInstanceIfAvailable();
+      if (!i18nInstance) {
+        break;
+      }
       if (i18nInstance.services.languageUtils.isSupportedCode(lng)) {
         if (isUseShortCode) {
           lang =

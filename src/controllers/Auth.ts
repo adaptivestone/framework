@@ -5,7 +5,7 @@ import AbstractController from '../modules/AbstractController.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.ts';
 import { defineSchema } from '../services/validate/defineSchema.ts';
-import type { StandardSchemaV1 } from '../services/validate/types.ts';
+import type { ValidationIssue } from '../services/validate/types.ts';
 import type {
   PostLoginRequest,
   PostLogoutRequest,
@@ -19,8 +19,38 @@ import type {
 type UserInstance = InstanceType<TUser>;
 
 // Zero-dependency validation for the built-in auth routes. Messages are i18n
-// keys (see `src/locales/*`); the framework auto-translates them via the
-// request's `i18n.t` before the error is serialized.
+// keys; the framework auto-translates them via the request's `i18n.t` before
+// the error is serialized, passing the English text below as `defaultValue`.
+
+// English source of truth for the built-in auth messages. Every emit site sends
+// its i18n key together with this text as i18next's `defaultValue`: an app that
+// ships the key in its own locales still wins, an app that ships nothing gets
+// English instead of a raw `auth.*`/`email.*` key.
+const EN = {
+  'auth.emailProvided': 'Email must be provided',
+  'auth.emailValid': 'Email is not valid',
+  'auth.passwordProvided': 'Password must be provided',
+  'auth.passwordValid':
+    'Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>',
+  'auth.passwordRecoveryTokenProvided':
+    'Password recovery token must be provided',
+  'auth.nickNameValid': 'Nick name is not valid,only a-z,A-Z,0-9',
+  'auth.nameValid': 'Name is not valid',
+  'auth.errorUPValid': 'User/password not valid',
+  'auth.nicknameExists': 'User with such nickname already exists',
+  'auth.recoveryEmailSent':
+    'If an account exists for this address, a recovery email has been sent.',
+  'auth.verificationEmailSent':
+    'If an account exists for this address, a verification email has been sent.',
+  'email.notVerified': 'Your email is not verified',
+  'email.registered': 'User with such an email already registered',
+  'email.alreadyVerifiedOrWrongToken':
+    'Your email is already verified or your verification token is wrong',
+  // The only key with no catalog entry: until now this response leaked the raw
+  // `password.wrongToken` string, so the English text is new in this release.
+  'password.wrongToken': 'Password recovery token is not valid',
+} as const;
+
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const PASSWORD_RE = /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/;
 const NICK_RE = /^[a-zA-Z0-9_\-.]+$/;
@@ -51,11 +81,19 @@ const duplicateKeyFields = (err: unknown): string[] | null => {
   return source ? Object.keys(source) : [];
 };
 
-const pushEmailIssues = (email: unknown, issues: StandardSchemaV1.Issue[]) => {
+const pushEmailIssues = (email: unknown, issues: ValidationIssue[]) => {
   if (isMissing(email)) {
-    issues.push({ message: 'auth.emailProvided', path: ['email'] });
+    issues.push({
+      message: 'auth.emailProvided',
+      path: ['email'],
+      params: { defaultValue: EN['auth.emailProvided'] },
+    });
   } else if (typeof email !== 'string' || !EMAIL_RE.test(email)) {
-    issues.push({ message: 'auth.emailValid', path: ['email'] });
+    issues.push({
+      message: 'auth.emailValid',
+      path: ['email'],
+      params: { defaultValue: EN['auth.emailValid'] },
+    });
   }
 };
 
@@ -92,12 +130,13 @@ class Auth extends AbstractController {
               const v = (value ?? {}) as Record<string, unknown>;
               const email = coerceStr(v.email);
               const password = coerceStr(v.password);
-              const issues: StandardSchemaV1.Issue[] = [];
+              const issues: ValidationIssue[] = [];
               pushEmailIssues(email, issues);
               if (isMissing(password) || typeof password !== 'string') {
                 issues.push({
                   message: 'auth.passwordProvided',
                   path: ['password'],
+                  params: { defaultValue: EN['auth.passwordProvided'] },
                 });
               }
               if (issues.length) {
@@ -127,12 +166,13 @@ class Auth extends AbstractController {
             const nickName = coerceStr(v.nickName);
             const firstName = coerceStr(v.firstName);
             const lastName = coerceStr(v.lastName);
-            const issues: StandardSchemaV1.Issue[] = [];
+            const issues: ValidationIssue[] = [];
             pushEmailIssues(email, issues);
             if (isMissing(password)) {
               issues.push({
                 message: 'auth.passwordProvided',
                 path: ['password'],
+                params: { defaultValue: EN['auth.passwordProvided'] },
               });
             } else if (
               typeof password !== 'string' ||
@@ -141,6 +181,7 @@ class Auth extends AbstractController {
               issues.push({
                 message: 'auth.passwordValid',
                 path: ['password'],
+                params: { defaultValue: EN['auth.passwordValid'] },
               });
             }
             // nickName is optional, but an empty string is invalid (matches the
@@ -152,16 +193,25 @@ class Auth extends AbstractController {
               issues.push({
                 message: 'auth.nickNameValid',
                 path: ['nickName'],
+                params: { defaultValue: EN['auth.nickNameValid'] },
               });
             }
             // firstName/lastName are optional free-form strings, but a non-string
             // (array/object) would otherwise reach `User.create` and fail the
             // Mongoose String cast with a 500. Reject it as a 400 (yup parity).
             if (firstName != null && typeof firstName !== 'string') {
-              issues.push({ message: 'auth.nameValid', path: ['firstName'] });
+              issues.push({
+                message: 'auth.nameValid',
+                path: ['firstName'],
+                params: { defaultValue: EN['auth.nameValid'] },
+              });
             }
             if (lastName != null && typeof lastName !== 'string') {
-              issues.push({ message: 'auth.nameValid', path: ['lastName'] });
+              issues.push({
+                message: 'auth.nameValid',
+                path: ['lastName'],
+                params: { defaultValue: EN['auth.nameValid'] },
+              });
             }
             if (issues.length) {
               return { issues };
@@ -184,7 +234,7 @@ class Auth extends AbstractController {
           request: defineSchema<{ email: string }>((value) => {
             const v = (value ?? {}) as Record<string, unknown>;
             const email = coerceStr(v.email);
-            const issues: StandardSchemaV1.Issue[] = [];
+            const issues: ValidationIssue[] = [];
             pushEmailIssues(email, issues);
             if (issues.length) {
               return { issues };
@@ -201,11 +251,12 @@ class Auth extends AbstractController {
             const v = (value ?? {}) as Record<string, unknown>;
             const password = coerceStr(v.password);
             const passwordRecoveryToken = coerceStr(v.passwordRecoveryToken);
-            const issues: StandardSchemaV1.Issue[] = [];
+            const issues: ValidationIssue[] = [];
             if (isMissing(password)) {
               issues.push({
                 message: 'auth.passwordProvided',
                 path: ['password'],
+                params: { defaultValue: EN['auth.passwordProvided'] },
               });
             } else if (
               typeof password !== 'string' ||
@@ -214,12 +265,16 @@ class Auth extends AbstractController {
               issues.push({
                 message: 'auth.passwordValid',
                 path: ['password'],
+                params: { defaultValue: EN['auth.passwordValid'] },
               });
             }
             if (isMissing(passwordRecoveryToken)) {
               issues.push({
                 message: 'auth.passwordRecoveryTokenProvided',
                 path: ['passwordRecoveryToken'],
+                params: {
+                  defaultValue: EN['auth.passwordRecoveryTokenProvided'],
+                },
               });
             }
             if (issues.length) {
@@ -238,7 +293,7 @@ class Auth extends AbstractController {
           request: defineSchema<{ email: string }>((value) => {
             const v = (value ?? {}) as Record<string, unknown>;
             const email = coerceStr(v.email);
-            const issues: StandardSchemaV1.Issue[] = [];
+            const issues: ValidationIssue[] = [];
             pushEmailIssues(email, issues);
             if (issues.length) {
               return { issues };
@@ -257,9 +312,11 @@ class Auth extends AbstractController {
       req.appInfo.request.password, // we do a request casting
     );
     if (!userResult) {
-      return res
-        .status(400)
-        .json({ message: req.appInfo.i18n?.t('auth.errorUPValid') });
+      return res.status(400).json({
+        message: req.appInfo.i18n?.t('auth.errorUPValid', {
+          defaultValue: EN['auth.errorUPValid'],
+        }),
+      });
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
     const user = userResult;
@@ -268,7 +325,9 @@ class Auth extends AbstractController {
     );
     if (isAuthWithVerificationFlow && !user.isVerified) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.notVerified'),
+        message: req.appInfo.i18n?.t('email.notVerified', {
+          defaultValue: EN['email.notVerified'],
+        }),
         notVerified: true,
       });
     }
@@ -288,18 +347,22 @@ class Auth extends AbstractController {
       req.appInfo.request.email,
     )) as InstanceType<TUser>;
     if (user) {
-      return res
-        .status(400)
-        .json({ message: req.appInfo.i18n?.t('email.registered') });
+      return res.status(400).json({
+        message: req.appInfo.i18n?.t('email.registered', {
+          defaultValue: EN['email.registered'],
+        }),
+      });
     }
     if (req.appInfo.request.nickName) {
       user = (await User.findOne({
         'name.nick': req.appInfo.request.nickName,
       })) as InstanceType<TUser>;
       if (user) {
-        return res
-          .status(400)
-          .json({ message: req.appInfo.i18n?.t('auth.nicknameExists') });
+        return res.status(400).json({
+          message: req.appInfo.i18n?.t('auth.nicknameExists', {
+            defaultValue: EN['auth.nicknameExists'],
+          }),
+        });
       }
     }
 
@@ -321,14 +384,18 @@ class Auth extends AbstractController {
       // so the error-handler registry keeps returning its honest 500.
       const dupFields = duplicateKeyFields(err);
       if (dupFields?.includes('email')) {
-        return res
-          .status(400)
-          .json({ message: req.appInfo.i18n?.t('email.registered') });
+        return res.status(400).json({
+          message: req.appInfo.i18n?.t('email.registered', {
+            defaultValue: EN['email.registered'],
+          }),
+        });
       }
       if (dupFields?.includes('name.nick')) {
-        return res
-          .status(400)
-          .json({ message: req.appInfo.i18n?.t('auth.nicknameExists') });
+        return res.status(400).json({
+          message: req.appInfo.i18n?.t('auth.nicknameExists', {
+            defaultValue: EN['auth.nicknameExists'],
+          }),
+        });
       }
       throw err;
     }
@@ -374,13 +441,17 @@ class Auth extends AbstractController {
       )) as unknown as UserInstance;
     } catch {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
+        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken', {
+          defaultValue: EN['email.alreadyVerifiedOrWrongToken'],
+        }),
       });
     }
     this.logger?.debug(`Verify user ${user?.id}`);
     if (!user) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken'),
+        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken', {
+          defaultValue: EN['email.alreadyVerifiedOrWrongToken'],
+        }),
       });
     }
 
@@ -408,9 +479,11 @@ class Auth extends AbstractController {
     } catch (e) {
       this.logger?.error(e);
     }
-    return res
-      .status(200)
-      .json({ message: req.appInfo.i18n?.t('auth.recoveryEmailSent') });
+    return res.status(200).json({
+      message: req.appInfo.i18n?.t('auth.recoveryEmailSent', {
+        defaultValue: EN['auth.recoveryEmailSent'],
+      }),
+    });
   }
 
   async recoverPassword(req: RecoverPasswordRequest, res: Response) {
@@ -422,9 +495,11 @@ class Auth extends AbstractController {
     });
 
     if (!user) {
-      return res
-        .status(400)
-        .json({ message: req.appInfo.i18n?.t('password.wrongToken') });
+      return res.status(400).json({
+        message: req.appInfo.i18n?.t('password.wrongToken', {
+          defaultValue: EN['password.wrongToken'],
+        }),
+      });
     }
 
     this.logger?.debug(`Password recovery user ${user.id}`);
@@ -453,9 +528,11 @@ class Auth extends AbstractController {
     } catch (e) {
       this.logger?.error(e);
     }
-    return res
-      .status(200)
-      .json({ message: req.appInfo.i18n?.t('auth.verificationEmailSent') });
+    return res.status(200).json({
+      message: req.appInfo.i18n?.t('auth.verificationEmailSent', {
+        defaultValue: EN['auth.verificationEmailSent'],
+      }),
+    });
   }
 
   static get middleware() {

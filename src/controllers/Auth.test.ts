@@ -6,6 +6,7 @@ import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
 import type { IApp } from '../server.ts';
+import type { ValidationIssue } from '../services/validate/types.ts';
 import {
   assertCalledTimes,
   assertCalledWith,
@@ -17,6 +18,7 @@ import {
   mockImplementation,
   mockRejectedValue,
   mockResolvedValue,
+  stubI18n,
 } from '../tests/mocks.ts';
 import { testEach } from '../tests/parameterized.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
@@ -103,6 +105,56 @@ describe('auth route schemas', () => {
       );
     },
   );
+
+  // Every framework-authored issue ships its English text as `params.
+  // defaultValue`; `ValidateService.translateInPlace` forwards `params` to
+  // `t()`, so an app whose locales lack the key still gets English.
+  const defaults = async (path: string, value: unknown) => {
+    const result = await validate(path, value);
+    const issues = (
+      'issues' in result ? (result.issues ?? []) : []
+    ) as ReadonlyArray<ValidationIssue>;
+    return issues.map((issue) => [issue.message, issue.params?.defaultValue]);
+  };
+
+  it('carries the English default next to every login issue key', async () => {
+    assert.deepStrictEqual(await defaults('/login', {}), [
+      ['auth.emailProvided', 'Email must be provided'],
+      ['auth.passwordProvided', 'Password must be provided'],
+    ]);
+  });
+
+  it('carries the English default next to every register issue key', async () => {
+    assert.deepStrictEqual(
+      await defaults('/register', {
+        email: 'nope',
+        password: 'contains a space',
+        nickName: '',
+        firstName: {},
+      }),
+      [
+        ['auth.emailValid', 'Email is not valid'],
+        [
+          'auth.passwordValid',
+          'Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>',
+        ],
+        ['auth.nickNameValid', 'Nick name is not valid,only a-z,A-Z,0-9'],
+        ['auth.nameValid', 'Name is not valid'],
+      ],
+    );
+  });
+
+  it('carries the English default for the recovery-token issue key', async () => {
+    assert.deepStrictEqual(
+      await defaults('/recover-password', { password: 'valid123' }),
+      [
+        [
+          'auth.passwordRecoveryTokenProvided',
+          'Password recovery token must be provided',
+        ],
+      ],
+    );
+  });
 
   testEach(
     ['/send-recovery-email', '/send-verification'],
@@ -307,6 +359,164 @@ describe('auth controller failure paths', () => {
     assert.strictEqual(state.status, 400);
     assert.deepStrictEqual(state.body, {
       message: 'email.alreadyVerifiedOrWrongToken',
+    });
+  });
+
+  // Each controller message is emitted with its English text as an in-code
+  // `defaultValue`. `enRequest` stubs an i18n that resolves nothing — what an
+  // app without framework translations (or with i18n disabled) hands over — so
+  // these assertions lock the English a bare install serves.
+  const enRequest = (app: IApp, values: Record<string, unknown> = {}) =>
+    ({
+      appInfo: { app, request: values, i18n: stubI18n({}) },
+      query: {},
+    }) as never;
+
+  const runEn = async (
+    User: Record<string, unknown>,
+    handler: (auth: Auth, req: never, res: Response) => Promise<unknown>,
+    values: Record<string, unknown> = {},
+  ) => {
+    const app = fakeApp(User);
+    const auth = new Auth(app, '');
+    const { res, state } = response();
+    await handler(auth, enRequest(app, values), res);
+    return state;
+  };
+
+  it('answers a rejected login in English', async () => {
+    const state = await runEn(
+      { getUserByEmailAndPassword: mockResolvedValue(mock.fn(), false) },
+      (auth, req, res) => auth.postLogin(req, res),
+    );
+
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, { message: 'User/password not valid' });
+  });
+
+  it('answers an unverified login in English', async () => {
+    const state = await runEn(
+      {
+        getUserByEmailAndPassword: mockResolvedValue(mock.fn(), {
+          isVerified: false,
+        }),
+      },
+      (auth, req, res) => auth.postLogin(req, res),
+    );
+
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, {
+      message: 'Your email is not verified',
+      notVerified: true,
+    });
+  });
+
+  it('answers a taken email in English', async () => {
+    const state = await runEn(
+      { getUserByEmail: mockResolvedValue(mock.fn(), { id: 'taken' }) },
+      (auth, req, res) => auth.postRegister(req, res),
+      { email: 'taken@example.com', password: 'valid123' },
+    );
+
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, {
+      message: 'User with such an email already registered',
+    });
+  });
+
+  it('answers a taken nickname in English', async () => {
+    const state = await runEn(
+      {
+        getUserByEmail: mockResolvedValue(mock.fn(), null),
+        findOne: mockResolvedValue(mock.fn(), { id: 'taken' }),
+      },
+      (auth, req, res) => auth.postRegister(req, res),
+      {
+        email: 'free@example.com',
+        password: 'valid123',
+        nickName: 'taken',
+      },
+    );
+
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, {
+      message: 'User with such nickname already exists',
+    });
+  });
+
+  it('answers a wrong verification token in English', async () => {
+    const state = await runEn(
+      { getUserByVerificationToken: mockResolvedValue(mock.fn(), null) },
+      (auth, req, res) => auth.verifyUser(req, res),
+    );
+
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, {
+      message:
+        'Your email is already verified or your verification token is wrong',
+    });
+  });
+
+  it('answers a wrong password-recovery token in English', async () => {
+    // The one key with no catalog entry ever: this response used to leak the
+    // raw `password.wrongToken` string.
+    const state = await runEn(
+      { getUserByPasswordRecoveryToken: mockResolvedValue(mock.fn(), null) },
+      (auth, req, res) => auth.recoverPassword(req, res),
+      { password: 'valid123', passwordRecoveryToken: 'nope' },
+    );
+
+    assert.strictEqual(state.status, 400);
+    assert.deepStrictEqual(state.body, {
+      message: 'Password recovery token is not valid',
+    });
+  });
+
+  it('answers the uniform recovery/verification responses in English', async () => {
+    const User = { getUserByEmail: mockResolvedValue(mock.fn(), null) };
+
+    const recovery = await runEn(
+      User,
+      (auth, req, res) => auth.sendPasswordRecoveryEmail(req, res),
+      { email: 'x@example.com' },
+    );
+    const verification = await runEn(
+      User,
+      (auth, req, res) => auth.sendVerification(req, res),
+      { email: 'x@example.com' },
+    );
+
+    assert.deepStrictEqual(recovery.body, {
+      message:
+        'If an account exists for this address, a recovery email has been sent.',
+    });
+    assert.deepStrictEqual(verification.body, {
+      message:
+        'If an account exists for this address, a verification email has been sent.',
+    });
+  });
+
+  it('still prefers an app translation over the in-code default', async () => {
+    const app = fakeApp({
+      getUserByEmailAndPassword: mockResolvedValue(mock.fn(), false),
+    });
+    const auth = new Auth(app, '');
+    const { res, state } = response();
+
+    await auth.postLogin(
+      {
+        appInfo: {
+          app,
+          request: {},
+          i18n: stubI18n({ 'auth.errorUPValid': 'Неверный логин или пароль' }),
+        },
+        query: {},
+      } as never,
+      res,
+    );
+
+    assert.deepStrictEqual(state.body, {
+      message: 'Неверный логин или пароль',
     });
   });
 });

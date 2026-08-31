@@ -7,7 +7,9 @@
 #   - public entry points actually import (exercises the dist's rewritten relative
 #     import paths — the class of bug behind the cluster fork-bomb, doc 03);
 #   - internal subpaths are NOT exported (the doc-24 exports map);
-#   - a Server constructs from the published dist.
+#   - a Server constructs from the published dist;
+#   - optional peers stay absent, and framework messages still answer in English
+#     without `i18next` installed.
 #
 set -euo pipefail
 
@@ -146,6 +148,24 @@ if (!oxcAbsent) {
 }
 console.log('  ✓ oxc-parser absent (codegen parser stays optional)');
 
+// 4c. i18n-optional guarantee: `i18next` + `i18next-fs-backend` are OPTIONAL
+//     peers. A default install must not carry them — framework messages ship
+//     their English text as in-code defaults (see section 6).
+for (const spec of ['i18next', 'i18next-fs-backend']) {
+  let absent = false;
+  try {
+    require.resolve(spec);
+  } catch (e) {
+    absent = e.code === 'MODULE_NOT_FOUND';
+  }
+  if (!absent) {
+    throw new Error(
+      `${spec} resolved in a default install — it must stay an optional peer`,
+    );
+  }
+  console.log('  ✓', spec, 'absent (i18n stays optional)');
+}
+
 const pkgRoot = path.dirname(
   require.resolve('@adaptivestone/framework/package.json'),
 );
@@ -167,8 +187,9 @@ if (typeof server?.app?.getConfig !== 'function') {
 console.log('  ✓ constructed a Server from the published dist');
 
 // 5. Runtime assets must ship. tsc compiles .ts only — locale JSON and email
-//    .pug templates are copied in postbuild. If they are missing, a consumer on
-//    the default config gets raw i18n keys and the email module can't render.
+//    .pug templates are copied in postbuild. If they are missing, a consumer
+//    loses the shipped translations (English still comes from the in-code
+//    defaults) and the email module can't render.
 for (const asset of [
   'locales/en/translation.json',
   'services/messaging/email/templates/verification/html.pug',
@@ -178,6 +199,63 @@ for (const asset of [
   }
   console.log('  ✓ asset', asset);
 }
+
+// 6. English out of the box: with i18next absent and the default config
+//    (`i18n.enabled: true`), the framework must still answer in English rather
+//    than 500ing or leaking raw `middleware.*`/`auth.*` keys.
+// Config files only — no model loading, no DB connection.
+await server.init({ isSkipModelInit: true, isSkipModelLoading: true });
+const i18nService = await server.app.getI18nService();
+const i18n = await i18nService.getI18nForLang('en');
+
+const { default: AuthMiddleware } = await import(
+  '@adaptivestone/framework/services/http/middleware/Auth.js'
+);
+let middlewareBody;
+await new AuthMiddleware(server.app).middleware(
+  { appInfo: { i18n } },
+  {
+    status() {
+      return this;
+    },
+    json(body) {
+      middlewareBody = body;
+      return this;
+    },
+  },
+  () => {},
+);
+if (middlewareBody?.message !== 'Please login to application') {
+  throw new Error(
+    `Middleware message without i18next: ${JSON.stringify(middlewareBody)}`,
+  );
+}
+console.log('  ✓ middleware answers English without i18next installed');
+
+const { default: AuthController } = await import(
+  '@adaptivestone/framework/controllers/Auth.js'
+);
+const { default: ValidateService } = await import(
+  '@adaptivestone/framework/services/validate/ValidateService.js'
+);
+const loginSchema = new AuthController(server.app, '').routes.post['/login']
+  .request;
+let validationBody;
+try {
+  await new ValidateService(server.app, loginSchema).validate({}, i18n);
+} catch (e) {
+  validationBody = e.message;
+}
+const expectedValidation = JSON.stringify({
+  email: ['Email must be provided'],
+  password: ['Password must be provided'],
+});
+if (JSON.stringify(validationBody) !== expectedValidation) {
+  throw new Error(
+    `Controller validation messages without i18next: ${JSON.stringify(validationBody)}`,
+  );
+}
+console.log('  ✓ built-in controller answers English without i18next installed');
 EOF
 
 echo "→ Verifying the installed package"

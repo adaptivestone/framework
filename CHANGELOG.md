@@ -36,6 +36,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   Nothing is added to the framework's own locale files — the in-code default is the single English source of truth, and a key present in the app's locales always wins, so existing translations keep working unchanged. The default also holds in every degenerate case: i18n disabled (the fallback translator now honours `defaultValue` instead of handing back the key), a request with no i18n at all, or a `t()` that returns a non-string. Custom middleware get the same behavior from the new protected `translate(req, key, defaultValue)` helper on `AbstractMiddleware`. Machine-readable fields are untouched — the auth 401 still carries `error: 'AUTH001'` — and the rate limiter's 500 `RateLimiter error` stays hardcoded, as it reports a misconfigured limiter to operators rather than something the caller can act on. With `saveMissing: true` in `config/i18n.ts`, a request that hits one of these messages writes the English default into `<lng>/translation.missing.json`, giving translators a ready-made starter file.
 
+### Changed
+
+- **Behavior change — a framework message whose key is missing now falls back to English instead of leaking the raw key, and `i18next` is optional.** The built-in auth controller, its request validation and the shipped email templates emitted bare i18n keys with no default, so an app whose locale files did not carry the key answered with `auth.messageSome` or `email.registered` in place of a sentence — the example project copied 3 of 26 keys and hit exactly that. Every framework-emitted key now travels with its current English text as an in-code `defaultValue` (validation issues carry it in `params`, which `ValidateService` already forwards to `t()`), so a key present in your locales still wins and existing translations are byte-identical, while a miss reads as English:
+
+  | Key | Default (English) |
+  |---|---|
+  | `auth.emailProvided` | Email must be provided |
+  | `auth.emailValid` | Email is not valid |
+  | `auth.passwordProvided` | Password must be provided |
+  | `auth.passwordValid` | Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,> |
+  | `auth.passwordRecoveryTokenProvided` | Password recovery token must be provided |
+  | `auth.nickNameValid` | Nick name is not valid,only a-z,A-Z,0-9 |
+  | `auth.nameValid` | Name is not valid |
+  | `auth.errorUPValid` | User/password not valid |
+  | `auth.nicknameExists` | User with such nickname already exists |
+  | `auth.recoveryEmailSent` | If an account exists for this address, a recovery email has been sent. |
+  | `auth.verificationEmailSent` | If an account exists for this address, a verification email has been sent. |
+  | `email.notVerified` | Your email is not verified |
+  | `email.registered` | User with such an email already registered |
+  | `email.alreadyVerifiedOrWrongToken` | Your email is already verified or your verification token is wrong |
+  | `email.passwordRecovery` | Recovery password |
+  | `email.passwordChanged` | Password changed |
+  | `email.greeating` | Dear user |
+  | `password.wrongToken` | Password recovery token is not valid |
+
+  `password.wrongToken` is the one message that never had a catalog entry at all — a wrong recovery token answered with the literal string `password.wrongToken` — so its English text is new. The in-code default is now the single English source of truth: the keys above were removed from the framework's `en/translation.json` (what remains there has no emit site in the framework, so nothing covers it), and `ru/translation.json` still ships in full and still wins for `ru` requests.
+
+  `i18next` and `i18next-fs-backend` move from dependencies to **optional peer dependencies**, the treatment `@redis/client`, `yup` and `oxc-parser` already got. **Install both only if you actually translate** (`npm i i18next i18next-fs-backend`); the default `i18n.enabled: true` no longer implies they are present. They are still imported lazily and only when i18n is enabled, so a fresh install serves every framework message in English with no translation engine at all; the first request that needs a translator logs one warning — naming both packages and the `enabled` flag — and then falls back for the rest of the process, rather than repeating per request or failing the request. `getI18nBaseInstance()` (the raw i18next instance) still rejects with that message for callers that require the real thing. Consumers who type-check with `skipLibCheck: false` will see `Cannot find module 'i18next'` reported inside the framework's `.d.ts` files if the package is absent — the same trade-off the other optional peers already carry; keep `skipLibCheck: true` (what the project template ships) or install the packages.
+
 ### Fixed
 
 - **Plain nested paths carried a phantom `_id` on hydrated documents.** Mongoose builds a subdocument, and generates an `_id` for it, only for the `{ type: { … } }` spelling; a plain nested object (`name: { first: String, last: String }`) is a path grouping that never gets an `_id` at runtime. `InferHydratedDocType` types both the same way, intersecting `{ _id: ObjectId }` onto nested paths too — so `doc.name._id` compiled for a value that is always `undefined`, and assigning the real runtime shape (`doc.name = { first: 'Ada' }`) was a type error on a property Mongoose will never persist, pushing consumers to `Omit<…, 'name'>` bridges or `unknown` casts at every nested-path call site. The framework's hydrated correction — which already strips the `_id` Mongoose adds to `_id: false` subdocuments — now also drops it from plain nested paths, at any depth, using the same no-`type`-wrapper discriminator the override pass uses. Real single-nested subdocuments keep their `_id`, and the raw/lean/create surfaces are untouched: those already matched runtime exactly. The framework's own `User.name` was affected.
