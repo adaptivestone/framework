@@ -11,7 +11,11 @@ import {
   assertRejectsValue,
   assertTextMatch,
 } from '../tests/assertions.ts';
-import { mockRejectedValueOnce, mockResolvedValue } from '../tests/mocks.ts';
+import {
+  mockRejectedValueOnce,
+  mockResolvedValue,
+  stubI18n,
+} from '../tests/mocks.ts';
 import type { TUser } from './User.ts';
 
 const userEmail = 'testing@test.com';
@@ -400,6 +404,48 @@ describe('password hashing (doc 02)', () => {
       await model.updateOne({ email }, { password: bad });
       const res = await model.getUserByEmailAndPassword(email, 'whatever');
       assert.ok(!res);
+    }
+  });
+});
+
+describe('auth mails for a user with no email address', () => {
+  /** A user document that never got an email — the field is optional. */
+  const userWithoutEmail = () => {
+    const UserModel = appInstance.getModel('User') as unknown as TUser;
+    return new UserModel({ name: { nick: 'noEmailNick' } });
+  };
+
+  it('refuses to send the verification mail and reports it', async () => {
+    const user = userWithoutEmail();
+    const logError = mock.method(appInstance.logger, 'error', () => {});
+
+    try {
+      const sent = await user.sendVerificationEmail(stubI18n({}));
+
+      assert.strictEqual(sent, false);
+      assertCalledTimes(logError, 1);
+      const [message] = logError.mock.calls[0].arguments as [string];
+      assertTextMatch(message, /verification email/);
+      assertTextMatch(message, /no email address/);
+    } finally {
+      logError.mock.restore();
+    }
+  });
+
+  it('refuses to send the password recovery mail and reports it', async () => {
+    const user = userWithoutEmail();
+    const logError = mock.method(appInstance.logger, 'error', () => {});
+
+    try {
+      const sent = await user.sendPasswordRecoveryEmail(stubI18n({}));
+
+      assert.strictEqual(sent, false);
+      assertCalledTimes(logError, 1);
+      const [message] = logError.mock.calls[0].arguments as [string];
+      assertTextMatch(message, /password recovery email/);
+      assertTextMatch(message, /no email address/);
+    } finally {
+      logError.mock.restore();
     }
   });
 });

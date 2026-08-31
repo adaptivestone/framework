@@ -431,6 +431,12 @@ class User extends BaseModel {
         this: UserAuthInstance & { name?: { nick?: string | null } | null },
         i18n: { t: TFunction; language: string },
       ) {
+        if (!this.email) {
+          appInstance.logger?.error(
+            'Cannot send password recovery email: user has no email address',
+          );
+          return false;
+        }
         const passwordRecoveryToken =
           await userHelpers.generateUserPasswordRecoveryToken(this);
         // speed optimisation
@@ -466,6 +472,12 @@ class User extends BaseModel {
         this: UserAuthInstance & { name?: { nick?: string | null } | null },
         i18n: { t: TFunction; language: string },
       ) {
+        if (!this.email) {
+          appInstance.logger?.error(
+            'Cannot send verification email: user has no email address',
+          );
+          return false;
+        }
         const verificationToken =
           await userHelpers.generateUserVerificationToken(this);
         // speed optimisation

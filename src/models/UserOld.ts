@@ -266,6 +266,12 @@ class UserOld extends AbstractModel<
     this: InstanceType<UserOld['mongooseModel']>,
     i18n: { t: TFunction; language: string },
   ) {
+    if (!this.email) {
+      this.getSuper().logger?.error(
+        'Cannot send password recovery email: user has no email address',
+      );
+      return false;
+    }
     const passwordRecoveryToken =
       await UserOld.generateUserPasswordRecoveryToken(this);
     // speed optimisation
@@ -358,6 +364,12 @@ class UserOld extends AbstractModel<
     this: InstanceType<UserOld['mongooseModel']>,
     i18n: { t: TFunction; language: string },
   ) {
+    if (!this.email) {
+      this.getSuper().logger?.error(
+        'Cannot send verification email: user has no email address',
+      );
+      return false;
+    }
     const verificationToken = await UserOld.generateUserVerificationToken(this);
     // speed optimisation
     try {

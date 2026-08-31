@@ -1,10 +1,6 @@
 {
   "auth": {
-    "userProvided": "User not specified",
     "passwordTooShort": "Password must be at least {{min}} characters",
     "messageSome": "Some server problem. Please try later"
-  },
-  "email": {
-    "newPassword": "New password"
   }
 }

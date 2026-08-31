@@ -9,6 +9,7 @@ import {
   assertRejectsValue,
   assertTextMatch,
 } from '../tests/assertions.ts';
+import { stubI18n } from '../tests/mocks.ts';
 
 // Call-through spies on the crypto helpers so the enumeration burn is
 // observable; implementations stay real (the model imports this same module).
@@ -162,5 +163,49 @@ describe('UserOld model (deprecated)', () => {
         new Error('User not exists'),
       );
     });
+  });
+});
+
+describe('UserOld auth mails for a user with no email address', () => {
+  const getUserOldModel = () => appInstance.getModel('UserOld');
+
+  /** A user document that never got an email — the field is optional. */
+  const userWithoutEmail = () =>
+    new (getUserOldModel())({ name: { nick: 'oldNoEmailNick' } });
+
+  it('refuses to send the verification mail and reports it', async () => {
+    const user = userWithoutEmail();
+    const { logger } = getUserOldModel().getSuper();
+    const logError = mock.method(logger, 'error', () => {});
+
+    try {
+      const sent = await user.sendVerificationEmail(stubI18n({}));
+
+      assert.strictEqual(sent, false);
+      assertCalledTimes(logError, 1);
+      const [message] = logError.mock.calls[0].arguments as [string];
+      assertTextMatch(message, /verification email/);
+      assertTextMatch(message, /no email address/);
+    } finally {
+      logError.mock.restore();
+    }
+  });
+
+  it('refuses to send the password recovery mail and reports it', async () => {
+    const user = userWithoutEmail();
+    const { logger } = getUserOldModel().getSuper();
+    const logError = mock.method(logger, 'error', () => {});
+
+    try {
+      const sent = await user.sendPasswordRecoveryEmail(stubI18n({}));
+
+      assert.strictEqual(sent, false);
+      assertCalledTimes(logError, 1);
+      const [message] = logError.mock.calls[0].arguments as [string];
+      assertTextMatch(message, /password recovery email/);
+      assertTextMatch(message, /no email address/);
+    } finally {
+      logError.mock.restore();
+    }
   });
 });

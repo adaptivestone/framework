@@ -28,7 +28,10 @@ class Bench extends AbstractController {
     },
     res: Response,
   ) {
-    const message = req.appInfo.i18n?.t('auth.userProvided') ?? 'fallback';
+    const message =
+      req.appInfo.i18n?.t('auth.userProvided', {
+        defaultValue: 'User not specified',
+      }) ?? 'User not specified';
     return res.json({ name: req.appInfo.query.name, message });
   }
 

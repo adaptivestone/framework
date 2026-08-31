@@ -133,6 +133,68 @@ describe('shipped email templates', () => {
     },
   );
 
+  const htmlNames = names.filter((name) => name.endsWith('/html'));
+
+  testEach(
+    htmlNames,
+    'renders the request locale as the document language: %s',
+    (name) => {
+      const template = templates[name];
+      if (!template) {
+        throw new Error(`Unknown template ${name}`);
+      }
+      const rendered = template.render({ ...data(missingT), locale: 'ru' });
+      assert.ok(
+        rendered.includes('<html lang="ru">'),
+        `${name} did not follow the request locale: ${rendered}`,
+      );
+    },
+  );
+
+  testEach(
+    htmlNames,
+    'falls back to English when no locale is given: %s',
+    (name) => {
+      const template = templates[name];
+      if (!template) {
+        throw new Error(`Unknown template ${name}`);
+      }
+      for (const locale of ['', undefined]) {
+        const rendered = template.render({
+          ...data(missingT),
+          locale,
+        } as TEmailTemplateData);
+        assert.ok(
+          rendered.includes('<html lang="en">'),
+          `${name} lost the default language for ${JSON.stringify(locale)}: ${rendered}`,
+        );
+      }
+    },
+  );
+
+  testEach(
+    htmlNames,
+    'escapes the locale it puts in the lang attribute: %s',
+    (name) => {
+      const template = templates[name];
+      if (!template) {
+        throw new Error(`Unknown template ${name}`);
+      }
+      const rendered = template.render({
+        ...data(missingT),
+        locale: 'en" onload="alert(1)',
+      });
+      assert.ok(
+        !rendered.includes('lang="en" onload="alert(1)"'),
+        `${name} broke out of the lang attribute: ${rendered}`,
+      );
+      assert.ok(
+        rendered.includes('lang="en&quot; onload=&quot;alert(1)"'),
+        `${name} did not escape the locale: ${rendered}`,
+      );
+    },
+  );
+
   it('escapes interpolated values in the HTML templates', () => {
     const hostile = 'https://example.com/?a="><script>alert(1)</script>';
     for (const render of [recoveryHtml, verificationHtml]) {

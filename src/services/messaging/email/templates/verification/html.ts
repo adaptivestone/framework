@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../escapeHtml.ts';
 import type { TEmailTemplate } from '../../types.ts';
 
-const html: TEmailTemplate = ({ t, link }) => {
+const html: TEmailTemplate = ({ t, link, locale }) => {
   const title = t('email.emailConfirm', { defaultValue: 'Email confirmation' });
   const heading = t('email.verify', { defaultValue: 'Verify email' });
   const body = t('email.verifyInstructions', {
@@ -10,7 +10,7 @@ const html: TEmailTemplate = ({ t, link }) => {
   const href = escapeHtml(link);
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(locale || 'en')}">
   <head>
     <meta charset="UTF-8" />
     <title>${escapeHtml(title)}</title>

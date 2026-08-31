@@ -1,14 +1,14 @@
 import { escapeHtml } from '../../escapeHtml.ts';
 import type { TEmailTemplate } from '../../types.ts';
 
-const html: TEmailTemplate = ({ t, link }) => {
+const html: TEmailTemplate = ({ t, link, locale }) => {
   const heading = t('email.passwordRecovery', {
     defaultValue: 'Recovery password',
   });
   const body = t('email.passwordChanged', { defaultValue: 'Password changed' });
 
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${escapeHtml(locale || 'en')}">
   <head>
     <meta charset="UTF-8" />
   </head>
