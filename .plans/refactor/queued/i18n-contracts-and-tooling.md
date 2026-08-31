@@ -1,6 +1,7 @@
 # P1y — i18n contracts, tooling, and resource ownership
 
 **Status**: ⏸ queued (v5 additive foundation; v6 namespace/type default cutover)
+**Staleness note 2026-08-31**: this plan predates P1y-bridge and email-templates-v2 (both shipped in 5.4) — revise before activation: Phase 0's `password.wrongToken` item is OBSOLETE (in-code default shipped); catalog audit baselines are stale (en trimmed to 2 keys, English lives in code); Pug extraction in Phase 1 is no longer needed (shipped templates are TS modules — extraction targets are now ordinary `t()` calls in .ts); the `email.greeating`→`greeting` rename stands but now means changing the EMIT key in templates with an old-key alias for app catalogs.
 **Depends on**: P1a runtime validators ✅, P1n AST codegen ✅
 **See also**: [P1y-bridge](../active/i18n-default-values.md) ships `key + defaultValue` at every framework emit site first (v5). Phase 4's namespace codemod must carry its new `middleware.*` keys → `framework:middleware.*`; `defaultValue` remains the runtime safety net after the bundled-catalog cutover.
 **Goal**: make translation correctness observable and enforceable in the framework and every consuming project: known keys autocomplete, unknown/missing keys fail, unused keys are reported safely, every locale is structurally complete, and runtime language handling is isolated and extensible.

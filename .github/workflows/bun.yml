@@ -1,0 +1,107 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+
+name: Bun
+
+# Bun is a SECOND supported runtime, not a replacement for Node — it gets its own
+# workflow so a Bun regression is immediately legible as "Bun broke", without
+# turning the Node matrix red or hiding inside it. Both jobs test the declared
+# floor (1.4.0, the first stable Bun that imports the Mongoose/BSON graph) and
+# the latest stable Bun; `fail-fast: false` so a floor break and a latest break
+# never mask each other.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  # The framework suite through Bun's Node compatibility layer. Dependencies come
+  # from the repository's own locked graph (`npm ci`) — certifying a runtime must
+  # not drag a second source-repo lockfile into the tree.
+  bun-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        bun: ["1.4.0", "latest"]
+
+    services:
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+
+    env:
+      LOGGER_CONSOLE_LEVEL: "error"
+      REDIS_URI: redis://localhost
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "latest"
+          cache: "npm"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun }}
+
+      - name: npm clean install
+        run: npm ci
+
+      # `bun test` replaces node:test's runner CLI; the script maps the flags and
+      # starts the in-memory replica set that `--test-global-setup` starts for
+      # Node. The four `mock.module()` files it excludes are named in README.md.
+      - name: Run the suite under Bun
+        run: npm run test:bun
+
+  # The packed tarball installed with Bun's own installer and driven under Bun:
+  # public entry points, exports map, Server boot, one HTTP request, Mongoose
+  # CRUD against a real MongoDB, clean shutdown.
+  bun-packaging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        bun: ["1.4.0", "latest"]
+
+    services:
+      mongo:
+        image: mongo:8
+        ports:
+          - 27017:27017
+
+    env:
+      LOGGER_CONSOLE_LEVEL: "error"
+      SMOKE_MONGO_URI: mongodb://127.0.0.1:27017
+      # The MongoDB half of the smoke test skips itself when nothing answers;
+      # in CI a missing database is a failure, not a skip.
+      SMOKE_REQUIRE_MONGO: "1"
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "latest"
+          cache: "npm"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ matrix.bun }}
+
+      - name: npm clean install
+        run: npm ci
+
+      - name: Bun packaging smoke test
+        run: npm run smoke:bun

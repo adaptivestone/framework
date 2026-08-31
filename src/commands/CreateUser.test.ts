@@ -78,6 +78,8 @@ describe('CreateUser command — input validation guards', () => {
       true,
     );
     const user = await appInstance.getModel('User').findOne({ email });
-    assert.deepStrictEqual(user?.roles, ['user', 'admin']);
+    // Spread before comparing: a Mongoose array is a Proxy, and Bun's
+    // `node:assert` reports any Proxy as unequal regardless of contents.
+    assert.deepStrictEqual([...(user?.roles ?? [])], ['user', 'admin']);
   });
 });

@@ -16,22 +16,22 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
                └──→ polish (independent) ───────────→ any order
                     [rate-limiter-lazy ✅] [cache-drivers ✅] [test-helpers ✅]
 
-v5.3 (queued/) ─────→ universal HttpResponse + Express writer
+v5.5 (queued/) ─────→ universal HttpResponse + Express writer
                       └──→ OpenAPI response contracts ──→ v6 removes ordinary `res`
 
 Bun stable with fix (external) ──→ immediate Bun-support v5.x patch
                                   never waits for v5.3, v6, or native adapters
 
-v5.2.0/5.2.1/5.2.2 ─→ shipped
-next release ───────→ params: schema + CastError floor + OpenAPI params
-                      + oxc-parser optional peer + node:test + benchmark repair
-                      └──→ version undecided (behavior change ⇒ minor?) · UNRELEASED
+v5.2.x · 5.3.0–5.3.3 ─→ shipped
+next release (5.4) ──→ i18n in-code defaults + optional i18next
+                      + email templates as TS modules (module ≥2.1) + Bun support
+                      └──→ minor settled (behavior change + consumer actions) · UNRELEASED
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
-          v5.3 (P1q) waits on publishing the current unreleased work
-          v5.4 OpenAPI response contracts waits on P1q landing + real usage
+          P1q (v5.5) waits on 5.4 shipping
+          OpenAPI response contracts (v5.6) waits on P1q landing + real usage
           v6 cutover blocked by all v5.1 active + queued work
-          Bun runtime support blocked only by Bun shipping the fix in stable
+          Bun gate OPEN (1.4.0 stable) — certification active, rides 5.4 if green
           node-adapter blocked by v6 — and is what unlocks HTTP/2 (stock node:http2,
             NOT a native-engine payoff; Express as listener is the only blocker)
           drop-express blocked by node-adapter
@@ -41,13 +41,13 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 
 ```mermaid
 flowchart LR
-    Foundation["✅ v5 foundations"] --> Patch["✅ 5.2.x shipped"]
-    Patch --> Unreleased["🔄 unreleased: params + CastError floor + oxc optional"]
+    Foundation["✅ v5 foundations"] --> Patch["✅ 5.2.x–5.3.x shipped"]
+    Patch --> Unreleased["🔄 5.4 unreleased: i18n defaults + email modules + Bun"]
 
-    Unreleased --> Responses["⏸ v5.3 universal responses"]
-    Responses --> OpenAPI["⏸ v5.4 OpenAPI response contracts"]
+    Unreleased --> Responses["⏸ v5.5 universal responses"]
+    Responses --> OpenAPI["⏸ v5.6 OpenAPI response contracts"]
 
-    BunRelease["Bun stable release with fix"] --> BunSupport["⏸ Immediate Bun-support v5.x patch"]
+    BunRelease["Bun stable release with fix"] --> BunSupport["🔄 Bun certification — riding 5.4"]
 
     Unreleased --> I18nV5["⏸ P1y i18n audit + types + runtime"]
     I18nV5 --> I18nV6["◌ v6 namespace + selector defaults"]
@@ -61,7 +61,7 @@ flowchart LR
     Foundation --> Docs["🔄 docs + LLM skills"]
     Docs --> Publish["◌ publish pipeline"]
 
-    Unreleased --> Params["✅ params validation"]
+    Patch --> Params["✅ params validation"]
     Unreleased --> Metrics["⏸ metrics seam"]
     Unreleased --> Logging["⏸ logging facade + Pino"]
     Logging --> Observability["◌ traces + correlation"]
@@ -91,14 +91,14 @@ repository; Markdown remains the reviewed source of truth.
 |---|---|---|
 | [i18n-default-values](active/i18n-default-values.md) | P1y-bridge | **Optionally translatable framework messages, English-in-code.** PR 1: middleware `translate()` helper + `middleware.*` keys with `defaultValue` (byte-identical when untranslated) + disabled-i18n fallback honours defaults. PR 2: sweep controllers/validation/email bare keys (raw-key leak → English, behavior change) + i18next → optional peer. Bridge to P1y Phase 4. |
 | [email-templates-v2](active/email-templates-v2.md) | Cross-repo | **Shipped email templates → JS/TS modules.** Module 2.1 ships built-in `js`/`ts` module engines (overridable map entries); framework converts its 6 pug defaults to typed template modules (fixes hardcoded-Russian verification + carries i18n defaultValue), trims the `postbuild` copy. Module first, then framework; after 5.4. |
+| [bun-runtime-support](active/bun-runtime-support.md) | Runtime | **Stable-fix-gated Bun certification.** Activate immediately when Bun ships `oven-sh/bun#32502` in any stable version; run the existing Express adapter through Bun's Node compatibility layer, require real Mongoose CRUD and packed-consumer CI, then cut an immediate v5.x patch. Never waits for v5.3, v6, or P3/P5; native `BunAdapter` remains separate. |
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
 
 ### queued/
 
 | File | Ref | Summary |
 |---|---|---|
-| [bun-runtime-support](queued/bun-runtime-support.md) | Runtime | **Stable-fix-gated Bun certification.** Activate immediately when Bun ships `oven-sh/bun#32502` in any stable version; run the existing Express adapter through Bun's Node compatibility layer, require real Mongoose CRUD and packed-consumer CI, then cut an immediate v5.x patch. Never waits for v5.3, v6, or P3/P5; native `BunAdapter` remains separate. |
-| [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.3 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.3; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
+| [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.5 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.5; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
 | [logging-facade-and-pino](queued/logging-facade-and-pino.md) | P1z | **Vendor-neutral logging + Pino.** Lock a framework-owned structured logger/Error contract in v5.x, then cut `IApp.logger`, config, Sentry and tests from Winston to a Pino-backed sink runtime in v6; LogTape remains a conformance-gated future option. |
@@ -192,7 +192,7 @@ repository; Markdown remains the reviewed source of truth.
 - Model-typing regression coverage for complex schema/document patterns.
 - `defineSchema(validate, { jsonSchema })` — dependency-free explicit OpenAPI shape.
 
-## 5.3.0 — unreleased
+## 5.3.0 — released 2026-08-08 (patches 5.3.1–5.3.3 followed)
 
 Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 400), a new feature
 (`params:`), and a consumer-action item (`oxc-parser`), so a minor is correct.
@@ -209,7 +209,16 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 - ✅ Dead `benchmark2` script removed (targeted `https://` + HTTP/2; the framework serves neither, so
   it reported `0.00 req/s` / 10000 errored).
 
-## v5.4 target (was "v5.3") — P1q line
+## 5.4.0 — unreleased — the i18n + email + Bun train
+
+- ✅ [i18n default values](active/i18n-default-values.md) (P1y-bridge) — every framework message is a key with an in-code English default (`t(key, { defaultValue })`): middleware, Auth controller + validation, email, 404/500 sinks. **Behavior change**: a missing framework key answers English instead of leaking the raw key. `i18next` + `i18next-fs-backend` → **optional peers** (install only if you translate; `skipLibCheck: true` or install for clean d.ts).
+- ✅ [Email templates v2](active/email-templates-v2.md) — shipped pug replaced by typed TS template modules compiled into dist; module peer → `^2.1.0` (its built-in js/ts engines render them out of the box); verification mails were hardcoded Russian → English + translatable; nullable-email guard on all User/UserOld mail methods; html `lang` follows request locale.
+- ✅ `configureTestServer` — test bootstrap accepts project `Server` options so `bootHttp` runs under test (+ boot-ordering fix).
+- ✅ Typing fix: phantom `_id` dropped from plain nested paths on hydrated documents.
+- ✅ Dead locale keys trimmed (`auth.userProvided/errorUExist/errorUAlready/noAccessRights`, `email.newPassword`).
+- 🔄 [Bun runtime support](active/bun-runtime-support.md) — certification running; rides this release if green.
+
+## v5.5 target — P1q line
 
 - [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
@@ -219,17 +228,17 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 - Small independent items: Node 24 in the CI matrix, Redis tests skipping when Redis is absent,
   the `OpenApiGenerator.ts` NUL byte, deploy-docs TLS/HTTP2 note.
 
-## v5.5 target
+## v5.6 target
 
 - [OpenAPI response contracts](queued/openapi-responses.md) — typed handler outcomes plus structural validation/middleware/error responses and optional authoritative Standard-Schema body contracts.
-  **Deliberately split from v5.3**: it documents the descriptors P1q invents, and stabilizing a new
+  **Deliberately split from the P1q release**: it documents the descriptors P1q invents, and stabilizing a new
   authoring surface *and* a contract derived from it in one release is too much at once.
 
 ## Unscheduled
 
-- [Bun runtime support](queued/bun-runtime-support.md) activates as soon as Bun publishes the fix
-  in any stable release and immediately cuts a v5.x patch; it does **not** wait for v5.3, v6, the
-  Node adapter, the later native `BunAdapter`, or any unrelated roadmap work.
+- [Bun runtime support](active/bun-runtime-support.md) — gate OPEN: Bun 1.4.0 stable ships the
+  bson fix; certification is active and the support rides 5.4 if green. The later native
+  `BunAdapter` remains separate/unscheduled.
 - [Observability Phase 1 — metrics](queued/metrics-seam.md) stays queued until it is planned with the broader observability work. Its automatic HTTP response status/size measurements may build on P1q's response writer.
 - [Vendor-neutral logging + Pino](queued/logging-facade-and-pino.md) starts with an additive v5.x
   contract/conformance phase; the public logger, config and dependency replacement land together

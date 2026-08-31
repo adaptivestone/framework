@@ -10,9 +10,42 @@ types, and batteries-included auth, rate limiting, i18n, and caching.
 
 ## Requirements
 
-- **Node ≥ 24** (ESM-only, runs `.ts` sources natively)
+- **Node ≥ 24** (ESM-only, runs `.ts` sources natively) — or **Bun ≥ 1.4.0**, see [Runtimes](#runtimes)
 - **MongoDB** — required; boot fails fast without `MONGO_DSN`
 - **`AUTH_SALT`** — required; generate one with `node src/cli.ts generateRandomBytes`
+
+## Runtimes
+
+Node is the primary runtime. **Bun ≥ 1.4.0** is supported as an additional one:
+the same application code, the same Express adapter, running on Bun's Node
+compatibility layer — there is no Bun-specific build, no `Bun.serve` path, and
+no dependency pin or override needed. 1.4.0 is the floor because it is the first
+stable Bun that imports the Mongoose/BSON graph the framework resolves.
+
+Certified on every release, on both the floor and the latest stable Bun: the
+framework test suite; and a consumer that installs the published tarball with
+`bun install`, imports the public entry points, boots a `Server`, serves a
+request, runs Mongoose create/read/update/delete against MongoDB and shuts down.
+
+Node-only, as of Bun 1.4:
+
+- **`cluster.js` / `runCluster`** — the multi-process production entry point. It
+  imports fine under Bun, but only the Node path is tested; run single-process
+  under Bun (or put the process manager outside the app).
+- **Node's test-runner CLI.** Bun implements the `node:test` *API* but not
+  `node --test`, so a Bun project runs its suite with `bun test` and the
+  framework preloads rather than the flags the Node docs show. Four framework
+  test files need `mock.module()` (Node's `--experimental-test-module-mocks`),
+  which Bun does not implement ([oven-sh/bun#5090][bun-5090]), and are the only
+  thing excluded from the Bun run: `cluster.test.ts`, `models/UserOld.test.ts`,
+  `helpers/redis/redisConnection.failure.test.ts`,
+  `services/i18n/I18n.missing.test.ts`. Everything else passes on both runtimes.
+- **`assert.deepStrictEqual` against a Mongoose array.** Bun 1.4 reports any
+  `Proxy` — which is what a Mongoose array is — as unequal. Spread it first
+  (`[...doc.tags]`). This is a test-assertion quirk; the values themselves are
+  correct.
+
+[bun-5090]: https://github.com/oven-sh/bun/issues/5090
 
 ## Quickstart
 

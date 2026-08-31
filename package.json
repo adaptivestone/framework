@@ -4,7 +4,8 @@
   "description": "Adaptive stone node js framework",
   "type": "module",
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=24.0.0",
+    "bun": ">=1.4.0"
   },
   "exports": {
     "./package.json": "./package.json",
@@ -38,6 +39,7 @@
     "test": "npm run test:coverage",
     "t": "node --experimental-test-module-mocks --test --import=./src/tests/setupNodeTest.ts --import=./src/tests/frameworkNodeTestSetup.ts --test-global-setup=./src/tests/globalSetupNodeTest.ts --test-timeout=10000 'src/**/*.test.ts' 'src/**/*.node-test.ts'",
     "test:node": "npm run t",
+    "test:bun": "./scripts/bun-test.sh",
     "test:coverage": "mkdir -p coverage && node --experimental-test-module-mocks --experimental-test-coverage --test --import=./src/tests/setupNodeTest.ts --import=./src/tests/frameworkNodeTestSetup.ts --test-global-setup=./src/tests/globalSetupNodeTest.ts --test-timeout=10000 --test-coverage-exclude='src/tests/**' --test-coverage-exclude='**/*.test.ts' --test-coverage-exclude='**/*.node-test.ts' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=coverage/junit.rspec.xml --test-reporter=lcov --test-reporter-destination=coverage/lcov.info 'src/**/*.test.ts' 'src/**/*.node-test.ts'",
     "format": "biome format",
     "format:fix": "biome format --write",
@@ -47,6 +49,7 @@
     "check:fix": "biome check --write",
     "prepublishOnly": "npm run gen && npm run build",
     "smoke": "./scripts/packaging-smoke-test.sh",
+    "smoke:bun": "./scripts/bun-packaging-smoke-test.sh",
     "cli": "node cliCommand.ts",
     "gen": "node cliCommand.ts generatetypes",
     "openapi": "node cliCommand.ts openapi",
