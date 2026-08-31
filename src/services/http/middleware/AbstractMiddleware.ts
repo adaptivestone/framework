@@ -1,4 +1,5 @@
 import type { NextFunction, Response } from 'express';
+import { translateWithDefault } from '../../../helpers/translate.ts';
 import Base from '../../../modules/Base.ts';
 import type { IApp } from '../../../server.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
@@ -112,8 +113,7 @@ class AbstractMiddleware extends Base {
     key: string,
     defaultValue: string,
   ): string {
-    const translated = req.appInfo?.i18n?.t(key, { defaultValue });
-    return typeof translated === 'string' ? translated : defaultValue;
+    return translateWithDefault(req, key, defaultValue);
   }
 
   async middleware(

@@ -2,10 +2,7 @@
   "auth": {
     "userProvided": "User not specified",
     "passwordTooShort": "Password must be at least {{min}} characters",
-    "messageSome": "Some server problem. Please try later",
-    "errorUExist": "User with such email isn't registered on this site",
-    "errorUAlready": "That user already exists",
-    "noAccessRights": "No access rights"
+    "messageSome": "Some server problem. Please try later"
   },
   "email": {
     "newPassword": "New password",

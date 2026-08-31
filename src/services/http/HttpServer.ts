@@ -10,6 +10,7 @@ import type {
 import express from 'express';
 import type { TFunction } from 'i18next';
 import type ThttpConfig from '../../config/http.ts';
+import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
 import {
@@ -213,9 +214,15 @@ class HttpServer extends Base {
    * Add handle for 404 error
    */
   add404Page() {
-    this.express.use((_req, res) => {
+    this.express.use((req, res) => {
       // error handling
-      res.status(404).json({ message: '404' });
+      res.status(404).json({
+        message: translateWithDefault(
+          req as FrameworkRequest,
+          'http.notFound',
+          '404',
+        ),
+      });
     });
   }
 
@@ -225,7 +232,7 @@ class HttpServer extends Base {
    */
   addErrorHandler() {
     this.express.use(
-      (err: Error, _req: Request, res: Response, next: NextFunction) => {
+      (err: Error, req: Request, res: Response, next: NextFunction) => {
         this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
         // If the response already started (e.g. a handler that threw mid-stream),
         // we can't set a 500 — hand off to Express's default finalizer instead
@@ -233,7 +240,13 @@ class HttpServer extends Base {
         if (res.headersSent) {
           return next(err);
         }
-        res.status(500).json({ message: 'Something broke!' });
+        res.status(500).json({
+          message: translateWithDefault(
+            req as FrameworkRequest,
+            'http.serverError',
+            'Something broke!',
+          ),
+        });
       },
     );
   }

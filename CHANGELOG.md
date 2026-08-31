@@ -36,6 +36,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   Nothing is added to the framework's own locale files — the in-code default is the single English source of truth, and a key present in the app's locales always wins, so existing translations keep working unchanged. The default also holds in every degenerate case: i18n disabled (the fallback translator now honours `defaultValue` instead of handing back the key), a request with no i18n at all, or a `t()` that returns a non-string. Custom middleware get the same behavior from the new protected `translate(req, key, defaultValue)` helper on `AbstractMiddleware`. Machine-readable fields are untouched — the auth 401 still carries `error: 'AUTH001'` — and the rate limiter's 500 `RateLimiter error` stays hardcoded, as it reports a misconfigured limiter to operators rather than something the caller can act on. With `saveMissing: true` in `config/i18n.ts`, a request that hits one of these messages writes the English default into `<lng>/translation.missing.json`, giving translators a ready-made starter file.
 
+- **The 404 and 500 fallback responses joined the translatable set.** `HttpServer`'s two sinks — the 404 for a path no route matched, and the generic 500 that finalizes an unhandled error — answered with hardcoded JSON. Both now emit an i18n key with the current English text as its in-code default, exactly like the middleware messages above:
+
+  | Key | Default (English) |
+  |---|---|
+  | `http.notFound` | 404 |
+  | `http.serverError` | Something broke! |
+
+  Same semantics: nothing is added to the framework's locale files, a key present in the app's locales wins, and the English default holds when i18n is disabled, when the request carries no i18n at all, or when `t()` returns a non-string — so untranslated responses stay byte-identical. Status codes are untouched, as is the guard that hands a 500 arriving after the response already started to Express's own finalizer.
+
 ### Changed
 
 - **Behavior change — a framework message whose key is missing now falls back to English instead of leaking the raw key, and `i18next` is optional.** The built-in auth controller, its request validation and the shipped email templates emitted bare i18n keys with no default, so an app whose locale files did not carry the key answered with `auth.messageSome` or `email.registered` in place of a sentence — the example project copied 3 of 26 keys and hit exactly that. Every framework-emitted key now travels with its current English text as an in-code `defaultValue` (validation issues carry it in `params`, which `ValidateService` already forwards to `t()`), so a key present in your locales still wins and existing translations are byte-identical, while a miss reads as English:
@@ -68,6 +77,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - **Plain nested paths carried a phantom `_id` on hydrated documents.** Mongoose builds a subdocument, and generates an `_id` for it, only for the `{ type: { … } }` spelling; a plain nested object (`name: { first: String, last: String }`) is a path grouping that never gets an `_id` at runtime. `InferHydratedDocType` types both the same way, intersecting `{ _id: ObjectId }` onto nested paths too — so `doc.name._id` compiled for a value that is always `undefined`, and assigning the real runtime shape (`doc.name = { first: 'Ada' }`) was a type error on a property Mongoose will never persist, pushing consumers to `Omit<…, 'name'>` bridges or `unknown` casts at every nested-path call site. The framework's hydrated correction — which already strips the `_id` Mongoose adds to `_id: false` subdocuments — now also drops it from plain nested paths, at any depth, using the same no-`type`-wrapper discriminator the override pass uses. Real single-nested subdocuments keep their `_id`, and the raw/lean/create surfaces are untouched: those already matched runtime exactly. The framework's own `User.name` was affected.
+
+### Removed
+
+- **Three dead framework locale keys.** `auth.errorUExist`, `auth.errorUAlready` and `auth.noAccessRights` had no emit site left anywhere in the framework — nothing could produce them — so they are gone from both `en/translation.json` and `ru/translation.json`. An app that defines the same keys in its own locales is unaffected: the framework never looked them up.
 
 ## [5.3.2] - 2026-08-08
 

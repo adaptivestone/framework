@@ -1,6 +1,6 @@
 # email-templates-v2 — shipped templates as JS/TS modules (module-v2 compatible)
 
-**Status**: ⏸ queued (after 5.4 ships; cross-repo with `framework-module-email`)
+**Status**: 🔄 active — module 2.1 half IMPLEMENTED + verified 2026-08-31 (35/35 tests, check/types/build green; js/ts/mjs/cjs engines as plain overridable map entries, fallback-t defaultValue fix, README/CHANGELOG/version 2.1.0), in module working tree pending user review + npm publish. Type note: TMinimalI18n declares only the `{ defaultValue }` options form — a positional string second param provably breaks either i18next TFunction or 2.0-consumer assignability under TS7 strictFunctionTypes (probe matrix in agent report); runtime honours both forms, tested. Framework half waits for module release + 5.4.
 **Depends on**: [P1y-bridge](../active/i18n-default-values.md) (defaultValue pattern the templates carry). **Sequencing**: email module 2.1 FIRST, then framework.
 
 ## Problem
@@ -27,9 +27,14 @@ Proven pattern: insailing converted all 20+ templates to typed TS modules (`defa
 - Export/document the template-data type so app templates are typed (mirror `TMailBaseData` shape insailing derived).
 - Docs note (framework + module): defaults require `framework-module-email >= 2.1`; older module + framework 5.4x defaults = unknown-extension error (same failure as today's pug, so no regression).
 
+### Documentation (docs repo, two stages)
+
+- **With module 2.1**: update `docs/12-email.md` — built-in `js`/`ts`/`mjs`/`cjs` module engines (register-your-own now only for pug/ejs/handlebars), a template-module example (`default export (data) => string`, i18n via `data.t(key, { defaultValue })`), and correct the "t can be a dummy function" note (the dummy honours `defaultValue` since 2.1). Module README is updated in the module repo itself.
+- **With the framework half**: rewrite the default-templates story — shipped defaults are compiled JS modules, pug references removed, `folders.emails` override examples switch to module templates, note the `framework-module-email >= 2.1` requirement.
+
 ## Out of scope
 
-Template-engine features (layout systems, MJML/react-email) — a template module can already do anything internally. Trimming the 4 dead `en` keys and `email.verify/emailConfirm/newPassword` key fate ride along here (verification templates decide their keys).
+Template-engine features (layout systems, MJML/react-email) — a template module can already do anything internally. The 4 dead `auth.*` keys were trimmed with the 5.4 riders instead (see [i18n-default-values](i18n-default-values.md)); the `email.verify/emailConfirm/newPassword` key fate still rides here (verification templates decide their keys).
 
 ## Done when
 

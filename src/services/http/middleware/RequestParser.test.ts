@@ -55,7 +55,7 @@ const postToParser = ({
     let result = { status: 0, body: {} as Record<string, unknown> };
     const server = createServer(async (req, res) => {
       const frReq = req as unknown as FrameworkRequest;
-      frReq.appInfo = { app: appInstance, request: {}, query: {} };
+      frReq.appInfo = { app: appInstance, request: {}, query: {}, params: {} };
       frReq.body = {};
       let status = 200;
       const resShim = {
@@ -118,6 +118,7 @@ describe('reqest parser limiter methods', () => {
           app: appInstance,
           request: {},
           query: {},
+          params: {},
         };
 
         const middleware = new RequestParser(appInstance);

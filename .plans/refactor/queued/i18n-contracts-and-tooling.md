@@ -56,7 +56,7 @@ The base locale is the structural source of truth. “Coverage” means matching
 
 ## Settled architecture
 
-1. **Keep i18next.** `i18next-fs-backend` remains the default project-resource loader on Node, but loading is an injectable adapter and never owns static correctness.
+1. **Keep i18next — as the default, not a wall.** `i18next-fs-backend` remains the default project-resource loader on Node, but loading is an injectable adapter and never owns static correctness. The consumer contract stays the structural `{ t, language }` (with `t(key, { defaultValue, …params })` semantics), so after Phase 3's runtime isolation a non-i18next `TranslationDriver` (same seam pattern as `CacheDriver`/`ValidatorDriver`) can slot in additively; the framework's own flat keys + in-code defaults port to any engine. Not scheduled — recorded 2026-08-31 as a supported future direction.
 2. **Separate ownership by namespace.** Framework-owned messages use `framework`; optional modules own unique namespaces; applications own `translation` and feature namespaces. The framework never publishes a global type for an application's namespace.
 3. **Compose package types.** Framework/modules augment i18next `ResourceNamespaceMap`; each application generates declarations from its own base-locale files. Do not have multiple packages redeclare `CustomTypeOptions.resources`.
 4. **Scale with selectors.** v5 supports generated string-key types plus opt-in selector mode; v6 defaults generated projects to `enableSelector: "optimize"`. The framework must not globally force this scalar type option on consumers.
