@@ -79,7 +79,7 @@
     "@types/node": "^26.0.0",
     "lefthook": "^2.0.0",
     "mongodb-memory-server": "^11.0.0",
-    "oxc-parser": "^0.144.0",
+    "oxc-parser": "^0.147.0",
     "typescript": "^7.0.2",
     "vitest": "^4.0.0",
     "yup": "^1.7.0",
