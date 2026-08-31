@@ -120,7 +120,11 @@ describe('Migrate command (doc 15)', () => {
     assert.deepStrictEqual(migrationRunLog, []);
     assert.deepStrictEqual(await Migration.distinct('migrationFile'), []);
     assertCalledTimes(errorSpy, 1);
-    assert.ok(errorSpy.mock.calls[0].arguments[0].includes('AddIndex.ts'));
+    // winston's overloaded `error()` types its first argument as `object`;
+    // the command always logs a string message.
+    const [errorMessage]: readonly unknown[] = errorSpy.mock.calls[0].arguments;
+    assert.ok(typeof errorMessage === 'string');
+    assert.ok(errorMessage.includes('AddIndex.ts'));
   });
 
   it('skips (returns true) when another run holds the migrations lock', async () => {

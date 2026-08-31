@@ -8,9 +8,14 @@ import {
 } from '../tests/mocks.ts';
 import type { TSequence } from './Sequence.ts';
 
+// `genTypes.d.ts` is not part of this repo's own tsc program, so `getModel`
+// resolves to the untyped fallback here. Same cast the shared test helpers use.
+const getSequenceModel = () =>
+  appInstance.getModel('Sequence') as unknown as TSequence;
+
 describe('sequence model', () => {
   it('should produce sequence', async () => {
-    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const SequenceModel = getSequenceModel();
 
     const number1 = await SequenceModel.getSequence('typeOne');
 
@@ -18,7 +23,7 @@ describe('sequence model', () => {
   });
 
   it('should produce sequence different for different types', async () => {
-    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const SequenceModel = getSequenceModel();
 
     const number1 = await SequenceModel.getSequence('typeOneAgain');
     const number2 = await SequenceModel.getSequence('typeTwo');
@@ -30,7 +35,7 @@ describe('sequence model', () => {
   });
 
   it('should works on async env', async () => {
-    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const SequenceModel = getSequenceModel();
 
     const promises: Promise<number>[] = [];
     const upTo = 100;
@@ -47,7 +52,7 @@ describe('sequence model', () => {
   });
 
   it('retries once when two upserts race to an E11000, returning the retry value', async () => {
-    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const SequenceModel = getSequenceModel();
     const spy = mockResolvedValueOnce(
       mockRejectedValueOnce(mock.method(SequenceModel, 'findByIdAndUpdate'), {
         code: 11000,
@@ -63,7 +68,7 @@ describe('sequence model', () => {
   });
 
   it('rethrows a non-E11000 error without retrying', async () => {
-    const SequenceModel: TSequence = appInstance.getModel('Sequence');
+    const SequenceModel = getSequenceModel();
     const spy = mockRejectedValueOnce(
       mock.method(SequenceModel, 'findByIdAndUpdate'),
       Object.assign(new Error('db exploded'), { code: 121 }) as never,

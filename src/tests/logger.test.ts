@@ -85,20 +85,26 @@ describe('custom winston transport loading (doc 13)', () => {
     running.length = 0;
   });
 
-  it('constructs + adds a valid default-export transport', async () => {
+  it('constructs + adds a valid default-export transport', {
+    timeout: 40000,
+  }, async () => {
     const { child, getOutput } = spawnFixture(transportFixture);
     running.push(child);
     await waitForMarker(child, getOutput, /FIXTURE_TRANSPORT_LOADED/);
     assertTextNotMatch(getOutput(), /not a constructor/);
-  }, 40000);
+  });
 
-  it('loads a CJS-interop double-wrapped transport', async () => {
+  it('loads a CJS-interop double-wrapped transport', {
+    timeout: 40000,
+  }, async () => {
     const { child, getOutput } = spawnFixture(cjsWrapFixture);
     running.push(child);
     await waitForMarker(child, getOutput, /FIXTURE_TRANSPORT_LOADED/);
-  }, 40000);
+  });
 
-  it('a nonexistent transport module logs an error without crashing', async () => {
+  it('a nonexistent transport module logs an error without crashing', {
+    timeout: 40000,
+  }, async () => {
     const { child, getOutput } = spawnFixture(
       '/no/such/transport-module-xyz.ts',
     );
@@ -107,5 +113,5 @@ describe('custom winston transport loading (doc 13)', () => {
     // marker appears; seeing it (child still alive) proves the .catch handled it.
     await waitForMarker(child, getOutput, /Failed to load logger transport/);
     assert.strictEqual(child.exitCode, null);
-  }, 40000);
+  });
 });

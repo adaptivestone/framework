@@ -63,7 +63,7 @@ describe('Mongoose validation safety-net messages', () => {
     },
   );
 
-  testEach(
+  testEach<[string, Record<string, unknown>, string]>(
     [
       ['required', {}, 'Required'],
       ['enum', { enumValues: [] }, 'Invalid value'],

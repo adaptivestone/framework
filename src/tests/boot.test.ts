@@ -41,15 +41,17 @@ const runBoot = (
   });
 
 describe('boot policy (docs 25 + 26)', () => {
-  it('fails boot when no Mongo connection is configured (Mongo is required)', async () => {
+  it('fails boot when no Mongo connection is configured (Mongo is required)', {
+    timeout: 40000,
+  }, async () => {
     const env = baseEnv();
     env.AUTH_SALT = undefined;
     const { code, out } = await runBoot(env);
     assert.strictEqual(code, 1);
     assertTextMatch(out, /No Mongo connection configured/);
-  }, 40000);
+  });
 
-  it('fails boot when AUTH_SALT is missing', async () => {
+  it('fails boot when AUTH_SALT is missing', { timeout: 40000 }, async () => {
     const env = baseEnv();
     env.BOOT_MONGO = '1';
     env.AUTH_SALT = undefined;
@@ -57,9 +59,11 @@ describe('boot policy (docs 25 + 26)', () => {
     assert.strictEqual(code, 1);
     assertTextMatch(out, /AUTH_SALT/);
     assertTextMatch(out, /generateRandomBytes/);
-  }, 40000);
+  });
 
-  it('fails boot and names the model when a model fails to initialize', async () => {
+  it('fails boot and names the model when a model fails to initialize', {
+    timeout: 40000,
+  }, async () => {
     const env = baseEnv();
     env.BOOT_MONGO = '1';
     env.BOOT_BROKEN_MODEL = '1';
@@ -67,9 +71,11 @@ describe('boot policy (docs 25 + 26)', () => {
     const { code, out } = await runBoot(env);
     assert.strictEqual(code, 1);
     assertTextMatch(out, /Failed to initialize model 'BrokenModel'/);
-  }, 40000);
+  });
 
-  it('fails boot with a dedupe diagnostic when a model extends BaseModel from a different framework copy', async () => {
+  it('fails boot with a dedupe diagnostic when a model extends BaseModel from a different framework copy', {
+    timeout: 40000,
+  }, async () => {
     const env = baseEnv();
     env.BOOT_MONGO = '1';
     env.BOOT_DUP_COPY = '1';
@@ -78,5 +84,5 @@ describe('boot policy (docs 25 + 26)', () => {
     assert.strictEqual(code, 1);
     assertTextMatch(out, /DIFFERENT copy of @adaptivestone\/framework/);
     assertTextMatch(out, /npm ls @adaptivestone\/framework/);
-  }, 40000);
+  });
 });

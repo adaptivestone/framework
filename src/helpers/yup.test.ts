@@ -34,7 +34,9 @@ describe('YupFile (deprecated)', () => {
   describe('type check', () => {
     // `instanceof PersistentFile` without invoking formidable's constructor.
     const fakeFile = () =>
-      Object.create(PersistentFile.prototype) as PersistentFile;
+      Object.create(PersistentFile.prototype) as InstanceType<
+        typeof PersistentFile
+      >;
 
     it('accepts an array of PersistentFile instances', () => {
       assert.strictEqual(new YupFile().isType([fakeFile(), fakeFile()]), true);

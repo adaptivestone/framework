@@ -110,7 +110,9 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     running.length = 0;
   });
 
-  it('exits 0 on SIGTERM, firing the shutdown event first', async () => {
+  it('exits 0 on SIGTERM, firing the shutdown event first', {
+    timeout: 40000,
+  }, async () => {
     const port = await getFreePort();
     const { child, getOutput } = spawnFixture(port);
     running.push(child);
@@ -121,9 +123,11 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     const { code } = await waitForExit(child, getOutput);
     assert.strictEqual(code, 0);
     assertTextMatch(getOutput(), /SHUTDOWN_EVENT_FIRED/);
-  }, 40000);
+  });
 
-  it('a second server on a taken port exits non-zero (no zombie)', async () => {
+  it('a second server on a taken port exits non-zero (no zombie)', {
+    timeout: 40000,
+  }, async () => {
     const port = await getFreePort();
     const first = spawnFixture(port);
     running.push(first.child);
@@ -133,5 +137,5 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     running.push(second.child);
     const { code } = await waitForExit(second.child, second.getOutput);
     assert.strictEqual(code, 1);
-  }, 40000);
+  });
 });

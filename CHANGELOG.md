@@ -6,11 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Deprecated
+
+- **`email.greeating` → `email.greeting`.** The greeting key the shipped email templates emit had carried a typo since it was introduced. The templates now emit the correctly spelled `email.greeting`; a catalog that only translates the old `email.greeating` keeps working — it is honoured as a fallback (new key → old key → the English default) until v6 removes it. Translate the new spelling going forward.
+
 ### Fixed
 
 - **`configureTestServer` now works in the documented arrangement — the boot no longer beats the preload that declares the options.** node:test runs a root `before()` registered from a `--import` preload immediately, synchronously inside the `before()` call — while the preload's module graph is still evaluating. The shipped setup glue therefore booted the test server, and closed the options window, during its own import; the preload's module body — where the 5.3.3 snippet places the `configureTestServer` call, below its hoisted imports — ran only afterwards, so every test file died on the helper's own "must be called before the test server boots" guard. The glue's `before()` hook now yields one microtask before booting, resuming after the whole preload graph has evaluated, so the documented snippet (setup-glue import above, call at module scope below) works as written. One arrangement remains out of reach: a preload that awaits at top level before calling — deferral cannot outwait arbitrary async work — and the guard's error message now names the fix for it (move the call into a separate module imported before the setup glue). Pinned by a spawned-runner regression test that executes the documented preload arrangement under `--test`.
 
 ### Added
+
+- **The test suite is type-checked now — `npm run check:types:tests`.** `tsconfig.json` excludes `src/**/*.test.ts` from the build, so no test file had ever been through `tsc`; a first run surfaced 164 errors. The new `tsconfig.tests.json` extends the build config with the tests included (fixtures stay out — they carry deliberate module augmentations and are already checked in isolation by `ModelTyping.typecheck.test.ts` and `routeTypes.golden.test.ts`), and CI runs it alongside `check:types`. Two things it caught, both silent until now: 20 `it()` calls still used Vitest's `it(name, fn, timeout)` signature, which node:test ignores — every one of those per-test timeouts, up to 240s, had quietly been running under the global 10s cap and is now declared as `it(name, { timeout }, fn)`; and `assertThrowsLike` / `assertRejectsLike` in `tests/assertions.js` matched error *classes* at runtime while typing the argument as a plain function, so `assertThrowsLike(fn, MyError)` failed to compile. The parameter now accepts constructors.
 
 - **The shipped test bootstrap now accepts project `Server` options, so `bootHttp` runs under test.** `Server` takes exactly two things — `folders` and the `bootHttp` hook — and the test bootstrap passed only the first, hardcoding `new Server({ folders })`. Every project that wires app-wide HTTP behavior in `bootHttp` (error handlers via `registerErrorHandler`, ad-hoc routes, Express middleware) therefore ran its tests against a server that had none of it: a mapped 400 in production showed up as a 500 under test, with nothing reporting the difference. Declare them with `configureTestServer` from `tests/testHelpers.js`, at module scope in the preload that imports the setup glue:
 

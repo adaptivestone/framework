@@ -45,7 +45,9 @@ const parseConfigs = (out: string): Record<string, unknown> => {
 };
 
 describe('config loading — env-only config (finding #11)', () => {
-  it('loads an env-only config (no base file) when NODE_ENV matches its env segment', async () => {
+  it('loads an env-only config (no base file) when NODE_ENV matches its env segment', {
+    timeout: 40000,
+  }, async () => {
     const { code, out } = await runInit('production');
     assert.strictEqual(code, 0);
     const configs = parseConfigs(out);
@@ -57,9 +59,11 @@ describe('config loading — env-only config (finding #11)', () => {
     });
     // A normal base+env config still merges byte-identically: env overrides base.
     assert.deepStrictEqual(configs.withBase, { a: 1, b: 'prod', c: 3 });
-  }, 40000);
+  });
 
-  it('treats an env-only config as absent (like an unknown config) when NODE_ENV does not match, naming the config and missing base', async () => {
+  it('treats an env-only config as absent (like an unknown config) when NODE_ENV does not match, naming the config and missing base', {
+    timeout: 40000,
+  }, async () => {
     const { code, out } = await runInit('test');
     assert.strictEqual(code, 0);
     // No applicable file for NODE_ENV=test → same as a config that was never
@@ -73,5 +77,5 @@ describe('config loading — env-only config (finding #11)', () => {
     assertTextMatch(out, /envOnly/);
     assertTextMatch(out, /envOnly\.ts/);
     assertTextNotMatch(out, /Cannot find package 'undefined'/);
-  }, 40000);
+  });
 });

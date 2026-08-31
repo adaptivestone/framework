@@ -623,6 +623,7 @@ describe('ControllerManager — handler-level middleware on route', () => {
 
     const node = findNode(registry, 'C', ['login']);
     const mws = node?.methods?.POST?.middlewares;
+    assert.ok(mws);
     assert.strictEqual(mws.length, 2);
     assert.strictEqual(mws?.[0]?.Class, FakeMw);
     assert.strictEqual(mws?.[1]?.Class, OtherMw);

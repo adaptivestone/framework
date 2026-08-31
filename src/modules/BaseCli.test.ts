@@ -122,6 +122,7 @@ describe('BaseCli command discovery and help', () => {
     cli.commands = { okcmd: commandPath('OkCommand') };
     const printCommandTable = mockResolvedValue(
       mock.method(cli, 'printCommandTable'),
+      undefined,
     );
     mockImplementation(mock.method(console, 'log'), () => {});
 
@@ -155,12 +156,14 @@ describe('BaseCli model-aware command lifecycle', () => {
     );
     const initAllModels = mockResolvedValue(
       mock.method(serverInstance, 'initAllModels'),
+      undefined,
     );
     mockImplementation(mock.method(console, 'info'), () => {});
     process.argv = ['node', 'cli.ts', 'modelcmd'];
 
     delete process.env.MONGO_APP_NAME;
     await assert.strictEqual(await cli.run('modelcmd'), true);
+    assert.ok(process.env.MONGO_APP_NAME);
     assertTextMatch(process.env.MONGO_APP_NAME, /^CLI: modelcmd /);
 
     process.env.MONGO_APP_NAME = 'operator-supplied-name';

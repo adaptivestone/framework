@@ -10,6 +10,9 @@ type Matcher = {
 
 type FunctionLike = ((...args: never[]) => unknown) & { readonly name: string };
 
+/** Error classes are matched with `instanceof`, so constructors count too. */
+type ErrorClass = abstract new (...args: never[]) => object;
+
 function matcher(
   description: string,
   predicate: (actual: unknown) => boolean,
@@ -220,7 +223,7 @@ export function assertHasProperty(
 
 export function assertThrowsLike(
   fn: () => unknown,
-  expected?: string | RegExp | FunctionLike | Error,
+  expected?: string | RegExp | FunctionLike | ErrorClass | Error,
 ): void {
   let didThrow = false;
   let error: unknown;
@@ -236,7 +239,7 @@ export function assertThrowsLike(
 
 export async function assertRejectsLike(
   value: Promise<unknown> | (() => Promise<unknown>),
-  expected?: string | RegExp | FunctionLike | Error,
+  expected?: string | RegExp | FunctionLike | ErrorClass | Error,
 ): Promise<void> {
   let didReject = false;
   let error: unknown;
@@ -268,7 +271,7 @@ export async function assertRejectsValue(
 
 function assertErrorMatches(
   error: unknown,
-  expected?: string | RegExp | FunctionLike | Error,
+  expected?: string | RegExp | FunctionLike | ErrorClass | Error,
 ): void {
   if (expected === undefined) {
     return;

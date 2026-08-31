@@ -18,6 +18,22 @@ import {
 } from '../tests/mocks.ts';
 import type { TUser } from './User.ts';
 
+// `genTypes.d.ts` is not part of this repo's own tsc program, so `getModel`
+// resolves to the untyped fallback here. Same cast the shared test helpers use.
+const getUserModel = () => appInstance.getModel('User') as unknown as TUser;
+
+/**
+ * Winston types `logger.error` as taking a single info object, so the recorded
+ * mock arguments need narrowing before the string assertions.
+ */
+const firstLoggedMessage = (call: {
+  arguments: readonly unknown[];
+}): string => {
+  const [message] = call.arguments;
+  assert.ok(typeof message === 'string');
+  return message;
+};
+
 const userEmail = 'testing@test.com';
 const userPassword = 'SuperNiceSecret123$';
 
@@ -25,7 +41,7 @@ let globalUser: InstanceType<TUser>;
 
 describe('user model', () => {
   it('can create user', async () => {
-    globalUser = await appInstance.getModel('User').create({
+    globalUser = await getUserModel().create({
       email: userEmail,
       password: userPassword,
       name: {
@@ -37,21 +53,19 @@ describe('user model', () => {
   });
 
   it('passwords should be hashed', async () => {
-    const user: InstanceType<TUser> = await appInstance
-      .getModel('User')
-      .findOne({
-        email: userEmail,
-      });
+    const user = await getUserModel().findOne({
+      email: userEmail,
+    });
+    assert.ok(user);
 
     assert.notStrictEqual(user.password, userPassword);
   });
 
   it('passwords should not be changed on other fields save', async () => {
-    const user: InstanceType<TUser> = await appInstance
-      .getModel('User')
-      .findOne({
-        email: userEmail,
-      });
+    const user = await getUserModel().findOne({
+      email: userEmail,
+    });
+    assert.ok(user);
     const psw = user.password;
     user.email = 'rrrr';
     await user.save();
@@ -63,7 +77,7 @@ describe('user model', () => {
 
   describe('getUserByEmailAndPassword', () => {
     it('should WORK with valid creds', async () => {
-      const userModel: TUser = await appInstance.getModel('User');
+      const userModel = getUserModel();
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         userPassword,
@@ -75,7 +89,7 @@ describe('user model', () => {
     });
 
     it('should NOT with INvalid creds', async () => {
-      const userModel: TUser = await appInstance.getModel('User');
+      const userModel = getUserModel();
       const user = await userModel.getUserByEmailAndPassword(
         userEmail,
         'wrongPassword',
@@ -85,7 +99,7 @@ describe('user model', () => {
     });
 
     it('should NOT with wrong email', async () => {
-      const userModel: TUser = await appInstance.getModel('User');
+      const userModel = getUserModel();
       const user = await userModel.getUserByEmailAndPassword(
         'not@exists.com',
         userPassword,
@@ -97,18 +111,15 @@ describe('user model', () => {
 
   describe('getUserByToken', () => {
     it('should NOT work for non valid token', async () => {
-      const user: InstanceType<TUser> = await appInstance
-        .getModel('User')
-        .getUserByToken('fake one');
+      const user = await getUserModel().getUserByToken('fake one');
 
       assert.ok(!user);
     });
 
     it('should  work for VALID token', async () => {
       const token = await globalUser.generateToken();
-      const user: InstanceType<TUser> = await appInstance
-        .getModel('User')
-        .getUserByToken(token.token);
+      const user = await getUserModel().getUserByToken(token.token);
+      assert.ok(user);
 
       assert.strictEqual(user.id, globalUser.id);
     });
@@ -117,7 +128,7 @@ describe('user model', () => {
   describe('getUserByVerificationToken', () => {
     it('should NOT work for non valid token', async () => {
       await assertRejectsValue(
-        appInstance.getModel('User').getUserByVerificationToken('fake one'),
+        getUserModel().getUserByVerificationToken('fake one'),
         new Error('User not exists'),
       );
     });
@@ -125,9 +136,7 @@ describe('user model', () => {
     it('should  work for VALID token', async () => {
       const token = await userHelpers.generateUserVerificationToken(globalUser);
 
-      const user = await appInstance
-        .getModel('User')
-        .getUserByVerificationToken(token.token);
+      const user = await getUserModel().getUserByVerificationToken(token.token);
 
       assert.strictEqual(user.id, globalUser.id);
     });
@@ -136,7 +145,7 @@ describe('user model', () => {
   describe('getUserByPasswordRecoveryToken', () => {
     it('should NOT work for non valid token', async () => {
       await assertRejectsValue(
-        appInstance.getModel('User').getUserByPasswordRecoveryToken('fake one'),
+        getUserModel().getUserByPasswordRecoveryToken('fake one'),
         new Error('User not exists'),
       );
     });
@@ -145,9 +154,9 @@ describe('user model', () => {
       const token =
         await userHelpers.generateUserPasswordRecoveryToken(globalUser);
 
-      const user = await appInstance
-        .getModel('User')
-        .getUserByPasswordRecoveryToken(token.token);
+      const user = await getUserModel().getUserByPasswordRecoveryToken(
+        token.token,
+      );
 
       assert.strictEqual(user.id, globalUser.id);
     });
@@ -159,7 +168,7 @@ describe('token security (doc 01)', () => {
   let user: InstanceType<TUser>;
 
   it('issues random base64url tokens that differ each call', async () => {
-    user = await appInstance.getModel('User').create({
+    user = await getUserModel().create({
       email,
       password: 'pw-token-sec',
       name: { nick: 'tokenSecNick' },
@@ -175,7 +184,7 @@ describe('token security (doc 01)', () => {
 
   it('stores only the token hash, never the raw token', async () => {
     const { token } = await user.generateToken();
-    const doc = await appInstance.getModel('User').findOne({ email }).orFail();
+    const doc = await getUserModel().findOne({ email }).orFail();
     const serialized = JSON.stringify(doc);
 
     assert.ok(!serialized.includes(token));
@@ -184,7 +193,7 @@ describe('token security (doc 01)', () => {
 
   it('rejects a session token whose `valid` is in the past', async () => {
     const raw = 'expired-session-raw-token';
-    await appInstance.getModel('User').updateOne(
+    await getUserModel().updateOne(
       { email },
       {
         $push: {
@@ -196,14 +205,14 @@ describe('token security (doc 01)', () => {
       },
     );
 
-    const found = await appInstance.getModel('User').getUserByToken(raw);
+    const found = await getUserModel().getUserByToken(raw);
     assert.ok(!found);
   });
 
   it('rejects verification/recovery tokens past `until`', async () => {
     const vRaw = 'expired-verification-raw';
     const rRaw = 'expired-recovery-raw';
-    await appInstance.getModel('User').updateOne(
+    await getUserModel().updateOne(
       { email },
       {
         verificationTokens: [
@@ -216,17 +225,17 @@ describe('token security (doc 01)', () => {
     );
 
     await assertRejectsValue(
-      appInstance.getModel('User').getUserByVerificationToken(vRaw),
+      getUserModel().getUserByVerificationToken(vRaw),
       new Error('User not exists'),
     );
     await assertRejectsValue(
-      appInstance.getModel('User').getUserByPasswordRecoveryToken(rRaw),
+      getUserModel().getUserByPasswordRecoveryToken(rRaw),
       new Error('User not exists'),
     );
   });
 
   it('requires an email before generating any auth token', async () => {
-    const UserModel = appInstance.getModel('User') as unknown as TUser;
+    const UserModel = getUserModel();
     const user = new UserModel();
     const helperUser = {
       email: '',
@@ -248,9 +257,12 @@ describe('token security (doc 01)', () => {
   });
 
   it('initializes a missing session-token array before appending', async () => {
-    const UserModel = appInstance.getModel('User') as unknown as TUser;
+    const UserModel = getUserModel();
     const user = new UserModel({ email: 'fresh-token-array@example.com' });
-    user.sessionTokens = undefined;
+    // The schema always materialises the array, so the legacy "missing array"
+    // shape has to be produced through `set` (the same `$set` the assignment
+    // `user.sessionTokens = undefined` compiles down to).
+    user.set('sessionTokens', undefined);
     const save = mockResolvedValue(mock.method(user, 'save'), user);
 
     const generated = await user.generateToken();
@@ -265,24 +277,26 @@ describe('password hashing (doc 02)', () => {
   const pw = 'SharedSecret123$';
 
   it('gives same-password users different stored hashes (per-user salt)', async () => {
-    const u1 = await appInstance.getModel('User').create({
+    const u1 = await getUserModel().create({
       email: 'pwhash1@test.com',
       password: pw,
       name: { nick: 'pwhash1' },
     });
-    const u2 = await appInstance.getModel('User').create({
+    const u2 = await getUserModel().create({
       email: 'pwhash2@test.com',
       password: pw,
       name: { nick: 'pwhash2' },
     });
 
+    assert.ok(u1.password);
+    assert.ok(u2.password);
     assertTextMatch(u1.password, /^v2:scrypt:/);
     assertTextMatch(u2.password, /^v2:scrypt:/);
     assert.notStrictEqual(u1.password, u2.password);
   });
 
   it('round-trips: correct password verifies, wrong password fails', async () => {
-    const model = appInstance.getModel('User') as unknown as TUser;
+    const model = getUserModel();
     const ok = await model.getUserByEmailAndPassword('pwhash1@test.com', pw);
     const bad = await model.getUserByEmailAndPassword(
       'pwhash1@test.com',
@@ -294,7 +308,7 @@ describe('password hashing (doc 02)', () => {
   });
 
   it('upgrades a legacy v1 hash to v2 on successful login', async () => {
-    const model = appInstance.getModel('User') as unknown as TUser;
+    const model = getUserModel();
     const email = 'legacy-v1@test.com';
     await model.create({
       email,
@@ -315,6 +329,7 @@ describe('password hashing (doc 02)', () => {
 
     // ...and the stored hash is upgraded to v2 (not the double-hashed string).
     const afterFirst = await model.findOne({ email }).orFail();
+    assert.ok(afterFirst.password);
     assertTextMatch(afterFirst.password, /^v2:scrypt:/);
     assert.notStrictEqual(afterFirst.password, legacyHash);
 
@@ -324,7 +339,7 @@ describe('password hashing (doc 02)', () => {
   });
 
   it('rehashes when the stored v2 cost is below the current target', async () => {
-    const model = appInstance.getModel('User') as unknown as TUser;
+    const model = getUserModel();
     const email = 'weak-v2@test.com';
     await model.create({
       email,
@@ -362,7 +377,7 @@ describe('password hashing (doc 02)', () => {
   });
 
   it('still returns the user when the rehash write fails', async () => {
-    const model = appInstance.getModel('User') as unknown as TUser;
+    const model = getUserModel();
     const email = 'rehash-fail@test.com';
     await model.create({
       email,
@@ -382,7 +397,7 @@ describe('password hashing (doc 02)', () => {
   });
 
   it('fails cleanly (no throw) on a corrupted or unknown-version hash', async () => {
-    const model = appInstance.getModel('User') as unknown as TUser;
+    const model = getUserModel();
     const email = 'corrupt-hash@test.com';
     await model.create({
       email,
@@ -411,7 +426,7 @@ describe('password hashing (doc 02)', () => {
 describe('auth mails for a user with no email address', () => {
   /** A user document that never got an email — the field is optional. */
   const userWithoutEmail = () => {
-    const UserModel = appInstance.getModel('User') as unknown as TUser;
+    const UserModel = getUserModel();
     return new UserModel({ name: { nick: 'noEmailNick' } });
   };
 
@@ -424,7 +439,7 @@ describe('auth mails for a user with no email address', () => {
 
       assert.strictEqual(sent, false);
       assertCalledTimes(logError, 1);
-      const [message] = logError.mock.calls[0].arguments as [string];
+      const message = firstLoggedMessage(logError.mock.calls[0]);
       assertTextMatch(message, /verification email/);
       assertTextMatch(message, /no email address/);
     } finally {
@@ -441,7 +456,7 @@ describe('auth mails for a user with no email address', () => {
 
       assert.strictEqual(sent, false);
       assertCalledTimes(logError, 1);
-      const [message] = logError.mock.calls[0].arguments as [string];
+      const message = firstLoggedMessage(logError.mock.calls[0]);
       assertTextMatch(message, /password recovery email/);
       assertTextMatch(message, /no email address/);
     } finally {

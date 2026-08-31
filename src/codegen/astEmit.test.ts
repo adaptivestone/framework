@@ -42,7 +42,9 @@ describe('astEmit', () => {
   // parallel writers raced and flaked the golden tsc gate). Tests here either
   // emit in-memory or write to their own temp dir.
 
-  it('discovers and emits a .js controller (runtime loads .js too)', async () => {
+  it('discovers and emits a .js controller (runtime loads .js too)', {
+    timeout: 30_000,
+  }, async () => {
     // The runtime loader (`helpers/files.ts`) accepts .js controllers; codegen
     // must see them too — otherwise they'd be untyped AND missing from the
     // shared bleed registry (silently wrong chains for OTHER controllers).
@@ -88,9 +90,11 @@ export default class Legacy extends Base {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-  }, 30_000);
+  });
 
-  it('skips colocated .d.ts / .gen.d.ts files (no spurious needsBoot)', async () => {
+  it('skips colocated .d.ts / .gen.d.ts files (no spurious needsBoot)', {
+    timeout: 30_000,
+  }, async () => {
     // Mirrors the runtime loader: a declaration file next to controllers has no
     // class → would be needsBoot → would throw, blocking ALL codegen. Must be
     // excluded by discovery instead.
@@ -128,5 +132,5 @@ export default class Legacy extends Base {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
-  }, 30_000);
+  });
 });

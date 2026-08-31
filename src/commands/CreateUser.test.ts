@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
+import type { TUser } from '../models/User.ts';
 import CreateUser from './CreateUser.ts';
+
+// `genTypes.d.ts` is not part of this repo's own tsc program, so `getModel`
+// resolves to the untyped fallback here. Same cast the shared test helpers use.
+const getUserModel = () => appInstance.getModel('User') as unknown as TUser;
 
 // Captures every log entry so the test can assert no credential is serialized.
 class CaptureTransport extends Transport {
@@ -77,7 +82,7 @@ describe('CreateUser command — input validation guards', () => {
       await run({ email, password: 'pw', roles: 'user,admin' }),
       true,
     );
-    const user = await appInstance.getModel('User').findOne({ email });
+    const user = await getUserModel().findOne({ email });
     // Spread before comparing: a Mongoose array is a Proxy, and Bun's
     // `node:assert` reports any Proxy as unequal regardless of contents.
     assert.deepStrictEqual([...(user?.roles ?? [])], ['user', 'admin']);

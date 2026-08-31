@@ -1,4 +1,10 @@
 {
+  // Type-checks the test suite, which `tsconfig.json` excludes from the build.
+  // `src/**/__fixtures__` stays excluded: those files carry deliberate module
+  // augmentations (e.g. a custom `AppModelTypes['User']`) that would leak into
+  // every other file, and they are already type-checked in isolation through
+  // their own tsconfig by `ModelTyping.typecheck.test.ts` and
+  // `routeTypes.golden.test.ts`.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true

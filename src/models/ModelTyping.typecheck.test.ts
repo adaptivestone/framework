@@ -61,7 +61,9 @@ const repoRoot = path.resolve(here, '../..');
 const fixturesTsconfig = path.join(here, '__fixtures__', 'tsconfig.json');
 
 describe('Model typing — compile-time fixture gate', () => {
-  it('type-checks schema-derived and class-derived model contracts', () => {
+  it('type-checks schema-derived and class-derived model contracts', {
+    timeout: 240_000,
+  }, () => {
     const tsc = path.join(repoRoot, 'node_modules/.bin/tsc');
     let ok = true;
     let output = '';
@@ -79,5 +81,5 @@ describe('Model typing — compile-time fixture gate', () => {
     assert.strictEqual(ok, true);
     // Generous ceiling (CPU-bound, synchronous tsc contends with parallel
     // workers); a real regression fails fast with TS errors.
-  }, 240_000);
+  });
 });

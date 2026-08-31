@@ -58,7 +58,7 @@ describe('cors middleware methods', () => {
       headers: { origin: 'https://localhost' },
     };
     const res = {
-      set: (key, val) => {
+      set: (key: string, val?: string | string[]) => {
         map.set(key, val);
       },
     };
@@ -130,7 +130,7 @@ describe('cors middleware methods', () => {
       },
     };
     const res = {
-      set: (key, val) => {
+      set: (key: string, val?: string | string[]) => {
         map.set(key, val);
       },
       status: () => {},
@@ -181,7 +181,7 @@ describe('cors middleware methods', () => {
       },
     };
     const res = {
-      set: (key, val) => {
+      set: (key: string, val?: string | string[]) => {
         map.set(key, val);
       },
       status: () => {},

@@ -41,7 +41,9 @@ const fixturesDir = path.join(here, '__fixtures__');
 const controllersDir = path.join(fixturesDir, 'controllers');
 
 describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
-  it('emits types that type-check against realistic handler usage', async () => {
+  it('emits types that type-check against realistic handler usage', {
+    timeout: 240_000,
+  }, async () => {
     // Boot-free codegen: a minimal app is all `generateRouteTypes` reads.
     const app = {
       logger: noopLogger,
@@ -130,7 +132,7 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
     // contends with the rest of the suite's parallel workers — ~18s in
     // isolation, but minutes under full-suite CPU saturation. The ceiling only
     // guards against that contention; a real regression fails fast (tsc errors).
-  }, 240_000);
+  });
 });
 
 function runTsc(): { ok: boolean; output: string } {

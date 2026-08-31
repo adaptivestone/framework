@@ -100,8 +100,12 @@ function emitSignal(signal: NodeJS.Signals): void {
 }
 
 beforeEach((context) => {
+  assert.ok('mock' in context);
   timers = context.mock.timers;
-  timers.enable({ now: 0 });
+  timers.enable({
+    apis: ['setInterval', 'setTimeout', 'setImmediate', 'Date'],
+    now: 0,
+  });
   clusterState.isPrimary = true;
   clusterState.parallelism = 2;
   clusterState.nextWorkerId = 1;

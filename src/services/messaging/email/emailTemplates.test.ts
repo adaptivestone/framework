@@ -51,7 +51,7 @@ const templates: Record<
   },
   'recovery/text': {
     render: recoveryText,
-    keys: ['email.greeating', 'email.passwordRecovery'],
+    keys: ['email.greeting', 'email.passwordRecovery'],
     english: ['Dear user', 'Recovery password'],
     hasLink: true,
     isSubject: false,
@@ -76,7 +76,7 @@ const templates: Record<
   },
   'verification/text': {
     render: verificationText,
-    keys: ['email.greeating', 'email.verifyInstructions'],
+    keys: ['email.greeting', 'email.verifyInstructions'],
     english: ['Dear user', 'To verify your email address, follow the link:'],
     hasLink: true,
     isSubject: false,
@@ -203,4 +203,42 @@ describe('shipped email templates', () => {
       assert.ok(rendered.includes('&lt;script&gt;'), 'markup was not escaped');
     }
   });
+});
+
+describe('deprecated email.greeating alias', () => {
+  const textTemplates = ['recovery/text', 'verification/text'];
+
+  // An app that translated only the pre-5.4 spelling keeps its translation.
+  testEach(
+    textTemplates,
+    'old key still translates the greeting: %s',
+    (name) => {
+      const oldOnlyT: TEmailTemplateData['t'] = (key, options) =>
+        key === 'email.greeating'
+          ? 'OLD-GREETING'
+          : (options?.defaultValue ?? key);
+      const rendered = templates[name]?.render(data(oldOnlyT)) as string;
+      assert.ok(rendered.includes('OLD-GREETING'));
+    },
+  );
+
+  // When both spellings are translated, the canonical key wins.
+  testEach(
+    textTemplates,
+    'new key wins over the deprecated one: %s',
+    (name) => {
+      const bothT: TEmailTemplateData['t'] = (key, options) => {
+        if (key === 'email.greeting') {
+          return 'NEW-GREETING';
+        }
+        if (key === 'email.greeating') {
+          return 'OLD-GREETING';
+        }
+        return options?.defaultValue ?? key;
+      };
+      const rendered = templates[name]?.render(data(bothT)) as string;
+      assert.ok(rendered.includes('NEW-GREETING'));
+      assert.ok(!rendered.includes('OLD-GREETING'));
+    },
+  );
 });

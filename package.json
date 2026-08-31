@@ -34,6 +34,7 @@
     "check:types": "npm run gen && tsc --noEmit",
     "check:types:raw": "tsc --noEmit",
     "check:types:fast": "npm run gen && tsc --noEmit",
+    "check:types:tests": "npm run gen && tsc --noEmit -p tsconfig.tests.json",
     "dev": "node --watch ./src/index.ts",
     "prod": "node ./src/cluster.ts",
     "test": "npm run test:coverage",

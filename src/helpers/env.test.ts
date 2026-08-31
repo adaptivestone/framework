@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
+import type { TLogConfig } from '../config/log.ts';
 import { envBool } from './env.ts';
 
 describe('envBool (doc 14)', () => {
@@ -58,7 +59,7 @@ describe('config/log enable coercion (doc 14)', () => {
   });
 
   let importSequence = 0;
-  const loadLog = async () => {
+  const loadLog = async (): Promise<TLogConfig> => {
     importSequence += 1;
     return (await import(`../config/log.ts?test=${importSequence}`)).default;
   };

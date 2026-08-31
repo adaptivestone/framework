@@ -45,7 +45,7 @@ class CaptureTransport extends Transport {
 
 describe('auth route schemas', () => {
   const routes = new Auth(appInstance, '').routes.post;
-  const validate = async (path: string, value: unknown) => {
+  const validate = async (path: keyof typeof routes, value: unknown) => {
     const route = routes[path];
     if (
       typeof route === 'function' ||
@@ -109,7 +109,7 @@ describe('auth route schemas', () => {
   // Every framework-authored issue ships its English text as `params.
   // defaultValue`; `ValidateService.translateInPlace` forwards `params` to
   // `t()`, so an app whose locales lack the key still gets English.
-  const defaults = async (path: string, value: unknown) => {
+  const defaults = async (path: keyof typeof routes, value: unknown) => {
     const result = await validate(path, value);
     const issues = (
       'issues' in result ? (result.issues ?? []) : []
@@ -157,7 +157,7 @@ describe('auth route schemas', () => {
   });
 
   testEach(
-    ['/send-recovery-email', '/send-verification'],
+    ['/send-recovery-email', '/send-verification'] as const,
     'requires an email for %s',
     async (path) => {
       const result = await validate(path, {});
@@ -844,6 +844,7 @@ describe('auth', () => {
       }
 
       const all = captured.join('\n');
+      assert.ok(hash);
       assert.ok(!all.includes(hash));
       assert.ok(!all.includes(token));
     });

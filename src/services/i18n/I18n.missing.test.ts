@@ -93,6 +93,7 @@ describe('i18n service without the optional i18next packages', () => {
     );
 
     assert.ok(nexted);
+    assert.ok(req.appInfo.i18n);
     assert.strictEqual(
       req.appInfo.i18n.t('middleware.role.noAccess', {
         defaultValue: 'You do not have access',

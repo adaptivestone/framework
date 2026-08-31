@@ -3,9 +3,14 @@ import { describe, it } from 'node:test';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TKeyValue } from './KeyValue.ts';
 
+// `genTypes.d.ts` is not part of this repo's own tsc program, so `getModel`
+// resolves to the untyped fallback here. Same cast the shared test helpers use.
+const getKeyValueModel = () =>
+  appInstance.getModel('KeyValue') as unknown as TKeyValue;
+
 describe('keyValue model', () => {
   it('should store and read a value', async () => {
-    const KeyValue: TKeyValue = appInstance.getModel('KeyValue');
+    const KeyValue = getKeyValueModel();
 
     await KeyValue.findByIdAndUpdate(
       'config:theme',
@@ -18,7 +23,7 @@ describe('keyValue model', () => {
   });
 
   it('should store any value type', async () => {
-    const KeyValue: TKeyValue = appInstance.getModel('KeyValue');
+    const KeyValue = getKeyValueModel();
 
     const value = { enabled: true, limits: [1, 2, 3] };
     await KeyValue.findByIdAndUpdate(
@@ -32,7 +37,7 @@ describe('keyValue model', () => {
   });
 
   it('should overwrite an existing key', async () => {
-    const KeyValue: TKeyValue = appInstance.getModel('KeyValue');
+    const KeyValue = getKeyValueModel();
 
     await KeyValue.findByIdAndUpdate('counter', { value: 1 }, { upsert: true });
     await KeyValue.findByIdAndUpdate('counter', { value: 2 }, { upsert: true });
@@ -42,7 +47,7 @@ describe('keyValue model', () => {
   });
 
   it('should delete a value', async () => {
-    const KeyValue: TKeyValue = appInstance.getModel('KeyValue');
+    const KeyValue = getKeyValueModel();
 
     await KeyValue.findByIdAndUpdate('temp', { value: 'x' }, { upsert: true });
     await KeyValue.deleteOne({ _id: 'temp' });

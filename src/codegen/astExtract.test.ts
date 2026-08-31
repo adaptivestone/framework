@@ -260,6 +260,7 @@ describe('astExtract — routes', () => {
 }`);
 
     assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason);
     assertTextMatch(ex.reason, /optional `const` setup/);
   });
 
@@ -277,6 +278,7 @@ describe('astExtract — routes', () => {
   }
 }`);
       assert.strictEqual(ex.ok, false, setup);
+      assert.ok(ex.reason);
       assertTextMatch(ex.reason, /optional `const` setup/, setup);
     }
   });
@@ -315,6 +317,7 @@ describe('astExtract — routes', () => {
   get routes() { return { get: { '/': { handler: this.r, middleware: ${middleware} } } }; }
 }`);
       assert.strictEqual(ex.ok, false, middleware);
+      assert.ok(ex.reason);
       assertTextMatch(
         ex.reason,
         /unanalyzable route-level middleware/,
@@ -337,6 +340,7 @@ describe('astExtract — routes', () => {
   get routes() { return { post: { '/x': { handler: this.x, request: { [k]: s() } } } }; }
 }`);
     assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason);
     assertTextMatch(ex.reason, /computed\/spread/);
   });
 
@@ -352,6 +356,7 @@ describe('astExtract — routes', () => {
   get routes() { return { get: { '/x': ${entry} } }; }
 }`);
       assert.strictEqual(ex.ok, false, entry);
+      assert.ok(ex.reason);
       assertTextMatch(ex.reason, /no identifiable handler/, entry);
     }
   });
@@ -361,6 +366,7 @@ describe('astExtract — routes', () => {
   get routes() { return { get: { '/x': { ...defaults, handler: this.x } } }; }
 }`);
     assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason);
     assertTextMatch(ex.reason, /spread in the route entry/);
   });
 
@@ -376,6 +382,7 @@ describe('astExtract — routes', () => {
   }
 }`);
     assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason);
     assertTextMatch(ex.reason, /routes getter not a literal/);
     assert.deepStrictEqual(ex.middleware, [
       { scope: '/{*splat}', bindings: ['Mw'] },
@@ -450,6 +457,7 @@ describe('astExtract — middleware', () => {
   static get middleware() { return new Map([['/', ${list}]]); }
 }`);
       assert.strictEqual(ex.ok, false, list);
+      assert.ok(ex.reason);
       assertTextMatch(ex.reason, reason, list);
     }
   });
@@ -469,6 +477,7 @@ describe('astExtract — middleware', () => {
   static get middleware() { return buildMap(); }
 }`);
     assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason);
     assertTextMatch(ex.reason, /middleware getter not a literal Map/);
     // The flag lets the extends-walk tell "non-literal getter here" apart from
     // "no getter here" (which inherits) — see astResolve's ancestor handling.
@@ -508,6 +517,7 @@ describe('astExtract — silent-wrong-type guards (doc 07)', () => {
       `export default class Ctrl { get routes() { return { gett: { '/x': this.h } }; } }`,
     );
     assert.strictEqual(ex.ok, false);
+    assert.ok(ex.reason);
     assert.ok(ex.reason.includes('unknown HTTP verb "gett"'));
   });
 

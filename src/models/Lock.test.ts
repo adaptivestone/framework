@@ -138,7 +138,7 @@ describe('Lock Model', () => {
       );
     });
 
-    it('should wait until lock is released', async () => {
+    it('should wait until lock is released', { timeout: 3000 }, async () => {
       await Lock.acquireLock(testLockName);
       let unlocked = false;
 
@@ -154,7 +154,7 @@ describe('Lock Model', () => {
 
       await waitPromise;
       assert.strictEqual(unlocked, true);
-    }, 3000);
+    });
 
     it('resolves via the post-live re-check when the lock is already gone', async () => {
       const name = 'delete-recheck-lock';
@@ -166,7 +166,9 @@ describe('Lock Model', () => {
       await assert.strictEqual(await Lock.waitForUnlock(name), undefined);
     });
 
-    it('observes a delete landing in the existence-check → stream-open window', async () => {
+    it('observes a delete landing in the existence-check → stream-open window', {
+      timeout: 3000,
+    }, async () => {
       const name = 'delete-race-lock';
       await Lock.acquireLock(name);
 
@@ -185,13 +187,15 @@ describe('Lock Model', () => {
       } finally {
         spy.mock.restore();
       }
-    }, 3000);
+    });
 
-    it('rejects after timeoutMs while a lock is still held', async () => {
+    it('rejects after timeoutMs while a lock is still held', {
+      timeout: 3000,
+    }, async () => {
       const name = 'timeout-lock';
       await Lock.acquireLock(name, testTtl);
       await assertRejectsLike(Lock.waitForUnlock(name, 50), /timed out/);
       await Lock.releaseLock(name);
-    }, 3000);
+    });
   });
 });

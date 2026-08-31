@@ -149,7 +149,12 @@ describe('getUserByToken middleware methods', () => {
       const server = createServer((req, res) => {
         const frReq = req as unknown as FrameworkRequest &
           GetUserByTokenAppInfo;
-        frReq.appInfo = { app: appInstance, request: {}, query: {} };
+        frReq.appInfo = {
+          app: appInstance,
+          request: {},
+          query: {},
+          params: {},
+        };
         frReq.body = {};
         // GetUserByToken reads req.get('Authorization') (logging + fallback).
         frReq.get = (() => undefined) as FrameworkRequest['get'];

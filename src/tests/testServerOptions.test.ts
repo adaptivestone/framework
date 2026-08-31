@@ -41,7 +41,9 @@ const runChild = (
   });
 
 describe('configureTestServer — consumer Server options in the test bootstrap', () => {
-  it('runs the configured bootHttp hook before the adapter mounts', async () => {
+  it('runs the configured bootHttp hook before the adapter mounts', {
+    timeout: 40000,
+  }, async () => {
     const { code, out } = await runChild([fixture]);
 
     assertTextMatch(out, /HOOK_RAN/);
@@ -50,9 +52,11 @@ describe('configureTestServer — consumer Server options in the test bootstrap'
     assertTextMatch(out, /ROUTE_STATUS:200/);
     assertTextMatch(out, /ROUTE_BODY:\{"bootHttp":"ran"\}/);
     assert.strictEqual(code, 0);
-  }, 40000);
+  });
 
-  it('works in the documented arrangement: glue imported above the call', async () => {
+  it('works in the documented arrangement: glue imported above the call', {
+    timeout: 40000,
+  }, async () => {
     // The changelog snippet: `import '…/setupNodeTest.js'` hoisted above a
     // module-scope `configureTestServer(...)` call, run as a `--test` preload.
     // node:test fires the glue's root `before()` at registration — during the
@@ -79,7 +83,7 @@ describe('configureTestServer — consumer Server options in the test bootstrap'
     assertTextMatch(out, /DOC_HOOK_RAN/);
     assertTextMatch(out, /pass 1/);
     assert.strictEqual(code, 0);
-  }, 40000);
+  });
 
   it('throws when called after the test server has booted', () => {
     assertThrowsLike(

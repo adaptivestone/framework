@@ -134,6 +134,7 @@ export default class Dyn extends Base {
     );
     const r = await resolveController(child);
     assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason);
     assertTextMatch(r.reason, /routes getter/);
     assert.deepStrictEqual(r.middleware, [
       { scope: '/{*splat}', bindings: ['OwnMW'] },
@@ -159,6 +160,7 @@ export default class ChildOfDynBase extends DynBase {
     );
     const r = await resolveController(child);
     assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason);
     assertTextMatch(r.reason, /ancestor/);
     assert.deepStrictEqual(r.middleware, []); // not emitted as a "valid" empty chain
   });
@@ -229,6 +231,7 @@ export default class OrphanChild extends Missing {
     );
     const r = await resolveController(child);
     assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason);
     assert.ok(r.reason.includes('./DoesNotExist.ts'));
   });
 
@@ -242,6 +245,7 @@ export default class BareChild extends Missing {
     );
     const r = await resolveController(child);
     assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason);
     assert.ok(r.reason.includes('@nope/not-installed/Base.js'));
   });
 
@@ -274,6 +278,7 @@ export default class LocalUnexported {
     );
     const r = await resolveController(ctrl);
     assert.strictEqual(r.needsBoot, true);
+    assert.ok(r.reason);
     assert.ok(r.reason.includes('LocalMw'));
     assert.ok(r.reason.includes('not exported'));
   });

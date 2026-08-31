@@ -358,9 +358,9 @@ describe('RouteRegistry — registerSubtree', () => {
 
     r.registerSubtree('/api', subtree);
 
-    assert.strictEqual(r.match('GET', '/api/one')?.entry.handler, noop);
-    assert.strictEqual(r.match('POST', '/api/one')?.entry.handler, noop);
-    assert.strictEqual(r.match('GET', '/api/sparse')?.entry.handler, noop);
+    assert.strictEqual(r.match('GET', '/api/one')?.entry?.handler, noop);
+    assert.strictEqual(r.match('POST', '/api/one')?.entry?.handler, noop);
+    assert.strictEqual(r.match('GET', '/api/sparse')?.entry?.handler, noop);
     assert.strictEqual(
       r.flatten().some((entry) => entry.method === 'DELETE'),
       false,

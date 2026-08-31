@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
+import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
 import I18n from './I18n.ts';
+
+// Minimal request/response stubs: the middleware touches only `get`, `query`
+// and `appInfo`, so the widening cast lives here instead of at every call site.
+const asRequest = (stub: object) => stub as unknown as FrameworkRequest;
+const asResponse = (stub: object) => stub as unknown as Response;
 
 describe('i18n middleware methods', () => {
   let middleware: I18n;
@@ -11,7 +18,10 @@ describe('i18n middleware methods', () => {
   });
 
   it('have description fields', async () => {
-    assert.notStrictEqual(middleware.constructor.description, undefined);
+    assert.notStrictEqual(
+      (middleware.constructor as typeof I18n).description,
+      undefined,
+    );
   });
 
   it('detectors should works correctly', async () => {
@@ -32,7 +42,7 @@ describe('i18n middleware methods', () => {
       },
       appInfo: {},
     };
-    let lang = await middleware.detectLang(request);
+    let lang = await middleware.detectLang(asRequest(request));
 
     assert.strictEqual(lang, 'en');
 
@@ -41,28 +51,28 @@ describe('i18n middleware methods', () => {
         locale: 'be',
       },
     };
-    lang = await middleware.detectLang(request);
+    lang = await middleware.detectLang(asRequest(request));
 
     assert.strictEqual(lang, 'en');
 
     request.get = () => null as unknown as string;
-    lang = await middleware.detectLang(request);
+    lang = await middleware.detectLang(asRequest(request));
 
     assert.strictEqual(lang, 'es');
 
     request.query = undefined;
-    lang = await middleware.detectLang(request);
+    lang = await middleware.detectLang(asRequest(request));
 
     assert.strictEqual(lang, 'be');
 
     request.query = {
       [middleware.lookupQuerystring]: 'en-GB',
     };
-    lang = await middleware.detectLang(request);
+    lang = await middleware.detectLang(asRequest(request));
 
     assert.strictEqual(lang, 'en');
 
-    lang = await middleware.detectLang(request, false);
+    lang = await middleware.detectLang(asRequest(request), false);
 
     assert.strictEqual(lang, 'en-GB');
   });
@@ -87,7 +97,7 @@ describe('i18n middleware methods', () => {
       get: () => 'en',
       appInfo: {},
     };
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(asRequest(req), asResponse({}), nextFunction);
 
     assert.ok(isCalled);
     assert.notStrictEqual(req.appInfo.i18n, undefined);
@@ -107,7 +117,7 @@ describe('i18n middleware methods', () => {
       appInfo: {},
     };
 
-    await middleware.middleware(req2, {}, nextFunction);
+    await middleware.middleware(asRequest(req2), asResponse({}), nextFunction);
 
     assert.strictEqual(req2.appInfo.i18n?.language, 'en');
   });
@@ -136,7 +146,7 @@ describe('i18n middleware methods', () => {
       get: () => 'en',
       appInfo: {},
     };
-    await middleware.middleware(req, {}, nextFunction);
+    await middleware.middleware(asRequest(req), asResponse({}), nextFunction);
 
     assert.ok(isCalled);
     assert.notStrictEqual(req.appInfo.i18n, undefined);

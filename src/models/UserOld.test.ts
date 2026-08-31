@@ -20,12 +20,40 @@ mock.module('../helpers/crypto.ts', {
 });
 const { default: UserOld } = await import('./UserOld.ts');
 
+/** The mongoose model handle the class builds — `UserOld` exports no type. */
+type TUserOld = InstanceType<typeof UserOld>['mongooseModel'];
+
+// `genTypes.d.ts` is not part of this repo's own tsc program, so `getModel`
+// resolves to the untyped fallback here. Same cast the shared test helpers use.
+const getUserOldModel = () =>
+  appInstance.getModel('UserOld') as unknown as TUserOld;
+
+/**
+ * `loadClass` copies the class instance methods onto every document, but the
+ * model's declared methods type does not carry them.
+ */
+type TUserOldDoc = InstanceType<TUserOld> &
+  Pick<
+    InstanceType<typeof UserOld>,
+    'sendPasswordRecoveryEmail' | 'sendVerificationEmail'
+  >;
+
+/**
+ * Winston types `logger.error` as taking a single info object, so the recorded
+ * mock arguments need narrowing before the string assertions.
+ */
+const firstLoggedMessage = (call: {
+  arguments: readonly unknown[];
+}): string => {
+  const [message] = call.arguments;
+  assert.ok(typeof message === 'string');
+  return message;
+};
+
 const userEmail = 'userold@test.com';
 const userPassword = 'OldSuperSecret123$';
 
 describe('UserOld model (deprecated)', () => {
-  const getUserOldModel = () => appInstance.getModel('UserOld');
-
   it('emits a DeprecationWarning (code ASF_DEP_USEROLD) with a security note on construction', () => {
     const spy = mock.method(process, 'emitWarning', () => {});
     try {
@@ -167,11 +195,11 @@ describe('UserOld model (deprecated)', () => {
 });
 
 describe('UserOld auth mails for a user with no email address', () => {
-  const getUserOldModel = () => appInstance.getModel('UserOld');
-
   /** A user document that never got an email — the field is optional. */
-  const userWithoutEmail = () =>
-    new (getUserOldModel())({ name: { nick: 'oldNoEmailNick' } });
+  const userWithoutEmail = (): TUserOldDoc =>
+    new (getUserOldModel())({
+      name: { nick: 'oldNoEmailNick' },
+    }) as TUserOldDoc;
 
   it('refuses to send the verification mail and reports it', async () => {
     const user = userWithoutEmail();
@@ -183,7 +211,7 @@ describe('UserOld auth mails for a user with no email address', () => {
 
       assert.strictEqual(sent, false);
       assertCalledTimes(logError, 1);
-      const [message] = logError.mock.calls[0].arguments as [string];
+      const message = firstLoggedMessage(logError.mock.calls[0]);
       assertTextMatch(message, /verification email/);
       assertTextMatch(message, /no email address/);
     } finally {
@@ -201,7 +229,7 @@ describe('UserOld auth mails for a user with no email address', () => {
 
       assert.strictEqual(sent, false);
       assertCalledTimes(logError, 1);
-      const [message] = logError.mock.calls[0].arguments as [string];
+      const message = firstLoggedMessage(logError.mock.calls[0]);
       assertTextMatch(message, /password recovery email/);
       assertTextMatch(message, /no email address/);
     } finally {

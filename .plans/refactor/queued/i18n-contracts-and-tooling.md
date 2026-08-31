@@ -67,12 +67,12 @@ The base locale is the structural source of truth. “Coverage” means matching
 
 ## Delivery plan
 
-### Phase 0 — pin the current truth (v5, no API change)
+### Phase 0 — pin the current truth (REVISED 2026-08-31; rename rides 5.4 by user decision)
 
-- Add the missing `password.wrongToken` value to every shipped locale.
-- Record the current static audit baseline: 26 catalog keys, one missing production key, and nine no-production-reference candidates. Review candidates manually; do not delete in this phase.
-- Rename `email.greeating` to `email.greeting` in source and catalogs with a temporary deprecated alias if externally addressable.
-- Add catalog unit fixtures for a missing key, extra key, blank value, placeholder mismatch, malformed JSON, unknown locale, dynamic preserve pattern, and Pug/validation usage.
+- ~~`password.wrongToken`~~ OBSOLETE — shipped in 5.4 as an in-code default.
+- Baseline as of 5.4: `en/translation.json` = 2 keys (`auth.passwordTooShort`, `auth.messageSome` — both test-referenced); every framework emit site carries an in-code English default (`middleware.*` ×6, `http.*` ×2, `auth.*`/`email.*`/`password.*` sweep, verification-template keys); `ru/translation.json` = full translator catalog. No missing production key, no dead keys (trimmed in 5.4).
+- **Rename `email.greeating` → `email.greeting` (IN 5.4)**: emit sites switch to the new key with an old-key alias as the defaultValue chain — `t('email.greeting', { defaultValue: t('email.greeating', { defaultValue: 'Dear user' }) })` — so an app catalog translating the old key keeps working; framework `ru` catalog renames its entry; CHANGELOG Deprecated entry (old key honoured until v6, removed with the Phase 4 namespace codemod); docs key tables updated.
+- Catalog unit fixtures (missing/extra/blank/placeholder/malformed/unknown-locale/dynamic-preserve) MOVED to Phase 1 — they are the audit engine's test bed, meaningless before it. Pug fixture dropped entirely (templates are TS modules since 5.4).
 
 ### Phase 1 — one audit engine and one report (v5 additive)
 

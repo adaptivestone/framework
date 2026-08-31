@@ -27,6 +27,7 @@ Run before claiming anything is done:
 - `npm test` — full suite (node:test)
 - `npm run check` — biome lint + format
 - `npm run check:types` — codegen + `tsc --noEmit`
+- `npm run check:types:tests` — same, but with the test suite included (`tsconfig.tests.json`)
 - `npm run smoke` — packaging smoke test (pack → install into a scratch consumer)
 
 ## Conventions

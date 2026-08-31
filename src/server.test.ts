@@ -132,12 +132,17 @@ describe('Server.runCliCommand', () => {
         await serverInstance.runCliCommand('first'),
         true,
       );
-      const cli = serverInstance.cli;
+      // `serverInstance.cli = null` above narrows the property to `null` for
+      // the rest of this block, so read it back through its declared type and
+      // let the runtime guard below do the narrowing.
+      const readCli = (): BaseCli | null => serverInstance.cli;
+      const cli = readCli();
       await assert.strictEqual(
         await serverInstance.runCliCommand('second'),
         true,
       );
 
+      assert.ok(cli);
       assert.ok(cli instanceof BaseCli);
       assert.strictEqual(serverInstance.cli, cli);
       assertNthCalledWith(run, 1, 'first');

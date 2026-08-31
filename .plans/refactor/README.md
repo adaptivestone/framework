@@ -99,6 +99,7 @@ repository; Markdown remains the reviewed source of truth.
 | File | Ref | Summary |
 |---|---|---|
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.5 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.5; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
+| [async-middleware](queued/async-middleware.md) | P1m | **Async middleware contract — v5.5 opt-in, v6 flip.** `static contractVersion = 2` (default 1): v2 = `middleware(ctx)`, return→continue / `HttpResponse`→P1q writer / throw→error registry; v1 keeps the Express bridge. Built-ins stay v1 through v5 (subclass safety); v6 flips default, drops v1, lands with static-middleware-cutover. Co-designed with P1q. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
 | [logging-facade-and-pino](queued/logging-facade-and-pino.md) | P1z | **Vendor-neutral logging + Pino.** Lock a framework-owned structured logger/Error contract in v5.x, then cut `IApp.logger`, config, Sentry and tests from Winston to a Pino-backed sink runtime in v6; LogTape remains a conformance-gated future option. |
@@ -110,7 +111,6 @@ repository; Markdown remains the reviewed source of truth.
 | File | Ref | Summary |
 |---|---|---|
 | [static-middleware-cutover](later/static-middleware-cutover.md) | P1f | v6: drop instance schema getters, remove `skipWrap` + `process.exit(0)` (= P1j Phase 5). v5.x bridge ✅ (P1j Phase 1). Note: the AST boot/ghost fallback was already deleted in v5.0.0 (P1n), so Phase 7 is partly done. |
-| [async-middleware](later/async-middleware.md) | P1m | v6: **async/await middleware contract.** Drop Express's `next` callback — return → continue, `throw` → error, send response → stop. Collapses the adapter's Promise-bridge. Design call open (linear drop-`next` vs awaitable-`next` onion; A recommended). Best landed with static-middleware-cutover. |
 | [observability](later/observability.md) | P2b | **Observability phases 2+.** OTel traces, log correlation, Sentry, health/readiness, diagnostics channels and profiling after the P1s metrics foundation. |
 | [performance](later/performance.md) | P2c | find-my-way, fast-json-stringify. |
 | [mcp-surface](later/mcp-surface.md) | P2d | Full MCP server (read + write). Now unblocked — the `toJsonSchema` seam + registry walk shipped with [openapi-generator](done/openapi-generator.md). |
@@ -216,9 +216,12 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 - ✅ `configureTestServer` — test bootstrap accepts project `Server` options so `bootHttp` runs under test (+ boot-ordering fix).
 - ✅ Typing fix: phantom `_id` dropped from plain nested paths on hydrated documents.
 - ✅ Dead locale keys trimmed (`auth.userProvided/errorUExist/errorUAlready/noAccessRights`, `email.newPassword`).
-- 🔄 [Bun runtime support](active/bun-runtime-support.md) — certification running; rides this release if green.
+- ✅ [Bun runtime support](active/bun-runtime-support.md) — CERTIFIED (768/768 under Bun 1.4; ~1.4–1.5× req/s vs Node on this machine); rides this release.
+- 🔜 P1y Phase 0 slice: `email.greeating` → `email.greeting` rename with old-key alias (folded into 5.4 by user decision 2026-08-31; see [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md)).
 
 ## v5.5 target — P1q line
+
+- [Async middleware v2 opt-in](queued/async-middleware.md) (P1m) — co-designed with P1q: `static contractVersion = 2`, returned `HttpResponse` through P1q's writer, throws through the error registry; v1 default untouched until v6.
 
 - [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
@@ -251,7 +254,7 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 - Case-sensitive + strict trailing-slash by default
 - `YupFile.check` single-file semantics
 
-(Async/await middleware contract — formerly a bullet here — now has its own card: [async-middleware](later/async-middleware.md), P1m.)
+(Async/await middleware contract — formerly a bullet here — now has its own card: [async-middleware](queued/async-middleware.md), P1m: v5.5 opt-in via `contractVersion = 2`, v6 flip.)
 
 ## Conventions
 
