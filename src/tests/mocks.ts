@@ -1,4 +1,18 @@
+import type { TI18n } from '../services/i18n/I18n.ts';
+
 type AnyFunction = (...args: never[]) => unknown;
+
+/**
+ * Per-request i18n stub for middleware tests: resolves exactly the keys it is
+ * given; anything else behaves like a miss and hands back the caller's
+ * `defaultValue` (or the key, matching i18next).
+ */
+export const stubI18n = (resources: Record<string, string>) =>
+  ({
+    language: 'en',
+    t: (key: string, options?: { defaultValue?: string }) =>
+      resources[key] ?? options?.defaultValue ?? key,
+  }) as unknown as TI18n;
 
 type ConfigurableMock = {
   mock: {

@@ -89,6 +89,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [i18n-default-values](active/i18n-default-values.md) | P1y-bridge | **Optionally translatable framework messages, English-in-code.** PR 1: middleware `translate()` helper + `middleware.*` keys with `defaultValue` (byte-identical when untranslated) + disabled-i18n fallback honours defaults. PR 2: sweep controllers/validation/email bare keys (raw-key leak → English, behavior change) + i18next → optional peer. Bridge to P1y Phase 4. |
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
 
 ### queued/

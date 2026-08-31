@@ -46,8 +46,11 @@ class RequestParser extends AbstractMiddleware {
           `Request body ${declaredLength}B exceeds maxFieldsSize ${maxBodySize}B`,
         );
         return res.status(413).json({
-          message:
+          message: this.translate(
+            req,
+            'middleware.requestParser.entityTooLarge',
             'Request entity too large. Your upload exceeds the allowed size or count limits.',
+          ),
         });
       }
       // Guard the streaming path too (chunked / absent Content-Length): abort as
@@ -92,12 +95,19 @@ class RequestParser extends AbstractMiddleware {
       // `bodyTooLarge`. Everything else (bad content type / length) stays a 400.
       if (bodyTooLarge || (err as { httpCode?: number })?.httpCode === 413) {
         return res.status(413).json({
-          message:
+          message: this.translate(
+            req,
+            'middleware.requestParser.entityTooLarge',
             'Request entity too large. Your upload exceeds the allowed size or count limits.',
+          ),
         });
       }
       return res.status(400).json({
-        message: `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
+        message: this.translate(
+          req,
+          'middleware.requestParser.parseError',
+          `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
+        ),
       });
     }
     this.logger?.verbose(

@@ -18,7 +18,13 @@ class RoleMiddleware extends AbstractMiddleware {
     const { user } = req.appInfo;
 
     if (!user) {
-      return res.status(401).json({ message: 'User should be provided' });
+      return res.status(401).json({
+        message: this.translate(
+          req,
+          'middleware.role.userRequired',
+          'User should be provided',
+        ),
+      });
     }
 
     // Guard against `Role` being mounted without a `roles` param: treat a
@@ -32,7 +38,13 @@ class RoleMiddleware extends AbstractMiddleware {
     });
 
     if (!hasRole) {
-      return res.status(403).json({ message: 'You do not have access' });
+      return res.status(403).json({
+        message: this.translate(
+          req,
+          'middleware.role.noAccess',
+          'You do not have access',
+        ),
+      });
     }
     return next();
   }

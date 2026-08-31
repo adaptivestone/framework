@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { TUser } from '../../../models/User.ts';
+import { stubI18n } from '../../../tests/mocks.ts';
+import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 import Role from './Role.ts';
@@ -102,5 +104,82 @@ describe('role middleware methods', () => {
     assert.ok(!isCalled);
     assert.strictEqual(status, 403);
     assert.ok(isSend);
+  });
+});
+
+/**
+ * Both rejection bodies go through `translate()`: an app that ships
+ * `middleware.role.*` gets its own wording, an app that does not keeps the
+ * exact English text.
+ */
+describe('role middleware message translation', () => {
+  const runRejected = async ({
+    i18n,
+    user,
+  }: {
+    i18n?: TI18n;
+    user?: { roles: string[] };
+  }) => {
+    const middleware = new Role(appInstance, { roles: ['admin'] });
+    let status = 0;
+    let payload: Record<string, unknown> = {};
+    await middleware.middleware(
+      { appInfo: { i18n, user } } as unknown as FrameworkRequest &
+        GetUserByTokenAppInfo & { user: InstanceType<TUser> },
+      {
+        status(statusCode: number) {
+          status = statusCode;
+          return this;
+        },
+        json(body: Record<string, unknown>) {
+          payload = body;
+          return this;
+        },
+      } as unknown as Response,
+      () => {},
+    );
+    return { status, payload };
+  };
+
+  it('401 keeps the English text when the app locales lack the key', async () => {
+    const i18nService = await appInstance.getI18nService();
+    const { status, payload } = await runRejected({
+      i18n: await i18nService.getI18nForLang('en'),
+    });
+
+    assert.strictEqual(status, 401);
+    assert.deepStrictEqual(payload, { message: 'User should be provided' });
+  });
+
+  it('401 uses the app translation when the key resolves', async () => {
+    const { status, payload } = await runRejected({
+      i18n: stubI18n({
+        'middleware.role.userRequired': 'Требуется пользователь',
+      }),
+    });
+
+    assert.strictEqual(status, 401);
+    assert.deepStrictEqual(payload, { message: 'Требуется пользователь' });
+  });
+
+  it('403 keeps the English text when the app locales lack the key', async () => {
+    const i18nService = await appInstance.getI18nService();
+    const { status, payload } = await runRejected({
+      i18n: await i18nService.getI18nForLang('en'),
+      user: { roles: ['user'] },
+    });
+
+    assert.strictEqual(status, 403);
+    assert.deepStrictEqual(payload, { message: 'You do not have access' });
+  });
+
+  it('403 uses the app translation when the key resolves', async () => {
+    const { status, payload } = await runRejected({
+      i18n: stubI18n({ 'middleware.role.noAccess': 'Нет доступа' }),
+      user: { roles: ['user'] },
+    });
+
+    assert.strictEqual(status, 403);
+    assert.deepStrictEqual(payload, { message: 'Нет доступа' });
   });
 });

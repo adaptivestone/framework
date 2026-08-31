@@ -23,6 +23,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
   `folders` stays owned by the bootstrap (it resolves those from the `TEST_FOLDER_*` env vars). Calling it after the server has booted throws rather than silently doing nothing — a late call cannot retroactively wire the running server, and a silent skip is exactly the failure this fixes. Also closes a coverage hole: `bootHttp` shipped in 5.1 with no test exercising it end to end, for the same reason.
 
+- **Built-in middleware messages are now translatable — and can no longer leak a raw key.** The six messages the shipped middleware return were hardcoded English with no way for an app to reword or translate them. Each is now emitted with an i18n key **and** the current English text as its in-code default, so responses stay byte-identical unless the app's locale files actually define the key:
+
+  | Key | Default (English) |
+  |---|---|
+  | `middleware.auth.notLoggedIn` | Please login to application |
+  | `middleware.role.userRequired` | User should be provided |
+  | `middleware.role.noAccess` | You do not have access |
+  | `middleware.rateLimiter.tooManyRequests` | Too Many Requests |
+  | `middleware.requestParser.entityTooLarge` | Request entity too large. Your upload exceeds the allowed size or count limits. |
+  | `middleware.requestParser.parseError` | Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type. |
+
+  Nothing is added to the framework's own locale files — the in-code default is the single English source of truth, and a key present in the app's locales always wins, so existing translations keep working unchanged. The default also holds in every degenerate case: i18n disabled (the fallback translator now honours `defaultValue` instead of handing back the key), a request with no i18n at all, or a `t()` that returns a non-string. Custom middleware get the same behavior from the new protected `translate(req, key, defaultValue)` helper on `AbstractMiddleware`. Machine-readable fields are untouched — the auth 401 still carries `error: 'AUTH001'` — and the rate limiter's 500 `RateLimiter error` stays hardcoded, as it reports a misconfigured limiter to operators rather than something the caller can act on. With `saveMissing: true` in `config/i18n.ts`, a request that hits one of these messages writes the English default into `<lng>/translation.missing.json`, giving translators a ready-made starter file.
+
 ### Fixed
 
 - **Plain nested paths carried a phantom `_id` on hydrated documents.** Mongoose builds a subdocument, and generates an `_id` for it, only for the `{ type: { … } }` spelling; a plain nested object (`name: { first: String, last: String }`) is a path grouping that never gets an `_id` at runtime. `InferHydratedDocType` types both the same way, intersecting `{ _id: ObjectId }` onto nested paths too — so `doc.name._id` compiled for a value that is always `undefined`, and assigning the real runtime shape (`doc.name = { first: 'Ada' }`) was a type error on a property Mongoose will never persist, pushing consumers to `Omit<…, 'name'>` bridges or `unknown` casts at every nested-path call site. The framework's hydrated correction — which already strips the `_id` Mongoose adds to `_id: false` subdocuments — now also drops it from plain nested paths, at any depth, using the same no-`type`-wrapper discriminator the override pass uses. Real single-nested subdocuments keep their `_id`, and the raw/lean/create surfaces are untouched: those already matched runtime exactly. The framework's own `User.name` was affected.

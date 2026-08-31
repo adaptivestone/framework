@@ -100,6 +100,22 @@ class AbstractMiddleware extends Base {
     };
   }
 
+  /**
+   * Translate a message with an in-code English default. The default is the
+   * source of truth: it is returned when the request carries no i18n (direct
+   * instantiation, i18n disabled), when the key is absent from the app's
+   * locales, or when `t()` gives back something that is not a string
+   * (malformed resource / `returnObjects`). A present key always wins.
+   */
+  protected translate(
+    req: FrameworkRequest,
+    key: string,
+    defaultValue: string,
+  ): string {
+    const translated = req.appInfo?.i18n?.t(key, { defaultValue });
+    return typeof translated === 'string' ? translated : defaultValue;
+  }
+
   async middleware(
     _req: FrameworkRequest,
     _res: Response,

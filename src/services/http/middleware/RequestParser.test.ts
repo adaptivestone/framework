@@ -4,10 +4,13 @@ import type { IncomingMessage } from 'node:http';
 import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
 import type { NextFunction, Response } from 'express';
 import { PersistentFile } from 'formidable';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { stubI18n } from '../../../tests/mocks.ts';
+import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 
 import RequestParser from './RequestParser.ts';
@@ -289,5 +292,160 @@ d\r
       assert.strictEqual(body.token, 'abc');
       assert.deepStrictEqual(body.tags, ['x']);
     });
+  });
+});
+
+// A request the parser can consume without an HTTP round-trip: a readable body
+// plus the headers formidable reads. `contentLength` may lie about the body —
+// that is exactly what the declared-length guard checks.
+const makeRequest = ({
+  body,
+  contentType,
+  contentLength,
+  i18n,
+}: {
+  body: string;
+  contentType: string;
+  contentLength?: string;
+  i18n?: TI18n;
+}) => {
+  const req = Readable.from([Buffer.from(body)]) as unknown as FrameworkRequest;
+  (req as unknown as { headers: Record<string, string> }).headers = {
+    'content-type': contentType,
+    'content-length': contentLength ?? String(Buffer.byteLength(body)),
+  };
+  req.appInfo = {
+    app: appInstance,
+    request: {},
+    query: {},
+    params: {},
+    i18n,
+  };
+  req.body = {};
+  return req;
+};
+
+const runParser = async (
+  req: FrameworkRequest,
+  params?: Record<string, unknown>,
+) => {
+  let status = 0;
+  let payload: Record<string, unknown> = {};
+  const res = {
+    status(statusCode: number) {
+      status = statusCode;
+      return res;
+    },
+    json(body: Record<string, unknown>) {
+      payload = body;
+      return res;
+    },
+    once() {
+      return res;
+    },
+  };
+  await new RequestParser(appInstance, params).middleware(
+    req,
+    res as unknown as Response,
+    (() => {}) as NextFunction,
+  );
+  return { status, payload };
+};
+
+/**
+ * All three rejection bodies go through `translate()`: an app that ships the
+ * `middleware.requestParser.*` keys gets its own wording, an app that does not
+ * keeps the exact English text.
+ */
+describe('request parser message translation', () => {
+  const englishTooLarge =
+    'Request entity too large. Your upload exceeds the allowed size or count limits.';
+  const englishParseError =
+    'Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.';
+  const tooLargeKey = 'middleware.requestParser.entityTooLarge';
+  const parseErrorKey = 'middleware.requestParser.parseError';
+
+  const oversizedJson = (i18n?: TI18n) =>
+    makeRequest({
+      body: '{}',
+      contentType: 'application/json',
+      contentLength: String(64 * 1024 * 1024),
+      i18n,
+    });
+
+  const oversizedUpload = (i18n?: TI18n) => {
+    const uploadBoundary = 'translationboundary';
+    return makeRequest({
+      body:
+        `--${uploadBoundary}\r\n` +
+        `Content-Disposition: form-data; name="upload"; filename="x.txt"\r\n` +
+        `Content-Type: text/plain\r\n\r\n` +
+        `file-contents-here\r\n` +
+        `--${uploadBoundary}--\r\n`,
+      contentType: `multipart/form-data; boundary=${uploadBoundary}`,
+      i18n,
+    });
+  };
+
+  const unparsable = (i18n?: TI18n) =>
+    makeRequest({ body: 'someBadBody', contentType: 'badContentType', i18n });
+
+  it('413 (declared content-length) keeps the English text without the key', async () => {
+    const i18nService = await appInstance.getI18nService();
+    const { status, payload } = await runParser(
+      oversizedJson(await i18nService.getI18nForLang('en')),
+    );
+
+    assert.strictEqual(status, 413);
+    assert.deepStrictEqual(payload, { message: englishTooLarge });
+  });
+
+  it('413 (declared content-length) uses the app translation', async () => {
+    const { status, payload } = await runParser(
+      oversizedJson(stubI18n({ [tooLargeKey]: 'Запрос слишком большой' })),
+    );
+
+    assert.strictEqual(status, 413);
+    assert.deepStrictEqual(payload, { message: 'Запрос слишком большой' });
+  });
+
+  it('413 (parser limit) keeps the English text without the key', async () => {
+    const i18nService = await appInstance.getI18nService();
+    const { status, payload } = await runParser(
+      oversizedUpload(await i18nService.getI18nForLang('en')),
+      { maxFileSize: 2 },
+    );
+
+    assert.strictEqual(status, 413);
+    assert.deepStrictEqual(payload, { message: englishTooLarge });
+  });
+
+  it('413 (parser limit) uses the app translation', async () => {
+    const { status, payload } = await runParser(
+      oversizedUpload(stubI18n({ [tooLargeKey]: 'Запрос слишком большой' })),
+      { maxFileSize: 2 },
+    );
+
+    assert.strictEqual(status, 413);
+    assert.deepStrictEqual(payload, { message: 'Запрос слишком большой' });
+  });
+
+  it('400 keeps the English text without the key', async () => {
+    const i18nService = await appInstance.getI18nService();
+    const { status, payload } = await runParser(
+      unparsable(await i18nService.getI18nForLang('en')),
+    );
+
+    assert.strictEqual(status, 400);
+    assert.deepStrictEqual(payload, { message: englishParseError });
+  });
+
+  it('400 uses the app translation', async () => {
+    const { status, payload } = await runParser(
+      unparsable(stubI18n({ [parseErrorKey]: 'Не удалось разобрать запрос' })),
+    );
+
+    assert.strictEqual(status, 400);
+    assert.deepStrictEqual(payload, { message: 'Не удалось разобрать запрос' });
   });
 });

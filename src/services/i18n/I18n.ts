@@ -10,8 +10,17 @@ export class I18n extends Base {
   #i18nBase?: i18n;
   #i18nBasePromise?: Promise<i18n>;
 
+  /**
+   * Translator used when i18n is disabled. Honours both i18next default-value
+   * overloads (`t(key, 'default')` and `t(key, { defaultValue })`) so framework
+   * messages emitted with an in-code English default stay English instead of
+   * leaking the raw key. A call with no default keeps returning the key.
+   */
   #i18nFallback: { t: TFunction; language: string } = {
-    t: ((text) => text) as TFunction,
+    t: ((key, options) =>
+      typeof options === 'string'
+        ? options
+        : (options?.defaultValue ?? key)) as TFunction,
     language: 'en',
   };
 

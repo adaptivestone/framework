@@ -31,7 +31,11 @@ class AuthMiddleware extends AbstractMiddleware {
       this.logger?.info('User try to access resource without credentials');
       return res.status(401).json({
         error: 'AUTH001',
-        message: 'Please login to application',
+        message: this.translate(
+          req,
+          'middleware.auth.notLoggedIn',
+          'Please login to application',
+        ),
       });
     }
     return next();

@@ -2,6 +2,7 @@
 
 **Status**: ⏸ queued (v5 additive foundation; v6 namespace/type default cutover)
 **Depends on**: P1a runtime validators ✅, P1n AST codegen ✅
+**See also**: [P1y-bridge](../active/i18n-default-values.md) ships `key + defaultValue` at every framework emit site first (v5). Phase 4's namespace codemod must carry its new `middleware.*` keys → `framework:middleware.*`; `defaultValue` remains the runtime safety net after the bundled-catalog cutover.
 **Goal**: make translation correctness observable and enforceable in the framework and every consuming project: known keys autocomplete, unknown/missing keys fail, unused keys are reported safely, every locale is structurally complete, and runtime language handling is isolated and extensible.
 
 ## Visual overview

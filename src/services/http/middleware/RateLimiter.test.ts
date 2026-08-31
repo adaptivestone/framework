@@ -4,7 +4,8 @@ import { after, before, describe, it, mock } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
-import { mockRejectedValue } from '../../../tests/mocks.ts';
+import { mockRejectedValue, stubI18n } from '../../../tests/mocks.ts';
+import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import RateLimiter from './RateLimiter.ts';
 
@@ -316,5 +317,62 @@ describe('rate limiter methods', () => {
         true,
       ); // and some pass
     });
+  });
+});
+
+/**
+ * The 429 body goes through `translate()`. The 500 (`RateLimiter error`) stays
+ * hardcoded on purpose — it reports a misconfigured limiter to operators, not
+ * a condition the caller can act on in their own language.
+ */
+describe('rate limiter message translation', () => {
+  const runLimited = async (i18n?: TI18n) => {
+    const rateLimiter = new RateLimiter(appInstance, { driver: 'memory' });
+    // A real limit hit rejects with a `RateLimiterRes`, not an Error.
+    mockRejectedValue(mock.method(rateLimiter.limiter, 'consume'), {
+      msBeforeNext: 5000,
+    } as never);
+
+    let status = 0;
+    let payload: Record<string, unknown> = {};
+    await rateLimiter.middleware(
+      { appInfo: { i18n }, ip: '10.10.0.4' } as unknown as FrameworkRequest,
+      {
+        status(statusCode: number) {
+          status = statusCode;
+          return this;
+        },
+        json(body: Record<string, unknown>) {
+          payload = body;
+          return this;
+        },
+        setHeader(_name: string, _value: string) {
+          return this;
+        },
+      } as unknown as Response,
+      () => {},
+    );
+    return { status, payload };
+  };
+
+  it('keeps the English text when the app locales lack the key', async () => {
+    const i18nService = await appInstance.getI18nService();
+    const { status, payload } = await runLimited(
+      await i18nService.getI18nForLang('en'),
+    );
+
+    assert.strictEqual(status, 429);
+    assert.deepStrictEqual(payload, { message: 'Too Many Requests' });
+  });
+
+  it('uses the app translation when the key resolves', async () => {
+    const { status, payload } = await runLimited(
+      stubI18n({
+        'middleware.rateLimiter.tooManyRequests': 'Слишком много запросов',
+      }),
+    );
+
+    assert.strictEqual(status, 429);
+    assert.deepStrictEqual(payload, { message: 'Слишком много запросов' });
   });
 });

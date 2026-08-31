@@ -47,3 +47,100 @@ describe('AbstractMiddleware base behavior', () => {
     assert.strictEqual(AbstractMiddleware.loggerGroup, 'middleware');
   });
 });
+
+/**
+ * `translate()` is the seam that makes framework middleware messages
+ * optionally translatable: a key plus the English default that ships in code.
+ */
+describe('AbstractMiddleware translate()', () => {
+  // `translate` is protected — a subclass exposes it the way a consumer
+  // middleware would use it from inside `middleware()`.
+  class Translating extends AbstractMiddleware {
+    call(req: FrameworkRequest, key: string, defaultValue: string) {
+      return this.translate(req, key, defaultValue);
+    }
+  }
+
+  it('returns the default when the request carries no i18n', () => {
+    const mw = new Translating(appInstance);
+    assert.strictEqual(
+      mw.call({} as FrameworkRequest, 'middleware.some.key', 'English default'),
+      'English default',
+    );
+    assert.strictEqual(
+      mw.call(
+        { appInfo: {} } as FrameworkRequest,
+        'middleware.some.key',
+        'English default',
+      ),
+      'English default',
+    );
+  });
+
+  it('returns the default when the key is missing (real fallback translator)', () => {
+    const mw = new Translating(appInstance);
+    const req = {
+      appInfo: {
+        i18n: {
+          language: 'en',
+          t: (_key: string, options: unknown) => options,
+        },
+      },
+    } as unknown as FrameworkRequest;
+    // the fallback translator hands back what it got: `{ defaultValue }`
+    assert.strictEqual(
+      mw.call(req, 'middleware.some.key', 'English default'),
+      'English default',
+    );
+  });
+
+  it('prefers the translation when the key resolves', () => {
+    const mw = new Translating(appInstance);
+    const req = {
+      appInfo: {
+        i18n: {
+          language: 'ru',
+          t: (key: string) =>
+            key === 'middleware.some.key' ? 'Переведено' : key,
+        },
+      },
+    } as unknown as FrameworkRequest;
+    assert.strictEqual(
+      mw.call(req, 'middleware.some.key', 'English default'),
+      'Переведено',
+    );
+  });
+
+  it('falls back to the default when t() returns a non-string', () => {
+    const mw = new Translating(appInstance);
+    const req = {
+      appInfo: {
+        i18n: { language: 'en', t: () => ({ nested: 'object' }) },
+      },
+    } as unknown as FrameworkRequest;
+    assert.strictEqual(
+      mw.call(req, 'middleware.some.key', 'English default'),
+      'English default',
+    );
+  });
+
+  it('passes the key and the default through to t()', () => {
+    const mw = new Translating(appInstance);
+    const calls: Array<[string, unknown]> = [];
+    const req = {
+      appInfo: {
+        i18n: {
+          language: 'en',
+          t: (key: string, options: unknown) => {
+            calls.push([key, options]);
+            return 'whatever';
+          },
+        },
+      },
+    } as unknown as FrameworkRequest;
+    mw.call(req, 'middleware.some.key', 'English default');
+    assert.deepStrictEqual(calls, [
+      ['middleware.some.key', { defaultValue: 'English default' }],
+    ]);
+  });
+});
