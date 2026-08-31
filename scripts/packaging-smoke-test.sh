@@ -34,9 +34,10 @@ npm init -y >/dev/null 2>&1
 npm install --silent --no-audit --no-fund "$TARBALL_PATH"
 
 cat > check.mjs <<'EOF'
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // 1. Actually import the heavy entry points → exercises the dist import graph,
 //    catching broken relative import paths in the build.
@@ -186,19 +187,79 @@ if (typeof server?.app?.getConfig !== 'function') {
 }
 console.log('  ✓ constructed a Server from the published dist');
 
-// 5. Runtime assets must ship. tsc compiles .ts only — locale JSON and email
-//    .pug templates are copied in postbuild. If they are missing, a consumer
-//    loses the shipped translations (English still comes from the in-code
-//    defaults) and the email module can't render.
+// 5. Runtime assets must ship. tsc compiles .ts only — locale JSON and the
+//    email resources folder are copied in postbuild. If they are missing, a
+//    consumer loses the shipped translations (English still comes from the
+//    in-code defaults) and the email module can't inline local resources.
 for (const asset of [
   'locales/en/translation.json',
-  'services/messaging/email/templates/verification/html.pug',
+  'services/messaging/email/resources',
 ]) {
   if (!existsSync(f(asset))) {
     throw new Error(`Expected published asset to exist: dist/${asset}`);
   }
   console.log('  ✓ asset', asset);
 }
+
+// 5a. Email templates ship as COMPILED modules. The email module picks a
+//     renderer from the on-disk extension, so a raw `.ts` (or a leftover
+//     `.pug`) next to the compiled `.js` would be handed to a consumer that
+//     cannot run it — postbuild must not copy the source tree.
+for (const template of ['recovery', 'verification']) {
+  const files = readdirSync(f(`services/messaging/email/templates/${template}`));
+  for (const part of ['html', 'subject', 'text']) {
+    if (!files.includes(`${part}.js`)) {
+      throw new Error(`Expected dist template ${template}/${part}.js to exist`);
+    }
+  }
+  const unrenderable = files.filter(
+    (name) =>
+      name.endsWith('.pug') || (name.endsWith('.ts') && !name.endsWith('.d.ts')),
+  );
+  if (unrenderable.length) {
+    throw new Error(
+      `dist template ${template} ships files the email module would try to render: ${unrenderable.join(', ')}`,
+    );
+  }
+  console.log('  ✓ template', template, 'ships compiled .js only');
+}
+
+// 5b. Render the packed templates the way the email module does — dynamic
+//     import of the file the folder scan found, default export called with the
+//     render data. Installing @adaptivestone/framework-module-email here would
+//     wrap these same two lines in another network install, so the module's
+//     engine is reproduced instead.
+const renderPacked = async (template, part, t) => {
+  const url = pathToFileURL(
+    f(`services/messaging/email/templates/${template}/${part}.js`),
+  ).href;
+  const { default: render } = await import(url);
+  return render({ locale: 'en', t, link: 'https://example.test/auth?token=x' });
+};
+const englishT = (key, options) => options?.defaultValue ?? key;
+
+const packedChecks = [
+  ['recovery', 'subject', englishT, 'Recovery password'],
+  ['recovery', 'html', englishT, 'Password changed'],
+  ['recovery', 'text', englishT, 'Dear user'],
+  ['verification', 'subject', englishT, 'Email confirmation'],
+  ['verification', 'html', englishT, 'Verify email'],
+  ['verification', 'text', englishT, 'To verify your email address'],
+  // An app that ships the key wins over the in-code English default.
+  ['verification', 'subject', () => 'Подтверждение Email', 'Подтверждение Email'],
+];
+for (const [template, part, t, expected] of packedChecks) {
+  const rendered = await renderPacked(template, part, t);
+  if (!rendered.includes(expected)) {
+    throw new Error(
+      `Packed template ${template}/${part} rendered ${JSON.stringify(rendered)}, expected it to contain ${JSON.stringify(expected)}`,
+    );
+  }
+  if (!rendered.includes('https://example.test/auth?token=x') && part !== 'subject') {
+    throw new Error(`Packed template ${template}/${part} dropped the link`);
+  }
+}
+console.log('  ✓ packed email templates render in English, app key wins');
 
 // 6. English out of the box: with i18next absent and the default config
 //    (`i18n.enabled: true`), the framework must still answer in English rather

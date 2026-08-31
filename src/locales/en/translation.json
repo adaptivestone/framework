@@ -5,8 +5,6 @@
     "messageSome": "Some server problem. Please try later"
   },
   "email": {
-    "newPassword": "New password",
-    "verify": "Verify email",
-    "emailConfirm": "Email confirmation"
+    "newPassword": "New password"
   }
 }
