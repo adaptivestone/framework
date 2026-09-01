@@ -55,6 +55,15 @@ void ApplicationUser.findByHandle('reader');
 const runtimeModel: AppModel = app.getModelOrThrow(runtimeName);
 void runtimeModel;
 
+// A model resolved by runtime name stays queryable: the overloaded finders must
+// resolve, not just the single-signature writers.
+void runtimeModel.findOne({});
+void runtimeModel.find({});
+void runtimeModel.findById('x');
+void runtimeModel.countDocuments({});
+// @ts-expect-error the runtime-name model is a real model type, not `any`
+void runtimeModel.notAMongooseMethod;
+
 const frameworkModel: AppModel | false = app.getModel('Lock');
 void frameworkModel;
 

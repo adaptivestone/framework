@@ -360,12 +360,27 @@ type CorrectHydratedSubdocumentElement<Raw, Schema> =
     : never;
 
 /**
+ * The single-nested definition a subdocument is re-derived from, keeping an
+ * `_id: false` the *wrapper* carries.
+ *
+ * A subdocument spelled `field: { type: { … }, _id: false }` puts the marker
+ * next to `type`, so unwrapping to the inner definition loses it and the
+ * subdocument keeps an `_id` the runtime never generates. The
+ * `field: { type: { _id: false, … } }` spelling survives the unwrap on its own
+ * and needs no re-attachment.
+ */
+type SingleNestedDefinitionWithIdMarker<S> = S extends { readonly _id: false }
+  ? SchemaSingleNestedDefinition<S> & { readonly _id: false }
+  : SchemaSingleNestedDefinition<S>;
+
+/**
  * Preserve Mongoose's hydrated array APIs while respecting inline `_id: false`,
  * and drop the `_id` Mongoose's hydrated inference adds to plain nested paths.
- * Mongoose 9.9.1 otherwise exposes a required `_id: unknown` on `_id: false`
- * subdocument elements, and intersects `{ _id: ObjectId }` onto every nested
- * path — a field that never exists at runtime, and one that makes assigning the
- * real runtime shape (`doc.name = { first: 'a' }`) a type error.
+ * Mongoose otherwise exposes a phantom `_id: Types.ObjectId` on `_id: false`
+ * subdocument elements (verified up to 9.9.4 — the correction is still
+ * required), and intersects `{ _id: ObjectId }` onto every nested path — a
+ * field that never exists at runtime, and one that makes assigning the real
+ * runtime shape (`doc.name = { first: 'a' }`) a type error.
  */
 type CorrectHydratedSubdocumentIds<Doc, Schema> = {
   [K in keyof Doc]: K extends keyof Schema
@@ -393,7 +408,7 @@ type CorrectHydratedSubdocumentIds<Doc, Schema> = {
                           SchemaSingleNestedDefinition<Schema[K]>
                         >
                       >,
-                      SchemaSingleNestedDefinition<Schema[K]>
+                      SingleNestedDefinitionWithIdMarker<Schema[K]>
                     >
                   | Exclude<Doc[K], object>
               : Doc[K]
@@ -517,10 +532,11 @@ type OverriddenHydratedDoc<T extends typeof BaseModel> =
 
 type HydratedDocumentFromClass<T extends typeof BaseModel> = HydratedDocument<
   OverriddenHydratedDoc<T>,
+  // No `& { id: string }`: Mongoose adds the `id` virtual itself and skips it
+  // for `id: false` options or a schema-declared `id` path. Forcing it back on
+  // typed a runtime `undefined` as a string and re-typed a custom `id` path.
   VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
-    DocFacingMethods<ExtractProperty<T, 'modelInstanceMethods'>> & {
-      id: string;
-    },
+    DocFacingMethods<ExtractProperty<T, 'modelInstanceMethods'>>,
   object,
   VirtualType<ExtractProperty<T, 'modelVirtuals'>>,
   OverriddenRawDoc<T>,
@@ -544,8 +560,19 @@ export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
   ExtractProperty<T, 'schemaOptions'> // TSchemaOptions
 >;
 
+/**
+ * Project each declared virtual onto the value the document exposes for it: a
+ * getter's return type whatever arguments Mongoose passes it, otherwise the
+ * value a set-only virtual's setter takes (reading one back is a misuse), and
+ * `unknown` for a virtual with neither — a populate virtual's shape is not
+ * knowable from the schema, so reading it must force a narrowing.
+ */
 export type VirtualType<T> = {
-  [P in keyof T]: T[P] extends { get: () => infer R } ? R : never;
+  [P in keyof T]: T[P] extends { get: (...args: never[]) => infer R }
+    ? R
+    : T[P] extends { set: (value: infer V, ...rest: never[]) => unknown }
+      ? V
+      : unknown;
 };
 
 /**

@@ -24,7 +24,7 @@ interface AppCache {
    * Read by codegen to recover env-only keys from source (`process.env.X` with
    * no default) that the value-based pass can't see. */
   configPaths: Map<string, string[]>;
-  models: Map<string, AbstractModel['mongooseModel'] | TBaseModel>;
+  models: Map<string, AppModel>;
   modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
 }
@@ -38,8 +38,18 @@ export type FrameworkModelName =
   | 'User'
   | 'UserOld';
 
-/** Runtime model type used when a model name is not statically known. */
-export type AppModel = AbstractModel['mongooseModel'] | TBaseModel;
+/**
+ * Model type used when a model name is not statically known: a model resolved
+ * by runtime name is typed as a BaseModel-shaped Mongoose model. Legacy
+ * `AbstractModel`-based models are stored under the same type until v6 removes
+ * them.
+ *
+ * The raw document type is the BaseModel base shape, so writes through a
+ * runtime-name model need a typed value, `new Model(...)`, or a cast to the
+ * concrete model type: an inline object literal on `create` is checked against
+ * that base shape and rejects the model's own fields.
+ */
+export type AppModel = TBaseModel;
 
 /**
  * Generated application model-name map. `npm run gen` augments this interface
@@ -147,7 +157,7 @@ class Server {
   cache: AppCache = {
     configs: new Map<string, unknown>(),
     configPaths: new Map<string, string[]>(),
-    models: new Map<string, AbstractModel['mongooseModel'] | TBaseModel>(),
+    models: new Map<string, AppModel>(),
     modelConstructors: new Map<
       string,
       typeof AbstractModel | typeof BaseModel
@@ -481,7 +491,12 @@ class Server {
               `Model ${modelName} is old type model. Please update it to BaseModel`,
             );
             const model = new ModelConstructor(this.app) as AbstractModel;
-            this.cache.models.set(modelName, model.mongooseModel);
+            // Legacy model shape, removed in v6: stored under the BaseModel
+            // type — no structural overlap, hence the double cast.
+            this.cache.models.set(
+              modelName,
+              model.mongooseModel as unknown as AppModel,
+            );
           }
         } catch (e: unknown) {
           // Fail fast at boot: a broken model that's logged-and-skipped here

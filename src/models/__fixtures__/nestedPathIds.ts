@@ -14,6 +14,17 @@
  *    a property Mongoose will never persist, pushing consumers to `Omit<…>`
  *    bridges or `unknown` casts at every nested-path call site.
  *
+ * A subdocument disables its generated `_id` with either of two spellings:
+ * `field: { type: { … }, _id: false }` carries the marker as a sibling of
+ * `type`, `field: { type: { _id: false, … } }` carries it inside. Both build
+ * the same runtime schema, so neither document surface may keep an `_id` — the
+ * sibling marker used to be dropped while unwrapping to the inner definition,
+ * leaving a phantom `ObjectId` on the hydrated document only. Both spellings are
+ * pinned here for *single-nested* subdocuments only: on a subdocument ARRAY
+ * (`field: { type: [{ … }], _id: false }`) the sibling marker is still dropped
+ * and hydrated elements still carry an `_id` the runtime never generates — out
+ * of scope, tracked in `.plans/refactor/done/model-typing-seam-fixes.md`.
+ *
  * The raw surface already matches runtime and must stay untouched.
  */
 
@@ -40,6 +51,21 @@ class NestedPathModel extends BaseModel {
           label: { type: String },
         },
       },
+      // The same subdocument with the generated `_id` disabled, spelled as a
+      // sibling of `type:`…
+      flagged: {
+        type: {
+          label: { type: String },
+        },
+        _id: false,
+      },
+      // …and spelled inside `type:`.
+      inside: {
+        type: {
+          _id: false,
+          label: { type: String },
+        },
+      },
     } as const;
   }
 }
@@ -48,6 +74,12 @@ type NestedPathModelType = GetModelTypeFromClass<typeof NestedPathModel>;
 type NestedPathDocument = InstanceType<NestedPathModelType>;
 
 type HasKey<T, K extends string> = K extends keyof T ? true : false;
+
+/** Invariant type identity: unlike assignability, `never` and `any` fail it. */
+type Exact<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
 
 const plainNestedPathHasNoId: HasKey<
   NonNullable<NestedPathDocument['profile']>,
@@ -70,6 +102,24 @@ const frameworkUserNameHasNoId: HasKey<
 const singleNestedSubdocumentHasId: HasKey<
   NonNullable<NestedPathDocument['wrapped']>,
   '_id'
+> = true;
+
+const singleNestedSubdocumentIdIsObjectId: Exact<
+  NonNullable<NestedPathDocument['wrapped']>['_id'],
+  Types.ObjectId
+> = true;
+
+// `_id: false` takes it away — whichever of the two spellings declared it. The
+// key itself comes from the subdocument base type and cannot be removed there,
+// so "no id" is spelled `never`: reachable, but usable for nothing.
+const siblingIdFalseHasNoUsableId: Exact<
+  NonNullable<NestedPathDocument['flagged']>['_id'],
+  never
+> = true;
+
+const insideIdFalseHasNoUsableId: Exact<
+  NonNullable<NestedPathDocument['inside']>['_id'],
+  never
 > = true;
 
 // The raw surface already matched runtime exactly before the hydrated
@@ -98,6 +148,16 @@ const rawSingleNestedSubdocumentHasId: HasKey<
   '_id'
 > = true;
 
+const rawSiblingIdFalseHasNoId: HasKey<
+  NonNullable<RawDocument['flagged']>,
+  '_id'
+> = false;
+
+const rawInsideIdFalseHasNoId: HasKey<
+  NonNullable<RawDocument['inside']>,
+  '_id'
+> = false;
+
 function assertNestedPathWrites(doc: NestedPathDocument) {
   // The runtime shape assigns cleanly — no `_id`, no cast, no `Omit<…>` bridge.
   doc.profile = { first: 'Ada', last: 'Lovelace', address: { city: 'London' } };
@@ -123,8 +183,13 @@ export {
   assertNestedPathWrites,
   deepNestedPathHasNoId,
   frameworkUserNameHasNoId,
+  insideIdFalseHasNoUsableId,
   plainNestedPathHasNoId,
+  rawInsideIdFalseHasNoId,
   rawNestedPathHasNoId,
+  rawSiblingIdFalseHasNoId,
   rawSingleNestedSubdocumentHasId,
+  siblingIdFalseHasNoUsableId,
   singleNestedSubdocumentHasId,
+  singleNestedSubdocumentIdIsObjectId,
 };

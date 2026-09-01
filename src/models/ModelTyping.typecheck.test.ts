@@ -43,7 +43,16 @@
  *    created-only timestamps;
  *  - `pluginExtendedModelPatterns.ts` — nested type overrides and refs,
  *    virtual/doc bridges, aggregate facets, preload maps, `$locals`, and typed
- *    `$model<T>()`.
+ *    `$model<T>()`;
+ *  - `nestedPathIds.ts` — runtime-accurate `_id` placement: none on plain
+ *    nested paths, a real one on `{ type: … }` subdocuments, and none for
+ *    either `_id: false` spelling (beside `type:` or inside it);
+ *  - `idVirtual.ts` — the `id` virtual as Mongoose builds it: `string` by
+ *    default, gone under `id: false`, and a schema-declared `id` path keeping
+ *    its own type;
+ *  - `virtualShapes.ts` — every virtual shape projected to a usable type
+ *    instead of `never`: getters with or without Mongoose's arguments, async
+ *    getters, get/set pairs, set-only virtuals, and populate virtuals.
  *
  * They must compile cleanly. A regression in the structural contracts re-pins a
  * helper or re-surfaces a narrow `this`, those calls fail with TS2684, and this
