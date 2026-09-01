@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-09-01
+
 ### Deprecated
 
 - **`email.greeating` → `email.greeting`.** The greeting key the shipped email templates emit had carried a typo since it was introduced. The templates now emit the correctly spelled `email.greeting`; a catalog that only translates the old `email.greeating` keeps working — it is honoured as a fallback (new key → old key → the English default) until v6 removes it. Translate the new spelling going forward.
