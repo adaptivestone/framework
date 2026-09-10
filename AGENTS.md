@@ -30,6 +30,27 @@ Run before claiming anything is done:
 - `npm run check:types:tests` — same, but with the test suite included (`tsconfig.tests.json`)
 - `npm run smoke` — packaging smoke test (pack → install into a scratch consumer)
 
+### TypeScript resource usage
+
+Prefer one checker for local TypeScript 7 checks, especially when memory is limited.
+The compiler investigation found substantially lower memory use and fewer generic
+instantiations with `--checkers 1`. This selects one checker, not one Go thread;
+do not set `GOMAXPROCS=1` on that basis. Benchmark CI separately before changing
+its concurrency defaults.
+
+Keep code generation in the check and use separate incremental caches for the
+main and test configurations:
+
+```sh
+npm run check:types -- --checkers 1 --incremental --tsBuildInfoFile node_modules/.cache/tsc/framework.tsbuildinfo
+npm run check:types:tests -- --checkers 1 --incremental --tsBuildInfoFile node_modules/.cache/tsc/tests.tsbuildinfo
+```
+
+Run these commands sequentially and retain the caches between local checks.
+For cold measurements, omit `--incremental` and `--tsBuildInfoFile`; add
+`--extendedDiagnostics` to record compiler cost. Keep all verification gates above.
+See [the measurements](.plans/refactor/done/model-type-cost-experiments.md).
+
 ## Conventions
 
 - Do not commit or push. Leave changes in the working tree — a human reviews every diff and does their own git.
