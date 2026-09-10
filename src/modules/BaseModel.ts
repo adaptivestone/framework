@@ -1,5 +1,4 @@
 import type {
-  // DefaultSchemaOptions,
   HydratedDocument,
   InferHydratedDocType,
   InferRawDocType,
@@ -106,21 +105,97 @@ type TsOverrideFor<
  * into it triggers a TS2615 circular mapped-type error — and it can carry no
  * `__tsType` marker anyway, so stopping there is always correct.
  */
-type IsLeafFieldDef<S> = S extends Schema
+type IsLeafFieldDef<S, TypeKey extends string = 'type'> = S extends Schema
   ? true
   : S extends abstract new (
-        ...args: never
+        ...args: never[]
       ) => unknown
     ? true
-    : S extends { type: infer Tp }
-      ? Tp extends Schema
+    : TypeKey extends keyof S
+      ? S[TypeKey] extends Schema
         ? true
-        : Tp extends abstract new (
-              ...args: never
+        : S[TypeKey] extends abstract new (
+              ...args: never[]
             ) => unknown
           ? true
           : false
       : false;
+
+type SchemaArrayElement<S, TypeKey extends string = 'type'> =
+  NonNullable<S> extends readonly (infer E)[]
+    ? E
+    : TypeKey extends keyof NonNullable<S>
+      ? NonNullable<S>[TypeKey] extends readonly (infer E)[]
+        ? E
+        : never
+      : never;
+
+type SchemaArrayElementWithIdMarker<
+  S,
+  TypeKey extends string = 'type',
+> = S extends { readonly _id: false }
+  ? SchemaArrayElement<S, TypeKey> & { readonly _id: false }
+  : SchemaArrayElement<S, TypeKey>;
+
+type SchemaSingleNestedDefinition<
+  S,
+  TypeKey extends string = 'type',
+> = TypeKey extends keyof NonNullable<S>
+  ? NonNullable<S>[TypeKey] extends infer Definition
+    ? Definition extends Schema
+      ? never
+      : Definition extends abstract new (
+            ...args: never[]
+          ) => unknown
+        ? never
+        : Definition extends readonly unknown[]
+          ? never
+          : Definition extends object
+            ? Definition
+            : never
+    : never
+  : never;
+
+type SingleNestedDefinitionOrSelf<S, TypeKey extends string = 'type'> = [
+  SchemaSingleNestedDefinition<S, TypeKey>,
+] extends [never]
+  ? S
+  : SchemaSingleNestedDefinition<S, TypeKey>;
+
+type ApplyTsOverrideArray<
+  DocField,
+  ElementSchema,
+  Surface extends TsOverrideSurface,
+  TypeKey extends string = 'type',
+> =
+  NonNullable<DocField> extends mongoose.Types.DocumentArray<
+    infer Raw,
+    infer Hydrated
+  >
+    ? IsLeafFieldDef<ElementSchema, TypeKey> extends true
+      ? DocField
+      :
+          | mongoose.Types.DocumentArray<
+              ApplyTsOverrides<Raw, ElementSchema, 'raw', TypeKey>,
+              ApplyTsOverrides<
+                Hydrated,
+                ElementSchema,
+                'hydrated',
+                TypeKey
+              > extends mongoose.Types.Subdocument
+                ? ApplyTsOverrides<Hydrated, ElementSchema, 'hydrated', TypeKey>
+                : Hydrated
+            >
+          | Extract<DocField, null | undefined>
+    : NonNullable<DocField> extends readonly (infer Item)[]
+      ? Item extends object
+        ? IsLeafFieldDef<ElementSchema, TypeKey> extends true
+          ? DocField
+          :
+              | ApplyTsOverrides<Item, ElementSchema, Surface, TypeKey>[]
+              | Exclude<DocField, readonly unknown[]>
+        : DocField
+      : DocField;
 
 /**
  * Walk an inferred document type alongside its schema and replace each field
@@ -138,76 +213,37 @@ export type ApplyTsOverrides<
   Doc,
   Schema,
   Surface extends TsOverrideSurface = 'raw',
+  TypeKey extends string = 'type',
 > = {
   [K in keyof Doc]: K extends keyof Schema
     ? '__tsType' extends keyof Schema[K]
       ? TsOverrideFor<Schema[K], Surface>
-      : NonNullable<Schema[K]> extends readonly (infer E)[]
-        ? NonNullable<Doc[K]> extends mongoose.Types.DocumentArray<
-            infer R,
-            infer H
-          >
-          ? IsLeafFieldDef<E> extends true
-            ? Doc[K]
-            :
-                | mongoose.Types.DocumentArray<
-                    ApplyTsOverrides<R, E, 'raw'>,
-                    ApplyTsOverrides<
-                      NonNullable<Doc[K]>[number],
-                      E,
-                      'hydrated'
-                    > extends mongoose.Types.Subdocument
-                      ? ApplyTsOverrides<
-                          NonNullable<Doc[K]>[number],
-                          E,
-                          'hydrated'
-                        >
-                      : H
-                  >
-                | Extract<Doc[K], null | undefined>
-          : NonNullable<Doc[K]> extends readonly (infer D)[]
-            ? D extends object
-              ? IsLeafFieldDef<E> extends true
-                ? Doc[K]
-                :
-                    | ApplyTsOverrides<D, E, Surface>[]
-                    | Exclude<Doc[K], readonly unknown[]>
-              : Doc[K]
-            : Doc[K]
-        : NonNullable<Schema[K]> extends object
+      : [SchemaArrayElement<Schema[K], TypeKey>] extends [never]
+        ? NonNullable<Schema[K]> extends object
           ? NonNullable<Doc[K]> extends object
-            ? IsLeafFieldDef<NonNullable<Schema[K]>> extends true
+            ? IsLeafFieldDef<NonNullable<Schema[K]>, TypeKey> extends true
               ? Doc[K]
               :
                   | ApplyTsOverrides<
                       NonNullable<Doc[K]>,
-                      SingleNestedDefinitionOrSelf<NonNullable<Schema[K]>>,
-                      Surface
+                      SingleNestedDefinitionOrSelf<
+                        NonNullable<Schema[K]>,
+                        TypeKey
+                      >,
+                      Surface,
+                      TypeKey
                     >
                   | Exclude<Doc[K], object>
             : Doc[K]
           : Doc[K]
+        : ApplyTsOverrideArray<
+            Doc[K],
+            SchemaArrayElement<Schema[K], TypeKey>,
+            Surface,
+            TypeKey
+          >
     : Doc[K];
 };
-
-/**
- * The definition to recurse into for a nested field.
- *
- * A single-nested subdocument is declared `{ type: { … }, _id?: false }`, so its
- * OWN keys are `type`/`_id` — recursing into the wrapper makes every inner key
- * fail `K extends keyof Schema` and silently drops the override (the inner field
- * keeps its plain inferred type). Unwrap to the inner definition so the keys line
- * up with the inferred document. A plain nested path (`organizer: { name: … }`)
- * has no `type` wrapper and recurses as itself.
- *
- * `HasTsOverride` needs no equivalent: it walks every key blindly, so it already
- * sees markers through the wrapper.
- */
-type SingleNestedDefinitionOrSelf<S> = [
-  SchemaSingleNestedDefinition<S>,
-] extends [never]
-  ? S
-  : SchemaSingleNestedDefinition<S>;
 
 /**
  * True when a schema carries at least one {@link TsTypeOverride} marker anywhere
@@ -218,14 +254,14 @@ type SingleNestedDefinitionOrSelf<S> = [
  * doc type is the plain Mongoose inference with no `ApplyTsOverrides<…>` wrapper
  * in hovers and no extra compile work.
  */
-type HasTsOverride<S> = S extends object
+type HasTsOverride<S, TypeKey extends string = 'type'> = S extends object
   ? '__tsType' extends keyof S
     ? true
-    : IsLeafFieldDef<S> extends true
+    : IsLeafFieldDef<S, TypeKey> extends true
       ? false
       : S extends readonly (infer E)[]
-        ? HasTsOverride<E>
-        : true extends { [K in keyof S]: HasTsOverride<S[K]> }[keyof S]
+        ? HasTsOverride<E, TypeKey>
+        : true extends { [K in keyof S]: HasTsOverride<S[K], TypeKey> }[keyof S]
           ? true
           : false
   : false;
@@ -236,34 +272,11 @@ type MaybeApplyOverrides<
   Doc,
   Schema,
   Surface extends TsOverrideSurface = 'raw',
+  TypeKey extends string = 'type',
 > =
-  HasTsOverride<Schema> extends true
-    ? ApplyTsOverrides<Doc, Schema, Surface>
+  HasTsOverride<Schema, TypeKey> extends true
+    ? ApplyTsOverrides<Doc, Schema, Surface, TypeKey>
     : Doc;
-
-type SchemaArrayElement<S> =
-  NonNullable<S> extends readonly (infer E)[]
-    ? E
-    : NonNullable<S> extends { readonly type: readonly (infer E)[] }
-      ? E
-      : never;
-
-type SchemaSingleNestedDefinition<S> =
-  NonNullable<S> extends {
-    readonly type: infer Definition;
-  }
-    ? Definition extends Schema
-      ? never
-      : Definition extends abstract new (
-            ...args: never[]
-          ) => unknown
-        ? never
-        : Definition extends readonly unknown[]
-          ? never
-          : Definition extends object
-            ? Definition
-            : never
-    : never;
 
 /**
  * True for a *plain nested path* — an object of field definitions with no
@@ -275,80 +288,161 @@ type SchemaSingleNestedDefinition<S> =
  * id. Anything with a `type` key, a leaf definition, or an array is therefore
  * excluded here — same discriminator {@link SchemaSingleNestedDefinition} uses.
  */
-type IsPlainNestedPath<S> = S extends object
+type IsPlainNestedPath<S, TypeKey extends string = 'type'> = S extends object
   ? S extends readonly unknown[]
     ? false
-    : IsLeafFieldDef<S> extends true
+    : IsLeafFieldDef<S, TypeKey> extends true
       ? false
-      : 'type' extends keyof S
+      : TypeKey extends keyof S
         ? false
         : true
   : false;
 
-type HasDisabledSubdocumentId<S> = S extends { readonly _id: false }
+type HasDisabledSubdocumentId<S, TypeKey extends string = 'type'> = S extends {
+  readonly _id: false;
+}
   ? true
   : S extends object
-    ? IsLeafFieldDef<S> extends true
+    ? IsLeafFieldDef<S, TypeKey> extends true
       ? false
       : S extends readonly (infer E)[]
-        ? HasDisabledSubdocumentId<E>
+        ? HasDisabledSubdocumentId<E, TypeKey>
         : true extends {
-              [K in keyof S]: HasDisabledSubdocumentId<S[K]>;
+              [K in keyof S]: HasDisabledSubdocumentId<S[K], TypeKey>;
             }[keyof S]
           ? true
           : false
     : false;
 
-type CorrectRawSubdocumentElement<Doc, Schema> = Doc extends object
+type CorrectRawSubdocumentElement<
+  Doc,
+  Schema,
+  TypeKey extends string = 'type',
+> = Doc extends object
   ? Schema extends { readonly _id: false }
-    ? Omit<CorrectRawSubdocumentIds<Doc, Schema>, '_id'>
-    : CorrectRawSubdocumentIds<Doc, Schema>
+    ? Omit<
+        CorrectRawSubdocumentIds<
+          MaybeApplyOverrides<Doc, Schema, 'raw', TypeKey>,
+          Schema,
+          TypeKey
+        >,
+        '_id'
+      >
+    : CorrectRawSubdocumentIds<
+        MaybeApplyOverrides<Doc, Schema, 'raw', TypeKey>,
+        Schema,
+        TypeKey
+      >
   : Doc;
 
-/** Remove generated-id fields that the schema explicitly disables. */
-type CorrectRawSubdocumentIds<Doc, Schema> = {
-  [K in keyof Doc]: K extends keyof Schema
-    ? HasDisabledSubdocumentId<Schema[K]> extends true
-      ? [SchemaArrayElement<Schema[K]>] extends [never]
-        ? [SchemaSingleNestedDefinition<Schema[K]>] extends [never]
-          ? Doc[K]
-          : NonNullable<Doc[K]> extends object
-            ?
-                | CorrectRawSubdocumentElement<
-                    NonNullable<Doc[K]>,
-                    SchemaSingleNestedDefinition<Schema[K]>
-                  >
-                | Exclude<Doc[K], object>
-            : Doc[K]
-        : NonNullable<Doc[K]> extends readonly (infer D)[]
-          ?
-              | CorrectRawSubdocumentElement<D, SchemaArrayElement<Schema[K]>>[]
-              | Exclude<Doc[K], readonly unknown[]>
-          : Doc[K]
-      : Doc[K]
+/** Resolve schema structure before mapping document fields. Keeping these
+ * steps separate avoids recursive generic instantiation in Mongoose model types.
+ * Custom-key array elements also need fresh inference: Mongoose 9.9.4 infers
+ * inline array elements using its default `type` key. */
+type RawIdFields<Definition, TypeKey extends string> = {
+  [K in keyof Definition as TypeKey extends 'type'
+    ? HasDisabledSubdocumentId<Definition[K], TypeKey> extends true
+      ? K
+      : never
+    : IsLeafFieldDef<Definition[K], TypeKey> extends true
+      ? never
+      : K]: RawIdShape<Definition[K], TypeKey>;
+};
+
+type RawIdObject<Definition, TypeKey extends string> = {
+  fields: RawIdFields<Definition, TypeKey>;
+  removeId: Definition extends { readonly _id: false } ? true : false;
+};
+
+type RawIdShape<Definition, TypeKey extends string> = [
+  SchemaArrayElement<Definition, TypeKey>,
+] extends [never]
+  ? [SchemaSingleNestedDefinition<Definition, TypeKey>] extends [never]
+    ? RawIdObject<Definition, TypeKey>
+    : RawIdObject<
+        SingleNestedDefinitionWithIdMarker<Definition, TypeKey>,
+        TypeKey
+      >
+  : TypeKey extends 'type'
+    ? {
+        array: RawIdObject<
+          SchemaArrayElementWithIdMarker<Definition, TypeKey>,
+          TypeKey
+        >;
+      }
+    : IsLeafFieldDef<
+          SchemaArrayElement<Definition, TypeKey>,
+          TypeKey
+        > extends true
+      ? object
+      : {
+          array: RawIdObject<
+            SchemaArrayElementWithIdMarker<Definition, TypeKey>,
+            TypeKey
+          >;
+          item: MaybeApplyOverrides<
+            InferRawDocType<
+              MutableSchemaForInference<
+                SchemaArrayElement<Definition, TypeKey>
+              >,
+              { typeKey: TypeKey }
+            >,
+            SchemaArrayElement<Definition, TypeKey>,
+            'raw',
+            TypeKey
+          >;
+        };
+
+type ApplyRawIdFields<Doc, Fields> = {
+  [K in keyof Doc]: K extends keyof Fields
+    ? ApplyRawIdShape<Doc[K], Fields[K]>
     : Doc[K];
 };
 
-type CorrectHydratedSubdocumentElement<Raw, Schema> =
-  CorrectRawSubdocumentElement<Raw, Schema> extends infer CorrectedRaw
+type ApplyRawIdShape<Doc, Shape> = Doc extends readonly (infer Item)[]
+  ? Shape extends { array: infer Element }
+    ? ApplyRawIdShape<
+        Shape extends { item: infer Inferred } ? Inferred : Item,
+        Element
+      >[]
+    : Doc
+  : Doc extends object
+    ? Shape extends { fields: infer Fields; removeId: infer Remove }
+      ? Remove extends true
+        ? Omit<ApplyRawIdFields<Doc, Fields>, '_id'>
+        : ApplyRawIdFields<Doc, Fields>
+      : Doc
+    : Doc;
+
+/** Correct disabled IDs and custom-key array inference on the raw surface. */
+type CorrectRawSubdocumentIds<
+  Doc,
+  Definition,
+  TypeKey extends string = 'type',
+> = ApplyRawIdFields<Doc, RawIdFields<Definition, TypeKey>>;
+
+type CorrectHydratedSubdocumentElement<
+  Raw,
+  Schema,
+  TypeKey extends string = 'type',
+> =
+  CorrectRawSubdocumentElement<Raw, Schema, TypeKey> extends infer CorrectedRaw
     ? CorrectHydratedSubdocumentIds<
-        // `'hydrated'` is REQUIRED, not decorative: this builder re-derives the
-        // subdocument type from the schema, so it must select the same surface
-        // its callers do. `MaybeApplyOverrides` defaults to `'raw'`, and
-        // omitting the argument here silently gave `_id: false` subdocuments the
-        // RAW override on their hydrated surface (a `TsTypeOverride<Raw, Hyd>`
-        // field resolved to `Raw`). Top-level fields were unaffected because
-        // `OverriddenHydratedDocFromSchema` passes `'hydrated'` explicitly, and
-        // this whole path only runs for `_id: false` schemas.
+        // Rebuilding a subdocument must retain the hydrated override surface.
         MaybeApplyOverrides<
-          InferHydratedDocType<MutableSchemaForInference<Schema>>,
+          InferHydratedDocType<
+            MutableSchemaForInference<Schema>,
+            { typeKey: TypeKey }
+          >,
           Schema,
-          'hydrated'
+          'hydrated',
+          TypeKey
         >,
-        Schema
+        Schema,
+        TypeKey
       > extends infer Fields
       ? Schema extends { readonly _id: false }
-        ? mongoose.Types.Subdocument<never, unknown, CorrectedRaw> &
+        ? mongoose.Types.Subdocument<undefined, unknown, CorrectedRaw> &
             Omit<Fields, '_id'>
         : mongoose.Types.Subdocument<
             ExtractProperty<Fields, '_id', mongoose.Types.ObjectId>,
@@ -369,9 +463,55 @@ type CorrectHydratedSubdocumentElement<Raw, Schema> =
  * `field: { type: { _id: false, … } }` spelling survives the unwrap on its own
  * and needs no re-attachment.
  */
-type SingleNestedDefinitionWithIdMarker<S> = S extends { readonly _id: false }
-  ? SchemaSingleNestedDefinition<S> & { readonly _id: false }
-  : SchemaSingleNestedDefinition<S>;
+type SingleNestedDefinitionWithIdMarker<
+  S,
+  TypeKey extends string = 'type',
+> = S extends { readonly _id: false }
+  ? SchemaSingleNestedDefinition<S, TypeKey> & { readonly _id: false }
+  : SchemaSingleNestedDefinition<S, TypeKey>;
+
+/** Inspect schema definitions before rebuilding a hydrated subdocument. Most
+ * arrays contain only leaf fields and need no correction or extra inference. */
+type HasHydratedCorrection<
+  Definition,
+  TypeKey extends string,
+> = Definition extends { readonly _id: false }
+  ? true
+  : IsLeafFieldDef<Definition, TypeKey> extends true
+    ? false
+    : Definition extends object
+      ? true extends {
+          [K in keyof Definition]: FieldNeedsHydratedCorrection<
+            Definition[K],
+            TypeKey
+          >;
+        }[keyof Definition]
+        ? true
+        : false
+      : false;
+
+type FieldNeedsHydratedCorrection<
+  Field,
+  TypeKey extends string,
+> = Field extends { readonly _id: false }
+  ? true
+  : IsLeafFieldDef<Field, TypeKey> extends true
+    ? false
+    : [SchemaArrayElement<Field, TypeKey>] extends [never]
+      ? [SchemaSingleNestedDefinition<Field, TypeKey>] extends [never]
+        ? IsPlainNestedPath<Field, TypeKey>
+        : HasHydratedCorrection<
+            SchemaSingleNestedDefinition<Field, TypeKey>,
+            TypeKey
+          >
+      : TypeKey extends 'type'
+        ? HasHydratedCorrection<SchemaArrayElement<Field, TypeKey>, TypeKey>
+        : IsLeafFieldDef<
+              SchemaArrayElement<Field, TypeKey>,
+              TypeKey
+            > extends true
+          ? false
+          : true;
 
 /**
  * Preserve Mongoose's hydrated array APIs while respecting inline `_id: false`,
@@ -382,49 +522,71 @@ type SingleNestedDefinitionWithIdMarker<S> = S extends { readonly _id: false }
  * field that never exists at runtime, and one that makes assigning the real
  * runtime shape (`doc.name = { first: 'a' }`) a type error.
  */
-type CorrectHydratedSubdocumentIds<Doc, Schema> = {
+type CorrectHydratedSubdocumentIds<
+  Doc,
+  Schema,
+  TypeKey extends string = 'type',
+> = {
   [K in keyof Doc]: K extends keyof Schema
-    ? IsPlainNestedPath<NonNullable<Schema[K]>> extends true
+    ? IsPlainNestedPath<NonNullable<Schema[K]>, TypeKey> extends true
       ? NonNullable<Doc[K]> extends object
         ?
-            | Omit<
-                CorrectHydratedSubdocumentIds<
-                  NonNullable<Doc[K]>,
-                  NonNullable<Schema[K]>
-                >,
-                '_id'
-              >
+            | ('_id' extends keyof NonNullable<Schema[K]>
+                ? CorrectHydratedSubdocumentIds<
+                    NonNullable<Doc[K]>,
+                    NonNullable<Schema[K]>,
+                    TypeKey
+                  >
+                : Omit<
+                    CorrectHydratedSubdocumentIds<
+                      NonNullable<Doc[K]>,
+                      NonNullable<Schema[K]>,
+                      TypeKey
+                    >,
+                    '_id'
+                  >)
             | Exclude<Doc[K], object>
         : Doc[K]
-      : HasDisabledSubdocumentId<Schema[K]> extends true
-        ? [SchemaArrayElement<Schema[K]>] extends [never]
-          ? [SchemaSingleNestedDefinition<Schema[K]>] extends [never]
+      : FieldNeedsHydratedCorrection<Schema[K], TypeKey> extends true
+        ? [SchemaArrayElement<Schema[K], TypeKey>] extends [never]
+          ? [SchemaSingleNestedDefinition<Schema[K], TypeKey>] extends [never]
             ? Doc[K]
             : NonNullable<Doc[K]> extends object
               ?
                   | CorrectHydratedSubdocumentElement<
                       InferRawDocType<
                         MutableSchemaForInference<
-                          SchemaSingleNestedDefinition<Schema[K]>
-                        >
+                          SchemaSingleNestedDefinition<Schema[K], TypeKey>
+                        >,
+                        { typeKey: TypeKey }
                       >,
-                      SingleNestedDefinitionWithIdMarker<Schema[K]>
+                      SingleNestedDefinitionWithIdMarker<Schema[K], TypeKey>,
+                      TypeKey
                     >
                   | Exclude<Doc[K], object>
               : Doc[K]
-          : NonNullable<Doc[K]> extends mongoose.Types.DocumentArray<
-                infer Raw,
-                infer _Hydrated
-              >
+          : NonNullable<Doc[K]> extends { isMongooseDocumentArray: true }
             ?
                 | mongoose.Types.DocumentArray<
                     CorrectRawSubdocumentElement<
-                      Raw,
-                      SchemaArrayElement<Schema[K]>
+                      InferRawDocType<
+                        MutableSchemaForInference<
+                          SchemaArrayElement<Schema[K], TypeKey>
+                        >,
+                        { typeKey: TypeKey }
+                      >,
+                      SchemaArrayElementWithIdMarker<Schema[K], TypeKey>,
+                      TypeKey
                     >,
                     CorrectHydratedSubdocumentElement<
-                      Raw,
-                      SchemaArrayElement<Schema[K]>
+                      InferRawDocType<
+                        MutableSchemaForInference<
+                          SchemaArrayElement<Schema[K], TypeKey>
+                        >,
+                        { typeKey: TypeKey }
+                      >,
+                      SchemaArrayElementWithIdMarker<Schema[K], TypeKey>,
+                      TypeKey
                     >
                   >
                 | Extract<Doc[K], null | undefined>
@@ -475,36 +637,77 @@ type MutableSchemaForInference<T> = T extends SchemaInferenceAtomic
 /** Schema options after applying the same framework defaults used at runtime. */
 type EffectiveSchemaOptions<TOptions> = Merge<typeof defaultOptions, TOptions>;
 
+type EffectiveTypeKey<TOptions> =
+  EffectiveSchemaOptions<TOptions> extends {
+    typeKey: infer Key extends string;
+  }
+    ? Key
+    : 'type';
+
+type TimestampSchema<TOptions> = {
+  [K in keyof WithTimestamps<EffectiveSchemaOptions<TOptions>>]: {
+    [P in keyof WithTimestamps<
+      EffectiveSchemaOptions<TOptions>
+    >[K] as P extends 'type' ? EffectiveTypeKey<TOptions> : P]: WithTimestamps<
+      EffectiveSchemaOptions<TOptions>
+    >[K][P];
+  };
+};
+
+type InferenceOptions<TOptions> = Omit<
+  EffectiveSchemaOptions<TOptions>,
+  'timestamps'
+> & {
+  timestamps: false;
+  typeKey: EffectiveTypeKey<TOptions>;
+};
+
 // biome-ignore lint/suspicious/noExplicitAny: unfinished class members must stay variance-neutral in Mongoose's Schema carrier
 type UnfinishedSchemaMember = any;
 
 type InferredRawDocFromSchema<
   TSchema extends typeof BaseModel.modelSchema,
   TOptions,
-> = InferRawDocType<
-  MutableSchemaForInference<TSchema> &
-    WithTimestamps<EffectiveSchemaOptions<TOptions>>
->;
+> = TOptions extends { typeKey: string } | { _id: false }
+  ? InferRawDocType<
+      MutableSchemaForInference<TSchema> & TimestampSchema<TOptions>,
+      InferenceOptions<TOptions>
+    >
+  : InferRawDocType<
+      MutableSchemaForInference<TSchema> &
+        WithTimestamps<EffectiveSchemaOptions<TOptions>>
+    >;
 
 type OverriddenRawDocFromSchema<
   TSchema extends typeof BaseModel.modelSchema,
   TOptions,
-> = CorrectRawSubdocumentIds<
-  MaybeApplyOverrides<
-    InferredRawDocFromSchema<TSchema, TOptions>,
+> = CorrectTopLevelRawId<
+  CorrectRawSubdocumentIds<
+    MaybeApplyOverrides<
+      InferredRawDocFromSchema<TSchema, TOptions>,
+      TSchema,
+      'raw',
+      EffectiveTypeKey<TOptions>
+    >,
     TSchema,
-    'raw'
+    EffectiveTypeKey<TOptions>
   >,
-  TSchema
+  TSchema,
+  TOptions
 >;
 
 type InferredHydratedDocFromSchema<
   TSchema extends typeof BaseModel.modelSchema,
   TOptions,
-> = InferHydratedDocType<
-  MutableSchemaForInference<TSchema> &
-    WithTimestamps<EffectiveSchemaOptions<TOptions>>
->;
+> = TOptions extends { typeKey: string } | { _id: false }
+  ? InferHydratedDocType<
+      MutableSchemaForInference<TSchema> & TimestampSchema<TOptions>,
+      InferenceOptions<TOptions>
+    >
+  : InferHydratedDocType<
+      MutableSchemaForInference<TSchema> &
+        WithTimestamps<EffectiveSchemaOptions<TOptions>>
+    >;
 
 type OverriddenHydratedDocFromSchema<
   TSchema extends typeof BaseModel.modelSchema,
@@ -513,10 +716,34 @@ type OverriddenHydratedDocFromSchema<
   MaybeApplyOverrides<
     InferredHydratedDocFromSchema<TSchema, TOptions>,
     TSchema,
-    'hydrated'
+    'hydrated',
+    EffectiveTypeKey<TOptions>
   > extends infer Doc
-    ? CorrectHydratedSubdocumentIds<Doc, TSchema>
+    ? HasHydratedCorrection<TSchema, EffectiveTypeKey<TOptions>> extends true
+      ? CorrectHydratedSubdocumentIds<Doc, TSchema, EffectiveTypeKey<TOptions>>
+      : Doc
     : never;
+
+type HasDisabledTopLevelId<Definition, Options> =
+  EffectiveSchemaOptions<Options> extends { _id: false }
+    ? '_id' extends keyof Definition
+      ? false
+      : true
+    : false;
+
+/** An optional undefined marker stops Mongoose's lean helpers reintroducing an ObjectId. */
+type CorrectTopLevelRawId<Doc, Definition, Options> =
+  HasDisabledTopLevelId<Definition, Options> extends true
+    ? Doc & { _id?: undefined }
+    : Doc;
+
+type CorrectTopLevelHydratedId<Doc, Definition, Options, Virtuals = object> =
+  HasDisabledTopLevelId<Definition, Options> extends true
+    ? Omit<
+        Doc,
+        '_id' | ('id' extends keyof Definition | keyof Virtuals ? never : 'id')
+      > & { _id?: undefined }
+    : Doc;
 
 /** Raw schema inference with per-field overrides and runtime-shape corrections. */
 type OverriddenRawDoc<T extends typeof BaseModel> = OverriddenRawDocFromSchema<
@@ -530,18 +757,24 @@ type OverriddenHydratedDoc<T extends typeof BaseModel> =
     ExtractProperty<T, 'schemaOptions'>
   >;
 
-type HydratedDocumentFromClass<T extends typeof BaseModel> = HydratedDocument<
-  OverriddenHydratedDoc<T>,
-  // No `& { id: string }`: Mongoose adds the `id` virtual itself and skips it
-  // for `id: false` options or a schema-declared `id` path. Forcing it back on
-  // typed a runtime `undefined` as a string and re-typed a custom `id` path.
-  VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
-    DocFacingMethods<ExtractProperty<T, 'modelInstanceMethods'>>,
-  object,
-  VirtualType<ExtractProperty<T, 'modelVirtuals'>>,
-  OverriddenRawDoc<T>,
-  EffectiveSchemaOptions<ExtractProperty<T, 'schemaOptions'>>
->;
+type HydratedDocumentFromClass<T extends typeof BaseModel> =
+  CorrectTopLevelHydratedId<
+    HydratedDocument<
+      OverriddenHydratedDoc<T>,
+      // No `& { id: string }`: Mongoose adds the `id` virtual itself and skips it
+      // for `id: false` options or a schema-declared `id` path. Forcing it back on
+      // typed a runtime `undefined` as a string and re-typed a custom `id` path.
+      VirtualType<ExtractProperty<T, 'modelVirtuals'>> &
+        DocFacingMethods<ExtractProperty<T, 'modelInstanceMethods'>>,
+      object,
+      VirtualType<ExtractProperty<T, 'modelVirtuals'>>,
+      OverriddenRawDoc<T>,
+      EffectiveSchemaOptions<ExtractProperty<T, 'schemaOptions'>>
+    >,
+    ExtractProperty<T, 'modelSchema'>,
+    ExtractProperty<T, 'schemaOptions'>,
+    ExtractProperty<T, 'modelVirtuals'>
+  >;
 
 // Type utility to get the complete Schema type for a BaseModel class
 export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
@@ -563,17 +796,33 @@ export type GetModelSchemaTypeFromClass<T extends typeof BaseModel> = Schema<
 /**
  * Project each declared virtual onto the value the document exposes for it: a
  * getter's return type whatever arguments Mongoose passes it, otherwise the
- * value a set-only virtual's setter takes (reading one back is a misuse), and
+ * setter's input type plus `undefined` when there is no getter, and
  * `unknown` for a virtual with neither — a populate virtual's shape is not
  * knowable from the schema, so reading it must force a narrowing.
  */
-export type VirtualType<T> = {
-  [P in keyof T]: T[P] extends { get: (...args: never[]) => infer R }
-    ? R
-    : T[P] extends { set: (value: infer V, ...rest: never[]) => unknown }
-      ? V
-      : unknown;
-};
+type VirtualValue<V> = V extends { get: (...args: never[]) => infer R }
+  ? R
+  : V extends { set: (value: infer S, ...rest: never[]) => unknown }
+    ? S | undefined
+    : unknown;
+
+type SetterVirtualKeys<T> = {
+  [P in keyof T]: T[P] extends { set: (...args: never[]) => unknown }
+    ? P
+    : never;
+}[keyof T];
+
+export type VirtualType<T> = [SetterVirtualKeys<T>] extends [never]
+  ? { [P in keyof T]: VirtualValue<T[P]> }
+  : {
+      [P in keyof T as P extends SetterVirtualKeys<T>
+        ? never
+        : P]: VirtualValue<T[P]>;
+    } & {
+      -readonly [P in keyof T as P extends SetterVirtualKeys<T>
+        ? P
+        : never]: VirtualValue<T[P]>;
+    };
 
 /**
  * Caller-facing view of instance methods: drop the authored `this` constraint
@@ -637,13 +886,17 @@ export type GetModelTypeLiteFromSchema<
   object, // TQueryHelpers
   object, // TInstanceMethods (unfinished in this authoring context)
   object, // TVirtuals (unfinished in this authoring context)
-  HydratedDocument<
-    OverriddenHydratedDocFromSchema<T, TOptions>,
-    object,
-    object,
-    object,
-    OverriddenRawDocFromSchema<T, TOptions>,
-    EffectiveSchemaOptions<TOptions>
+  CorrectTopLevelHydratedId<
+    HydratedDocument<
+      OverriddenHydratedDocFromSchema<T, TOptions>,
+      object,
+      object,
+      object,
+      OverriddenRawDocFromSchema<T, TOptions>,
+      EffectiveSchemaOptions<TOptions>
+    >,
+    T,
+    TOptions
   >,
   Schema<
     OverriddenRawDocFromSchema<T, TOptions>,

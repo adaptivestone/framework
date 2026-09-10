@@ -529,6 +529,27 @@ describe('astExtract — silent-wrong-type guards (doc 07)', () => {
     assert.strictEqual(ex.routes[0]?.hasRequest, false);
   });
 
+  it('treats nullish query schemas as no schema', () => {
+    const ex = extract(`export default class Ctrl {
+  get routes() {
+    return {
+      get: {
+        '/null': { handler: this.nullQuery, query: null },
+        '/undefined': { handler: this.undefinedQuery, query: undefined },
+      },
+    };
+  }
+}`);
+    assert.strictEqual(ex.ok, true);
+    assert.deepStrictEqual(
+      ex.routes.map((route) => [route.path, route.hasQuery]),
+      [
+        ['/null', false],
+        ['/undefined', false],
+      ],
+    );
+  });
+
   it('dedupes duplicate route keys last-wins (no duplicate push)', () => {
     const ex = extract(
       `export default class Ctrl { get routes() { return { get: { '/x': { handler: this.first }, '/x': { handler: this.second } } }; } }`,

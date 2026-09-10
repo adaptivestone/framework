@@ -3,7 +3,7 @@
  *
  * Every other codegen test asserts string fragments in the emitted output —
  * which is exactly why a string of type-level codegen bugs shipped (an empty
- * `UnionAppInfoProvides<readonly []>` is wrong, but a `toContain` check never
+ * `ValidatedRequest<readonly []>` is wrong, but a `toContain` check never
  * notices unless someone thought to assert it). This test runs the REAL
  * pipeline (`generateRouteTypesViaAst`, boot-free) against fixture controllers
  * and then `tsc`-checks the generated types against handlers that actually read
@@ -76,7 +76,7 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       'utf8',
     );
     for (const gen of [fileGen, inheritedGen]) {
-      assertTextMatch(gen, /UnionAppInfoProvides<readonly \[[^\]]+\]>/);
+      assertTextMatch(gen, /ValidatedRequest<readonly \[[^\]]+\]>/);
       assertTextMatch(gen, /typeof GetUserByToken\b/);
       assertTextMatch(gen, /typeof Auth\b/);
       assert.ok(!gen.includes('AuthMiddleware'));
@@ -91,12 +91,12 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
       path.join(controllersDir, 'ParamSiblings.routes.gen.ts'),
       'utf8',
     );
-    assert.ok(!paramSiblingsGen.includes('UnionAppInfoProvides<readonly []>'));
+    assert.ok(!paramSiblingsGen.includes('ValidatedRequest<readonly []>'));
     for (const t of ['DuplicateRequest', 'UpdateRequest', 'YachtsRequest']) {
       assertTextMatch(
         paramSiblingsGen,
         new RegExp(
-          `${t} =[^;]*UnionAppInfoProvides<readonly \\[typeof GetUserByToken, typeof Auth\\]>`,
+          `${t} =[^;]*ValidatedRequest<readonly \\[typeof GetUserByToken, typeof Auth\\]>`,
         ),
       );
     }

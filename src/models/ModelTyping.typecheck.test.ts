@@ -47,6 +47,8 @@
  *  - `nestedPathIds.ts` — runtime-accurate `_id` placement: none on plain
  *    nested paths, a real one on `{ type: … }` subdocuments, and none for
  *    either `_id: false` spelling (beside `type:` or inside it);
+ *  - `schemaOptions.ts` — custom type keys (including array elements), disabled
+ *    top-level IDs on hydrated/lean/Lite surfaces, and timestamp names;
  *  - `idVirtual.ts` — the `id` virtual as Mongoose builds it: `string` by
  *    default, gone under `id: false`, and a schema-declared `id` path keeping
  *    its own type;

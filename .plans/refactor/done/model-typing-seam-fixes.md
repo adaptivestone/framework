@@ -241,19 +241,20 @@ Everything listed under "Not in scope" in **Why**; the docs repo (three wrong
 examples and a phantom "5.2.3" version floor are tracked in the audit notes);
 the example project; `select-projection-typing` (separate `later/` plan).
 
-Found during review, deliberately left open (each needs its own fixture first):
+Follow-up status (2026-09-09; see [type/runtime parity fixes](type-runtime-parity.md)):
 
-- **Subdocument arrays with the sibling marker** — `field: { type: [{ … }], _id: false }`
-  drops the child `_id` at runtime, but `SchemaArrayElement` unwraps to the
-  element definition and loses the wrapper's `_id: false`, so hydrated elements
-  still type `_id: Types.ObjectId`. Same shape as Task 2, in the array branch of
-  `CorrectHydratedSubdocumentIds` (and `CorrectRawSubdocumentIds`). The inside
-  spelling in an array is handled.
-- **Set-only virtuals on `as const` models are read-only.** `VirtualType` is
-  homomorphic, so `as const` virtuals project `readonly`; assigning through a
-  set-only virtual only compiles on a non-`as const` `modelVirtuals`. A
-  follow-up should strip `readonly` on the setter branch only — a blanket
-  `-readonly` would make getter-only virtuals assignable, which is worse.
+- **Resolved: subdocument arrays with the sibling marker.** Both raw and hydrated
+  array elements now honor `field: { type: [{ … }], _id: false }`. Coverage is in
+  `nestedPathIds.ts` and `ModelTyping.runtime.test.ts`. Disabled hydrated IDs read
+  as `undefined`, replacing the earlier `never` representation.
+- **Resolved: setter-only virtuals on `as const` models.** Setter properties are
+  writable; getter-only modifiers are preserved. Reads include `undefined`,
+  matching runtime. Exact types and actual assignments are in `virtualShapes.ts`.
+- The original task descriptions above record the earlier implementation;
+  the parity follow-up supersedes their disabled-ID and setter-only read types.
+
+Still open:
+
 - **A custom `id` virtual** is intersected with Mongoose's default `id: string`
   (`AddDefaultId` keys off an `id` schema *path*), so one returning anything but
   a string collapses to `never`. Upstream behaviour; declare it as a path or

@@ -205,7 +205,7 @@ export async function checkNestedWorkflowPatterns(M: NestedWorkflowModel) {
   const primaryAllocation: number | null | undefined =
     firstItem.allocation?.primary;
   if (firstItem.allocation) {
-    const allocationIdMustNotExist: never = firstItem.allocation._id;
+    const allocationIdMustNotExist: undefined = firstItem.allocation._id;
     void allocationIdMustNotExist;
   }
   const total: number = created.calculateTotal();
@@ -232,7 +232,7 @@ export async function checkNestedWorkflowPatterns(M: NestedWorkflowModel) {
   const checkpoint = created.checkpoints[0];
   const checkpointLabel: string = checkpoint.label;
   const checkpointScore: number = checkpoint.score;
-  const checkpointIdMustNotExist: never = checkpoint._id;
+  const checkpointIdMustNotExist: undefined = checkpoint._id;
   created.checkpoints.push({ label: 'reviewed' });
 
   const leanCreated = await M.findById(created._id).lean();

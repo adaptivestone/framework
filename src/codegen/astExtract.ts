@@ -489,7 +489,12 @@ function readRouteEntry(method: string, path: string, init: Node): RouteInfo {
           }
         }
       } else if (key === 'query') {
-        out.hasQuery = true;
+        // A nullish query schema is skipped by the runtime. Keep it out of
+        // the generated `InferOutput<…>` navigation just like request/params;
+        // otherwise `query: null` produces an invalid type argument.
+        if (!isNullishLiteral(prop.value)) {
+          out.hasQuery = true;
+        }
       } else if (key === 'params') {
         if (!isNullishLiteral(prop.value)) {
           out.hasParams = true;

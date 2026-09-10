@@ -20,12 +20,9 @@
  * the same runtime schema, so neither document surface may keep an `_id` — the
  * sibling marker used to be dropped while unwrapping to the inner definition,
  * leaving a phantom `ObjectId` on the hydrated document only. Both spellings are
- * pinned here for *single-nested* subdocuments only: on a subdocument ARRAY
- * (`field: { type: [{ … }], _id: false }`) the sibling marker is still dropped
- * and hydrated elements still carry an `_id` the runtime never generates — out
- * of scope, tracked in `.plans/refactor/done/model-typing-seam-fixes.md`.
- *
- * The raw surface already matches runtime and must stay untouched.
+ * pinned here for single-nested subdocuments and wrapped arrays. Plain nested
+ * paths inside either shape have no generated ID; explicitly declared IDs remain.
+ * Raw and hydrated surfaces are checked independently.
  */
 
 import type { Model, Types } from 'mongoose';
@@ -65,6 +62,13 @@ class NestedPathModel extends BaseModel {
           _id: false,
           label: { type: String },
         },
+      },
+      arrayPlain: [{ profile: { name: String } }],
+      nestedWrapped: { type: { profile: { name: String } } },
+      arrayNoIds: { type: [{ label: String }], _id: false },
+      explicitNestedId: {
+        _id: { type: String, required: true },
+        label: { type: String },
       },
     } as const;
   }
@@ -111,15 +115,35 @@ const singleNestedSubdocumentIdIsObjectId: Exact<
 
 // `_id: false` takes it away — whichever of the two spellings declared it. The
 // key itself comes from the subdocument base type and cannot be removed there,
-// so "no id" is spelled `never`: reachable, but usable for nothing.
+// so reads of a disabled id are typed as `undefined`.
 const siblingIdFalseHasNoUsableId: Exact<
   NonNullable<NestedPathDocument['flagged']>['_id'],
-  never
+  undefined
 > = true;
 
 const insideIdFalseHasNoUsableId: Exact<
   NonNullable<NestedPathDocument['inside']>['_id'],
-  never
+  undefined
+> = true;
+
+const arrayPlainHasNoId: HasKey<
+  NonNullable<NonNullable<NestedPathDocument['arrayPlain']>[number]['profile']>,
+  '_id'
+> = false;
+
+const wrappedPlainHasNoId: HasKey<
+  NonNullable<NonNullable<NestedPathDocument['nestedWrapped']>['profile']>,
+  '_id'
+> = false;
+
+const arrayNoIdHasNoUsableId: Exact<
+  NonNullable<NestedPathDocument['arrayNoIds']>[number]['_id'],
+  undefined
+> = true;
+
+const explicitNestedIdIsString: Exact<
+  NonNullable<NestedPathDocument['explicitNestedId']>['_id'],
+  string
 > = true;
 
 // The raw surface already matched runtime exactly before the hydrated
@@ -138,6 +162,8 @@ type RawDocumentOf<T> =
     : never;
 type RawDocument = RawDocumentOf<NestedPathModelType>;
 
+const rawWrappedArrayHasNoId: HasKey<RawDocument['arrayNoIds'][number], '_id'> =
+  false;
 const rawNestedPathHasNoId: HasKey<
   NonNullable<RawDocument['profile']>,
   '_id'
@@ -180,8 +206,11 @@ export async function assertRawWrites(Model: NestedPathModelType) {
 }
 
 export {
+  arrayNoIdHasNoUsableId,
+  arrayPlainHasNoId,
   assertNestedPathWrites,
   deepNestedPathHasNoId,
+  explicitNestedIdIsString,
   frameworkUserNameHasNoId,
   insideIdFalseHasNoUsableId,
   plainNestedPathHasNoId,
@@ -189,7 +218,9 @@ export {
   rawNestedPathHasNoId,
   rawSiblingIdFalseHasNoId,
   rawSingleNestedSubdocumentHasId,
+  rawWrappedArrayHasNoId,
   siblingIdFalseHasNoUsableId,
   singleNestedSubdocumentHasId,
   singleNestedSubdocumentIdIsObjectId,
+  wrappedPlainHasNoId,
 };

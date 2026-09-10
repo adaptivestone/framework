@@ -9,7 +9,7 @@
  * being mapped over) keep their Mongoose-inferred type.
  */
 
-import { Schema, type Types } from 'mongoose';
+import { type Model, Schema, type Types } from 'mongoose';
 import type {
   GetModelTypeFromClass,
   GetModelTypeLiteFromSchema,
@@ -21,6 +21,12 @@ import { BaseModel } from '../../modules/BaseModel.ts';
 type IntlSubDocValue<T> = { native: T; machine: T };
 type IntlText = Partial<Record<'en' | 'fr', string>>;
 type IntlHydratedValue = string | IntlText;
+
+/** Invariant type identity: unlike assignability, `never` and `any` fail it. */
+type Exact<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
 
 /** Tiny app-side factory: a `String` field whose static type is an intl value.
  * Runtime is unchanged (`type: String`); only the compile-time type is marked. */
@@ -61,9 +67,22 @@ class Event extends BaseModel {
           }),
         },
       ],
-      // Single-nested subdocument with `_id: false` — the ONLY shape that runs
-      // the `CorrectHydratedSubdocument*` machinery, which re-derives the doc
-      // type from the schema and so must be told which surface it is building.
+      // Wrapped subdocument array with an optional/default-undefined value.
+      // The override must reach the array element on both document surfaces.
+      wrappedLocalizedSchedule: {
+        type: [
+          {
+            title: localeString({
+              type: String,
+              required: true,
+              intl: true,
+            }),
+          },
+        ],
+        default: undefined,
+      },
+      // Single-nested subdocument with `_id: false` — a shape that exercises
+      // the `CorrectHydratedSubdocument*` machinery on the hydrated surface.
       description: {
         type: {
           short: localeString({ type: String, required: true, intl: true }),
@@ -76,6 +95,43 @@ class Event extends BaseModel {
 
 type EventModel = GetModelTypeFromClass<typeof Event>;
 type EventAuthoringModel = GetModelTypeLiteFromSchema<typeof Event.modelSchema>;
+type EventDocument = InstanceType<EventModel>;
+type EventRawDocument =
+  EventModel extends Model<
+    infer Raw,
+    infer _QueryHelpers,
+    infer _InstanceMethods,
+    infer _Virtuals,
+    infer _HydratedDocument,
+    infer _Schema
+  >
+    ? Raw
+    : never;
+
+const wrappedHydratedTitleIsExact: Exact<
+  NonNullable<EventDocument['wrappedLocalizedSchedule']>[number]['title'],
+  IntlHydratedValue
+> = true;
+const wrappedRawTitleIsExact: Exact<
+  NonNullable<EventRawDocument['wrappedLocalizedSchedule']>[number]['title'],
+  IntlText
+> = true;
+const wrappedHydratedArrayAcceptsNull: EventDocument['wrappedLocalizedSchedule'] =
+  null;
+const wrappedHydratedArrayAcceptsUndefined: EventDocument['wrappedLocalizedSchedule'] =
+  undefined;
+const wrappedRawArrayAcceptsNull: EventRawDocument['wrappedLocalizedSchedule'] =
+  null;
+const wrappedRawArrayAcceptsUndefined: EventRawDocument['wrappedLocalizedSchedule'] =
+  undefined;
+const wrappedHydratedArrayNullabilityIsExact: Exact<
+  Extract<EventDocument['wrappedLocalizedSchedule'], null | undefined>,
+  null | undefined
+> = true;
+const wrappedRawArrayNullabilityIsExact: Exact<
+  Extract<EventRawDocument['wrappedLocalizedSchedule'], null | undefined>,
+  null | undefined
+> = true;
 
 export async function checkAuthoringModel(M: EventAuthoringModel) {
   const created = await M.create({
@@ -83,6 +139,12 @@ export async function checkAuthoringModel(M: EventAuthoringModel) {
   });
   const hydratedStringState: typeof created.localizedTitle = 'Title';
   void hydratedStringState;
+
+  if (created.wrappedLocalizedSchedule) {
+    const wrappedCreatedTitle: IntlHydratedValue =
+      created.wrappedLocalizedSchedule[0].title;
+    void wrappedCreatedTitle;
+  }
 
   const lean = await M.findOne().lean();
   if (lean) {
@@ -139,16 +201,31 @@ export async function check(M: EventModel) {
     const localizedItemStringGetterState: typeof localizedItem.title =
       'Session';
     doc.localizedSchedule.push(localizedItem);
+    if (doc.wrappedLocalizedSchedule) {
+      const wrappedHydratedTitle: IntlHydratedValue =
+        doc.wrappedLocalizedSchedule[0].title;
+      const wrappedItem = doc.wrappedLocalizedSchedule.create({
+        title: { en: 'Wrapped', fr: 'Enveloppé' },
+      });
+      const wrappedItemTitle: IntlHydratedValue = wrappedItem.title;
+      void wrappedHydratedTitle;
+      void wrappedItemTitle;
+    }
     // An `_id: false` single-nested subdoc must expose the HYDRATED override
     // (`string | IntlText`), exactly like a top-level field — not the raw one.
     if (doc.description) {
       const nestedHydratedStringState: typeof doc.description.short = 'Short';
       const nestedHydratedMapState: typeof doc.description.short = { en: 'S' };
       const nestedHydratedValue: IntlHydratedValue = doc.description.short;
+      const nestedStoredValue: IntlText = doc.description.toObject().short;
+      void nestedStoredValue;
       void nestedHydratedStringState;
       void nestedHydratedMapState;
       void nestedHydratedValue;
     }
+    const sessionStoredLabel: IntlSubDocValue<string> | null | undefined =
+      doc.sessions[0].toObject().room?.label;
+    void sessionStoredLabel;
     void sessionLabel;
     void hydratedStringState;
     void hydratedMapState;
@@ -190,6 +267,10 @@ export async function check(M: EventModel) {
       lean.title;
     const rawTitle: IntlText = lean.localizedTitle;
     const rawScheduleTitle: IntlText = lean.localizedSchedule[0].title;
+    if (lean.wrappedLocalizedSchedule) {
+      const rawWrappedTitle: IntlText = lean.wrappedLocalizedSchedule[0].title;
+      void rawWrappedTitle;
+    }
     // The same `_id: false` subdoc keeps the RAW override on the lean surface —
     // the counterpart to the hydrated assertion above. Both must hold: the
     // hydrated rebuild selects its surface explicitly, and the raw pass unwraps
@@ -209,3 +290,14 @@ export async function check(M: EventModel) {
     void invalidRawTitle;
   }
 }
+
+export {
+  wrappedHydratedArrayAcceptsNull,
+  wrappedHydratedArrayAcceptsUndefined,
+  wrappedHydratedArrayNullabilityIsExact,
+  wrappedHydratedTitleIsExact,
+  wrappedRawArrayAcceptsNull,
+  wrappedRawArrayAcceptsUndefined,
+  wrappedRawArrayNullabilityIsExact,
+  wrappedRawTitleIsExact,
+};

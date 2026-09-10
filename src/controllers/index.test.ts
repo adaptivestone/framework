@@ -25,12 +25,14 @@ import AbstractController from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
+import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import type { MiddlewareSpec } from '../services/http/routing/middlewareNormalization.ts';
 import type {
   HttpMethod,
   RouteNode,
 } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
+import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import { assertCalledTimes, assertThrowsLike } from '../tests/assertions.ts';
 import ErrorRegistryController, {
   FakeDriverError,
@@ -48,10 +50,35 @@ import ControllerManager, { compareControllerLoadOrder } from './index.ts';
 
 const fakeApp = (registry: RouteRegistry): IApp =>
   ({
-    httpServer: { routeRegistry: registry },
+    httpServer: { routeRegistry: registry, resolveError: async () => null },
     logger: { child: () => ({ warn() {}, verbose() {}, error() {} }) },
     // biome-ignore lint/suspicious/noExplicitAny: minimal IApp stub for translation tests
   }) as any;
+
+const outputSchema = (output: unknown): StandardSchemaV1 => ({
+  '~standard': {
+    version: 1,
+    vendor: 'runtime-test',
+    validate: () => ({ value: output }),
+  },
+});
+
+const responseForHandler = () => {
+  const response = {
+    body: undefined as unknown,
+    headersSent: false,
+    statusCode: 200,
+    status(code: number) {
+      response.statusCode = code;
+      return response;
+    },
+    json(body: unknown) {
+      response.body = body;
+      return response;
+    },
+  };
+  return response;
+};
 
 const setup = () => {
   const registry = new RouteRegistry();
@@ -935,6 +962,189 @@ describe('ControllerManager — schema-less route appInfo defaults', () => {
     assert.strictEqual(body.data.request, 'absent');
     assert.strictEqual(body.data.queryIsObject, true);
     assert.strictEqual(body.data.requestIsObject, true);
+  });
+});
+
+// ─── validated output merge semantics ───────────────────────────────
+// Standard Schema permits arrays, primitives, and null outputs. The runtime
+// must preserve those values for singleton schemas and only merge plain
+// objects when route and middleware schemas contribute several outputs.
+describe('ControllerManager — validated output runtime parity', () => {
+  const contentObject = { name: 'Alice' };
+  const incompatibleMiddlewareOutput = outputSchema(['unexpected']);
+
+  class RequestOutputMiddleware extends AbstractMiddleware {
+    static get relatedRequestParameters() {
+      return outputSchema({
+        shared: 'middleware',
+        middlewareOnly: true,
+      });
+    }
+  }
+
+  class QueryOutputMiddleware extends AbstractMiddleware {
+    static get relatedQueryParameters() {
+      return outputSchema({
+        shared: 'query-middleware',
+        middlewareOnly: true,
+      });
+    }
+  }
+
+  class ValidationOutputs extends AbstractController {
+    get routes() {
+      return {
+        post: {
+          '/single-array': {
+            handler: this.read,
+            request: outputSchema(['one', 'two']),
+          },
+          '/single-scalar': {
+            handler: this.read,
+            request: outputSchema(42),
+          },
+          '/single-null': {
+            handler: this.read,
+            request: outputSchema(null),
+          },
+          '/query-array': {
+            handler: this.readQuery,
+            query: outputSchema(['query']),
+          },
+          '/query-scalar': {
+            handler: this.readQuery,
+            query: outputSchema(42),
+          },
+          '/query-null': {
+            handler: this.readQuery,
+            query: outputSchema(null),
+          },
+          '/query-merged': {
+            handler: this.readQuery,
+            query: outputSchema({ shared: 'query-route', routeOnly: true }),
+            middleware: [QueryOutputMiddleware],
+          },
+          '/merged': {
+            handler: this.read,
+            request: outputSchema({ shared: 'route', routeOnly: true }),
+            middleware: [RequestOutputMiddleware],
+          },
+          '/incompatible': {
+            handler: this.read,
+            request: outputSchema({ valid: true }),
+            middleware: [
+              class IncompatibleMiddleware extends AbstractMiddleware {
+                static get relatedRequestParameters() {
+                  return incompatibleMiddlewareOutput;
+                }
+              },
+            ],
+          },
+          '/content-object': {
+            handler: this.read,
+            request: { 'application/json': outputSchema(contentObject) },
+          },
+          '/content-array': {
+            handler: this.read,
+            request: { 'application/json': outputSchema([]) },
+          },
+        },
+      };
+    }
+
+    async read(req: FrameworkRequest, res: Response) {
+      return res.status(200).json({ output: req.appInfo.request });
+    }
+
+    async readQuery(req: FrameworkRequest, res: Response) {
+      return res.status(200).json({ output: req.appInfo.query });
+    }
+
+    static get middleware() {
+      return new Map();
+    }
+  }
+
+  const invoke = async (path: string) => {
+    const registry = new RouteRegistry();
+    const cm = new ControllerManager(fakeApp(registry));
+    cm.registerController(ValidationOutputs);
+    const hit = registry.match('POST', `/validationoutputs${path}`);
+    assert.ok(hit?.entry?.handler, `route did not match: ${path}`);
+    const response = responseForHandler();
+    const req = {
+      body: {},
+      headers: { 'content-type': 'application/json' },
+      query: {},
+      params: {},
+      appInfo: { request: {}, query: {}, params: {} },
+    } as unknown as FrameworkRequest;
+    await hit.entry.handler(req, response as unknown as Response, () => {});
+    return response;
+  };
+
+  it('passes singleton array, scalar, and null outputs through unchanged', async () => {
+    const arrayResponse = await invoke('/single-array');
+    assert.deepStrictEqual(arrayResponse.body, { output: ['one', 'two'] });
+    const scalarResponse = await invoke('/single-scalar');
+    assert.deepStrictEqual(scalarResponse.body, { output: 42 });
+    const nullResponse = await invoke('/single-null');
+    assert.deepStrictEqual(nullResponse.body, { output: null });
+  });
+
+  it('merges route and middleware objects in order with later keys winning', async () => {
+    const response = await invoke('/merged');
+    assert.deepStrictEqual(response.body, {
+      output: {
+        shared: 'middleware',
+        routeOnly: true,
+        middlewareOnly: true,
+      },
+    });
+  });
+
+  it('passes singleton query array, scalar, and null outputs through unchanged', async () => {
+    const arrayResponse = await invoke('/query-array');
+    assert.deepStrictEqual(arrayResponse.body, { output: ['query'] });
+    const scalarResponse = await invoke('/query-scalar');
+    assert.deepStrictEqual(scalarResponse.body, { output: 42 });
+    const nullResponse = await invoke('/query-null');
+    assert.deepStrictEqual(nullResponse.body, { output: null });
+  });
+
+  it('merges route and middleware query objects in order with later keys winning', async () => {
+    const response = await invoke('/query-merged');
+    assert.deepStrictEqual(response.body, {
+      output: {
+        shared: 'query-middleware',
+        routeOnly: true,
+        middlewareOnly: true,
+      },
+    });
+  });
+
+  it('turns incompatible multi-output validation into the existing 500 sink', async () => {
+    const response = await invoke('/incompatible');
+    assert.strictEqual(response.statusCode, 500);
+    assert.deepStrictEqual(response.body, {
+      message: 'Platform error. Please check later or contact support',
+    });
+  });
+
+  it('adds a content-type discriminator to a clone of object output', async () => {
+    const response = await invoke('/content-object');
+    assert.deepStrictEqual(response.body, {
+      output: { name: 'Alice', contentType: 'application/json' },
+    });
+    assert.deepStrictEqual(contentObject, { name: 'Alice' });
+  });
+
+  it('rejects a non-object content-type output through the 500 sink', async () => {
+    const response = await invoke('/content-array');
+    assert.strictEqual(response.statusCode, 500);
+    assert.deepStrictEqual(response.body, {
+      message: 'Platform error. Please check later or contact support',
+    });
   });
 });
 

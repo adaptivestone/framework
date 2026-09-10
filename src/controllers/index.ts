@@ -28,6 +28,10 @@ import {
   isContentTypeRequestMap,
   normalizeContentType,
 } from '../services/validate/contentType.ts';
+import {
+  addContentTypeDiscriminator,
+  mergeValidatedOutputs,
+} from '../services/validate/mergeValidatedOutputs.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import ValidateService from '../services/validate/ValidateService.ts';
 import { ValidationError } from '../services/validate/ValidationError.ts';
@@ -429,31 +433,31 @@ class ControllerManager extends Base {
 
         if (requestSchemas.length > 0) {
           const parts = await Promise.all(
-            requestSchemas.map(
-              (s) =>
-                new ValidateService(app, s).validate(
-                  req.body,
-                  req.appInfo.i18n,
-                ) as Promise<Record<string, unknown>>,
+            requestSchemas.map((s) =>
+              new ValidateService(app, s).validate(req.body, req.appInfo.i18n),
             ),
           );
-          req.appInfo.request = Object.assign({}, ...parts);
+          req.appInfo.request = mergeValidatedOutputs(parts) as Record<
+            string,
+            unknown
+          >;
           if (resolvedContentType) {
-            (req.appInfo.request as Record<string, unknown>).contentType =
-              resolvedContentType;
+            req.appInfo.request = addContentTypeDiscriminator(
+              req.appInfo.request,
+              resolvedContentType,
+            );
           }
         }
         if (querySchemas.length > 0) {
           const parts = await Promise.all(
-            querySchemas.map(
-              (s) =>
-                new ValidateService(app, s).validate(
-                  req.query,
-                  req.appInfo.i18n,
-                ) as Promise<Record<string, unknown>>,
+            querySchemas.map((s) =>
+              new ValidateService(app, s).validate(req.query, req.appInfo.i18n),
             ),
           );
-          req.appInfo.query = Object.assign({}, ...parts);
+          req.appInfo.query = mergeValidatedOutputs(parts) as Record<
+            string,
+            unknown
+          >;
         }
       } catch (err) {
         if (res.headersSent) {

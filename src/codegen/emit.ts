@@ -127,12 +127,7 @@ export function renderGenFile(input: RenderInput): string {
 
   const importLines: string[] = [];
   importLines.push(...middlewareImports);
-  importLines.push(
-    `import type {`,
-    `  BaseRequestContext,`,
-    `  UnionAppInfoProvides,`,
-    `} from '${typesPath}';`,
-  );
+  importLines.push(`import type { ValidatedRequest } from '${typesPath}';`);
   if (navigateSchema) {
     importLines.push(
       `import type { StandardSchemaV1 } from '${validateTypesPath}';`,
@@ -207,7 +202,7 @@ export type ${typeName} =
   | ${shapes.join('\n  | ')};`;
 }
 
-/** Render the BaseRequestContext intersection for one route. */
+/** Render a handler context using the same ordered validation outputs as runtime. */
 function renderShape(
   route: RouteMeta,
   chain: MiddlewareRef[],
@@ -228,32 +223,9 @@ function renderShape(
       ? ` & { params: { ${pathParams.map((p) => `${paramKey(p)}: string`).join('; ')} } }`
       : '';
 
-  // appInfo overrides for body/query when their schema is declared inline
-  // on the route entry.
-  const appInfoOverrides: string[] = [];
-  if (route.hasSchema && navigateSchema) {
-    if (route.requestContentTypes?.length) {
-      // Content-type map → discriminated union keyed by `contentType`. Each
-      // branch reads InferOutput of that media type's schema.
-      const base = `${routesAlias}[${sq(route.method)}][${sq(route.path)}]['request']`;
-      // Discriminant literal is lower-cased to match the runtime-injected
-      // value (the parser normalizes `Content-Type` to lower case); the type
-      // navigation keeps the author's original key so the schema resolves.
-      const union = route.requestContentTypes
-        .map(
-          (ct) =>
-            `({ contentType: ${sq(ct.toLowerCase())} } & StandardSchemaV1.InferOutput<${base}[${sq(ct)}]>)`,
-        )
-        .join(' | ');
-      appInfoOverrides.push(`request: ${union}`);
-    } else {
-      appInfoOverrides.push(
-        `request: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['request']>`,
-      );
-    }
-  }
+  const otherOutputs: string[] = [];
   if (route.hasQuerySchema && navigateSchema) {
-    appInfoOverrides.push(
+    otherOutputs.push(
       `query: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['query']>`,
     );
   }
@@ -261,14 +233,34 @@ function renderShape(
   // raw `params` override above stays `string`-valued — the runtime never
   // rewrites `req.params`, so the two surfaces are deliberately different types.
   if (route.hasParamsSchema && navigateSchema) {
-    appInfoOverrides.push(
+    otherOutputs.push(
       `params: StandardSchemaV1.InferOutput<${routesAlias}[${sq(route.method)}][${sq(route.path)}]['params']>`,
     );
   }
-  const appInfoOverride =
-    appInfoOverrides.length > 0 ? ` & { ${appInfoOverrides.join('; ')} }` : '';
-
-  return `BaseRequestContext & { appInfo: UnionAppInfoProvides<${tupleInner}>${appInfoOverride} }${paramsOverride}`;
+  const variant = (request?: string, contentType?: string) => {
+    const outputs = request
+      ? [`request: ${request}`, ...otherOutputs]
+      : otherOutputs;
+    const outputArg = outputs.length ? `, { ${outputs.join('; ')} }` : '';
+    const contentTypeArg = contentType
+      ? `, ${sq(contentType.toLowerCase())}`
+      : '';
+    return `ValidatedRequest<${tupleInner}${outputArg}${contentTypeArg}>${paramsOverride}`;
+  };
+  if (route.hasSchema && navigateSchema) {
+    const base = `${routesAlias}[${sq(route.method)}][${sq(route.path)}]['request']`;
+    if (route.requestContentTypes?.length) {
+      // Each media type stays correlated with its output. The discriminator
+      // is applied AFTER middleware outputs, just as it is at runtime.
+      return `(${route.requestContentTypes
+        .map((ct) =>
+          variant(`StandardSchemaV1.InferOutput<${base}[${sq(ct)}]>`, ct),
+        )
+        .join(' | ')})`;
+    }
+    return variant(`StandardSchemaV1.InferOutput<${base}>`);
+  }
+  return variant();
 }
 
 /**
