@@ -70,7 +70,10 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
-## Authentication and cache upgrade notes
+## Authentication and cache upgrade notes (5.4.1)
+
+See the [5.4.1 release notes](CHANGELOG.md) for all fixes, including model/validation
+typing corrections and the optional-i18next declaration change.
 
 The built-in registration and password-reset routes accept passwords of 15–128
 Unicode code points, including spaces. Existing passwords remain usable at login.

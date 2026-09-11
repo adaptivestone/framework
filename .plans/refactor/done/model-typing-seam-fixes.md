@@ -1,5 +1,7 @@
 # Side — Model typing seam fixes (Mongoose 9.9.4 audit follow-up)
 
+**Release target**: 5.4.1, prepared 2026-09-11. Publication is a separate human step.
+
 **Status**: ✅ done (2026-09-01 — in the working tree, unreleased; lands with the next release after 5.4.0)
 **Depends on**: nothing (edits the existing `GetModelTypeFromClass` machinery in `src/modules/BaseModel.ts` and the `AppModel` alias in `src/server.ts`)
 **Unblocks**: nothing

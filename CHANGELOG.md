@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [5.4.1] - 2026-09-11
+
 ### Fixed
 
 - **Core TypeScript consumers compile without the optional i18n packages.** Published request, validation, user-mail and i18n-service types now use dependency-free translation interfaces, so importing `helpers/appInstance.js` no longer requires `i18next` with `skipLibCheck: false`. The packed-package smoke test compiles those surfaces with both `i18next` and `i18next-fs-backend` absent. Ordinary string keys, defaults and interpolation remain typed; object/detail results require narrowing. Base-instance methods still return the real i18next object at runtime, but expose a smaller structural type: consumers needing vendor-specific methods or resource-aware types can explicitly assert it as `import('i18next').i18n` after installing the peers. This supersedes the 5.4.0 `skipLibCheck` workaround.
@@ -28,6 +30,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Virtuals that are not a plain zero-argument getter no longer type as `never`.** The virtual mapper understood only `get()` with no parameters, so a getter declared with Mongoose's `(value, virtual, doc)` arguments, a set-only virtual, and a populate virtual (`{ options: { ref, localField, foreignField } }`, no getter) all resolved to `never` — which is assignable to anything, so wrong code compiled silently. The rules are now: a getter's return type wins whatever its parameters; a set-only virtual takes its setter's value type plus `undefined` because it has no getter; a virtual with neither (populate virtuals) is `unknown`, because the populated shape is not knowable from the schema — narrow it, or intersect the document type at the call site. Virtuals with setters remain writable even when declared `as const`; getter-only virtuals retain their existing modifiers. Type-level only. Pinned by the new `virtualShapes.ts` fixture.
 
 ### Changed
+
+- **Code generation now requires `oxc-parser` `^0.149.0`.** Projects that run `npm run gen` should update their optional development peer with `npm i -D oxc-parser@^0.149.0`. Runtime-only consumers do not need it.
 
 - **New passwords default to 15–128 Unicode code points.** Built-in registration and reset share `auth.passwordPolicy.minLength` / `maxLength`; spaces and Unicode are allowed. Existing login passwords remain valid. Applications with custom model writes or password endpoints must apply their own validation. New translation keys: `auth.passwordTooShort` and `auth.passwordTooLong` (parameters `min` / `max`).
 - **Deployment note:** rate-key changes reset counters once. The lossless cache codec uses a new `cache-v2` key space and starts cold; old keys expire naturally. Mixed versions maintain separate cache entries/invalidation and rate counters, so complete the rollout across workers promptly.

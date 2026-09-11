@@ -44,7 +44,10 @@ class CaptureTransport extends Transport {
 }
 
 describe('auth route schemas', () => {
-  const routes = new Auth(appInstance, '').routes.post;
+  let routes: Auth['routes']['post'];
+  before(() => {
+    routes = new Auth(appInstance, '').routes.post;
+  });
   const validate = async (path: keyof typeof routes, value: unknown) => {
     const route = routes[path];
     if (

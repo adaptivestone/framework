@@ -1,5 +1,7 @@
 # Optional i18n declaration dependency
 
+**Release target**: 5.4.1, prepared 2026-09-11. Publication is a separate human step.
+
 ## Goal
 
 A packed core consumer importing `helpers/appInstance.js` must compile with
@@ -33,7 +35,7 @@ A packed core consumer importing `helpers/appInstance.js` must compile with
 - `src/models/User.ts`, `src/models/UserOld.ts`
 - `scripts/packaging-smoke-test.sh`, `scripts/fixtures/optional-i18n.mts` (new)
 - `CHANGELOG.md`, this card, `.plans/refactor/README.md`,
-  `.plans/refactor/active/i18n-default-values.md`,
+  `.plans/refactor/done/i18n-default-values.md`,
   `.plans/refactor/queued/i18n-contracts-and-tooling.md`
 - Documentation follow-up: `framework-documenation-github/docs/08-i18n.md`
   and generated `static/llm-context.md`.

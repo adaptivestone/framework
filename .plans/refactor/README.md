@@ -19,19 +19,19 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
 v5.5 (queued/) ─────→ universal HttpResponse + Express writer
                       └──→ OpenAPI response contracts ──→ v6 removes ordinary `res`
 
-Bun stable with fix (external) ──→ immediate Bun-support v5.x patch
-                                  never waits for v5.3, v6, or native adapters
+Bun support (shipped 5.4.0) ──→ ongoing floor/latest CI certification
+                                native adapters remain separate
 
-v5.2.x · 5.3.0–5.3.3 ─→ shipped
-next release (5.4) ──→ i18n in-code defaults + optional i18next
-                      + email templates as TS modules (module ≥2.1) + Bun support
-                      └──→ minor settled (behavior change + consumer actions) · UNRELEASED
+v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
+5.4.1 (prepared) ───→ optional-i18n declarations + model/validation typing
+                      + request/auth/rate-limit/cache fixes
+                      └──→ patch settled by user 2026-09-11 · NOT YET PUBLISHED
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
-          P1q (v5.5) waits on 5.4 shipping
+          P1q (v5.5) is unblocked by 5.4.0 shipping and remains queued
           OpenAPI response contracts (v5.6) waits on P1q landing + real usage
           v6 cutover blocked by all v5.1 active + queued work
-          Bun gate OPEN (1.4.0 stable) — certification active, rides 5.4 if green
+          Bun support shipped in 5.4.0 — floor/latest certification continues in CI
           node-adapter blocked by v6 — and is what unlocks HTTP/2 (stock node:http2,
             NOT a native-engine payoff; Express as listener is the only blocker)
           drop-express blocked by node-adapter
@@ -42,12 +42,13 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 ```mermaid
 flowchart LR
     Foundation["✅ v5 foundations"] --> Patch["✅ 5.2.x–5.3.x shipped"]
-    Patch --> Unreleased["🔄 5.4 unreleased: i18n defaults + email modules + Bun"]
+    Patch --> Released["✅ 5.4.0: i18n defaults + email modules + Bun"]
+    Released --> Unreleased["✅ 5.4.1 prepared, not published: declaration + validation + security fixes"]
 
     Unreleased --> Responses["⏸ v5.5 universal responses"]
     Responses --> OpenAPI["⏸ v5.6 OpenAPI response contracts"]
 
-    BunRelease["Bun stable release with fix"] --> BunSupport["🔄 Bun certification — riding 5.4"]
+    BunRelease["Bun stable release with fix"] --> BunSupport["✅ Bun support — shipped 5.4.0"]
 
     Unreleased --> I18nV5["⏸ P1y i18n audit + types + runtime"]
     I18nV5 --> I18nV6["◌ v6 namespace + selector defaults"]
@@ -89,9 +90,6 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
-| [i18n-default-values](active/i18n-default-values.md) | P1y-bridge | **Optionally translatable framework messages, English-in-code.** PR 1: middleware `translate()` helper + `middleware.*` keys with `defaultValue` (byte-identical when untranslated) + disabled-i18n fallback honours defaults. PR 2: sweep controllers/validation/email bare keys (raw-key leak → English, behavior change) + i18next → optional peer. Bridge to P1y Phase 4. |
-| [email-templates-v2](active/email-templates-v2.md) | Cross-repo | **Shipped email templates → JS/TS modules.** Module 2.1 ships built-in `js`/`ts` module engines (overridable map entries); framework converts its 6 pug defaults to typed template modules (fixes hardcoded-Russian verification + carries i18n defaultValue), trims the `postbuild` copy. Module first, then framework; after 5.4. |
-| [bun-runtime-support](active/bun-runtime-support.md) | Runtime | **Stable-fix-gated Bun certification.** Activate immediately when Bun ships `oven-sh/bun#32502` in any stable version; run the existing Express adapter through Bun's Node compatibility layer, require real Mongoose CRUD and packed-consumer CI, then cut an immediate v5.x patch. Never waits for v5.3, v6, or P3/P5; native `BunAdapter` remains separate. |
 | [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
 
 ### queued/
@@ -128,16 +126,21 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [release-5.4.1](done/release-5.4.1.md) | Release | Prepared 5.4.1: versions, release notes, docs and inspected tarball. All five gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Publication remains a human step. |
+| [i18n-default-values](done/i18n-default-values.md) | P1y-bridge | Shipped in 5.4.0: English defaults and optional translation peers. Declaration checking without those peers is fixed in 5.4.1. |
+| [email-templates-v2](done/email-templates-v2.md) | Cross-repo | Shipped in 5.4.0: typed default email template modules, translatable English verification mail, and module peer ^2.1.0. |
+| [bun-runtime-support](done/bun-runtime-support.md) | Runtime | Shipped in 5.4.0: Bun >=1.4.0 support through the Express adapter, runtime tests and packed MongoDB consumers. Floor/latest certification continues in CI. |
+| [security-review-fixes](done/security-review-fixes.md) | Security | Prepared for 5.4.1: parser limits, shared rate buckets, stronger new passwords, race-safe rehash and cache serialization/logging fixes. |
 | [optional-i18n-declarations](done/optional-i18n-declarations.md) | Patch | Core declarations compile with both i18n peers absent and `skipLibCheck: false`; packed regression, 838 tests and all five gates pass. Supersedes P1y-bridge's workaround; vendor-specific typing stays opt-in. I18n docs and generated LLM context updated; docs build passed. |
-| [type-guidance-docs-follow-up](done/type-guidance-docs-follow-up.md) | Docs / types | Model parity, validation composition and TypeScript 7 checking guidance updated; unreleased notices, docs build and generated LLM context verified. |
+| [type-guidance-docs-follow-up](done/type-guidance-docs-follow-up.md) | Docs / types | Model parity, validation composition and TypeScript 7 checking guidance updated; release notices advance to 5.4.1 in release preparation. |
 | [model-boundary-prototype](done/model-boundary-prototype.md) | Types | One-model proof: independent generated contracts remove Mongoose from application checking; same-program wrappers do not reduce cost. Adapter compilation still required. Prototype only. |
 | [model-type-cost-experiments](done/model-type-cost-experiments.md) | Types | Cold cost mostly predates recent fixes; tested representations offered little benefit. One checker plus incremental caching reused an unchanged check with zero new instantiations. |
 | [compiler-type-cost-investigation](done/compiler-type-cost-investigation.md) | Types | Profiled structural model-type comparison costs; one checker reduced reported memory by about 62% and generic instantiations by 68% in a private snapshot. Analysis only. |
 | [consumer-type-parity-validation](done/consumer-type-parity-validation.md) | Consumer | Local packed build verified: generation, types and lint pass; 229/230 runtime tests pass, with the single search failure passing focused old/new reruns. |
 | [params-validation](done/params-validation.md) | P1b+ | **Implemented 2026-08-07, unreleased.** Route `params:` schema (validate + coerce path params → `req.appInfo.params`, malformed → 400). Grew beyond plan: also a standalone-`CastError` 400 floor and OpenAPI path-parameter typing. |
 | [codegen-literal-prelude](done/codegen-literal-prelude.md) | P1w | **Shipped in 5.2.1.** Initialized `const` config reads may precede a literal route return. |
-| [type-runtime-parity](done/type-runtime-parity.md) | Audit | **Unreleased (2026-09-09).** Model IDs, wrapped overrides, schema options, virtual setters, and validated request types now match runtime. All 817 tests and five required gates pass. |
-| [model-typing-seam-fixes](done/model-typing-seam-fixes.md) | Side | **Unreleased (working tree, 2026-09-01).** Four type-level fixes from the Mongoose 9.9.4 model-typing audit: no forced `id` virtual (`id: false` / an `id` path now honoured), the sibling `_id: false` spelling honoured on hydrated single-nested subdocuments, every virtual shape typed (populate virtuals → `unknown`, never `never`), and `AppModel` a single queryable type (finders compile; `create({ literal })` and legacy-model assignability caveats disclosed). Each pinned by a fixture in the compile gate; array-sibling `_id: false` and set-only virtual follow-ups resolved by the type/runtime parity fixes; custom `id` virtual limitation remains documented. |
+| [type-runtime-parity](done/type-runtime-parity.md) | Audit | **Prepared for 5.4.1 (implemented 2026-09-09).** Model IDs, wrapped overrides, schema options, virtual setters, and validated request types now match runtime. All 817 tests and five required gates pass. |
+| [model-typing-seam-fixes](done/model-typing-seam-fixes.md) | Side | **Prepared for 5.4.1 (implemented 2026-09-01).** Four type-level fixes from the Mongoose 9.9.4 model-typing audit: no forced `id` virtual (`id: false` / an `id` path now honoured), the sibling `_id: false` spelling honoured on hydrated single-nested subdocuments, every virtual shape typed (populate virtuals → `unknown`, never `never`), and `AppModel` a single queryable type (finders compile; `create({ literal })` and legacy-model assignability caveats disclosed). Each pinned by a fixture in the compile gate; array-sibling `_id: false` and set-only virtual follow-ups resolved by the type/runtime parity fixes; custom `id` virtual limitation remains documented. |
 | [v5.2.1-adoption-fixes](done/v5.2.1-adoption-fixes.md) | P1x | **Shipped in 5.2.1.** Grouped same-name controller override identity; `defineSchema` explicit JSON Schema; Pagination emits `page`/`limit`. |
 | [openapi-schema-resilience](done/openapi-schema-resilience.md) | P2a-fix | **Shipped in 5.2.0.** Zod input-shape/date export plus per-schema failure containment; one unrepresentable route no longer aborts the document. |
 | [controller-route-groups](done/controller-route-groups.md) | P1u | **Shipped in 5.2.0.** Parenthesized controller folders organize source without contributing URL segments; runtime and AST codegen share path derivation. |
@@ -219,15 +222,23 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 - ✅ Dead `benchmark2` script removed (targeted `https://` + HTTP/2; the framework serves neither, so
   it reported `0.00 req/s` / 10000 errored).
 
-## 5.4.0 — unreleased — the i18n + email + Bun train
+## 5.4.0 — released 2026-09-01
 
-- ✅ [i18n default values](active/i18n-default-values.md) (P1y-bridge) — every framework message is a key with an in-code English default (`t(key, { defaultValue })`): middleware, Auth controller + validation, email, 404/500 sinks. **Behavior change**: a missing framework key answers English instead of leaking the raw key. `i18next` + `i18next-fs-backend` → **optional peers** (install only if you translate). The original declaration-check workaround is superseded by [optional i18n declarations](done/optional-i18n-declarations.md).
-- ✅ [Email templates v2](active/email-templates-v2.md) — shipped pug replaced by typed TS template modules compiled into dist; module peer → `^2.1.0` (its built-in js/ts engines render them out of the box); verification mails were hardcoded Russian → English + translatable; nullable-email guard on all User/UserOld mail methods; html `lang` follows request locale.
+- ✅ [i18n default values](done/i18n-default-values.md) (P1y-bridge) — every framework message is a key with an in-code English default (`t(key, { defaultValue })`): middleware, Auth controller + validation, email, 404/500 sinks. **Behavior change**: a missing framework key answers English instead of leaking the raw key. `i18next` + `i18next-fs-backend` → **optional peers** (install only if you translate). The original declaration-check workaround is superseded by [optional i18n declarations](done/optional-i18n-declarations.md).
+- ✅ [Email templates v2](done/email-templates-v2.md) — shipped pug replaced by typed TS template modules compiled into dist; module peer → `^2.1.0` (its built-in js/ts engines render them out of the box); verification mails were hardcoded Russian → English + translatable; nullable-email guard on all User/UserOld mail methods; html `lang` follows request locale.
 - ✅ `configureTestServer` — test bootstrap accepts project `Server` options so `bootHttp` runs under test (+ boot-ordering fix).
 - ✅ Typing fix: phantom `_id` dropped from plain nested paths on hydrated documents.
 - ✅ Dead locale keys trimmed (`auth.userProvided/errorUExist/errorUAlready/noAccessRights`, `email.newPassword`).
-- ✅ [Bun runtime support](active/bun-runtime-support.md) — CERTIFIED (768/768 under Bun 1.4; ~1.4–1.5× req/s vs Node on this machine); rides this release.
-- 🔜 P1y Phase 0 slice: `email.greeating` → `email.greeting` rename with old-key alias (folded into 5.4 by user decision 2026-08-31; see [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md)).
+- ✅ [Bun runtime support](done/bun-runtime-support.md) — Node-compatible Express runtime and packed MongoDB consumer certified for the release.
+- ✅ P1y Phase 0 slice: `email.greeating` → `email.greeting` rename with old-key alias (folded into 5.4 by user decision 2026-08-31; see [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md)).
+
+## 5.4.1 — prepared, not published (2026-09-11)
+
+User-selected patch release of the current post-5.4.0 fixes. See
+[release preparation](done/release-5.4.1.md) and `CHANGELOG.md` for verification
+and compatibility notes. Includes optional-i18n declarations, model/validation
+parity, security/cache fixes and the optional oxc-parser ^0.149.0 peer update.
+Package and documentation publication remain separate human steps.
 
 ## v5.5 target — P1q line
 
@@ -238,7 +249,7 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
   ResponseWriter is the instrumentation seam, and adding it afterwards means reopening the hot path.
 - Resolve `bodyParsing` — `'raw'`/`'none'` are accepted by the type, do nothing, and the JSDoc still
   promises v5.1. Implement (the request-side half of P1q's thesis) or remove them from the type.
-- Small independent items: Node 24 in the CI matrix, Redis tests skipping when Redis is absent,
+- Small independent items: Redis tests skipping when Redis is absent,
   the `OpenApiGenerator.ts` NUL byte, deploy-docs TLS/HTTP2 note.
 
 ## v5.6 target
@@ -249,9 +260,8 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 
 ## Unscheduled
 
-- [Bun runtime support](active/bun-runtime-support.md) — gate OPEN: Bun 1.4.0 stable ships the
-  bson fix; certification is active and the support rides 5.4 if green. The later native
-  `BunAdapter` remains separate/unscheduled.
+- A native `BunAdapter` remains separate/unscheduled; Bun through the Express
+  adapter already shipped in 5.4.0.
 - [Observability Phase 1 — metrics](queued/metrics-seam.md) stays queued until it is planned with the broader observability work. Its automatic HTTP response status/size measurements may build on P1q's response writer.
 - [Vendor-neutral logging + Pino](queued/logging-facade-and-pino.md) starts with an additive v5.x
   contract/conformance phase; the public logger, config and dependency replacement land together

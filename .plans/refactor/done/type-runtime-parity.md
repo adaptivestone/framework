@@ -1,5 +1,7 @@
 # Type/runtime parity audit fixes
 
+**Release target**: 5.4.1, prepared 2026-09-11. Publication is a separate human step.
+
 **Status:** done (2026-09-09); unreleased, left in the working tree for human review.
 **Depends on:** shipped model typing and AST codegen. Independent of the queued response/middleware v2 contracts.
 
