@@ -91,3 +91,17 @@ from the remote Node/Bun CI matrix, which preparation does not run.
 Release preparation is complete. The package, changelog, documentation and plan
 status are ready for review. Changes remain in both working trees; no commit,
 tag, push, package publication, site deployment or GitHub release was created.
+
+## Publication follow-up
+
+The user reported npm publication and explicitly requested the GitHub release on
+2026-09-11. npm 5.4.1 and the existing remote tag both resolve to
+`ade7ccadbe73e710a045f6ebc4e7665797cca895`; npm integrity matches the prepared
+tarball above. Publish GitHub release `5.4.1` against that existing tag using
+the changelog's fixes and upgrade notes. This follow-up authorizes the GitHub
+release; no new commit, tag, push, npm publish or site deployment is needed.
+
+Published and verified the stable [GitHub release 5.4.1](https://github.com/adaptivestone/framework/releases/tag/5.4.1)
+against the existing tag. It is the latest release, not a draft or prerelease;
+the saved body matches the prepared notes. Package and GitHub publication are
+complete. Documentation site deployment was not part of this follow-up.

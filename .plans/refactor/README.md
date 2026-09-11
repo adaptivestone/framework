@@ -23,9 +23,9 @@ Bun support (shipped 5.4.0) ──→ ongoing floor/latest CI certification
                                 native adapters remain separate
 
 v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
-5.4.1 (prepared) ───→ optional-i18n declarations + model/validation typing
+5.4.1 (shipped) ────→ optional-i18n declarations + model/validation typing
                       + request/auth/rate-limit/cache fixes
-                      └──→ patch settled by user 2026-09-11 · NOT YET PUBLISHED
+                      └──→ npm + GitHub release published 2026-09-11
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           P1q (v5.5) is unblocked by 5.4.0 shipping and remains queued
@@ -43,7 +43,7 @@ Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
 flowchart LR
     Foundation["✅ v5 foundations"] --> Patch["✅ 5.2.x–5.3.x shipped"]
     Patch --> Released["✅ 5.4.0: i18n defaults + email modules + Bun"]
-    Released --> Unreleased["✅ 5.4.1 prepared, not published: declaration + validation + security fixes"]
+    Released --> Unreleased["✅ 5.4.1 shipped: declaration + validation + security fixes"]
 
     Unreleased --> Responses["⏸ v5.5 universal responses"]
     Responses --> OpenAPI["⏸ v5.6 OpenAPI response contracts"]
@@ -126,7 +126,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
-| [release-5.4.1](done/release-5.4.1.md) | Release | Prepared 5.4.1: versions, release notes, docs and inspected tarball. All five gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Publication remains a human step. |
+| [release-5.4.1](done/release-5.4.1.md) | Release | Published to npm and GitHub on 2026-09-11. All five local gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Documentation site deployment is separate. |
 | [i18n-default-values](done/i18n-default-values.md) | P1y-bridge | Shipped in 5.4.0: English defaults and optional translation peers. Declaration checking without those peers is fixed in 5.4.1. |
 | [email-templates-v2](done/email-templates-v2.md) | Cross-repo | Shipped in 5.4.0: typed default email template modules, translatable English verification mail, and module peer ^2.1.0. |
 | [bun-runtime-support](done/bun-runtime-support.md) | Runtime | Shipped in 5.4.0: Bun >=1.4.0 support through the Express adapter, runtime tests and packed MongoDB consumers. Floor/latest certification continues in CI. |
@@ -232,13 +232,14 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 - ✅ [Bun runtime support](done/bun-runtime-support.md) — Node-compatible Express runtime and packed MongoDB consumer certified for the release.
 - ✅ P1y Phase 0 slice: `email.greeating` → `email.greeting` rename with old-key alias (folded into 5.4 by user decision 2026-08-31; see [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md)).
 
-## 5.4.1 — prepared, not published (2026-09-11)
+## 5.4.1 — released 2026-09-11
 
 User-selected patch release of the current post-5.4.0 fixes. See
 [release preparation](done/release-5.4.1.md) and `CHANGELOG.md` for verification
 and compatibility notes. Includes optional-i18n declarations, model/validation
 parity, security/cache fixes and the optional oxc-parser ^0.149.0 peer update.
-Package and documentation publication remain separate human steps.
+Published to npm and [GitHub Releases](https://github.com/adaptivestone/framework/releases/tag/5.4.1).
+Documentation site deployment remains separate.
 
 ## v5.5 target — P1q line
 
