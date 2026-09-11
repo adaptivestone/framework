@@ -30,8 +30,8 @@ const EN = {
   'auth.emailProvided': 'Email must be provided',
   'auth.emailValid': 'Email is not valid',
   'auth.passwordProvided': 'Password must be provided',
-  'auth.passwordValid':
-    'Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>',
+  'auth.passwordTooShort': 'Password must be at least {{min}} characters',
+  'auth.passwordTooLong': 'Password must be at most {{max}} characters',
   'auth.passwordRecoveryTokenProvided':
     'Password recovery token must be provided',
   'auth.nickNameValid': 'Nick name is not valid,only a-z,A-Z,0-9',
@@ -52,7 +52,6 @@ const EN = {
 } as const;
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const PASSWORD_RE = /^[a-zA-Z0-9!@#$%ˆ^&*()_+\-{}[\]<>]+$/;
 const NICK_RE = /^[a-zA-Z0-9_\-.]+$/;
 const isMissing = (v: unknown) => v === undefined || v === null || v === '';
 // Coerce primitives to string the way yup's `string()` did, so numeric/boolean
@@ -93,6 +92,54 @@ const pushEmailIssues = (email: unknown, issues: ValidationIssue[]) => {
       message: 'auth.emailValid',
       path: ['email'],
       params: { defaultValue: EN['auth.emailValid'] },
+    });
+  }
+};
+
+/** Shared registration/reset policy; login intentionally keeps legacy compatibility. */
+const pushPasswordIssues = (
+  password: unknown,
+  issues: ValidationIssue[],
+  authConfig: Record<string, unknown>,
+) => {
+  if (isMissing(password) || typeof password !== 'string') {
+    issues.push({
+      message: 'auth.passwordProvided',
+      path: ['password'],
+      params: { defaultValue: EN['auth.passwordProvided'] },
+    });
+    return;
+  }
+  const policy = authConfig.passwordPolicy as
+    | { minLength?: number; maxLength?: number }
+    | undefined;
+  const min = policy?.minLength ?? 15;
+  const max = policy?.maxLength ?? 128;
+  if (
+    !Number.isInteger(min) ||
+    min < 1 ||
+    !Number.isInteger(max) ||
+    max < min
+  ) {
+    throw new Error(
+      'Invalid auth.passwordPolicy: require 1 <= minLength <= maxLength',
+    );
+  }
+  // Count Unicode code points, without normalizing or truncating the secret.
+  const length = Array.from(password).length;
+  if (length < min || length > max) {
+    const message =
+      length < min ? 'auth.passwordTooShort' : 'auth.passwordTooLong';
+    issues.push({
+      message,
+      path: ['password'],
+      params: {
+        min,
+        max,
+        defaultValue: EN[message]
+          .replace('{{min}}', String(min))
+          .replace('{{max}}', String(max)),
+      },
     });
   }
 };
@@ -168,22 +215,7 @@ class Auth extends AbstractController {
             const lastName = coerceStr(v.lastName);
             const issues: ValidationIssue[] = [];
             pushEmailIssues(email, issues);
-            if (isMissing(password)) {
-              issues.push({
-                message: 'auth.passwordProvided',
-                path: ['password'],
-                params: { defaultValue: EN['auth.passwordProvided'] },
-              });
-            } else if (
-              typeof password !== 'string' ||
-              !PASSWORD_RE.test(password)
-            ) {
-              issues.push({
-                message: 'auth.passwordValid',
-                path: ['password'],
-                params: { defaultValue: EN['auth.passwordValid'] },
-              });
-            }
+            pushPasswordIssues(password, issues, this.app.getConfig('auth'));
             // nickName is optional, but an empty string is invalid (matches the
             // old yup `.matches()` behavior — only `null`/`undefined` skip).
             if (
@@ -252,22 +284,7 @@ class Auth extends AbstractController {
             const password = coerceStr(v.password);
             const passwordRecoveryToken = coerceStr(v.passwordRecoveryToken);
             const issues: ValidationIssue[] = [];
-            if (isMissing(password)) {
-              issues.push({
-                message: 'auth.passwordProvided',
-                path: ['password'],
-                params: { defaultValue: EN['auth.passwordProvided'] },
-              });
-            } else if (
-              typeof password !== 'string' ||
-              !PASSWORD_RE.test(password)
-            ) {
-              issues.push({
-                message: 'auth.passwordValid',
-                path: ['password'],
-                params: { defaultValue: EN['auth.passwordValid'] },
-              });
-            }
+            pushPasswordIssues(password, issues, this.app.getConfig('auth'));
             if (isMissing(passwordRecoveryToken)) {
               issues.push({
                 message: 'auth.passwordRecoveryTokenProvided',

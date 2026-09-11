@@ -9,8 +9,8 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { IApp } from '../../../server.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
-import { MalformedPathError } from './match.ts';
-import type { MatchResult, MiddlewareEntry } from './RouteNode.ts';
+import { getMatchedNode, MalformedPathError } from './match.ts';
+import type { MatchResult, MiddlewareEntry, RouteNode } from './RouteNode.ts';
 import type { RouteRegistry } from './RouteRegistry.ts';
 
 const instanceCache = new WeakMap<MiddlewareEntry, AbstractMiddleware>();
@@ -25,6 +25,10 @@ export function createExpressAdapter(
   registry: RouteRegistry,
   app: IApp,
 ): ExpressAdapter {
+  const routeTemplates = new WeakMap<RouteNode, string>();
+  const indexTemplates = () =>
+    registry.walk((node, path) => routeTemplates.set(node, path));
+  indexTemplates();
   return async function dispatch(req, res, next) {
     let result: MatchResult | null;
     try {
@@ -51,6 +55,21 @@ export function createExpressAdapter(
 
     // Populate request with match metadata before middleware runs.
     req.params = result.params;
+    // Follow Express's registered-template convention. Refresh on a miss for
+    // routes added after mounting; ordinary dispatch stays O(1).
+    const matchedNode = getMatchedNode(result);
+    if (matchedNode && !routeTemplates.has(matchedNode)) {
+      indexTemplates();
+    }
+    req.route = {
+      path: matchedNode ? routeTemplates.get(matchedNode) : 'unmatched',
+      methods: Object.fromEntries(
+        Object.keys(matchedNode?.methods ?? {}).map((method) => [
+          method.toLowerCase(),
+          true,
+        ]),
+      ),
+    };
     // biome-ignore lint/suspicious/noExplicitAny: routeMeta is a runtime extension on req
     (req as any).routeMeta = {
       bodyParsing: result.bodyParsing,

@@ -450,3 +450,49 @@ describe('request parser message translation', () => {
     assert.deepStrictEqual(payload, { message: 'Не удалось разобрать запрос' });
   });
 });
+
+describe('request parser media-type isolation', () => {
+  it('enforces declared limits when JSON parameters contain multipart', async () => {
+    const result = await postToParser({
+      body: JSON.stringify({ value: 'x'.repeat(100) }),
+      contentType: 'application/json; note=multipart',
+      params: { maxFieldsSize: 32 },
+    });
+    assert.strictEqual(result.status, 413);
+    assert.deepStrictEqual(result.body, {});
+  });
+
+  it('parses bounded JSON regardless of misleading header parameters', async () => {
+    for (const contentType of [
+      'application/json; note=multipart',
+      'APPLICATION/JSON; charset=utf-8',
+    ]) {
+      const result = await postToParser({ body: '{"ok":true}', contentType });
+      assert.strictEqual(result.status, 200);
+      assert.deepStrictEqual(result.body, { ok: true });
+    }
+  });
+
+  it('keeps multipart boundaries containing json on the multipart parser', async () => {
+    const result = await postToParser({
+      body: multipartBody.replaceAll(boundary, 'boundary-json'),
+      contentType: 'MULTIPART/FORM-DATA; boundary=boundary-json',
+      params: { maxFieldsSize: 8 },
+    });
+    assert.strictEqual(result.status, 200);
+    assert.strictEqual(result.body.title, 'hello');
+    assert.ok(result.body.upload);
+  });
+
+  it('bounds streamed JSON even without a declared length', async () => {
+    const req = makeRequest({
+      body: JSON.stringify({ value: 'x'.repeat(100) }),
+      contentType: 'application/json; note=multipart',
+    });
+    delete req.headers['content-length'];
+    req.headers['transfer-encoding'] = 'chunked';
+    const result = await runParser(req, { maxFieldsSize: 32 });
+    assert.strictEqual(result.status, 413);
+    assert.deepStrictEqual(req.body, {});
+  });
+});

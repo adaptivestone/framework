@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
+import i18next, { type i18n } from 'i18next';
 import { appInstance } from '../../helpers/appInstance.ts';
 import type { TI18n } from './I18n.ts';
+import type { I18nBaseInstance } from './types.ts';
 
 /**
  * With `i18n.enabled: false` the service hands out a fallback translator
@@ -43,4 +45,50 @@ describe('i18n service fallback translator (i18n disabled)', () => {
       'You do not have access',
     );
   });
+
+  it('accepts default-value options and fallback key arrays', () => {
+    assert.strictEqual(
+      fallback.t(['app.missing', 'app.fallback']),
+      'app.fallback',
+    );
+    assert.strictEqual(
+      fallback.t(['app.missing', 'app.fallback'], {
+        defaultValue: 'Default',
+      }),
+      'Default',
+    );
+    assert.strictEqual(
+      fallback.t('app.missing', 'Default', { name: 'Ada' }),
+      'Default',
+    );
+  });
+});
+
+it('accepts a real i18next instance through the public structural types', async () => {
+  const instance = i18next.createInstance();
+  await instance.init({
+    lng: 'en',
+    resources: {
+      en: {
+        translation: { greeting: 'Hello {{name}}', nested: { value: 'ok' } },
+      },
+    },
+  });
+  const translator: TI18n = instance;
+  const base: I18nBaseInstance = instance;
+  // Opt-in consumers retain the actual vendor instance and its full API.
+  const vendor = base as i18n;
+  assert.strictEqual(
+    vendor.getResource('en', 'translation', 'greeting'),
+    'Hello {{name}}',
+  );
+  assert.strictEqual(translator.t('greeting', { name: 'Ada' }), 'Hello Ada');
+  assert.strictEqual(
+    translator.t('missing', 'Default', { name: 'Ada' }),
+    'Default',
+  );
+  assert.deepStrictEqual(translator.t('nested', { returnObjects: true }), {
+    value: 'ok',
+  });
+  assert.ok(base.cloneInstance({ lng: 'en', initAsync: false }));
 });

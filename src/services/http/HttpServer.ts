@@ -8,11 +8,11 @@ import type {
   Response,
 } from 'express';
 import express from 'express';
-import type { TFunction } from 'i18next';
 import type ThttpConfig from '../../config/http.ts';
 import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
+import type { TI18n } from '../i18n/types.ts';
 import {
   builtInErrorHandlers,
   type ErrorHandlerFn,
@@ -36,10 +36,7 @@ export interface FrameworkRequest extends Request {
     request: Record<string, unknown>;
     query: Record<string, unknown>;
     params: Record<string, unknown>;
-    i18n?: {
-      t: TFunction;
-      language: string;
-    };
+    i18n?: TI18n;
   };
 }
 

@@ -4,6 +4,14 @@
 **Depends on**: nothing. **Feeds**: [P1y](../queued/i18n-contracts-and-tooling.md) Phase 4 (v6 `framework` namespace cutover — its codemod must carry the keys added here).
 **Decided**: 2026-08-31 with three-way review (Claude design + grok/codex critiques + cross-framework research). Pattern = Spring's `getMessage(code, args, defaultMessage)`: key + in-code English default at the emit site; the always-loaded vendor catalog (Laravel/Rails/Django model) arrives later via P1y Phase 4, with `defaultValue` staying as the safety net.
 
+## September 11 declaration correction
+
+The current consumer-failure request supersedes the August 31 decision above to
+accept mandatory i18next types and require `skipLibCheck: true`. The focused
+[declaration fix](../done/optional-i18n-declarations.md) introduces structural translation
+types and a packed-consumer compile gate with both i18n peers absent. P1y's
+generated key types, selectors and runtime/backend work remain queued.
+
 ## Problem
 
 Framework middleware returns hardcoded English (`Please login to application`) — untranslatable. Framework controllers/validation/email use bare i18n keys with **no default** — when the app's locale files lack a key (the example project copied only 3 of 26), the **raw key leaks** into API responses (`auth.messageSome`). With `i18n.enabled: false` the fallback `t = (text) => text` leaks keys too, so i18n is not genuinely optional today.

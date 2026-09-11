@@ -9,6 +9,8 @@ export default {
   // and throws with the `generateRandomBytes` hint if it's missing.
   saltSecret: process.env.AUTH_SALT,
   isAuthWithVerificationFlow: true,
+  // Registration/reset only. Existing passwords remain valid at login.
+  passwordPolicy: { minLength: 15, maxLength: 128 },
   // Password hashing cost for the v2 scrypt scheme. `ln` = log2(N). Raise over
   // time to harden — existing hashes upgrade to the new cost on next login.
   // Tests lower this for speed; scrypt is memory-hard, so the production value

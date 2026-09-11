@@ -1,7 +1,13 @@
 import { unlink } from 'node:fs/promises';
 import type { NextFunction, Response } from 'express';
-import formidable from 'formidable';
+import formidable, {
+  json,
+  multipart,
+  octetstream,
+  querystring,
+} from 'formidable';
 import type ThttpConfig from '../../../config/http.ts';
+import { normalizeContentType } from '../../validate/contentType.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
@@ -24,16 +30,27 @@ class RequestParser extends AbstractMiddleware {
     const { requestParser } = this.app.getConfig('http') as typeof ThttpConfig;
     // Config defaults bound unauthenticated uploads; explicit per-mount params win.
     const parserOptions = { ...requestParser, ...this.params };
-    const form = formidable(parserOptions); // not in construstor as reuse formidable affects performance
+    const mediaType = normalizeContentType(req.headers?.['content-type']);
+    const isMultipart =
+      mediaType === 'multipart/form-data' || mediaType === 'multipart/related';
+    // Formidable's default plugins inspect the entire header. Select one for
+    // known media types so parameter text cannot switch the parser.
+    const plugin = isMultipart
+      ? multipart
+      : mediaType === 'application/json' || mediaType?.endsWith('+json')
+        ? json
+        : mediaType === 'application/x-www-form-urlencoded'
+          ? querystring
+          : mediaType === 'application/octet-stream'
+            ? octetstream
+            : undefined;
+    const form = formidable({
+      ...parserOptions,
+      ...(plugin ? { enabledPlugins: [plugin] } : {}),
+    });
 
-    // formidable enforces `maxFieldsSize` only for MULTIPART field data — its
-    // JSON and urlencoded parsers buffer the whole body with no cap. Apply the
-    // same field-data ceiling to those bodies so a large unauthenticated request
-    // can't exhaust process memory. Multipart keeps formidable's own per-file /
-    // per-field caps.
-    const isMultipart = String(req.headers?.['content-type'] ?? '').includes(
-      'multipart/form-data',
-    );
+    // JSON/urlencoded parsing buffers the body; multipart has its own field
+    // and file limits. Unknown media types retain the v5 fallback, bounded below.
     const maxBodySize =
       typeof parserOptions.maxFieldsSize === 'number'
         ? parserOptions.maxFieldsSize
@@ -53,15 +70,18 @@ class RequestParser extends AbstractMiddleware {
           ),
         });
       }
-      // Guard the streaming path too (chunked / absent Content-Length): abort as
-      // soon as the running byte count crosses the ceiling.
-      form.on('progress', (bytesReceived: number) => {
-        if (bytesReceived > maxBodySize) {
-          bodyTooLarge = true;
-          req.destroy();
-        }
-      });
     }
+    // Also guard chunked bodies. Only a genuinely selected multipart parser
+    // may rely on the separate file/field limits.
+    form.on('progress', (bytesReceived: number) => {
+      if (
+        (form as unknown as { type?: string }).type !== 'multipart' &&
+        bytesReceived > maxBodySize
+      ) {
+        bodyTooLarge = true;
+        req.destroy();
+      }
+    });
 
     // Track every temp file formidable opens (via fileBegin, so a file that
     // later errors mid-write is tracked too) and unlink them once the response
@@ -88,6 +108,11 @@ class RequestParser extends AbstractMiddleware {
     let files: formidable.Files<string>;
     try {
       [fields, files] = await form.parse(req);
+      // Destroying the stream cannot cancel a chunk already inside the parser.
+      // Even if that chunk completes parsing, an oversized body must not advance.
+      if (bodyTooLarge) {
+        throw new Error('Request body exceeds maxFieldsSize');
+      }
     } catch (err) {
       this.logger?.error(`Parsing failed ${err}`);
       // formidable tags limit-exceeded errors (file/field size, file/field

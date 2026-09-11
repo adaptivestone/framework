@@ -5,8 +5,8 @@
  * later) compose these primitives into per-route `Request<M, P>` helpers.
  */
 
-import type { TFunction } from 'i18next';
 import type { IApp } from '../../server.ts';
+import type { TI18n } from '../i18n/types.ts';
 import type { StandardSchemaV1 } from '../validate/types.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 
@@ -40,7 +40,7 @@ export interface AppInfoExtensions {}
 export interface BaseAppInfo {
   app: IApp;
   ip?: string | undefined;
-  i18n: { t: TFunction; language: string };
+  i18n: TI18n;
   request: Record<string, unknown>;
   query: Record<string, unknown>;
   /**

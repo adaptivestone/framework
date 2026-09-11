@@ -1,8 +1,9 @@
-import type { i18n, TFunction } from 'i18next';
+import type { i18n } from 'i18next';
 import type i18nConfig from '../../config/i18n.ts';
 import Base from '../../modules/Base.ts';
+import type { I18nBaseInstance, TI18n } from './types.ts';
 
-export type TI18n = { t: TFunction; language: string };
+export type { TI18n } from './types.ts';
 
 const MISSING_I18NEXT_MESSAGE =
   'Loading translations requires the optional peer dependencies `i18next` and ' +
@@ -37,7 +38,7 @@ async function loadI18next() {
 }
 
 export class I18n extends Base {
-  #cache: { [key: string]: i18n } = {};
+  #cache: { [key: string]: TI18n } = {};
 
   #i18nBase?: i18n;
   #i18nBasePromise?: Promise<i18n>;
@@ -49,15 +50,16 @@ export class I18n extends Base {
    * messages emitted with an in-code English default stay English instead of
    * leaking the raw key. A call with no default keeps returning the key.
    */
-  #i18nFallback: { t: TFunction; language: string } = {
-    t: ((key, options) =>
+  #i18nFallback: TI18n = {
+    t: (key, options) =>
       typeof options === 'string'
         ? options
-        : (options?.defaultValue ?? key)) as TFunction,
+        : (options?.defaultValue ??
+          (Array.isArray(key) ? (key.at(-1) ?? '') : key)),
     language: 'en',
   };
 
-  async getI18nForLang(lang?: string) {
+  async getI18nForLang(lang?: string): Promise<TI18n> {
     const i18NConfig = this.app.getConfig('i18n') as typeof i18nConfig;
     if (!i18NConfig.enabled) {
       return this.#i18nFallback;
@@ -91,7 +93,7 @@ export class I18n extends Base {
    * installed — use `getI18nBaseInstanceIfAvailable()` where falling back to
    * the framework's English defaults is the better answer.
    */
-  async getI18nBaseInstance() {
+  async getI18nBaseInstance(): Promise<I18nBaseInstance> {
     if (this.#i18nBase) {
       return this.#i18nBase;
     }
@@ -121,7 +123,7 @@ export class I18n extends Base {
    * Base i18next instance, or `null` when the optional packages are missing —
    * logged once, not per request. Any other initialisation failure still throws.
    */
-  async getI18nBaseInstanceIfAvailable(): Promise<i18n | null> {
+  async getI18nBaseInstanceIfAvailable(): Promise<I18nBaseInstance | null> {
     try {
       return await this.getI18nBaseInstance();
     } catch (e) {

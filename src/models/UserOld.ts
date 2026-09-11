@@ -1,4 +1,3 @@
-import type { TFunction } from 'i18next';
 import { appInstance } from '../helpers/appInstance.ts';
 import { burnPasswordVerify, scryptAsync } from '../helpers/crypto.ts';
 import type {
@@ -7,6 +6,7 @@ import type {
 } from '../modules/AbstractModel.ts';
 import AbstractModel from '../modules/AbstractModel.ts';
 import type { IApp } from '../server.ts';
+import type { TI18n } from '../services/i18n/types.ts';
 
 interface IUser {
   avatar: string;
@@ -264,7 +264,7 @@ class UserOld extends AbstractModel<
 
   async sendPasswordRecoveryEmail(
     this: InstanceType<UserOld['mongooseModel']>,
-    i18n: { t: TFunction; language: string },
+    i18n: TI18n,
   ) {
     if (!this.email) {
       this.getSuper().logger?.error(
@@ -362,7 +362,7 @@ class UserOld extends AbstractModel<
 
   async sendVerificationEmail(
     this: InstanceType<UserOld['mongooseModel']>,
-    i18n: { t: TFunction; language: string },
+    i18n: TI18n,
   ) {
     if (!this.email) {
       this.getSuper().logger?.error(

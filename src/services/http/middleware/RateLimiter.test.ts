@@ -68,7 +68,7 @@ describe('rate limiter methods', () => {
       },
     } as unknown as FrameworkRequest);
 
-    assert.strictEqual(res, '192.168.0.0__someId');
+    assert.strictEqual(res, '192.168.0.0_ALL:unmatched_someId');
   });
 
   it('generateConsumeKey with request works correctly', async () => {
@@ -88,7 +88,7 @@ describe('rate limiter methods', () => {
       },
     } as FrameworkRequest);
 
-    assert.strictEqual(res, '192.168.0.0__foo@example.com');
+    assert.strictEqual(res, '192.168.0.0_ALL:unmatched_foo@example.com');
   });
 
   it('middleware without driver should fail', async () => {

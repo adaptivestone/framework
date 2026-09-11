@@ -9,7 +9,8 @@
 #   - internal subpaths are NOT exported (the doc-24 exports map);
 #   - a Server constructs from the published dist;
 #   - optional peers stay absent, and framework messages still answer in English
-#     without `i18next` installed.
+#     without `i18next` installed;
+#   - core declarations compile with skipLibCheck: false without the i18n peers.
 #
 set -euo pipefail
 
@@ -30,8 +31,54 @@ trap 'rm -rf "$SCRATCH" "$TARBALL_PATH"' EXIT
 
 echo "→ Installing into a scratch consumer"
 cd "$SCRATCH"
-npm init -y >/dev/null 2>&1
-npm install --silent --no-audit --no-fund "$TARBALL_PATH"
+node --input-type=module - "$ROOT/package.json" "$TARBALL_PATH" <<'EOF'
+import { readFileSync, writeFileSync } from 'node:fs';
+const framework = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+writeFileSync('package.json', JSON.stringify({
+  name: 'framework-smoke-consumer',
+  version: '1.0.0',
+  private: true,
+  type: 'module',
+  dependencies: { [framework.name]: `file:${process.argv[3]}` },
+  devDependencies: Object.fromEntries(
+    ['@types/node', '@types/express', '@types/formidable'].map(
+      (name) => [name, framework.devDependencies[name]],
+    ),
+  ),
+}));
+EOF
+npm install --silent --no-audit --no-fund
+
+cp "$ROOT/scripts/fixtures/optional-i18n.mts" ./consumer.mts
+cat > tsconfig.json <<'EOF'
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "files": ["consumer.mts"]
+}
+EOF
+
+echo "→ Type-checking the installed core declarations without i18n peers"
+node --input-type=module <<'EOF'
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+for (const from of [
+  import.meta.url,
+  import.meta.resolve('@adaptivestone/framework/package.json'),
+]) {
+  const require = createRequire(from);
+  for (const peer of ['i18next', 'i18next-fs-backend']) {
+    assert.throws(() => require.resolve(peer), { code: 'MODULE_NOT_FOUND' });
+  }
+}
+EOF
+"$ROOT/node_modules/.bin/tsc" --project tsconfig.json --checkers 1
 
 cat > check.mjs <<'EOF'
 import { existsSync, readdirSync } from 'node:fs';

@@ -128,6 +128,8 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [optional-i18n-declarations](done/optional-i18n-declarations.md) | Patch | Core declarations compile with both i18n peers absent and `skipLibCheck: false`; packed regression, 838 tests and all five gates pass. Supersedes P1y-bridge's workaround; vendor-specific typing stays opt-in. |
+| [type-guidance-docs-follow-up](done/type-guidance-docs-follow-up.md) | Docs / types | Model parity, validation composition and TypeScript 7 checking guidance updated; unreleased notices, docs build and generated LLM context verified. |
 | [model-boundary-prototype](done/model-boundary-prototype.md) | Types | One-model proof: independent generated contracts remove Mongoose from application checking; same-program wrappers do not reduce cost. Adapter compilation still required. Prototype only. |
 | [model-type-cost-experiments](done/model-type-cost-experiments.md) | Types | Cold cost mostly predates recent fixes; tested representations offered little benefit. One checker plus incremental caching reused an unchanged check with zero new instantiations. |
 | [compiler-type-cost-investigation](done/compiler-type-cost-investigation.md) | Types | Profiled structural model-type comparison costs; one checker reduced reported memory by about 62% and generic instantiations by 68% in a private snapshot. Analysis only. |
@@ -219,7 +221,7 @@ Version settled 2026-08-08: it carries a behavior change (`CastError` 500 → 40
 
 ## 5.4.0 — unreleased — the i18n + email + Bun train
 
-- ✅ [i18n default values](active/i18n-default-values.md) (P1y-bridge) — every framework message is a key with an in-code English default (`t(key, { defaultValue })`): middleware, Auth controller + validation, email, 404/500 sinks. **Behavior change**: a missing framework key answers English instead of leaking the raw key. `i18next` + `i18next-fs-backend` → **optional peers** (install only if you translate; `skipLibCheck: true` or install for clean d.ts).
+- ✅ [i18n default values](active/i18n-default-values.md) (P1y-bridge) — every framework message is a key with an in-code English default (`t(key, { defaultValue })`): middleware, Auth controller + validation, email, 404/500 sinks. **Behavior change**: a missing framework key answers English instead of leaking the raw key. `i18next` + `i18next-fs-backend` → **optional peers** (install only if you translate). The original declaration-check workaround is superseded by [optional i18n declarations](done/optional-i18n-declarations.md).
 - ✅ [Email templates v2](active/email-templates-v2.md) — shipped pug replaced by typed TS template modules compiled into dist; module peer → `^2.1.0` (its built-in js/ts engines render them out of the box); verification mails were hardcoded Russian → English + translatable; nullable-email guard on all User/UserOld mail methods; html `lang` follows request locale.
 - ✅ `configureTestServer` — test bootstrap accepts project `Server` options so `bootHttp` runs under test (+ boot-ordering fix).
 - ✅ Typing fix: phantom `_id` dropped from plain nested paths on hydrated documents.

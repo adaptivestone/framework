@@ -117,7 +117,16 @@ class RateLimiter extends AbstractMiddleware {
       }
     }
     if (route) {
-      key.push(`${req.baseUrl ?? ''}${req.path ?? ''}`); // to avoid quesry params
+      // Concrete URLs are attacker-controlled: aliases and different IDs
+      // must consume the registered route's budget. A global/unmatched limiter
+      // uses one fixed bucket until routing has established a template.
+      const method =
+        req.method === 'HEAD' &&
+        req.route?.methods?.get &&
+        !req.route?.methods?.head
+          ? 'GET'
+          : (req.method ?? 'ALL');
+      key.push(`${method}:${req.route?.path ?? 'unmatched'}`);
     }
     if (user && req.appInfo?.user) {
       key.push(req.appInfo?.user.id);

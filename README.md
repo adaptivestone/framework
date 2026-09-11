@@ -70,6 +70,40 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Authentication and cache upgrade notes
+
+The built-in registration and password-reset routes accept passwords of 15–128
+Unicode code points, including spaces. Existing passwords remain usable at login.
+To customize the length limits, extend the default in your application's
+`src/config/auth.ts`:
+
+```ts
+import auth from '@adaptivestone/framework/config/auth.js';
+
+export default {
+  ...auth,
+  passwordPolicy: { minLength: 15, maxLength: 128 },
+};
+```
+
+The policy applies to the built-in HTTP routes; direct model writes and custom
+password-change endpoints must enforce their own policy. Translate
+`auth.passwordTooShort` and `auth.passwordTooLong` to customize the validation
+messages (`min` and `max` are available as interpolation parameters).
+
+With `consumeKeyComponents.route` enabled, rate limits use the registered route
+and method. Case variants, encoded spellings, trailing slashes and different
+parameter values share the same budget; implicit HEAD shares GET's budget.
+A limiter mounted before routing shares one bucket per method, without splitting
+by the requested URL. Upgrading resets existing rate-limit counters once; roll
+out to all workers promptly so older workers cannot keep separate alias buckets.
+
+Cache keys now include a `cache-v2` marker so strings and signed BigInts round-trip
+without collisions. The upgrade starts with a cold cache; older keys expire under
+their original TTLs. During mixed-version deployment, each version invalidates
+only its own key space, so complete the rollout before relying on cross-worker
+cache invalidation. Cache hit/miss logs no longer include keys or values.
+
 ## Generated types
 
 The framework generates `genTypes.d.ts` (typed `getConfig`/`getModel`) and

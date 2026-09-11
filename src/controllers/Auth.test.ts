@@ -61,17 +61,17 @@ describe('auth route schemas', () => {
     [
       [{}, ['auth.emailProvided', 'auth.passwordProvided']],
       [
-        { email: 'valid@example.com', password: 'contains a space' },
-        ['auth.passwordValid'],
+        { email: 'valid@example.com', password: 'a' },
+        ['auth.passwordTooShort'],
       ],
       [
-        { email: 'valid@example.com', password: 'valid123', nickName: '' },
+        { email: 'valid@example.com', password: userPassword, nickName: '' },
         ['auth.nickNameValid'],
       ],
       [
         {
           email: 'valid@example.com',
-          password: 'valid123',
+          password: userPassword,
           firstName: {},
           lastName: [],
         },
@@ -92,8 +92,8 @@ describe('auth route schemas', () => {
     [
       [{}, ['auth.passwordProvided', 'auth.passwordRecoveryTokenProvided']],
       [
-        { password: 'contains a space', passwordRecoveryToken: 'token' },
-        ['auth.passwordValid'],
+        { password: 'a', passwordRecoveryToken: 'token' },
+        ['auth.passwordTooShort'],
       ],
     ],
     'validates password recovery input %#',
@@ -105,6 +105,59 @@ describe('auth route schemas', () => {
       );
     },
   );
+
+  testEach(
+    ['/register', '/recover-password'] as const,
+    'enforces the new-password policy on %s',
+    async (path) => {
+      for (const [password, expected] of [
+        ['a', 'auth.passwordTooShort'],
+        ['a'.repeat(14), 'auth.passwordTooShort'],
+        ['😀'.repeat(14), 'auth.passwordTooShort'],
+        ['a'.repeat(15), undefined],
+        ['😀'.repeat(15), undefined],
+        ['a long passphrase with spaces', undefined],
+        ['a'.repeat(128), undefined],
+        ['a'.repeat(129), 'auth.passwordTooLong'],
+      ] as const) {
+        const result = await validate(path, {
+          email: 'policy@example.com',
+          passwordRecoveryToken: 'token',
+          password,
+        });
+        assert.deepStrictEqual(
+          result.issues?.map((issue) => issue.message) ?? [],
+          expected ? [expected] : [],
+        );
+      }
+    },
+  );
+
+  it('keeps legacy short passwords valid at the login boundary', async () => {
+    const result = await validate('/login', {
+      email: 'legacy@example.com',
+      password: 'a',
+    });
+    assert.strictEqual(result.issues, undefined);
+  });
+
+  it('supports application-specific password length limits', async () => {
+    const app = {
+      getConfig: () => ({ passwordPolicy: { minLength: 8, maxLength: 20 } }),
+    } as unknown as IApp;
+    const route = new Auth(app, '').routes.post['/register'];
+    assert.ok(
+      route &&
+        typeof route !== 'function' &&
+        route.request &&
+        '~standard' in route.request,
+    );
+    const result = await route.request['~standard'].validate({
+      email: 'policy@example.com',
+      password: '12345678',
+    });
+    assert.strictEqual(result.issues, undefined);
+  });
 
   // Every framework-authored issue ships its English text as `params.
   // defaultValue`; `ValidateService.translateInPlace` forwards `params` to
@@ -128,16 +181,13 @@ describe('auth route schemas', () => {
     assert.deepStrictEqual(
       await defaults('/register', {
         email: 'nope',
-        password: 'contains a space',
+        password: 'a',
         nickName: '',
         firstName: {},
       }),
       [
         ['auth.emailValid', 'Email is not valid'],
-        [
-          'auth.passwordValid',
-          'Password is not valid,only a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>',
-        ],
+        ['auth.passwordTooShort', 'Password must be at least 15 characters'],
         ['auth.nickNameValid', 'Nick name is not valid,only a-z,A-Z,0-9'],
         ['auth.nameValid', 'Name is not valid'],
       ],
@@ -146,7 +196,7 @@ describe('auth route schemas', () => {
 
   it('carries the English default for the recovery-token issue key', async () => {
     assert.deepStrictEqual(
-      await defaults('/recover-password', { password: 'valid123' }),
+      await defaults('/recover-password', { password: userPassword }),
       [
         [
           'auth.passwordRecoveryTokenProvided',
@@ -595,7 +645,7 @@ describe('auth', () => {
         },
         body: JSON.stringify({
           email: userEmail2,
-          password: '123',
+          password: userPassword,
           nickName: 'test',
         }),
       }).catch(() => ({ status: 500 }));
@@ -835,7 +885,7 @@ describe('auth', () => {
           method: 'POST',
           headers: { 'Content-type': 'application/json' },
           body: JSON.stringify({
-            password: 'newPass',
+            password: 'new recovery passphrase',
             passwordRecoveryToken: token,
           }),
         });
@@ -873,7 +923,7 @@ describe('auth', () => {
             'Content-type': 'application/json',
           },
           body: JSON.stringify({
-            password: 'newPass',
+            password: 'new recovery passphrase',
             passwordRecoveryToken: token,
           }),
         },
@@ -907,7 +957,7 @@ describe('auth', () => {
             'Content-type': 'application/json',
           },
           body: JSON.stringify({
-            password: 'newPass',
+            password: 'new recovery passphrase',
             passwordRecoveryToken: '13123',
           }),
         },

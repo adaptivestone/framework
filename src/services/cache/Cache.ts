@@ -48,7 +48,8 @@ class Cache extends Base {
    * @param key key to add namespace
    */
   getKeyWithNameSpace(key: string) {
-    return `${this.namespace}-${key}`;
+    // Isolate the lossless codec from older processes during rolling upgrades.
+    return `${this.namespace}-cache-v2-${key}`;
   }
 
   /**
@@ -112,18 +113,15 @@ class Cache extends Base {
       if (cached) {
         try {
           parsedResult = JSON.parse(cached, (_jsonkey, value) => {
-            if (typeof value === 'string' && /^\d+n$/.test(value)) {
-              return BigInt(value.slice(0, value.length - 1));
+            if (typeof value === 'string' && value.startsWith('~n:')) {
+              return BigInt(value.slice(3));
             }
-            return value;
+            return typeof value === 'string' && value.startsWith('~s:')
+              ? value.slice(3)
+              : value;
           });
           cacheHit = true;
-          this.logger?.verbose(
-            `getSetValueFromCache FROM CACHE key ${key}, value ${cached.substring(
-              0,
-              100,
-            )}`,
-          );
+          this.logger?.verbose('Cache hit');
         } catch {
           // This class only ever stores `JSON.stringify` output, so a value that
           // won't parse is genuine corruption. Treat it as a miss — recompute
@@ -135,11 +133,15 @@ class Cache extends Base {
       }
 
       if (!cacheHit) {
-        this.logger?.verbose(`getSetValueFromCache not found for key ${key}`);
+        this.logger?.verbose('Cache miss');
         parsedResult = await onNotFound();
 
         const serialized = JSON.stringify(parsedResult, (_jsonkey, value) =>
-          typeof value === 'bigint' ? `${value}n` : value,
+          typeof value === 'bigint'
+            ? `~n:${value}`
+            : typeof value === 'string' && value.startsWith('~')
+              ? `~s:${value}`
+              : value,
         );
         // Skip the write when the cache is unreachable, or the value serializes
         // to `undefined` (which the redis client rejects). The write is

@@ -1,6 +1,6 @@
-import type { TFunction } from 'i18next';
 import Base from '../../modules/Base.ts';
 import type { IApp } from '../../server.ts';
+import type { TranslationFunction } from '../i18n/types.ts';
 import { standardSchemaDriver } from './drivers/StandardSchemaDriver.ts';
 import { yupDriver } from './drivers/YupDriver.ts';
 import type { ValidatorDriver } from './types.ts';
@@ -82,7 +82,7 @@ class ValidateService extends Base {
    */
   async validate(
     data: unknown,
-    i18n?: { t: TFunction } | null,
+    i18n?: { t: TranslationFunction } | null,
   ): Promise<unknown> {
     if (!this.driver) {
       return data;
@@ -117,7 +117,7 @@ const I18N_KEY_RE = /^[\w.:-]+$/;
  * message into it turns a 400 response into a reflected injection that can
  * resolve arbitrary keys out of the loaded translation bundle.
  */
-function translateInPlace(err: ValidationError, t: TFunction): void {
+function translateInPlace(err: ValidationError, t: TranslationFunction): void {
   err.issues = err.issues.map((issue) => {
     if (typeof issue.message !== 'string' || !I18N_KEY_RE.test(issue.message)) {
       return issue;

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { randomBytes, scrypt } from 'node:crypto';
 import { describe, it, mock } from 'node:test';
 import { appInstance } from '../helpers/appInstance.ts';
-import { scryptAsyncWithSaltAsString } from '../helpers/crypto.ts';
+import {
+  hashPassword,
+  scryptAsyncWithSaltAsString,
+} from '../helpers/crypto.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
 import {
   assertCalledTimes,
@@ -336,6 +339,43 @@ describe('password hashing (doc 02)', () => {
     // A second login still succeeds (the pre-save hook did not double-hash).
     const second = await model.getUserByEmailAndPassword(email, 'legacyPass');
     assert.ok(second);
+  });
+
+  it('does not overwrite a password reset that wins the rehash race', async () => {
+    const model = getUserModel();
+    const email = 'rehash-race@test.com';
+    await model.create({
+      email,
+      password: 'placeholder',
+      name: { nick: 'rehashRace' },
+    });
+    const legacyHash = await scryptAsyncWithSaltAsString('oldPass');
+    await model.updateOne({ email }, { password: legacyHash });
+    const resetHash = await hashPassword('new reset passphrase');
+    const originalUpdate = model.updateOne.bind(model);
+    const spy = mock.method(model, 'updateOne');
+    spy.mock.mockImplementation((...args) => {
+      const query = originalUpdate(...args);
+      query.pre(async () => {
+        await originalUpdate({ email }, { password: resetHash });
+      });
+      return query;
+    });
+    try {
+      assert.strictEqual(
+        await model.getUserByEmailAndPassword(email, 'oldPass'),
+        false,
+      );
+      assert.strictEqual(
+        (await model.findOne({ email }).orFail()).password,
+        resetHash,
+      );
+    } finally {
+      spy.mock.restore();
+    }
+    assert.ok(
+      await model.getUserByEmailAndPassword(email, 'new reset passphrase'),
+    );
   });
 
   it('rehashes when the stored v2 cost is below the current target', async () => {

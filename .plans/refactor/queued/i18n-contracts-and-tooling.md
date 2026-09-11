@@ -6,6 +6,13 @@
 **See also**: [P1y-bridge](../active/i18n-default-values.md) ships `key + defaultValue` at every framework emit site first (v5). Phase 4's namespace codemod must carry its new `middleware.*` keys → `framework:middleware.*`; `defaultValue` remains the runtime safety net after the bundled-catalog cutover.
 **Goal**: make translation correctness observable and enforceable in the framework and every consuming project: known keys autocomplete, unknown/missing keys fail, unused keys are reported safely, every locale is structurally complete, and runtime language handling is isolated and extensible.
 
+**Declaration baseline, September 11**: the focused
+[optional-i18n fix](../done/optional-i18n-declarations.md) introduces
+`src/services/i18n/types.ts` for the existing string-key translation contract and
+removes vendor types from the core declaration graph. Phase 2 must build its
+opt-in vendor/resource typing on this baseline without restoring mandatory
+i18next imports for non-translating consumers. This does not activate P1y.
+
 ## Visual overview
 
 ```mermaid

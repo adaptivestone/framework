@@ -100,6 +100,60 @@ describe('cache', () => {
     assert.strictEqual(res2, 1n);
   });
 
+  it('preserves strings and signed BigInts on cache hits', async () => {
+    const cache = new Cache(appInstance);
+    const value = {
+      positive: 123n,
+      negative: -123n,
+      zero: 0n,
+      strings: ['123n', '-123n', '~n:123', '~s:hello', '~s:~n:12', '~'],
+      nested: [{ value: -1n, string: '~n:invalid' }],
+    };
+    const compute = mock.fn(async () => value);
+    assert.deepStrictEqual(await cache.getSetValue('codec', compute), value);
+    assert.deepStrictEqual(await cache.getSetValue('codec', compute), value);
+    assert.strictEqual(compute.mock.callCount(), 1);
+  });
+
+  it('isolates legacy serialized entries from the new codec', async () => {
+    const cache = new Cache(appInstance);
+    await cache.driver.set(
+      `${cache.namespace}-legacy`,
+      JSON.stringify('123n'),
+      60,
+    );
+    const compute = mock.fn(async () => '123n');
+    assert.strictEqual(await cache.getSetValue('legacy', compute), '123n');
+    assert.strictEqual(await cache.getSetValue('legacy', compute), '123n');
+    assert.strictEqual(compute.mock.callCount(), 1);
+  });
+
+  it('does not log cached payloads or keys on hits and misses', async () => {
+    const cache = new Cache(appInstance);
+    const log = mock.method(cache.logger, 'verbose', () => {});
+    try {
+      const value = {
+        token: 'private-cache-token',
+        email: 'private@example.com',
+      };
+      await cache.getSetValue('private-cache-key', async () => value);
+      await cache.getSetValue('private-cache-key', async () => value);
+      const output = JSON.stringify(
+        log.mock.calls.map((call) => call.arguments),
+      );
+      assert.ok(log.mock.callCount() >= 2);
+      for (const secret of [
+        'private-cache-token',
+        'private@example.com',
+        'private-cache-key',
+      ]) {
+        assert.ok(!output.includes(secret));
+      }
+    } finally {
+      log.mock.restore();
+    }
+  });
+
   it('can execute only one request per time', async () => {
     const { cache } = appInstance;
     let counter = 0;

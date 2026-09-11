@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { describe, it, mock } from 'node:test';
 import type { Request, Response } from 'express';
+import { appInstance } from '../../../helpers/appInstance.ts';
 import type { IApp } from '../../../server.ts';
 import {
   assertCalled,
@@ -12,6 +13,7 @@ import {
   assertTextMatch,
   pattern,
 } from '../../../tests/assertions.ts';
+import RateLimiter from '../middleware/RateLimiter.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
 
@@ -28,7 +30,7 @@ interface MockRes extends EventEmitter {
   headers: Record<string, string>;
   body?: unknown;
   status(code: number): MockRes;
-  setHeader(k: string, v: string): void;
+  setHeader(k: string, v: string): MockRes;
   getHeader(k: string): string | undefined;
   json(obj: unknown): MockRes;
   end(): MockRes;
@@ -46,6 +48,7 @@ const makeRes = (): MockRes => {
   };
   res.setHeader = function (k, v) {
     this.headers[k.toLowerCase()] = v;
+    return this;
   };
   res.getHeader = function (k) {
     return this.headers[k.toLowerCase()];
@@ -469,5 +472,105 @@ describe('createExpressAdapter — match throws non-MalformedPathError', () => {
     const next = mock.fn();
     await adapter(makeReq('GET', '/users'), asExpressRes(makeRes()), next);
     assertCalledWith(next, explosion);
+  });
+});
+
+describe('registered route rate-limit budgets', () => {
+  const setup = () => {
+    const registry = new RouteRegistry();
+    registry.root.middlewares.push({
+      Class: RateLimiter,
+      params: {
+        driver: 'memory',
+        limiterOptions: { points: 1, duration: 60 },
+        consumeKeyComponents: {
+          ip: true,
+          route: true,
+          user: false,
+          request: [],
+        },
+      },
+    });
+    const handler = (_req: Request, res: Response) => res.json({ ok: true });
+    registry.registerRoute('GET', '/users/:id', { handler });
+    registry.registerRoute('POST', '/users/:id', { handler });
+    registry.registerRoute('GET', '/other', { handler });
+    const adapter = createExpressAdapter(registry, appInstance);
+    const send = async (method: string, path: string) => {
+      const req = makeReq(method, path);
+      req.appInfo = {
+        app: appInstance,
+        ip: '203.0.113.1',
+        request: {},
+        query: {},
+        params: {},
+      };
+      const res = makeRes();
+      const next = mock.fn();
+      await adapter(req, asExpressRes(res), next);
+      assertNotCalled(next);
+      return { req, res };
+    };
+    return { registry, handler, send };
+  };
+
+  it('shares one budget across case, encoding, trailing slashes, IDs and implicit HEAD', async () => {
+    const { send } = setup();
+    assert.strictEqual((await send('GET', '/users/1')).res.statusCode, 200);
+    for (const [method, path] of [
+      ['GET', '/USERS/1'],
+      ['GET', '/%75sers/1'],
+      ['GET', '/users/1/'],
+      ['GET', '/users/2'],
+      ['HEAD', '/users/3'],
+    ]) {
+      assert.strictEqual((await send(method, path)).res.statusCode, 429);
+    }
+  });
+
+  it('keeps separate registered routes and explicit methods independent', async () => {
+    const { registry, handler, send } = setup();
+    registry.registerRoute('HEAD', '/users/:id', { handler });
+    for (const [method, path] of [
+      ['GET', '/users/1'],
+      ['POST', '/users/2'],
+      ['HEAD', '/users/3'],
+      ['GET', '/other'],
+    ]) {
+      const { req, res } = await send(method, path);
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual(
+        req.route.path,
+        path === '/other' ? '/other' : '/users/:id',
+      );
+      assert.strictEqual((await send(method, path)).res.statusCode, 429);
+    }
+  });
+
+  it('resolves the actual template and method when handler entries are reused', async () => {
+    const { registry, handler, send } = setup();
+    const entry = { handler };
+    registry.registerRoute('GET', '/shared/:id', entry);
+    registry.registerRoute('HEAD', '/shared/:id', entry);
+    registry.registerRoute('GET', '/alias/:id', entry);
+    for (const [method, path, template] of [
+      ['GET', '/shared/1', '/shared/:id'],
+      ['HEAD', '/shared/2', '/shared/:id'],
+      ['GET', '/alias/3', '/alias/:id'],
+    ]) {
+      const { req, res } = await send(method, path);
+      assert.strictEqual(req.route.path, template);
+      assert.strictEqual(res.statusCode, 200);
+      assert.strictEqual((await send(method, path)).res.statusCode, 429);
+    }
+  });
+
+  it('exposes templates for routes registered after mounting', async () => {
+    const { registry, handler, send } = setup();
+    registry.registerRoute('GET', '/late/:id', { handler });
+    const { req, res } = await send('GET', '/late/42');
+    assert.strictEqual(req.route.path, '/late/:id');
+    assert.strictEqual(res.statusCode, 200);
+    assert.strictEqual((await send('GET', '/late/43')).res.statusCode, 429);
   });
 });

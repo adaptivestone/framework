@@ -27,6 +27,14 @@ import type {
   RouteNode,
 } from './RouteNode.ts';
 
+// Runtime adapter metadata, separate from the public match-result contract.
+// Nodes identify routes even when callers reuse one handler entry at many paths.
+const matchedNodes = new WeakMap<MatchResult, RouteNode>();
+
+export function getMatchedNode(result: MatchResult): RouteNode | undefined {
+  return matchedNodes.get(result);
+}
+
 /** Thrown when a path contains a malformed `%XX` sequence. */
 export class MalformedPathError extends Error {
   readonly statusCode = 400;
@@ -87,7 +95,7 @@ export function match(
     }
   }
 
-  return {
+  const matched: MatchResult = {
     entry: handler,
     allowedMethods,
     middlewares: handler
@@ -96,6 +104,8 @@ export function match(
     params,
     bodyParsing: handler?.bodyParsing ?? result.bodyParsing ?? 'parsed',
   };
+  matchedNodes.set(matched, result.node);
+  return matched;
 }
 
 function nodeHasMethods(node: RouteNode): boolean {

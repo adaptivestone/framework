@@ -1,5 +1,4 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { TFunction } from 'i18next';
 import type { HydratedDocument, Model, Schema } from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import {
@@ -13,6 +12,7 @@ import type {
   GetModelTypeLiteFromSchema,
 } from '../modules/BaseModel.ts';
 import { BaseModel } from '../modules/BaseModel.ts';
+import type { TI18n } from '../services/i18n/types.ts';
 
 /** A fresh, unguessable bearer token (43-char base64url, 256 bits). */
 const createRandomToken = () => randomBytes(32).toString('base64url');
@@ -278,7 +278,15 @@ class User extends BaseModel {
             const newHash = await hashPassword(password);
             // Direct update bypasses the pre-save hook, which would otherwise
             // re-hash the already-hashed string and lock the user out.
-            await this.updateOne({ _id: data._id }, { password: newHash });
+            const upgrade = await this.updateOne(
+              { _id: data._id, password: data.password },
+              { password: newHash },
+            );
+            // A password reset/change won the race. Never overwrite it or
+            // issue a session using the credentials read before that change.
+            if (upgrade.matchedCount === 0) {
+              return false;
+            }
           } catch (e) {
             appInstance.logger?.error('Failed to upgrade password hash', e);
           }
@@ -423,13 +431,13 @@ class User extends BaseModel {
       /**
        * Send password recovery email
        * @param {Object}
-       * @param {TFunction}
+       * @param {TI18n}
        * @param {string} i18n.language
        * @returns {Promise<boolean>}
        */
       sendPasswordRecoveryEmail: async function (
         this: UserAuthInstance & { name?: { nick?: string | null } | null },
-        i18n: { t: TFunction; language: string },
+        i18n: TI18n,
       ) {
         if (!this.email) {
           appInstance.logger?.error(
@@ -464,13 +472,13 @@ class User extends BaseModel {
       /**
        * Send verification email
        * @param {Object}
-       * @param {TFunction} i18n.t
+       * @param {TI18n} i18n
        * @param {string} i18n.language
        * @returns {Promise<boolean>}
        */
       sendVerificationEmail: async function (
         this: UserAuthInstance & { name?: { nick?: string | null } | null },
-        i18n: { t: TFunction; language: string },
+        i18n: TI18n,
       ) {
         if (!this.email) {
           appInstance.logger?.error(
