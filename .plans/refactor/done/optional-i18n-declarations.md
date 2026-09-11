@@ -35,6 +35,8 @@ A packed core consumer importing `helpers/appInstance.js` must compile with
 - `CHANGELOG.md`, this card, `.plans/refactor/README.md`,
   `.plans/refactor/active/i18n-default-values.md`,
   `.plans/refactor/queued/i18n-contracts-and-tooling.md`
+- Documentation follow-up: `framework-documenation-github/docs/08-i18n.md`
+  and generated `static/llm-context.md`.
 
 ## Verification
 
@@ -81,3 +83,19 @@ Verification:
 The test suite required local-socket permission for MongoDB/HTTP; packaging used
 a temporary npm cache and permitted registry access. All changes remain
 uncommitted, and pre-existing working-tree changes are preserved.
+
+## Documentation follow-up — September 11, 2026
+
+Update the i18n guide's TypeScript workaround with explicit 5.4.0/unreleased
+scope; describe the structural translation types and the opt-in full i18next
+instance assertion. Keep ordinary translation/install guidance intact. Rebuild
+the docs to regenerate LLM context and check the rendered sections. No framework
+source changes or publishing; preserve the docs repository's existing edits.
+
+Completed: the i18n guide now scopes the old workaround to published 5.4.0,
+labels the declaration change and structural types as unreleased, and shows the
+full-instance type assertion. The middleware and email guides required no edits
+for this fix. `npm run build` passed, regenerated LLM context contains the guide
+verbatim, and rendered HTML has the release notice, examples and correct section
+anchors. Both repository diffs pass whitespace checks. The only build warning
+was the existing experimental Node localStorage warning. No commits or publish.

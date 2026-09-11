@@ -128,7 +128,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
-| [optional-i18n-declarations](done/optional-i18n-declarations.md) | Patch | Core declarations compile with both i18n peers absent and `skipLibCheck: false`; packed regression, 838 tests and all five gates pass. Supersedes P1y-bridge's workaround; vendor-specific typing stays opt-in. |
+| [optional-i18n-declarations](done/optional-i18n-declarations.md) | Patch | Core declarations compile with both i18n peers absent and `skipLibCheck: false`; packed regression, 838 tests and all five gates pass. Supersedes P1y-bridge's workaround; vendor-specific typing stays opt-in. I18n docs and generated LLM context updated; docs build passed. |
 | [type-guidance-docs-follow-up](done/type-guidance-docs-follow-up.md) | Docs / types | Model parity, validation composition and TypeScript 7 checking guidance updated; unreleased notices, docs build and generated LLM context verified. |
 | [model-boundary-prototype](done/model-boundary-prototype.md) | Types | One-model proof: independent generated contracts remove Mongoose from application checking; same-program wrappers do not reduce cost. Adapter compilation still required. Prototype only. |
 | [model-type-cost-experiments](done/model-type-cost-experiments.md) | Types | Cold cost mostly predates recent fixes; tested representations offered little benefit. One checker plus incremental caching reused an unchanged check with zero new instantiations. |
