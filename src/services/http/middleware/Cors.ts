@@ -39,20 +39,22 @@ class Cors extends AbstractMiddleware {
     if (!Array.isArray(origins)) {
       return next();
     }
+    // Whether the allow-origin header is sent depends on Origin, so every
+    // response varies by it. `vary` appends instead of replacing other values.
+    res.vary('Origin');
     for (const host of origins as (string | RegExp)[]) {
       if (
         (typeof host === 'string' && req.headers.origin === host) ||
         (host instanceof RegExp && host.test(req.headers.origin ?? ''))
       ) {
         res.set('Access-Control-Allow-Origin', req.headers.origin);
-        res.set('Vary', 'Origin');
 
         if (req.method === 'OPTIONS') {
           res.set(
             'Access-Control-Allow-Methods',
             'GET,HEAD,PUT,PATCH,POST,DELETE',
           );
-          res.set('Vary', 'Origin, Access-Control-Request-Headers');
+          res.vary('Access-Control-Request-Headers');
 
           const allowedHeaders = req.headers['access-control-request-headers'];
           if (allowedHeaders) {

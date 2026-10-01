@@ -111,25 +111,36 @@ class HttpServer extends Base {
       this.logger?.error(`HTTP server failed to start: ${err}`);
       process.exit(1);
     });
+  }
 
-    const listener = this.httpServer.listen(
-      httpConfig.port as number,
-      httpConfig.hostname,
-      () => {
-        const address = listener.address();
-        const port = typeof address === 'string' ? 0 : address?.port || 0;
-        this.logger?.info(`App started and listening on port ${port}`);
-        if (+port !== +httpConfig.port) {
-          // in case we using port 0
-          this.app.updateConfig('http', { port });
-          this.logger?.info(
-            `Updating http config to use new port ${
-              port
-            }. Old was ${httpConfig.port} `,
-          );
-        }
-      },
-    );
+  /**
+   * Start accepting connections; resolves once the port is bound. Called by
+   * `startServer` after routes, the 404 page and the error handler are
+   * mounted, so no request reaches a partly built app.
+   */
+  listen(): Promise<void> {
+    const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
+    return new Promise((resolve) => {
+      const listener = this.httpServer.listen(
+        httpConfig.port as number,
+        httpConfig.hostname,
+        () => {
+          const address = listener.address();
+          const port = typeof address === 'string' ? 0 : address?.port || 0;
+          this.logger?.info(`App started and listening on port ${port}`);
+          if (+port !== +httpConfig.port) {
+            // in case we using port 0
+            this.app.updateConfig('http', { port });
+            this.logger?.info(
+              `Updating http config to use new port ${
+                port
+              }. Old was ${httpConfig.port} `,
+            );
+          }
+          resolve();
+        },
+      );
+    });
   }
 
   /** Mount the route adapter — single entry to the registry. */

@@ -10,7 +10,7 @@ Drop `express` dep entirely. The canonical handler contract remains `(ctx) => Ht
 P1q; Fetch-style adapters render it to Web `Response`, and `HttpResponse.native(Response)` remains
 the portable pass-through. Native `BunAdapter` and `DenoAdapter` ship; ordinary Bun runtime
 support through the existing Express adapter ships much earlier as an
-[immediate stable-fix-gated v5.x patch](../queued/bun-runtime-support.md). Cloudflare Containers adapter.
+[immediate stable-fix-gated v5.x patch](../done/bun-runtime-support.md). Cloudflare Containers adapter.
 Sub-MCP servers per Mongoose model. Tool-quality lint + eval harness.
 
 ## Detail

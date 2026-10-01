@@ -58,6 +58,13 @@ describe('Pagination — relatedQueryParameters schema', () => {
       issues: [{ message: 'limit must be a number', path: ['limit'] }],
     });
   });
+
+  it('reports an issue for a value that overflows to Infinity', async () => {
+    const res = await validateQuery({ page: '9'.repeat(400) });
+    assert.deepStrictEqual(res, {
+      issues: [{ message: 'page must be a number', path: ['page'] }],
+    });
+  });
 });
 
 describe('Pagination — middleware clamping', () => {
@@ -111,6 +118,14 @@ describe('Pagination — middleware clamping', () => {
     const p = await runMiddleware({ limit: 10, maxLimit: 100 }, { page: '0' });
     assert.strictEqual(p.page, 1);
     assert.strictEqual(p.skip, 0);
+  });
+
+  it('falls back to page 1 when skip would not be a safe integer', async () => {
+    for (const page of ['9'.repeat(400), '9'.repeat(20)]) {
+      const p = await runMiddleware({ limit: 10, maxLimit: 100 }, { page });
+      assert.strictEqual(p.page, 1);
+      assert.strictEqual(p.skip, 0);
+    }
   });
 
   it('accepts string-typed params (parseInt path) and applies their defaults', async () => {

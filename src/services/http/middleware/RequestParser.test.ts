@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
-import { createServer } from 'node:http';
+import { createServer, request } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
-import type { NextFunction, Response } from 'express';
+import type { Handler, NextFunction, Response } from 'express';
+import express from 'express';
 import { PersistentFile } from 'formidable';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
@@ -70,6 +72,10 @@ const postToParser = ({
         },
         once(event: string, cb: () => void) {
           res.once(event, cb);
+          return resShim;
+        },
+        setHeader(name: string, value: string) {
+          res.setHeader(name, value);
           return resShim;
         },
       };
@@ -344,6 +350,9 @@ const runParser = async (
     once() {
       return res;
     },
+    setHeader() {
+      return res;
+    },
   };
   await new RequestParser(appInstance, params).middleware(
     req,
@@ -494,5 +503,62 @@ describe('request parser media-type isolation', () => {
     const result = await runParser(req, { maxFieldsSize: 32 });
     assert.strictEqual(result.status, 413);
     assert.deepStrictEqual(req.body, {});
+  });
+
+  it('answers an oversized streamed body with 413, not a connection reset', async () => {
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as unknown as FrameworkRequest).appInfo = {
+        app: appInstance,
+        request: {},
+        query: {},
+        params: {},
+      };
+      next();
+    });
+    app.use(
+      new RequestParser(appInstance, {
+        maxFieldsSize: 32,
+      }).getMiddleware() as Handler,
+    );
+    app.use((_req, res) => {
+      res.json({ ok: true });
+    });
+    const server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const response = await new Promise<{ status?: number; close?: string }>(
+        (resolve, reject) => {
+          const clientReq = request(
+            {
+              port,
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            },
+            (res) => {
+              res.resume();
+              resolve({
+                status: res.statusCode,
+                close: res.headers.connection,
+              });
+            },
+          );
+          // Keep streaming (chunked, no length) past the limit until answered.
+          const writer = setInterval(() => clientReq.write('x'.repeat(64)), 5);
+          clientReq.on('response', () => {
+            clearInterval(writer);
+            clientReq.destroy();
+          });
+          clientReq.on('close', () => clearInterval(writer));
+          clientReq.on('error', reject);
+          clientReq.write('{"value":"');
+        },
+      );
+      assert.deepStrictEqual(response, { status: 413, close: 'close' });
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

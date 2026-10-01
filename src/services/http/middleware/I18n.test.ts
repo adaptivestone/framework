@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { getTestServerURL } from '../../../tests/testHelpers.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import I18n from './I18n.ts';
 
@@ -28,7 +29,7 @@ describe('i18n middleware methods', () => {
     const request: {
       get: () => string;
       query?: {
-        [key: string]: string;
+        [key: string]: string | string[];
       };
       appInfo: {
         user?: {
@@ -38,7 +39,7 @@ describe('i18n middleware methods', () => {
     } = {
       get: () => 'en',
       query: {
-        [middleware.lookupQuerystring]: 'es',
+        [middleware.lookupQuerystring]: 'ru',
       },
       appInfo: {},
     };
@@ -48,7 +49,7 @@ describe('i18n middleware methods', () => {
 
     request.appInfo = {
       user: {
-        locale: 'be',
+        locale: 'ru',
       },
     };
     lang = await middleware.detectLang(asRequest(request));
@@ -58,12 +59,30 @@ describe('i18n middleware methods', () => {
     request.get = () => null as unknown as string;
     lang = await middleware.detectLang(asRequest(request));
 
-    assert.strictEqual(lang, 'es');
+    assert.strictEqual(lang, 'ru');
 
     request.query = undefined;
     lang = await middleware.detectLang(asRequest(request));
 
-    assert.strictEqual(lang, 'be');
+    assert.strictEqual(lang, 'ru');
+
+    // An unsupported value falls through to the next detector.
+    request.get = () => 'de';
+    request.query = { [middleware.lookupQuerystring]: 'es' };
+    lang = await middleware.detectLang(asRequest(request));
+
+    assert.strictEqual(lang, 'ru');
+
+    request.appInfo = {};
+    lang = await middleware.detectLang(asRequest(request));
+
+    assert.strictEqual(lang, '');
+
+    // A repeated query parameter is an array: ignored, never thrown on.
+    request.query = { [middleware.lookupQuerystring]: ['a', '_'] };
+    lang = await middleware.detectLang(asRequest(request));
+
+    assert.strictEqual(lang, '');
 
     request.query = {
       [middleware.lookupQuerystring]: 'en-GB',
@@ -154,5 +173,25 @@ describe('i18n middleware methods', () => {
     assert.strictEqual(req.i18n?.t('aaaaa'), 'aaaaa'); // proxy test
 
     appInstance.updateConfig('i18n', { enabled: true });
+  });
+});
+
+describe('i18n middleware over HTTP', () => {
+  it('a repeated language query parameter does not fail the request', async () => {
+    const response = await fetch(getTestServerURL('/?lng=a&lng=_'));
+
+    assert.strictEqual(response.status, 200);
+  });
+
+  it('an unsupported X-Lang header does not hide a supported query language', async () => {
+    const response = await fetch(getTestServerURL('/auth/login?lng=ru'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Lang': 'de' },
+      body: '{}',
+    });
+    const body = await response.json();
+
+    assert.strictEqual(response.status, 400);
+    assert.deepStrictEqual(body.errors.email, ['Нужно указать Email']);
   });
 });

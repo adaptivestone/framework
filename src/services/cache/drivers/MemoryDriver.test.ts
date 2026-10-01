@@ -40,6 +40,25 @@ describe('MemoryDriver', () => {
     assert.strictEqual(await driver.get('zero'), null);
   });
 
+  it('keeps a key whose TTL exceeds the timer limit (~24.8 days)', async () => {
+    const driver = new MemoryDriver();
+    await driver.set('k', 'v', 30 * 24 * 60 * 60);
+    await setTimeout(20);
+    assert.strictEqual(await driver.get('k'), 'v');
+  });
+
+  it('expires a long-TTL key once its time has passed', async (t) => {
+    t.mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+    const driver = new MemoryDriver();
+    const ttlSeconds = 30 * 24 * 60 * 60;
+    await driver.set('k', 'v', ttlSeconds);
+
+    t.mock.timers.tick(ttlSeconds * 1000 - 1);
+    assert.strictEqual(await driver.get('k'), 'v');
+    t.mock.timers.tick(1);
+    assert.strictEqual(await driver.get('k'), null);
+  });
+
   it('expires a key after its TTL', async () => {
     const driver = new MemoryDriver();
     // TTL is in seconds; a fractional value keeps the test fast.

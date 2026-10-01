@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, it } from 'node:test';
-import type { Response } from 'express';
+import type { Handler, Response } from 'express';
+import express from 'express';
 import Transport from 'winston-transport';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { assertThrowsLike } from '../../../tests/assertions.ts';
@@ -61,6 +64,10 @@ describe('cors middleware methods', () => {
       set: (key: string, val?: string | string[]) => {
         map.set(key, val);
       },
+      vary: (field: string) => {
+        const current = map.get('Vary');
+        map.set('Vary', current ? `${current}, ${field}` : field);
+      },
     };
     const middleware = new Cors(appInstance, {
       origins: ['https://localhost'],
@@ -81,9 +88,18 @@ describe('cors middleware methods', () => {
     const nextFunction = () => {
       isCalled = true;
     };
+    const map = new Map();
     const req = {
       method: 'OPTIONS',
       headers: { origin: 'http://anotherDomain.com' },
+    };
+    const res = {
+      set: (key: string, val?: string | string[]) => {
+        map.set(key, val);
+      },
+      vary: (field: string) => {
+        map.set('Vary', field);
+      },
     };
     const middleware = new Cors(appInstance, {
       origins: ['https://localhost'],
@@ -91,11 +107,14 @@ describe('cors middleware methods', () => {
 
     await middleware.middleware(
       req as FrameworkRequest,
-      {} as Response,
+      res as unknown as Response,
       nextFunction,
     );
 
     assert.ok(isCalled);
+    // No allow-origin, but caches must still key the response on Origin.
+    assert.strictEqual(map.get('Access-Control-Allow-Origin'), undefined);
+    assert.strictEqual(map.get('Vary'), 'Origin');
   });
 
   it('continues safely if origins are unavailable at request time', async () => {
@@ -132,6 +151,10 @@ describe('cors middleware methods', () => {
     const res = {
       set: (key: string, val?: string | string[]) => {
         map.set(key, val);
+      },
+      vary: (field: string) => {
+        const current = map.get('Vary');
+        map.set('Vary', current ? `${current}, ${field}` : field);
       },
       status: () => {},
       end: () => {
@@ -184,6 +207,10 @@ describe('cors middleware methods', () => {
       set: (key: string, val?: string | string[]) => {
         map.set(key, val);
       },
+      vary: (field: string) => {
+        const current = map.get('Vary');
+        map.set('Vary', current ? `${current}, ${field}` : field);
+      },
       status: () => {},
 
       end: () => {
@@ -224,7 +251,10 @@ describe('cors middleware methods', () => {
       const map = new Map();
       await new Cors(appInstance, { origins }).middleware(
         { method: 'GET', headers: { origin } } as FrameworkRequest,
-        { set: (k: string, v: string) => map.set(k, v) } as unknown as Response,
+        {
+          set: (k: string, v: string) => map.set(k, v),
+          vary: () => {},
+        } as unknown as Response,
         () => {},
       );
       return map.get('Access-Control-Allow-Origin');
@@ -261,5 +291,43 @@ describe('cors middleware methods', () => {
     const all = captured.join('\n');
     assert.ok(all.includes('not anchored'));
     assert.strictEqual((all.match(/not anchored/g) ?? []).length, 1);
+  });
+});
+
+describe('cors middleware over HTTP', () => {
+  it('appends Origin to an existing Vary header', async () => {
+    const app = express();
+    app.use((_req, res, next) => {
+      res.vary('Accept-Encoding');
+      next();
+    });
+    app.use(
+      new Cors(appInstance, {
+        origins: ['https://localhost'],
+      }).getMiddleware() as Handler,
+    );
+    app.use((_req, res) => {
+      res.json({ ok: true });
+    });
+    const server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const { port } = server.address() as AddressInfo;
+    try {
+      const response = await fetch(`http://localhost:${port}/`, {
+        headers: { Origin: 'https://localhost' },
+      });
+
+      assert.strictEqual(
+        response.headers.get('vary'),
+        'Accept-Encoding, Origin',
+      );
+      assert.strictEqual(
+        response.headers.get('access-control-allow-origin'),
+        'https://localhost',
+      );
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

@@ -62,6 +62,8 @@ class RequestParser extends AbstractMiddleware {
         this.logger?.error(
           `Request body ${declaredLength}B exceeds maxFieldsSize ${maxBodySize}B`,
         );
+        // Close after the 413 instead of draining the unread body.
+        res.setHeader('Connection', 'close');
         return res.status(413).json({
           message: this.translate(
             req,
@@ -72,14 +74,22 @@ class RequestParser extends AbstractMiddleware {
       }
     }
     // Also guard chunked bodies. Only a genuinely selected multipart parser
-    // may rely on the separate file/field limits.
+    // may rely on the separate file/field limits. Pausing (not destroying) the
+    // request keeps the socket writable, so the client receives the 413; its
+    // `Connection: close` then ends the connection.
+    let rejectOversized: (reason: Error) => void = () => {};
+    const oversized = new Promise<never>((_resolve, reject) => {
+      rejectOversized = reject;
+    });
     form.on('progress', (bytesReceived: number) => {
       if (
+        !bodyTooLarge &&
         (form as unknown as { type?: string }).type !== 'multipart' &&
         bytesReceived > maxBodySize
       ) {
         bodyTooLarge = true;
-        req.destroy();
+        req.pause();
+        rejectOversized(new Error('Request body exceeds maxFieldsSize'));
       }
     });
 
@@ -107,8 +117,8 @@ class RequestParser extends AbstractMiddleware {
     let fields: formidable.Fields<string>;
     let files: formidable.Files<string>;
     try {
-      [fields, files] = await form.parse(req);
-      // Destroying the stream cannot cancel a chunk already inside the parser.
+      [fields, files] = await Promise.race([form.parse(req), oversized]);
+      // Pausing the stream cannot cancel a chunk already inside the parser.
       // Even if that chunk completes parsing, an oversized body must not advance.
       if (bodyTooLarge) {
         throw new Error('Request body exceeds maxFieldsSize');
@@ -119,6 +129,10 @@ class RequestParser extends AbstractMiddleware {
       // count) with httpCode 413; our own JSON/urlencoded body-size guard sets
       // `bodyTooLarge`. Everything else (bad content type / length) stays a 400.
       if (bodyTooLarge || (err as { httpCode?: number })?.httpCode === 413) {
+        if (bodyTooLarge) {
+          // The rest of the body stays unread; close rather than drain it.
+          res.setHeader('Connection', 'close');
+        }
         return res.status(413).json({
           message: this.translate(
             req,

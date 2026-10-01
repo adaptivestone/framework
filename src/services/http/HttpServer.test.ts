@@ -155,3 +155,26 @@ describe('HttpServer — translatable sink messages', () => {
     assert.deepStrictEqual(run500().payload, { message: 'Something broke!' });
   });
 });
+
+describe('HttpServer — listen after mount', () => {
+  it('does not accept connections until listen() is called', async () => {
+    // Own port and config sink: the shared test server must stay untouched.
+    const app = Object.create(appInstance, {
+      getConfig: {
+        value: (name: string) =>
+          name === 'http'
+            ? { ...appInstance.getConfig('http'), port: 0 }
+            : appInstance.getConfig(name),
+      },
+      updateConfig: { value: () => ({}) },
+    }) as typeof appInstance;
+    const server = new HttpServer(app);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.strictEqual(server.httpServer.listening, false);
+
+    await server.listen();
+    assert.strictEqual(server.httpServer.listening, true);
+    await server.shutdown();
+  });
+});

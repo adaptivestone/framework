@@ -1,6 +1,6 @@
 # P1f — Static middleware metadata (breaking)
 
-**Status**: ⏸ v6 cutover deferred · v5.x bridge ⏳ tracked in [P1j Phase 1](../active/codegen-zero-init.md#phase-1--static-middleware-schemas--p1f-v5x-bridge)
+**Status**: ⏸ v6 cutover deferred · v5.x bridge ⏳ tracked in [P1j Phase 1](../done/codegen-zero-init.md#phase-1--static-middleware-schemas--p1f-v5x-bridge--beta52)
 **Depends on**: P1b (RouteRegistry shipped)
 **Time**: ~½ day for the v5.x bridge (under P1j), ~½ day for the v6 cutover
 **Origin**: noticed during 2026-05-11 dogfooding against a consumer codebase (28 controllers, ~500 `MiddlewareEntry` references) — boot-time instantiation of middlewares to read instance-bound schema getters opens Redis clients / spawns timers / etc., 5-second shutdown stalls, and ~500 redundant instantiations per server boot.

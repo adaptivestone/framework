@@ -4,7 +4,7 @@
 
 **Goal:** Typed throwable HTTP errors (`HttpError` + subclasses) and an extensible error-class → response registry on `HttpServer`, with the P1o mongoose safety net folded in as a built-in entry.
 
-**Architecture:** New public vocabulary module `httpErrors.ts`; registry types + built-in entries in `builtinErrorHandlers.ts`; two-tier storage and `registerErrorHandler`/`resolveError` on `HttpServer`; the wrapped-handler catch in `controllers/index.ts` shrinks to headersSent guard → `resolveError` walk → unchanged 500 fallback. Spec: `.plans/refactor/queued/error-handler-registry.md`.
+**Architecture:** New public vocabulary module `httpErrors.ts`; registry types + built-in entries in `builtinErrorHandlers.ts`; two-tier storage and `registerErrorHandler`/`resolveError` on `HttpServer`; the wrapped-handler catch in `controllers/index.ts` shrinks to headersSent guard → `resolveError` walk → unchanged 500 fallback. Spec: `.plans/refactor/done/error-handler-registry.md`.
 
 **Tech Stack:** TypeScript ESM, vitest 4 (no `basic` reporter), mongoose, winston, biome.
 

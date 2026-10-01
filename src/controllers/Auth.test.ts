@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { before, describe, it, mock } from 'node:test';
 import type { Response } from 'express';
+import mongoose from 'mongoose';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
@@ -445,6 +446,46 @@ describe('auth controller failure paths', () => {
 
     assert.strictEqual(state.status, 400);
     assert.deepStrictEqual(state.body, { message: 'User/password not valid' });
+  });
+
+  it('answers a login whose password changed meanwhile like a wrong password', async () => {
+    for (const conflict of [
+      new mongoose.Error.VersionError({ _doc: { _id: 'u1' } } as never, 1, [
+        'sessionTokens',
+      ]),
+      new mongoose.Error.DocumentNotFoundError('{ _id: "u1" }'),
+    ]) {
+      const state = await runEn(
+        {
+          getUserByEmailAndPassword: mockResolvedValue(mock.fn(), {
+            isVerified: true,
+            generateToken: mockRejectedValue(mock.fn(), conflict),
+          }),
+        },
+        (auth, req, res) => auth.postLogin(req, res),
+      );
+
+      assert.strictEqual(state.status, 400);
+      assert.deepStrictEqual(state.body, {
+        message: 'User/password not valid',
+      });
+    }
+  });
+
+  it('rethrows any other session-issue failure', async () => {
+    const failure = new Error('db down');
+    await assertRejectsValue(
+      runEn(
+        {
+          getUserByEmailAndPassword: mockResolvedValue(mock.fn(), {
+            isVerified: true,
+            generateToken: mockRejectedValue(mock.fn(), failure),
+          }),
+        },
+        (auth, req, res) => auth.postLogin(req, res),
+      ),
+      failure,
+    );
   });
 
   it('answers an unverified login in English', async () => {

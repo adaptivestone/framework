@@ -3,7 +3,7 @@ import AbstractCommand, {
   type CommandArgumentToTypes,
 } from '../modules/AbstractCommand.ts';
 
-// Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles
+// Example: node src/cli createuser --email=somemail@gmail.com  --password=somePassword --roles=user,admin,someOtherRoles --token
 class CreateUser extends AbstractCommand {
   static get description() {
     return 'Create user in a database';
@@ -36,13 +36,19 @@ class CreateUser extends AbstractCommand {
         default: false,
         description: 'Update user if it exists',
       },
+      token: {
+        type: 'boolean',
+        default: false,
+        description:
+          'Issue a 30-day session and print its token once (to stdout, not the log)',
+      },
     } as const;
   }
 
   async run() {
     const User = this.app.getModel('User') as unknown as TUser;
 
-    const { id, email, password, roles, update } = this
+    const { id, email, password, roles, update, token } = this
       .args as CommandArgumentToTypes<typeof CreateUser.commandArguments>;
 
     if (!email && !id) {
@@ -98,8 +104,6 @@ class CreateUser extends AbstractCommand {
 
     await user.save();
 
-    await user.generateToken();
-
     // Log identifiers only — serializing the document leaks the password hash
     // and all session/recovery/verification tokens.
     this.logger?.info(
@@ -107,6 +111,15 @@ class CreateUser extends AbstractCommand {
         user.name?.nick ?? ''
       }`,
     );
+
+    if (token) {
+      const session = await user.generateToken();
+      // The raw token exists only here (the database keeps its hash), so print
+      // it once — to stdout, never the logger, whose transports may ship it.
+      console.log(
+        `Session token (valid until ${session.valid.toISOString()}): ${session.token}`,
+      );
+    }
 
     return true;
   }

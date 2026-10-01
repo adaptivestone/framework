@@ -21,7 +21,8 @@ publish a package/site or create commits, tags, pushes or a GitHub release.
   references in `queued/i18n-contracts-and-tooling.md` and
   `done/optional-i18n-declarations.md`.
 - Label `done/model-typing-seam-fixes.md`, `done/type-runtime-parity.md` and
-  `done/security-review-fixes.md` with the prepared 5.4.1 release target.
+  the security-review-fixes card (since removed from the repository) with the
+  prepared 5.4.1 release target.
 - Documentation repo: `docs/05-models.md`, `docs/06-Controllers/02-routes.md`,
   `docs/06-Controllers/03-middleware.md`, `docs/08-i18n.md`, `docs/10-cli.md`,
   `docs/11-cache.md`, and generated `static/llm-context.md`.

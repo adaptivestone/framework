@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **`createuser --token` prints a usable session token again.** Since 5.0.0 tokens are stored hashed and the command logs only identifiers, so the session it created on every run could never be used. Without the flag the command now creates no session; with `--token` it issues one and prints the raw token once to stdout, never to the logger.
+
+### Changed
+
+- **Code generation now requires `oxc-parser` `^0.152.0`.** Projects that run `npm run gen` should update their optional development peer with `npm i -D oxc-parser@^0.152.0`. Runtime-only consumers do not need it.
+- **Optional peers accept the new majors.** `@sentry/core` / `@sentry/node` accept `^10.34.0 || ^11.0.0` (Sentry 11 needs Node 20.19+), and `vitest` accepts `^4.0.0 || ^5.0.0` for the `setupVitest` helper. Existing installs keep working; no action needed.
+
+### Fixed
+
+- **A login racing a password reset no longer gets a session.** `generateToken` now saves on the condition that the stored password hash is still the one on the document, so a login whose password check started before a reset answers "User/password not valid" instead of issuing a 30-day token for the old password. The 5.4.1 fix covered only logins that also upgraded the hash. Custom flows that call `generateToken` on a stale document now get a Mongoose `VersionError` (or `DocumentNotFoundError` with versioning disabled) instead of a session.
+- **Concurrent logins and logouts no longer overwrite each other.** Issuing a token rewrote the whole session array whenever an expired token was stored, so two simultaneous logins failed one with a 500, and a logout landing during a login came back to life. Tokens are now appended atomically and expired ones removed with a separate update. Pending changes on the document are still saved with the token, as before.
+- **A repeated `lng` query parameter no longer answers 500.** `?lng=a&lng=_` reached i18next as an array and failed every route with an error-level log. Non-string detector values are now ignored.
+- **An unsupported language no longer stops language detection.** `X-Lang: de` with only `en`/`ru` configured ended detection with the fallback language, hiding a supported `?lng=ru`. Detection now continues to the next detector when the value's language is not in `i18n.supportedLngs`.
+- **The HTTP server accepts connections only once the app is ready.** It used to listen from the `HttpServer` constructor, before controllers, `bootHttp`, the 404 page and the error handler were mounted, so early requests got Express's HTML 404. `startServer` now calls the new `httpServer.listen()` last and resolves after the port is bound.
+- **In-memory cache entries with long TTLs no longer vanish.** A TTL above about 24.8 days overflowed Node's timer and the entry expired after 1 ms. Entries now store their expiry time, checked on every read.
+- **An oversized streamed body gets a 413 instead of a connection reset.** The parser now stops reading and answers 413 with `Connection: close`; a body over the declared-length limit also closes the connection rather than being drained.
+- **Pagination rejects pages that overflow.** A `page` of hundreds of digits parsed to `Infinity`; the query schema now reports it as not a number, and the middleware falls back to page 1 whenever `skip` would not be a safe integer.
+- **CORS keeps other `Vary` values and always varies by `Origin`.** The middleware replaced any existing `Vary` header and set it only for allowed origins, so a shared cache could serve a response without the allow-origin header to an allowed origin.
+
 ## [5.4.1] - 2026-09-11
 
 ### Fixed

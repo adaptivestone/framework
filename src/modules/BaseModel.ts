@@ -439,7 +439,8 @@ type CorrectHydratedSubdocumentElement<
           TypeKey
         >,
         Schema,
-        TypeKey> extends infer Fields
+        TypeKey
+      > extends infer Fields
       ? Schema extends { readonly _id: false }
         ? mongoose.Types.Subdocument<undefined, unknown, CorrectedRaw> &
             Omit<Fields, '_id'>

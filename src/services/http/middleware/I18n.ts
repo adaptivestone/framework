@@ -70,10 +70,12 @@ class I18n extends AbstractMiddleware {
     req: FrameworkRequest,
     isUseShortCode = true,
   ): Promise<string> {
+    const { supportedLngs } = this.app.getConfig('i18n') as typeof i18nConfig;
     let lang = '';
     for (const detectorName of this.detectorOrder) {
       const lng = this.detectors[detectorName](req);
-      if (!lng) {
+      // A repeated query parameter arrives as an array — not a language code.
+      if (!lng || typeof lng !== 'string') {
         continue;
       }
       const i18nService = await this.app.getI18nService();
@@ -83,13 +85,16 @@ class I18n extends AbstractMiddleware {
       if (!i18nInstance) {
         break;
       }
-      if (i18nInstance.services.languageUtils.isSupportedCode(lng)) {
-        if (isUseShortCode) {
-          lang =
-            i18nInstance.services.languageUtils.getLanguagePartFromCode(lng);
-        } else {
-          lang = lng;
-        }
+      const { languageUtils } = i18nInstance.services;
+      const languagePart = languageUtils.getLanguagePartFromCode(lng);
+      // i18next accepts any code unless it knows `supportedLngs`, so check the
+      // configured list too: an unsupported value falls through to the next
+      // detector instead of ending detection with the fallback language.
+      if (
+        languageUtils.isSupportedCode(lng) &&
+        supportedLngs.includes(languagePart)
+      ) {
+        lang = isUseShortCode ? languagePart : lng;
         break;
       }
     }

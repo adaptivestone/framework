@@ -43,6 +43,48 @@ describe('CreateUser command (doc 20)', () => {
     assert.ok(all.includes(email)); // identifier kept for debuggability
     assert.ok(!all.includes('sessionTokens')); // whole document not serialized
   });
+
+  it('does not store a session nobody can use', async () => {
+    const email = 'cu-no-session@example.com';
+    const created = await new CreateUser(
+      appInstance,
+      {},
+      { email, password: 'somePassword123' },
+    ).run();
+
+    assert.strictEqual(created, true);
+    const user = await getUserModel().findOne({ email }).orFail();
+    assert.strictEqual(user.sessionTokens.length, 0);
+  });
+
+  it('with --token, prints one usable session token to stdout, never to the log', async (t) => {
+    const email = 'cu-token@example.com';
+    const printed: string[] = [];
+    t.mock.method(console, 'log', (line: string) => printed.push(line));
+    const captured: string[] = [];
+    const transport = new CaptureTransport(captured);
+    appInstance.logger.add(transport);
+    try {
+      const created = await new CreateUser(
+        appInstance,
+        {},
+        { email, password: 'somePassword123', token: true },
+      ).run();
+      assert.strictEqual(created, true);
+    } finally {
+      appInstance.logger.remove(transport);
+    }
+
+    const match = printed
+      .join('\n')
+      .match(/Session token \(valid until [^)]+\): ([A-Za-z0-9_-]{43})$/m);
+    assert.ok(match, 'token line printed');
+    const [, token] = match;
+    const user = await getUserModel().getUserByToken(token);
+    assert.ok(user);
+    assert.strictEqual(user.email, email);
+    assert.ok(!captured.join('\n').includes(token));
+  });
 });
 
 describe('CreateUser command — input validation guards', () => {

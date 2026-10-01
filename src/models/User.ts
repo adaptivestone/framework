@@ -287,6 +287,11 @@ class User extends BaseModel {
             if (upgrade.matchedCount === 0) {
               return false;
             }
+            // Keep the in-memory hash equal to the stored one without marking
+            // it modified (a save would hash it again): `generateToken` binds
+            // the new session to this value.
+            data.set('password', newHash);
+            data.unmarkModified('password');
           } catch (e) {
             appInstance.logger?.error('Failed to upgrade password hash', e);
           }
@@ -396,14 +401,15 @@ class User extends BaseModel {
   static get modelInstanceMethods() {
     return {
       /**
-       * Generate token for user
+       * Generate a session token for the user and save the document. Rejects
+       * (Mongoose `VersionError`/`DocumentNotFoundError`) when the stored
+       * password changed after this document was read.
        * @returns {Object}
        */
-      generateToken: async function (this: {
-        email?: string | null;
-        sessionTokens?: { token?: string | null; valid?: Date | null }[] | null;
-        save: () => Promise<unknown>;
-      }) {
+      generateToken: async function (
+        this: UserAuthInstance &
+          Pick<UserSchemaDocument, '_id' | '$where' | 'isModified'>,
+      ) {
         const timestamp = new Date();
         timestamp.setDate(timestamp.getDate() + 30);
         if (!this.email) {
@@ -411,19 +417,42 @@ class User extends BaseModel {
         }
         const token = createRandomToken();
         if (!this.sessionTokens) {
-          this.sessionTokens = [];
+          clearHydratedArray(this, 'sessionTokens');
         }
-        // Prune already-expired tokens on append so the array can't grow
-        // forever (keep only tokens still valid right now).
         const now = new Date();
-        this.sessionTokens = this.sessionTokens.filter(
-          (t) => t.valid && new Date(t.valid) > now,
-        ) as typeof this.sessionTokens;
-        this.sessionTokens.push({
-          token: hashToken(token),
-          valid: timestamp,
-        } as (typeof this.sessionTokens)[number]);
-        await this.save();
+        const hasExpired = this.sessionTokens.some(
+          (t) => !(t.valid && new Date(t.valid) > now),
+        );
+        // Append only: an atomic `$push` cannot overwrite a concurrent login
+        // or logout, while reassigning the array would rewrite it wholesale.
+        this.sessionTokens.push({ token: hashToken(token), valid: timestamp });
+        // Never issue a session for a password that changed after this
+        // document was read (e.g. a reset racing a login). Skipped when the
+        // caller is setting a new password on this document now.
+        const previousWhere = this.$where;
+        if (typeof this.password === 'string' && !this.isModified('password')) {
+          this.$where = { ...previousWhere, password: this.password };
+        }
+        try {
+          await this.save();
+        } finally {
+          this.$where = previousWhere;
+        }
+        if (hasExpired) {
+          // Prune separately: `$push` and `$pull` can't share one update.
+          // Best effort — the session is already issued.
+          const UserModel = this.constructor as unknown as {
+            updateOne: (filter: object, update: object) => PromiseLike<unknown>;
+          };
+          try {
+            await UserModel.updateOne(
+              { _id: this._id },
+              { $pull: { sessionTokens: { valid: { $not: { $gt: now } } } } },
+            );
+          } catch (e) {
+            appInstance.logger?.error('Failed to prune expired sessions', e);
+          }
+        }
         // The raw token is returned to the caller exactly once; only its hash
         // is persisted. Wire format is unchanged.
         return { token, valid: timestamp };

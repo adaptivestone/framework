@@ -261,6 +261,10 @@ class Server {
     // production filters this out by default via the logger level.
     this.app.logger.verbose(formatRouteTree(this.app.httpServer.routeRegistry));
 
+    // Bind last: before this point a request would find no routes and get
+    // Express's default HTML 404.
+    await this.app.httpServer.listen();
+
     this.#registerShutdownSignals();
   }
 

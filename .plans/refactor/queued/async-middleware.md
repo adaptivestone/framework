@@ -118,7 +118,7 @@ factory return.
 
 - Exact v6 raw-route API — P1q reserves an explicit adapter-specific escape hatch.
 - Global Express middleware mounted directly via `app.express.use` (Cors-as-global, security headers, `RequestParser`) — those run on the raw Express stack, not the adapter loop; they keep Express's native `(req,res,next)`. This card is only the **registry-dispatched** middleware contract. (Confirm the framework-middleware list against this split when building.)
-- Static metadata getters — that's [static-middleware-cutover](static-middleware-cutover.md); land together but they're orthogonal changes.
+- Static metadata getters — that's [static-middleware-cutover](../later/static-middleware-cutover.md); land together but they're orthogonal changes.
 - `WeakMap` instance cache keyed by `(Class, params)` — orthogonal request-time dedup, tracked elsewhere.
 
 ## Done when

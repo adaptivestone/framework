@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes, scrypt } from 'node:crypto';
 import { describe, it, mock } from 'node:test';
+import mongoose from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import {
   hashPassword,
@@ -274,6 +275,82 @@ describe('token security (doc 01)', () => {
     assert.strictEqual(user.sessionTokens.length, 1);
     assertCalledTimes(save, 1);
   });
+
+  describe('concurrent session writes', () => {
+    const password = 'session race password';
+    const expired = () => ({
+      token: hashToken('expired-session'),
+      valid: new Date(Date.now() - 1000),
+    });
+    const createUser = async (email: string) => {
+      const created = await getUserModel().create({ email, password });
+      // An expired entry forces the prune path that used to rewrite the array.
+      await getUserModel().updateOne(
+        { email },
+        { $push: { sessionTokens: expired() } },
+      );
+      return created;
+    };
+
+    it('does not issue a session for a password reset after the read', async () => {
+      const model = getUserModel();
+      const email = 'session-race-reset@test.com';
+      // No expired entry: the plain append path must be guarded too.
+      await model.create({ email, password });
+      const staleLogin = await model.getUserByEmailAndPassword(email, password);
+      assert.ok(staleLogin);
+
+      const reset = await model.findOne({ email }).orFail();
+      reset.password = 'a brand new reset password';
+      reset.set('sessionTokens', []);
+      await reset.save();
+
+      await assertRejectsLike(
+        staleLogin.generateToken(),
+        mongoose.Error.VersionError,
+      );
+      const stored = await model.findOne({ email }).orFail();
+      assert.strictEqual(stored.sessionTokens.length, 0);
+    });
+
+    it('keeps both sessions of two concurrent logins and prunes expired ones', async () => {
+      const model = getUserModel();
+      const email = 'session-race-logins@test.com';
+      await createUser(email);
+      const a = await model.findOne({ email }).orFail();
+      const b = await model.findOne({ email }).orFail();
+
+      const [first, second] = await Promise.all([
+        a.generateToken(),
+        b.generateToken(),
+      ]);
+
+      assert.ok(await model.getUserByToken(first.token));
+      assert.ok(await model.getUserByToken(second.token));
+      const stored = await model.findOne({ email }).orFail();
+      assert.deepStrictEqual(
+        stored.sessionTokens.map((t) => t.token).sort(),
+        [hashToken(first.token), hashToken(second.token)].sort(),
+      );
+    });
+
+    it('keeps a logout that lands while a login is in flight', async () => {
+      const model = getUserModel();
+      const email = 'session-race-logout@test.com';
+      const created = await createUser(email);
+      const { token: loggedOut } = await created.generateToken();
+      const inFlightLogin = await model.findOne({ email }).orFail();
+
+      await model.updateOne(
+        { email },
+        { $pull: { sessionTokens: { token: hashToken(loggedOut) } } },
+      );
+      const { token: issued } = await inFlightLogin.generateToken();
+
+      assert.strictEqual(await model.getUserByToken(loggedOut), false);
+      assert.ok(await model.getUserByToken(issued));
+    });
+  });
 });
 
 describe('password hashing (doc 02)', () => {
@@ -339,6 +416,25 @@ describe('password hashing (doc 02)', () => {
     // A second login still succeeds (the pre-save hook did not double-hash).
     const second = await model.getUserByEmailAndPassword(email, 'legacyPass');
     assert.ok(second);
+  });
+
+  it('issues a session after an upgrading login without hashing it again', async () => {
+    const model = getUserModel();
+    const email = 'legacy-v1-session@test.com';
+    await model.create({
+      email,
+      password: 'placeholder',
+      name: { nick: 'legacyV1Session' },
+    });
+    const legacyHash = await scryptAsyncWithSaltAsString('legacyPass');
+    await model.updateOne({ email }, { password: legacyHash });
+
+    const user = await model.getUserByEmailAndPassword(email, 'legacyPass');
+    assert.ok(user);
+    const { token } = await user.generateToken();
+
+    assert.ok(await model.getUserByToken(token));
+    assert.ok(await model.getUserByEmailAndPassword(email, 'legacyPass'));
   });
 
   it('does not overwrite a password reset that wins the rehash race', async () => {

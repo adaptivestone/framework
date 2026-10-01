@@ -27,7 +27,8 @@ const paginationQueryParameters = defineSchema<{
         continue;
       }
       const n = Number(v[key]);
-      if (Number.isNaN(n)) {
+      // `Infinity` (e.g. hundreds of digits) is no usable page or limit either.
+      if (!Number.isFinite(n)) {
         issues.push({ message: `${key} must be a number`, path: [key] });
       } else {
         out[key] = n;
@@ -100,22 +101,23 @@ class Pagination extends AbstractMiddleware {
       effectiveLimit = maxLimit;
     }
 
-    req.appInfo.pagination = {
-      page:
-        typeof req?.query?.page === 'string'
-          ? parseInt(req?.query?.page, 10) || 1
-          : 1,
-      limit: effectiveLimit,
-      skip: 0,
-    };
-
-    if (req.appInfo.pagination.page < 1) {
-      req.appInfo.pagination.page = 1;
+    const requestedPage =
+      typeof req?.query?.page === 'string' ? parseInt(req.query.page, 10) : 1;
+    // A malformed, non-positive or absurdly large page (hundreds of digits
+    // parse to Infinity) falls back to 1, so `skip` is always a safe integer.
+    let page =
+      Number.isSafeInteger(requestedPage) && requestedPage > 0
+        ? requestedPage
+        : 1;
+    if (!Number.isSafeInteger((page - 1) * effectiveLimit)) {
+      page = 1;
     }
 
-    req.appInfo.pagination.skip =
-      req.appInfo.pagination.page * req.appInfo.pagination.limit -
-      req.appInfo.pagination.limit;
+    req.appInfo.pagination = {
+      page,
+      limit: effectiveLimit,
+      skip: (page - 1) * effectiveLimit,
+    };
 
     return next();
   }
