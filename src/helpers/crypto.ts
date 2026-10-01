@@ -1,4 +1,10 @@
-import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import {
+  createHmac,
+  hkdfSync,
+  randomBytes,
+  scrypt,
+  timingSafeEqual,
+} from 'node:crypto';
 import { promisify } from 'node:util';
 import type authConfig from '../config/auth.ts';
 import { appInstance } from './appInstance.ts';
@@ -207,3 +213,41 @@ export const burnPasswordVerify = async (password: string): Promise<void> => {
     // Timing side effect only — any error here is irrelevant.
   }
 };
+
+// --- Short secrets ----------------------------------------------------------
+//
+// One-time codes (e-mail/SMS login, reset) are too low-entropy for a bare
+// SHA-256: a 6-digit code's 10^6 values fall to a leaked hash in under a
+// second. An HMAC keyed from AUTH_SALT makes a leaked hash useless without the
+// secret, at microseconds per call where scrypt costs ~100 ms and 128 MB.
+// Stored hashes depend on this exact recipe — changing it invalidates them.
+
+/** HMAC-SHA256 under a per-purpose key derived from AUTH_SALT with HKDF. */
+const hmacSecret = (value: string, purpose: string) => {
+  if (!purpose) {
+    throw new Error('Secret hashing purpose is required, e.g. "email-login"');
+  }
+  const key = hkdfSync('sha256', getPepper(), '', `hashSecret:${purpose}`, 32);
+  return createHmac('sha256', Buffer.from(key)).update(value).digest();
+};
+
+/**
+ * Hash a short, low-entropy secret such as a 6-digit login code (base64url).
+ * Keyed with `AUTH_SALT`: a leaked hash cannot be brute-forced without it, and
+ * rotating `AUTH_SALT` invalidates every stored hash. `purpose` names the
+ * feature; a hash made for one purpose never verifies under another.
+ * For long random tokens use `hashToken`; for passwords use `hashPassword`.
+ */
+export const hashSecret = (value: string, { purpose }: { purpose: string }) =>
+  hmacSecret(value, purpose).toString('base64url');
+
+/** Constant-time check of `value` against a {@link hashSecret} result. */
+export const verifySecret = (
+  value: string,
+  stored: string,
+  { purpose }: { purpose: string },
+) =>
+  timingSafeEqualBuffers(
+    hmacSecret(value, purpose),
+    Buffer.from(stored, 'base64url'),
+  );
