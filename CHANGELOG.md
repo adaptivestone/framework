@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [5.4.2] - 2026-10-01
+
 ### Added
 
 - **`createuser --token` prints a usable session token again.** Since 5.0.0 tokens are stored hashed and the command logs only identifiers, so the session it created on every run could never be used. Without the flag the command now creates no session; with `--token` it issues one and prints the raw token once to stdout, never to the logger.

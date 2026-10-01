@@ -26,6 +26,8 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
 5.4.1 (shipped) ────→ optional-i18n declarations + model/validation typing
                       + request/auth/rate-limit/cache fixes
                       └──→ npm + GitHub release published 2026-09-11
+5.4.2 (prepared) ───→ session-race/i18n/boot-order/cache/parser fixes
+                      + createuser --token + Sentry 11 / vitest 5 peers
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           P1q (v5.5) is unblocked by 5.4.0 shipping and remains queued
@@ -45,7 +47,8 @@ flowchart LR
     Patch --> Released["✅ 5.4.0: i18n defaults + email modules + Bun"]
     Released --> Unreleased["✅ 5.4.1 shipped: declaration + validation + security fixes"]
 
-    Unreleased --> Responses["⏸ v5.5 universal responses"]
+    Unreleased --> Patch542["🔄 5.4.2 prepared: review fixes + peer updates"]
+    Patch542 --> Responses["⏸ v5.5 universal responses"]
     Responses --> OpenAPI["⏸ v5.6 OpenAPI response contracts"]
 
     BunRelease["Bun stable release with fix"] --> BunSupport["✅ Bun support — shipped 5.4.0"]
@@ -121,12 +124,13 @@ repository; Markdown remains the reviewed source of truth.
 | [drop-express](later/drop-express.md) | P5 | Edge-compatible, Express gone. Blocked by P3+P4. |
 | [mongo-er-diagram](later/mongo-er-diagram.md) | Side | Issue #11. |
 | [select-projection-typing](later/select-projection-typing.md) | Side | Type `.select(...)` results to the projected fields (typing track). Object-form first; fixture-gated. |
-| [vitest-to-node-test](later/vitest-to-node-test.md) | Side | Replace vitest with `node:test`. Best slot: after v5.1. |
 
 ### done/
 
 | File | Ref | Summary |
 |---|---|---|
+| [release-5.4.2](done/release-5.4.2.md) | Release | Prepared 2026-10-01 (not yet published): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
+| [vitest-to-node-test](done/vitest-to-node-test.md) | Side | Shipped in 5.3.0: the framework's own suite runs on `node:test`; vitest stays only for the published `setupVitest` helper. |
 | [release-5.4.1](done/release-5.4.1.md) | Release | Published to npm and GitHub on 2026-09-11. All five local gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Documentation site deployment is separate. |
 | [i18n-default-values](done/i18n-default-values.md) | P1y-bridge | Shipped in 5.4.0: English defaults and optional translation peers. Declaration checking without those peers is fixed in 5.4.1. |
 | [email-templates-v2](done/email-templates-v2.md) | Cross-repo | Shipped in 5.4.0: typed default email template modules, translatable English verification mail, and module peer ^2.1.0. |
@@ -240,6 +244,16 @@ and compatibility notes. Includes optional-i18n declarations, model/validation
 parity, security/cache fixes and the optional oxc-parser ^0.149.0 peer update.
 Published to npm and [GitHub Releases](https://github.com/adaptivestone/framework/releases/tag/5.4.1).
 Documentation site deployment remains separate.
+
+## 5.4.2 — prepared 2026-10-01
+
+User-selected patch release. See [release preparation](done/release-5.4.2.md) and
+`CHANGELOG.md`. Race-safe session issuance (password reset, concurrent
+login/logout), i18n detector crash and fall-through, listen after mount,
+long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
+`createuser --token`; optional peers accept Sentry 11 and vitest 5, and codegen
+requires oxc-parser ^0.152.0. Email case-folding stays queued
+([email-normalization](queued/email-normalization.md)).
 
 ## v5.5 target — P1q line
 

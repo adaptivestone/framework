@@ -6,7 +6,7 @@
 `ensureTestServerReady()` gate for application root hooks and expands the node:test suite to 7 tests.
 **Depends on**: nothing critical — can ship anytime
 **Time**: ~½ day
-**Origin**: framework currently ships test helpers (`getTestServerURL`, `serverInstance`, etc.) that lean on vitest's globals and lifecycle hooks. Consumers who'd rather use Node's built-in `node:test` (smaller dep tree, native TypeScript, runtime alignment) can't use them directly. Different scope from [vitest-to-node-test](../later/vitest-to-node-test.md), which is about migrating the framework's *own* tests.
+**Origin**: framework currently ships test helpers (`getTestServerURL`, `serverInstance`, etc.) that lean on vitest's globals and lifecycle hooks. Consumers who'd rather use Node's built-in `node:test` (smaller dep tree, native TypeScript, runtime alignment) can't use them directly. Different scope from [vitest-to-node-test](vitest-to-node-test.md), which is about migrating the framework's *own* tests.
 
 ## Goal
 
@@ -54,7 +54,7 @@ Reference: `_archive/REFACTOR_PLAN_v1.md` §7b.
 
 ## Out of scope
 
-- Migrating the framework's own tests — that's [vitest-to-node-test](../later/vitest-to-node-test.md), a separate decision.
+- Migrating the framework's own tests — that's [vitest-to-node-test](vitest-to-node-test.md), a separate decision.
 - Building a custom test runner.
 - `expect()` polyfill for node:test. Users adapt to `node:assert/strict`; we don't paper over the difference.
 

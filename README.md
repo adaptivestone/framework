@@ -70,6 +70,20 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.4.2)
+
+See the [5.4.2 release notes](CHANGELOG.md) for all fixes. Most need no action:
+
+- Projects that run `npm run gen` must update the optional peer:
+  `npm i -D oxc-parser@^0.152.0`.
+- `user.generateToken()` now rejects with a Mongoose `VersionError` when the
+  stored password changed after the document was loaded; the built-in login
+  answers this like a wrong password. Custom login flows should do the same.
+- The HTTP server opens its port only after routes, `bootHttp` and error
+  handlers are mounted; `startServer()` resolves once it is listening.
+- `createuser --token` prints a usable session token; without the flag the
+  command no longer creates a session.
+
 ## Authentication and cache upgrade notes (5.4.1)
 
 See the [5.4.1 release notes](CHANGELOG.md) for all fixes, including model/validation

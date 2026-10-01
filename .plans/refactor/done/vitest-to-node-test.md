@@ -1,6 +1,6 @@
 # Side — Replace vitest with `node:test`
 
-**Status**: ⏸ deferred (live decision; technical blockers resolved as of Node 25/26)
+**Status**: ✅ shipped in 5.3.0 (commit `3d9951e`, 2026-08-07). The framework's own suite runs on `node:test`; vitest remains only as a dev/optional peer for the published `setupVitest` helper. Rationale below kept for reference.
 **Depends on**: P1d (initial scope green and stable)
 **Unblocks**: nothing
 **Schedule**: after P1d, alongside or just before P2a — when there's a natural lull and no other phase is mid-flight
