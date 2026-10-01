@@ -13,6 +13,6 @@ export default {
     ip: true, // include ip to key generation
     route: true, // include route to key generation
     user: true, // include user id to key generation (if user exits)
-    request: [], // what should be included from request (req.appInfo.request) if it presented
+    request: [], // req.body fields to include (raw, before validation); values are case-folded and hashed
   },
 };

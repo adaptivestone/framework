@@ -255,9 +255,10 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
-## Unreleased — next minor
+## Unreleased — next minor (5.5.0)
 
 - ✅ [Keyed hashing for short secrets](done/short-secret-hashing.md) — `hashSecret` / `verifySecret` in `helpers/crypto.ts`: per-purpose HMAC-SHA256 keyed from `AUTH_SALT` via HKDF, for e-mail/SMS login and reset codes. Additive; implemented 2026-10-01, not yet released.
+- ✅ [Canonical rate-limit request keys](done/rate-limit-request-keys.md) — `consumeKeyComponents.request` values are NFKC + trim + lowercase, field-named and hashed, so spelling variants share one budget and e-mails leave keys/logs; `gerenateConsumeKey` → `generateConsumeKey` (old name deprecated until v6). Behavior change: request-keyed counters reset once. Implemented 2026-10-02.
 
 ## v5.5 target — P1q line
 

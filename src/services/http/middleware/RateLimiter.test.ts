@@ -59,7 +59,7 @@ describe('rate limiter methods', () => {
       driver: 'redis',
     });
 
-    const res = await redisRateLimiter.gerenateConsumeKey({
+    const res = await redisRateLimiter.generateConsumeKey({
       appInfo: {
         ip: '192.168.0.0',
         user: {
@@ -71,24 +71,97 @@ describe('rate limiter methods', () => {
     assert.strictEqual(res, '192.168.0.0_ALL:unmatched_someId');
   });
 
-  it('generateConsumeKey with request works correctly', async () => {
-    const redisRateLimiter = new RateLimiter(appInstance, {
-      driver: 'redis',
-      consumeKeyComponents: {
-        request: ['email'],
-      },
+  it('keeps the misspelled method as an alias', () => {
+    const limiter = new RateLimiter(appInstance, { driver: 'memory' });
+    const req = { appInfo: { ip: '10.0.0.1' } } as unknown as FrameworkRequest;
+    assert.strictEqual(
+      limiter.gerenateConsumeKey(req),
+      limiter.generateConsumeKey(req),
+    );
+  });
+
+  describe('request key components', () => {
+    const keyFor = (body: Record<string, unknown>, request = ['email']) =>
+      new RateLimiter(appInstance, {
+        driver: 'memory',
+        consumeKeyComponents: { request },
+      }).generateConsumeKey({
+        appInfo: { ip: '192.168.0.0' },
+        body,
+      } as unknown as FrameworkRequest);
+
+    it('hashes the field names and values into the key', () => {
+      const expected = crypto
+        .createHash('sha256')
+        .update(JSON.stringify([['email', 'foo@example.com']]))
+        .digest('hex');
+      assert.strictEqual(
+        keyFor({ email: 'foo@example.com' }),
+        `192.168.0.0_ALL:unmatched_${expected}`,
+      );
     });
 
-    const res = await redisRateLimiter.gerenateConsumeKey({
-      appInfo: {
-        ip: '192.168.0.0',
-      },
-      body: {
-        email: 'foo@example.com',
-      },
-    } as FrameworkRequest);
+    it('keeps raw request values out of the key', () => {
+      assert.ok(!keyFor({ email: 'foo@example.com' }).includes('foo'));
+    });
 
-    assert.strictEqual(res, '192.168.0.0_ALL:unmatched_foo@example.com');
+    it('folds case, surrounding spaces and compatibility forms together', () => {
+      const key = keyFor({ email: 'foo@example.com' });
+      for (const email of [
+        'Foo@Example.com',
+        '  FOO@example.com\t',
+        'ｆｏｏ@example.com',
+      ]) {
+        assert.strictEqual(keyFor({ email }), key, email);
+      }
+    });
+
+    it('keeps different values and different fields apart', () => {
+      assert.notStrictEqual(
+        keyFor({ email: 'foo@example.com' }),
+        keyFor({ email: 'bar@example.com' }),
+      );
+      assert.notStrictEqual(
+        keyFor({ email: 'a' }, ['email', 'phone']),
+        keyFor({ phone: 'a' }, ['email', 'phone']),
+      );
+    });
+
+    it('treats blank and non-scalar values as absent', () => {
+      const noRequestPart = '192.168.0.0_ALL:unmatched';
+      for (const email of ['', '   ', { a: 1 }, ['foo@example.com'], null]) {
+        assert.strictEqual(keyFor({ email }), noRequestPart);
+      }
+      assert.notStrictEqual(keyFor({ email: 0 }), noRequestPart);
+    });
+  });
+
+  it('still honours a subclass that overrides the misspelled method', async () => {
+    const warnings: string[] = [];
+    const onWarning = (w: Error) => warnings.push(w.message);
+    process.on('warning', onWarning);
+    try {
+      class LegacyLimiter extends RateLimiter {
+        gerenateConsumeKey() {
+          return 'legacy-key';
+        }
+      }
+      const limiter = new LegacyLimiter(appInstance, { driver: 'memory' });
+      const consume = mock.method(limiter.limiter, 'consume');
+      const req = { appInfo: {} } as unknown as FrameworkRequest;
+      const res = {} as Response;
+      await limiter.middleware(req, res, () => {});
+      await limiter.middleware(req, res, () => {});
+      await setTimeout(0); // warnings are emitted on the next tick
+
+      assert.match(String(consume.mock.calls[0].arguments[0]), /-legacy-key$/);
+      assert.strictEqual(
+        warnings.filter((m) => m.includes('gerenateConsumeKey')).length,
+        1,
+      );
+    } finally {
+      process.off('warning', onWarning);
+    }
   });
 
   it('middleware without driver should fail', async () => {

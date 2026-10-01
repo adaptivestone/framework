@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **`hashSecret` / `verifySecret` for short codes.** E-mail login, SMS and reset codes are too short for `hashToken`: a leaked SHA-256 of a 6-digit code is reversed in under a second. `hashSecret(code, { purpose })` from `helpers/crypto.js` returns a base64url HMAC-SHA256 keyed from `AUTH_SALT`, so a leaked hash is useless without the secret, and `verifySecret(code, stored, { purpose })` checks a candidate in constant time. `purpose` names the feature; a hash made for one purpose never verifies under another. Rotating `AUTH_SALT` invalidates outstanding codes. Keep `hashToken` for long random tokens and `hashPassword` for passwords.
 
+### Deprecated
+
+- **`RateLimiter.gerenateConsumeKey` is renamed to `generateConsumeKey`.** The misspelled name still works and is removed in v6. A subclass that overrides the old name keeps its custom key and gets a one-time `DeprecationWarning` (`ASF_DEP_RATE_LIMITER_KEY_METHOD`).
+
+### Fixed
+
+- **Spelling variants no longer get separate rate-limit budgets.** `consumeKeyComponents.request` keyed on the raw body, so with a per-e-mail limit (`ip: false, request: ['email']`) every variant such as `Foo@x.com`, `FOO@x.com` or ` foo@x.com` got a fresh budget while the app's lookup treated them as one account. Each configured field is now Unicode-normalized (NFKC), trimmed and lowercased; blank values and non-scalar values (objects, arrays) are ignored. Field names and values are hashed into the key, so values of different fields no longer share a bucket and request values (often e-mails) no longer appear in stored keys or the 429 log line. Upgrading resets existing counters for request-keyed limiters; finish the rollout across workers promptly. A normalizing middleware placed before `RateLimiter` for this purpose can be removed. For stricter rules (dots, `+tags`, accents), override `generateConsumeKey`.
+
 ## [5.4.2] - 2026-10-01
 
 ### Added

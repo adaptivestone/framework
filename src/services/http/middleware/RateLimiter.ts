@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import merge from 'deepmerge';
 import type { NextFunction, Response } from 'express';
 import mongoose from 'mongoose';
@@ -11,10 +12,17 @@ import {
   RateLimiterRedis,
 } from 'rate-limiter-flexible';
 import type rateLimiterConfig from '../../../config/rateLimiter.js';
+import { makeOncePerClassWarner } from '../../../helpers/deprecation.ts';
 import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+
+const warnMisspelledKeyOverride = makeOncePerClassWarner(
+  'ASF_DEP_RATE_LIMITER_KEY_METHOD',
+  (name) =>
+    `Middleware "${name}" overrides RateLimiter.gerenateConsumeKey, which is renamed to generateConsumeKey. Rename the override — the old name will be removed in v6.`,
+);
 
 class RateLimiter extends AbstractMiddleware {
   static get description() {
@@ -103,7 +111,7 @@ class RateLimiter extends AbstractMiddleware {
     }
   }
 
-  gerenateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
+  generateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
     const { ip, route, user, request } = this.finalOptions.consumeKeyComponents;
 
     const key = [];
@@ -133,14 +141,35 @@ class RateLimiter extends AbstractMiddleware {
     }
 
     if (request?.length) {
-      request.forEach((val) => {
-        if (req.body?.[val]) {
-          key.push(req.body[val]);
+      // Raw body, before validation: fold the spellings a normalizing lookup
+      // treats as one account (case, surrounding spaces, compatibility forms),
+      // or each variant gets a fresh budget.
+      const fields: [string, string][] = [];
+      for (const field of request) {
+        const value = req.body?.[field];
+        if (typeof value !== 'string' && typeof value !== 'number') {
+          continue;
         }
-      });
+        const normalized = String(value).normalize('NFKC').trim().toLowerCase();
+        if (normalized) {
+          fields.push([field, normalized]);
+        }
+      }
+      // Hashed: bounds the key size and keeps request values (often e-mails)
+      // out of stored keys and the 429 log line.
+      if (fields.length) {
+        key.push(
+          createHash('sha256').update(JSON.stringify(fields)).digest('hex'),
+        );
+      }
     }
 
     return key.join('_');
+  }
+
+  /** @deprecated Misspelled; use {@link generateConsumeKey}. Removed in v6. */
+  gerenateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
+    return this.generateConsumeKey(req);
   }
 
   async consumeResult(consumeKey: string, consumePoints = 0) {
@@ -187,7 +216,15 @@ class RateLimiter extends AbstractMiddleware {
     // switch. Not a redis dependency; don't "fix" it to be redis-only.
     const { namespace } = this.app.getConfig('redis');
 
-    const consumeKey = `${namespace}-${this.gerenateConsumeKey(req)}`;
+    // A subclass still overriding the misspelled name keeps its custom key.
+    let key: string;
+    if (this.gerenateConsumeKey !== RateLimiter.prototype.gerenateConsumeKey) {
+      warnMisspelledKeyOverride(this.constructor);
+      key = this.gerenateConsumeKey(req);
+    } else {
+      key = this.generateConsumeKey(req);
+    }
+    const consumeKey = `${namespace}-${key}`;
 
     const consumeResult = await this.consumeResult(consumeKey);
     if (consumeResult.isAllowed) {
