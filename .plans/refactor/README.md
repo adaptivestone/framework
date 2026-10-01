@@ -255,6 +255,10 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
+## Unreleased — next minor
+
+- ✅ [Keyed hashing for short secrets](done/short-secret-hashing.md) — `hashSecret` / `verifySecret` in `helpers/crypto.ts`: per-purpose HMAC-SHA256 keyed from `AUTH_SALT` via HKDF, for e-mail/SMS login and reset codes. Additive; implemented 2026-10-01, not yet released.
+
 ## v5.5 target — P1q line
 
 - [Async middleware v2 opt-in](queued/async-middleware.md) (P1m) — co-designed with P1q: `static contractVersion = 2`, returned `HttpResponse` through P1q's writer, throws through the error registry; v1 default untouched until v6.
