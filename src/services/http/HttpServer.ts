@@ -94,6 +94,7 @@ class HttpServer extends Base {
     this.express.use(
       new Cors(this.app, {
         origins: httpConfig.corsDomains,
+        exposedHeaders: httpConfig.corsExposedHeaders,
       }).getMiddleware() as Handler,
     );
 

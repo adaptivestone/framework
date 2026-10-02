@@ -7,6 +7,10 @@ export default {
   // `/example\.com/` also matches evil-example.com and example.com.attacker.io.
   // `corsDomains: [/./]` reflects EVERY origin — dangerous, dev-only.
   corsDomains: ['http://localhost:3000'],
+  // Response headers that browser code on those origins may read (CORS hides
+  // all but a few basic ones). `Retry-After` lets a web app show the rate
+  // limiter's wait time. Your own array REPLACES this one — keep 'Retry-After'.
+  corsExposedHeaders: ['Retry-After'],
   myDomain: process.env.HTTP_DOMAIN || 'http://localhost:3300',
   siteDomain: process.env.FRONT_DOMAIN || 'http://localhost:3000',
   // Standard security response headers, applied to every response (set a value
