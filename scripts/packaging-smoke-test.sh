@@ -319,20 +319,23 @@ const i18n = await i18nService.getI18nForLang('en');
 const { default: AuthMiddleware } = await import(
   '@adaptivestone/framework/services/http/middleware/Auth.js'
 );
-let middlewareBody;
-await new AuthMiddleware(server.app).middleware(
-  { appInfo: { i18n } },
-  {
-    status() {
-      return this;
-    },
-    json(body) {
-      middlewareBody = body;
-      return this;
-    },
-  },
-  () => {},
+const { builtInErrorHandlers } = await import(
+  '@adaptivestone/framework/services/http/builtinErrorHandlers.js'
 );
+// The middleware throws its 401; render it the way the HTTP layer does, with
+// the built-in HttpError mapper (no HTTP server is started here).
+const middlewareReq = { appInfo: { i18n } };
+const thrown = await new AuthMiddleware(server.app)
+  .middleware(middlewareReq, {}, () => {})
+  .then(
+    () => null,
+    (err) => err,
+  );
+const [httpErrorEntry] = builtInErrorHandlers();
+const middlewareBody =
+  thrown instanceof httpErrorEntry.errorClass
+    ? httpErrorEntry.handler(thrown, middlewareReq)?.body
+    : undefined;
 if (middlewareBody?.message !== 'Please login to application') {
   throw new Error(
     `Middleware message without i18next: ${JSON.stringify(middlewareBody)}`,

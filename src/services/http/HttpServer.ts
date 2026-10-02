@@ -19,7 +19,9 @@ import {
   type ErrorHandlerResult,
   type ErrorLogLevel,
   type RegisteredErrorHandler,
+  sendErrorResult,
   serverErrorMessage,
+  toLoggableError,
 } from './builtinErrorHandlers.ts';
 import Cors from './middleware/Cors.ts';
 import I18nMiddleware from './middleware/I18n.ts';
@@ -158,9 +160,9 @@ class HttpServer extends Base {
    * pass to the next entry. Typical registration point is the project's
    * `bootHttp` hook. Returns an unregister function.
    *
-   * Scope: handlers fire for errors thrown from route handlers and request
-   * validation only. Errors thrown by middleware bypass the registry and are
-   * finalized by the generic 500 sink (`addErrorHandler`).
+   * Scope: handlers fire for errors thrown from route handlers, request
+   * validation and middleware (the final sink, `addErrorHandler`, resolves
+   * through the same registry).
    */
   registerErrorHandler<E extends Error>(
     errorClass: abstract new (...args: never[]) => E,
@@ -184,12 +186,12 @@ class HttpServer extends Base {
   }
 
   /**
-   * Resolve a handler-thrown error through the registry: consumer tier first,
-   * then built-ins; first `instanceof` match returning non-null wins. A
-   * handler that itself throws aborts the walk (logged here at `error`; the
-   * caller falls through to its 500) — never a crash loop. Returns null when
-   * no entry produced a response. Scope: only the route-handler and validation
-   * catches call this; middleware throws bypass it and hit the 500 sink.
+   * Resolve a thrown error through the registry: consumer tier first, then
+   * built-ins; first `instanceof` match returning non-null wins. A handler
+   * that itself throws aborts the walk (logged here at `error`; the caller
+   * falls through to its 500) — never a crash loop. Returns null when no entry
+   * produced a response. Called by the route-handler and validation catches
+   * and by the final sink, which receives middleware errors.
    */
   async resolveError(
     err: unknown,
@@ -237,19 +239,27 @@ class HttpServer extends Base {
   }
 
   /**
-   * Add the 500 error handler. Express recognises 4-arg middleware as the
-   * error sink, so it must be registered last.
+   * Add the final error sink. A 4-arg handler is the error sink, so it must
+   * be registered last. Errors from middleware (and from a handler that
+   * already streamed) land here; the registry answers what it recognises,
+   * anything else is a 500.
    */
   addErrorHandler() {
     this.express.use(
-      (err: Error, req: Request, res: Response, next: NextFunction) => {
-        this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
+      async (err: Error, req: Request, res: Response, next: NextFunction) => {
         // If the response already started (e.g. a handler that threw mid-stream),
-        // we can't set a 500 — hand off to Express's default finalizer instead
-        // of crashing with ERR_HTTP_HEADERS_SENT.
+        // nothing can be sent — hand off to the default finalizer instead of
+        // crashing with ERR_HTTP_HEADERS_SENT.
         if (res.headersSent) {
+          this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
           return next(err);
         }
+        const resolved = await this.resolveError(err, req as FrameworkRequest);
+        if (resolved) {
+          this.logger?.[resolved.logLevel](toLoggableError(err));
+          return sendErrorResult(res, resolved);
+        }
+        this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
         res.status(500).json({
           message: serverErrorMessage(req as FrameworkRequest),
         });

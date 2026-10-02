@@ -5,6 +5,7 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { UnauthorizedError } from '../httpErrors.ts';
 import Auth from './Auth.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
@@ -42,60 +43,42 @@ describe('atuh middleware methods', () => {
 
   it('middleware NOT pass when user NOT presented', async () => {
     let isCalled = false;
-    let status = 0;
-    let isSend = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
     const req = {
       appInfo: {}, // no user
     };
-    await middleware.middleware(
-      req as unknown as AuthRequest,
-      {
-        status(statusCode: number) {
-          status = statusCode;
-          return this;
+    await assert.rejects(
+      middleware.middleware(
+        req as unknown as AuthRequest,
+        {} as Response,
+        () => {
+          isCalled = true;
         },
-        json() {
-          isSend = true;
-          return this;
-        },
-      } as unknown as Response,
-      nextFunction,
+      ),
+      UnauthorizedError,
     );
 
     assert.ok(!isCalled);
-    assert.strictEqual(status, 401);
-    assert.ok(isSend);
   });
 });
 
 /**
- * The 401 body is emitted through `translate()`: an app that ships
- * `middleware.auth.notLoggedIn` gets its own wording, an app that does not
- * keeps the exact English text. `error` is a machine code and never translated.
+ * The 401 is a thrown `UnauthorizedError`, answered through the error-handler
+ * registry: an app that ships `middleware.auth.notLoggedIn` gets its own
+ * wording, an app that does not keeps the exact English text. `error` is a
+ * machine code and never translated.
  */
 describe('auth middleware message translation', () => {
   const runUnauthenticated = async (i18n?: TI18n) => {
-    const middleware = new Auth(appInstance);
-    let status = 0;
-    let payload: Record<string, unknown> = {};
-    await middleware.middleware(
-      { appInfo: { i18n } } as unknown as AuthRequest,
-      {
-        status(statusCode: number) {
-          status = statusCode;
-          return this;
-        },
-        json(body: Record<string, unknown>) {
-          payload = body;
-          return this;
-        },
-      } as unknown as Response,
-      () => {},
-    );
-    return { status, payload };
+    const req = { appInfo: { i18n } } as unknown as AuthRequest;
+    const thrown = await new Auth(appInstance)
+      .middleware(req, {} as Response, () => {})
+      .then(
+        () => null,
+        (err: unknown) => err,
+      );
+    // Answered the way the HTTP layer answers a middleware error.
+    const answer = await appInstance.httpServer?.resolveError(thrown, req);
+    return { status: answer?.status, payload: answer?.body };
   };
 
   it('keeps the English text when the app locales lack the key', async () => {

@@ -7,6 +7,7 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import { mockRejectedValue, stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpError } from '../httpErrors.ts';
 import RateLimiter from './RateLimiter.ts';
 
 let mongoRateLimiter: RateLimiter;
@@ -214,27 +215,22 @@ describe('rate limiter methods', () => {
       ...request,
     };
     let status = 0;
-    let isSend = false;
     let isNextCalled = false;
-    await realRateLimiter.middleware(
-      req as FrameworkRequest,
-      {
-        status(statusCode: number) {
-          status = statusCode;
-          return this;
+    try {
+      await realRateLimiter.middleware(
+        req as FrameworkRequest,
+        {} as Response,
+        () => {
+          isNextCalled = true;
         },
-        json() {
-          isSend = true;
-        },
-        setHeader(_name, _value) {
-          return this;
-        },
-      } as Response,
-      () => {
-        isNextCalled = true;
-      },
-    );
-    return { status, isSend, isNextCalled };
+      );
+    } catch (err) {
+      if (!(err instanceof HttpError)) {
+        throw err;
+      }
+      status = err.status;
+    }
+    return { status, isNextCalled };
   };
 
   it('middleware should works with a mongo drivers', async () => {
@@ -271,11 +267,7 @@ describe('rate limiter methods', () => {
 
     const data = await Promise.all(middlewares);
 
-    const status = data.find((obj) => obj.status === 429);
-    const isSend = data.find((obj) => obj.isSend);
-
-    assert.strictEqual(status?.status, 429);
-    assert.ok(isSend?.isSend);
+    assert.ok(data.some((obj) => obj.status === 429));
   });
 
   it('middleware should rate limits for us. memory driver', async () => {
@@ -289,11 +281,7 @@ describe('rate limiter methods', () => {
 
     const data = await Promise.all(middlewares);
 
-    const status = data.find((obj) => obj.status === 429);
-    const isSend = data.find((obj) => obj.isSend);
-
-    assert.strictEqual(status?.status, 429);
-    assert.ok(isSend?.isSend);
+    assert.ok(data.some((obj) => obj.status === 429));
   });
 
   it('middleware should rate limits for us. redis driver', async () => {
@@ -307,11 +295,7 @@ describe('rate limiter methods', () => {
 
     const data = await Promise.all(middlewares);
 
-    const status = data.find((obj) => obj.status === 429);
-    const isSend = data.find((obj) => obj.isSend);
-
-    assert.strictEqual(status?.status, 429);
-    assert.ok(isSend?.isSend);
+    assert.ok(data.some((obj) => obj.status === 429));
   });
 
   describe('store failure handling (doc 10)', () => {
@@ -335,28 +319,20 @@ describe('rate limiter methods', () => {
         msBeforeNext: 5000,
       } as never);
 
-      let status = 0;
-      let retryAfter = '';
-      await rateLimiter.middleware(
-        { appInfo: {}, ip: '10.10.0.3' } as unknown as FrameworkRequest,
-        {
-          status(s: number) {
-            status = s;
-            return this;
-          },
-          json() {},
-          setHeader(name: string, value: string) {
-            if (name === 'Retry-After') {
-              retryAfter = value;
-            }
-            return this;
-          },
-        } as unknown as Response,
-        () => {},
-      );
+      const req = {
+        appInfo: {},
+        ip: '10.10.0.3',
+      } as unknown as FrameworkRequest;
+      const thrown = await rateLimiter
+        .middleware(req, {} as Response, () => {})
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+      const answer = await appInstance.httpServer?.resolveError(thrown, req);
 
-      assert.strictEqual(status, 429);
-      assert.strictEqual(retryAfter, '5');
+      assert.strictEqual(answer?.status, 429);
+      assert.deepStrictEqual(answer?.headers, { 'Retry-After': '5' });
     });
 
     it('keeps limiting via the memory insurance when the redis store fails', async () => {
@@ -394,7 +370,8 @@ describe('rate limiter methods', () => {
 });
 
 /**
- * The 429 body goes through `translate()`. The 500 (`RateLimiter error`) stays
+ * The 429 is a thrown `HttpError` answered through the error-handler registry,
+ * so its message is translated. The 500 (`RateLimiter error`) stays
  * hardcoded on purpose — it reports a misconfigured limiter to operators, not
  * a condition the caller can act on in their own language.
  */
@@ -406,26 +383,19 @@ describe('rate limiter message translation', () => {
       msBeforeNext: 5000,
     } as never);
 
-    let status = 0;
-    let payload: Record<string, unknown> = {};
-    await rateLimiter.middleware(
-      { appInfo: { i18n }, ip: '10.10.0.4' } as unknown as FrameworkRequest,
-      {
-        status(statusCode: number) {
-          status = statusCode;
-          return this;
-        },
-        json(body: Record<string, unknown>) {
-          payload = body;
-          return this;
-        },
-        setHeader(_name: string, _value: string) {
-          return this;
-        },
-      } as unknown as Response,
-      () => {},
-    );
-    return { status, payload };
+    const req = {
+      appInfo: { i18n },
+      ip: '10.10.0.4',
+    } as unknown as FrameworkRequest;
+    const thrown = await rateLimiter
+      .middleware(req, {} as Response, () => {})
+      .then(
+        () => null,
+        (err: unknown) => err,
+      );
+    // Answered the way the HTTP layer answers a middleware error.
+    const answer = await appInstance.httpServer?.resolveError(thrown, req);
+    return { status: answer?.status, payload: answer?.body };
   };
 
   it('keeps the English text when the app locales lack the key', async () => {
@@ -435,7 +405,10 @@ describe('rate limiter message translation', () => {
     );
 
     assert.strictEqual(status, 429);
-    assert.deepStrictEqual(payload, { message: 'Too Many Requests' });
+    assert.deepStrictEqual(payload, {
+      error: 'TOO_MANY_REQUESTS',
+      message: 'Too Many Requests',
+    });
   });
 
   it('uses the app translation when the key resolves', async () => {
@@ -446,6 +419,9 @@ describe('rate limiter message translation', () => {
     );
 
     assert.strictEqual(status, 429);
-    assert.deepStrictEqual(payload, { message: 'Слишком много запросов' });
+    assert.deepStrictEqual(payload, {
+      error: 'TOO_MANY_REQUESTS',
+      message: 'Слишком много запросов',
+    });
   });
 });

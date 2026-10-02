@@ -13,6 +13,7 @@ import { getTestServerURL } from '../../tests/testHelpers.ts';
 import type { TI18n } from '../i18n/I18n.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import HttpServer from './HttpServer.ts';
+import { HttpError, UnauthorizedError } from './httpErrors.ts';
 
 describe('HttpServer — 404 fallthrough', () => {
   it('returns 404 JSON for unmatched paths', async () => {
@@ -53,6 +54,74 @@ describe('HttpServer — security headers (doc 22)', () => {
   });
 });
 
+// ─── Sink drivers: capture the handler `express.use()` receives ─────────
+
+const recordingResponse = (headersSent = false) => {
+  const captured = {
+    status: 0,
+    payload: {} as Record<string, unknown>,
+    headers: {} as Record<string, string>,
+  };
+  const res = {
+    headersSent,
+    setHeader(name: string, value: string) {
+      captured.headers[name] = value;
+      return this;
+    },
+    status(code: number) {
+      captured.status = code;
+      return this;
+    },
+    json(body: Record<string, unknown>) {
+      captured.payload = body;
+      return this;
+    },
+  } as unknown as Response;
+  return { captured, res };
+};
+
+/** Grab the handler a registration method hands to `express.use()`. */
+const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
+  let handler: unknown;
+  const ctx = {
+    express: {
+      use(fn: unknown) {
+        handler = fn;
+      },
+    },
+    // The sink resolves through the registry: delegate to the test server's.
+    resolveError: (err: unknown, req: FrameworkRequest) =>
+      appInstance.httpServer?.resolveError(err, req) ?? null,
+  };
+  HttpServer.prototype[register].call(ctx as unknown as HttpServer);
+  assert.ok(handler, `${register} registered no handler`);
+  return handler as T;
+};
+
+const runSink = async (
+  err: Error,
+  { i18n, headersSent }: { i18n?: TI18n; headersSent?: boolean } = {},
+) => {
+  const { captured, res } = recordingResponse(headersSent);
+  let passedOn: unknown;
+  await captureHandler<
+    (
+      err: Error,
+      req: FrameworkRequest,
+      res: Response,
+      next: NextFunction,
+    ) => Promise<void>
+  >('addErrorHandler')(
+    err,
+    { appInfo: { i18n } } as unknown as FrameworkRequest,
+    res,
+    (nextErr?: unknown) => {
+      passedOn = nextErr;
+    },
+  );
+  return { ...captured, passedOn };
+};
+
 /**
  * The 404 and 500 sinks are plain Express handlers, not `AbstractMiddleware`
  * subclasses, so they run the same guarded `t(key, { defaultValue })` lookup
@@ -61,37 +130,6 @@ describe('HttpServer — security headers (doc 22)', () => {
  * that does not keeps the exact English text.
  */
 describe('HttpServer — translatable sink messages', () => {
-  const recordingResponse = () => {
-    const captured = { status: 0, payload: {} as Record<string, unknown> };
-    const res = {
-      headersSent: false,
-      status(code: number) {
-        captured.status = code;
-        return this;
-      },
-      json(body: Record<string, unknown>) {
-        captured.payload = body;
-        return this;
-      },
-    } as unknown as Response;
-    return { captured, res };
-  };
-
-  /** Grab the handler a registration method hands to `express.use()`. */
-  const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
-    let handler: unknown;
-    const ctx = {
-      express: {
-        use(fn: unknown) {
-          handler = fn;
-        },
-      },
-    };
-    HttpServer.prototype[register].call(ctx as unknown as HttpServer);
-    assert.ok(handler, `${register} registered no handler`);
-    return handler as T;
-  };
-
   const run404 = (i18n?: TI18n) => {
     const { captured, res } = recordingResponse();
     captureHandler<(req: FrameworkRequest, res: Response) => void>(
@@ -100,23 +138,7 @@ describe('HttpServer — translatable sink messages', () => {
     return captured;
   };
 
-  const run500 = (i18n?: TI18n) => {
-    const { captured, res } = recordingResponse();
-    captureHandler<
-      (
-        err: Error,
-        req: FrameworkRequest,
-        res: Response,
-        next: NextFunction,
-      ) => void
-    >('addErrorHandler')(
-      new Error('boom'),
-      { appInfo: { i18n } } as unknown as FrameworkRequest,
-      res,
-      () => {},
-    );
-    return captured;
-  };
+  const run500 = (i18n?: TI18n) => runSink(new Error('boom'), { i18n });
 
   it('404 keeps the English text when the app locales lack the key', async () => {
     const i18nService = await appInstance.getI18nService();
@@ -135,7 +157,7 @@ describe('HttpServer — translatable sink messages', () => {
 
   it('500 keeps the English text when the app locales lack the key', async () => {
     const i18nService = await appInstance.getI18nService();
-    const captured = run500(await i18nService.getI18nForLang('en'));
+    const captured = await run500(await i18nService.getI18nForLang('en'));
 
     assert.strictEqual(captured.status, 500);
     assert.deepStrictEqual(captured.payload, {
@@ -143,8 +165,8 @@ describe('HttpServer — translatable sink messages', () => {
     });
   });
 
-  it('500 uses the app translation when the key resolves', () => {
-    const captured = run500(
+  it('500 uses the app translation when the key resolves', async () => {
+    const captured = await run500(
       stubI18n({ 'http.serverError': 'Что-то сломалось' }),
     );
 
@@ -152,11 +174,54 @@ describe('HttpServer — translatable sink messages', () => {
     assert.deepStrictEqual(captured.payload, { message: 'Что-то сломалось' });
   });
 
-  it('both sinks fall back to English when the request carries no i18n', () => {
+  it('both sinks fall back to English when the request carries no i18n', async () => {
     assert.deepStrictEqual(run404().payload, { message: 'Not found' });
-    assert.deepStrictEqual(run500().payload, {
+    assert.deepStrictEqual((await run500()).payload, {
       message: 'Something went wrong. Please try again later.',
     });
+  });
+});
+
+/**
+ * Middleware errors reach the final sink, which answers them through the same
+ * registry as handler errors instead of a blanket 500.
+ */
+describe('HttpServer — final sink resolves through the registry', () => {
+  it('answers an HttpError with its status, body and headers', async () => {
+    const answer = await runSink(
+      new HttpError(429, {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too Many Requests',
+        headers: { 'Retry-After': '7' },
+      }),
+    );
+    assert.strictEqual(answer.status, 429);
+    assert.deepStrictEqual(answer.payload, {
+      error: 'TOO_MANY_REQUESTS',
+      message: 'Too Many Requests',
+    });
+    assert.deepStrictEqual(answer.headers, { 'Retry-After': '7' });
+  });
+
+  it('lets an app handler reshape a middleware error', async () => {
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      UnauthorizedError,
+      () => ({ status: 401, body: { reason: 'login' } }),
+    );
+    try {
+      const answer = await runSink(new UnauthorizedError());
+      assert.strictEqual(answer.status, 401);
+      assert.deepStrictEqual(answer.payload, { reason: 'login' });
+    } finally {
+      unregister?.();
+    }
+  });
+
+  it('passes the error on when the response already started', async () => {
+    const err = new UnauthorizedError();
+    const answer = await runSink(err, { headersSent: true });
+    assert.strictEqual(answer.passedOn, err);
+    assert.strictEqual(answer.status, 0);
   });
 });
 

@@ -8,6 +8,7 @@ import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import {
+  sendErrorResult,
   serverErrorMessage,
   toLoggableError,
   validationFailedMessage,
@@ -487,7 +488,7 @@ class ControllerManager extends Base {
           : null;
         if (resolved) {
           logger?.[resolved.logLevel](toLoggableError(err));
-          return res.status(resolved.status).json(resolved.body);
+          return sendErrorResult(res, resolved);
         }
         logger?.error(err);
         return res.status(500).json({
@@ -520,7 +521,7 @@ class ControllerManager extends Base {
           // below keeps the full original error — a server-side defect the
           // developer needs in complete detail.
           logger?.[resolved.logLevel](toLoggableError(err));
-          return res.status(resolved.status).json(resolved.body);
+          return sendErrorResult(res, resolved);
         }
         logger?.error(err);
         return res.status(500).json({
