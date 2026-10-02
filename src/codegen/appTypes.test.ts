@@ -155,6 +155,33 @@ describe('appTypes — config type emission (shape-derived)', () => {
       assert.ok(out.includes('"saltSecret": number'));
     });
 
+    describe('nested objects', () => {
+      const nested = fileURLToPath(
+        new URL('./__fixtures__/config/nested.ts', import.meta.url),
+      );
+      const value = { db: { url: undefined, pool: 5 } };
+      const expected = '"db": { "url": string | undefined; "pool": number }';
+
+      it('types a nested env key from the config own source', async () => {
+        const out = await getTemplate(
+          new Map<string, unknown>([['db', value]]),
+          [],
+          new Map<string, string[]>([['db', [nested]]]),
+        );
+        assert.ok(out.includes(expected));
+      });
+
+      it('types a nested env key from the overridden framework config', async () => {
+        const out = await getTemplate(
+          new Map<string, unknown>([['db', value]]),
+          [],
+          new Map<string, string[]>([['db', [appAuth]]]),
+          new Map<string, string[]>([['db', [nested]]]),
+        );
+        assert.ok(out.includes(expected));
+      });
+    });
+
     it('adds no key the app value does not have', async () => {
       const out = await render({ hashRounds: 64 });
       assert.ok(!out.includes('saltSecret'));
