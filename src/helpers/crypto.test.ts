@@ -5,6 +5,7 @@ import { appInstance } from './appInstance.ts';
 import {
   hashPassword,
   hashSecret,
+  timingSafeEqualStrings,
   verifyPassword,
   verifySecret,
 } from './crypto.ts';
@@ -116,5 +117,23 @@ describe('hashSecret / verifySecret', () => {
     );
     assert.strictEqual(verifySecret('042017', '042017', purpose), false);
     assert.strictEqual(verifySecret('042017', '', purpose), false);
+  });
+});
+
+describe('timingSafeEqualStrings', () => {
+  it('is true only for identical strings', () => {
+    assert.strictEqual(
+      timingSafeEqualStrings('probe-secret', 'probe-secret'),
+      true,
+    );
+    assert.strictEqual(
+      timingSafeEqualStrings('probe-secret', 'probe-secreT'),
+      false,
+    );
+    assert.strictEqual(
+      timingSafeEqualStrings('short', 'a much longer value'),
+      false,
+    );
+    assert.strictEqual(timingSafeEqualStrings('', ''), true);
   });
 });

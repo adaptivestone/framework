@@ -1,7 +1,7 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Response } from 'express';
 import mongoose from 'mongoose';
 import type healthConfig from '../config/health.ts';
+import { timingSafeEqualStrings } from '../helpers/crypto.ts';
 import { translateWithDefault } from '../helpers/translate.ts';
 import AbstractController, {
   type TMiddleware,
@@ -9,8 +9,6 @@ import AbstractController, {
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 
 const MONGO_PING_TIMEOUT_MS = 1000;
-
-const sha256 = (value: string) => createHash('sha256').update(value).digest();
 
 /** Ping MongoDB; false when disconnected, failing, or slower than the timeout. */
 async function pingMongo(): Promise<boolean> {
@@ -86,9 +84,7 @@ class Health extends AbstractController {
     }
     const header = req.headers['x-health-token'];
     const sent = typeof header === 'string' ? header : req.query?.token;
-    return (
-      typeof sent === 'string' && timingSafeEqual(sha256(sent), sha256(token))
-    );
+    return typeof sent === 'string' && timingSafeEqualStrings(sent, token);
   }
 
   unauthorized(req: FrameworkRequest, res: Response) {
