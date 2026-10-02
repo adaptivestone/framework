@@ -6,6 +6,7 @@
  */
 
 import path from 'node:path';
+import { isPlainObject } from '../helpers/objects.ts';
 import {
   type EnvShape,
   envShapeToType,
@@ -90,8 +91,7 @@ function valueToTypeString(
           : `[${itemTypes.join(', ')}]`;
       }
       // Only walk plain objects; anything exotic (Date, RegExp, Map, …) is opaque.
-      const proto = Object.getPrototypeOf(value);
-      if (proto !== Object.prototype && proto !== null) {
+      if (!isPlainObject(value)) {
         return 'unknown';
       }
       const rendered = new Map<string, string>();

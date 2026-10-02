@@ -1,15 +1,8 @@
 import winston from 'winston';
+import { isPlainObject } from '../../helpers/objects.ts';
 
 /** What a redacted value is replaced with. */
 export const REDACTED = '[REDACTED]';
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> => {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-};
 
 /**
  * Copy of `value` with the values of `keys` (lower-case) replaced at any
