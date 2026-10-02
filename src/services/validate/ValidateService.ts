@@ -4,7 +4,11 @@ import type { TranslationFunction } from '../i18n/types.ts';
 import { standardSchemaDriver } from './drivers/StandardSchemaDriver.ts';
 import { yupDriver } from './drivers/YupDriver.ts';
 import type { ValidatorDriver } from './types.ts';
-import { issuesToPayload, ValidationError } from './ValidationError.ts';
+import {
+  issuesToPayload,
+  translateIssues,
+  ValidationError,
+} from './ValidationError.ts';
 
 /**
  * Per-route validator dispatcher. Resolves a `ValidatorDriver` once at
@@ -102,34 +106,9 @@ class ValidateService extends Base {
   }
 }
 
-// A framework validation message is an i18n KEY (e.g. `auth.emailValid`) — a
-// dotted/underscored token with no whitespace or template syntax. Driver
-// messages (yup/zod) are free-form English sentences that often embed the raw
-// submitted value (e.g. yup's typeError: `… (cast from the value "…")`). Only
-// keys are sent through i18next; free-form messages are passed through verbatim.
-const I18N_KEY_RE = /^[\w.:-]+$/;
-
-/**
- * Translate validation messages that are i18n keys; pass everything else
- * through untouched. This is deliberately a KEY allow-list, not a fallback to
- * `t(msg, msg, …)`: i18next runs nesting (`$t(...)`) and interpolation
- * (`{{...}}`) over its key/defaultValue, so feeding a user-influenced driver
- * message into it turns a 400 response into a reflected injection that can
- * resolve arbitrary keys out of the loaded translation bundle.
- */
+/** Translate key-like messages (see {@link translateIssues}) and rebuild the payload. */
 function translateInPlace(err: ValidationError, t: TranslationFunction): void {
-  err.issues = err.issues.map((issue) => {
-    if (typeof issue.message !== 'string' || !I18N_KEY_RE.test(issue.message)) {
-      return issue;
-    }
-    return {
-      ...issue,
-      // 2-arg form: the message IS the key; if it isn't loaded i18next returns
-      // the key string unchanged. `params` supplies interpolation values for the
-      // (trusted, app-authored) translation string.
-      message: t(issue.message, issue.params) as unknown as string,
-    };
-  });
+  err.issues = translateIssues(err.issues, t);
   err.message = issuesToPayload(err.issues);
 }
 

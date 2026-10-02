@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 import { testEach } from '../../tests/parameterized.ts';
 import {
   BadRequestError,
@@ -11,12 +12,16 @@ import {
 } from './httpErrors.ts';
 
 describe('httpErrors', () => {
-  it('base HttpError carries status, message and optional body', () => {
-    const err = new HttpError(422, 'Unprocessable', { errors: { csv: 'bad' } });
+  it('base HttpError carries status, message and optional field errors', () => {
+    const err = new HttpError(422, {
+      message: 'Unprocessable',
+      errors: { csv: 'bad' },
+    });
     assert.ok(err instanceof Error);
     assert.strictEqual(err.status, 422);
     assert.strictEqual(err.message, 'Unprocessable');
-    assert.deepStrictEqual(err.body, { errors: { csv: 'bad' } });
+    assert.deepStrictEqual(err.issues, [{ message: 'bad', path: ['csv'] }]);
+    assert.strictEqual(err.body, undefined);
     assert.strictEqual(err.name, 'HttpError');
   });
 
@@ -39,11 +44,37 @@ describe('httpErrors', () => {
     },
   );
 
-  it('subclasses accept a custom message and body', () => {
-    const err = new NotFoundError('Boat not found', { code: 'BOAT_MISSING' });
-    assert.strictEqual(err.status, 404);
-    assert.strictEqual(err.message, 'Boat not found');
-    assert.deepStrictEqual(err.body, { code: 'BOAT_MISSING' });
+  it('subclasses accept field errors; an empty set is dropped', () => {
+    const err = new BadRequestError({
+      message: 'Bad boat',
+      errors: { name: ['too long', 'has digits'] },
+    });
+    assert.strictEqual(err.status, 400);
+    assert.strictEqual(err.issues?.length, 2);
+    assert.strictEqual(
+      new BadRequestError({ message: 'x', errors: {} }).issues,
+      undefined,
+    );
+  });
+
+  it('still accepts the deprecated positional body and warns once per class', async () => {
+    const warnings: { code?: string; message: string }[] = [];
+    const onWarning = (w: Error & { code?: string }) =>
+      warnings.push({ code: w.code, message: w.message });
+    process.on('warning', onWarning);
+    try {
+      class LegacyError extends NotFoundError {}
+      const first = new LegacyError('Boat not found', { code: 'BOAT_MISSING' });
+      new LegacyError('again', { code: 'BOAT_MISSING' });
+      await setTimeout(0); // warnings are emitted on the next tick
+
+      assert.deepStrictEqual(first.body, { code: 'BOAT_MISSING' });
+      const ours = warnings.filter((w) => w.code === 'ASF_DEP_HTTP_ERROR_BODY');
+      assert.strictEqual(ours.length, 1);
+      assert.match(ours[0]?.message ?? '', /LegacyError/);
+    } finally {
+      process.off('warning', onWarning);
+    }
   });
 
   it('accepts a details object with a code and an i18n key', () => {

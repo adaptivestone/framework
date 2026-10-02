@@ -1,6 +1,16 @@
 import mongoose from 'mongoose';
+import { translateWithDefault } from '../../helpers/translate.ts';
+import {
+  issuesToPayload,
+  translateIssues,
+  ValidationError,
+} from '../validate/ValidationError.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import { HttpError } from './httpErrors.ts';
+
+/** The `message` of every framework field-error (400) response. */
+export const validationFailedMessage = (req: FrameworkRequest) =>
+  translateWithDefault(req, 'http.validationFailed', 'Validation failed');
 
 /** Levels the registry may log a handled error at (winston leveled methods). */
 export type ErrorLogLevel =
@@ -312,6 +322,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
       handler: (err, req) => {
         const httpErr = err as HttpError;
         if (httpErr.body != null) {
+          // Deprecated positional body: answered verbatim until v6.
           return { status: httpErr.status, body: httpErr.body };
         }
         let { message } = httpErr;
@@ -327,10 +338,15 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
             message = translated;
           }
         }
-        return {
-          status: httpErr.status,
-          body: httpErr.code ? { error: httpErr.code, message } : { message },
-        };
+        const body: { error?: string; message: string; errors?: unknown } =
+          httpErr.code ? { error: httpErr.code, message } : { message };
+        if (httpErr.issues) {
+          const t = req.appInfo?.i18n?.t;
+          body.errors = issuesToPayload(
+            t ? translateIssues(httpErr.issues, t) : httpErr.issues,
+          );
+        }
+        return { status: httpErr.status, body };
       },
       logLevel: 'verbose',
     },
@@ -342,7 +358,13 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
           req,
         );
         return clientErrors
-          ? { status: 400, body: { errors: clientErrors } }
+          ? {
+              status: 400,
+              body: {
+                message: validationFailedMessage(req),
+                errors: new ValidationError(clientErrors).message,
+              },
+            }
           : null;
       },
       logLevel: 'warn',
@@ -355,7 +377,13 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
           req,
         );
         return clientErrors
-          ? { status: 400, body: { errors: clientErrors } }
+          ? {
+              status: 400,
+              body: {
+                message: validationFailedMessage(req),
+                errors: new ValidationError(clientErrors).message,
+              },
+            }
           : null;
       },
       logLevel: 'warn',

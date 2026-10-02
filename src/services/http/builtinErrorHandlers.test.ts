@@ -295,7 +295,45 @@ describe('builtInErrorHandlers', () => {
       );
     });
 
-    it('keeps an explicit body over the code and key', async () => {
+    it('answers field errors like request validation, translating key messages', async () => {
+      const i18n = stubI18n({ 'accounts.errors.nameTaken': 'Имя занято' });
+      const err = new HttpError(400, {
+        ...details,
+        errors: {
+          name: 'accounts.errors.nameTaken',
+          note: 'free text $t(secret) stays as is',
+        },
+      });
+      assert.deepStrictEqual((await map(err, i18n))?.body, {
+        error: 'LOGIN_CODE_EXPIRED',
+        message: 'This code has expired.',
+        errors: {
+          name: ['Имя занято'],
+          note: ['free text $t(secret) stays as is'],
+        },
+      });
+    });
+
+    it('passes issue params to the translation', async () => {
+      const t = (key: string, params?: Record<string, unknown>) =>
+        key === 'auth.passwordTooShort' ? `min ${params?.min}` : key;
+      const err = new HttpError(400, {
+        message: 'Weak password',
+        errors: [
+          {
+            message: 'auth.passwordTooShort',
+            path: ['password'],
+            params: { min: 15 },
+          },
+        ],
+      });
+      assert.deepStrictEqual((await map(err, { t, language: 'en' }))?.body, {
+        message: 'Weak password',
+        errors: { password: ['min 15'] },
+      });
+    });
+
+    it('a deprecated positional body still replaces the response', async () => {
       const err = new HttpError(400, details, { custom: true });
       assert.deepStrictEqual((await map(err))?.body, { custom: true });
     });

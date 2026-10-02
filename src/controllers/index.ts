@@ -6,7 +6,10 @@ import type AbstractController from '../modules/AbstractController.ts';
 import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
-import { toLoggableError } from '../services/http/builtinErrorHandlers.ts';
+import {
+  toLoggableError,
+  validationFailedMessage,
+} from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import {
@@ -470,7 +473,10 @@ class ControllerManager extends Base {
         // as the handler catch below, so consumer handlers apply consistently;
         // otherwise a generic 500 with the detail LOGGED, never echoed.
         if (ValidationError.isValidationError(err)) {
-          return res.status(400).json({ errors: err.message });
+          return res.status(400).json({
+            message: validationFailedMessage(req),
+            errors: err.message,
+          });
         }
         const resolved = app.httpServer
           ? await app.httpServer.resolveError(err, req)

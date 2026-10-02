@@ -1203,8 +1203,9 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     assert.deepStrictEqual(Object.keys(body.errors), ['name']);
     // Message is rebuilt from the `maxlength` kind + bound, NOT the raw Mongoose
     // template — so it carries the constant (5) but never the submission.
-    assert.strictEqual(body.errors.name, 'Must be at most 5 characters');
-    assert.ok(!body.errors.name.includes('toolong'));
+    assert.strictEqual(body.message, 'Validation failed');
+    assert.deepStrictEqual(body.errors.name, ['Must be at most 5 characters']);
+    assert.ok(!JSON.stringify(body).includes('toolong'));
     // Handled → warn, not error.
     assert.deepStrictEqual(
       netLogs().map((r) => r.level),
@@ -1218,7 +1219,7 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     const body = await res.json();
 
     assert.strictEqual(res.status, 400);
-    assert.strictEqual(body.errors.name, 'Must be at most 5 characters');
+    assert.deepStrictEqual(body.errors.name, ['Must be at most 5 characters']);
     // The value must not appear anywhere in the serialized 400 body…
     assert.ok(!JSON.stringify(body).includes(overflow));
     // …nor in the warn log line (the Sentry/retention vector): the logged
@@ -1235,7 +1236,7 @@ describe('ControllerManager — Mongoose validation safety net', () => {
 
     assert.strictEqual(res.status, 400);
     assert.deepStrictEqual(Object.keys(body.errors), ['age']);
-    assert.strictEqual(body.errors.age, 'Must be a number');
+    assert.deepStrictEqual(body.errors.age, ['Must be a number']);
     assert.ok(!JSON.stringify(body).includes('900'));
     assert.deepStrictEqual(
       netLogs().map((r) => r.level),
@@ -1254,7 +1255,7 @@ describe('ControllerManager — Mongoose validation safety net', () => {
 
     assert.strictEqual(res.status, 400);
     assert.deepStrictEqual(Object.keys(body.errors), ['role']);
-    assert.strictEqual(body.errors.role, 'Must be one of: admin, user');
+    assert.deepStrictEqual(body.errors.role, ['Must be one of: admin, user']);
     assert.ok(!JSON.stringify(body).includes('superhacker'));
   });
 
@@ -1267,8 +1268,10 @@ describe('ControllerManager — Mongoose validation safety net', () => {
     assert.deepStrictEqual(Object.keys(body.errors), ['nickname']);
     // The model's custom string ("The nickname {VALUE} is far too long…") is
     // NOT passed through — rebuilt from the kind + bound instead.
-    assert.strictEqual(body.errors.nickname, 'Must be at most 5 characters');
-    assert.ok(!body.errors.nickname.includes('far too long'));
+    assert.deepStrictEqual(body.errors.nickname, [
+      'Must be at most 5 characters',
+    ]);
+    assert.ok(!JSON.stringify(body).includes('far too long'));
     assert.ok(!JSON.stringify(body).includes(secret));
     // The warn log line is sanitized too — neither the value nor the custom
     // template survives into it.
@@ -1341,13 +1344,13 @@ describe('ControllerManager — Mongoose validation safety net', () => {
 
   it('route-level ValidationError still handled by the pre-handler 400 path', async () => {
     // Missing a required route field: caught before the handler runs, so the
-    // framework `ValidationError` never crosses into the safety-net catch. Its
-    // wire shape is the path-keyed payload (arrays), distinct from the safety
-    // net's string messages.
+    // framework `ValidationError` never crosses into the safety-net catch. Both
+    // answer the same contract: `message` plus path-keyed arrays.
     const res = await post('/routeValidation', {});
     const body = await res.json();
 
     assert.strictEqual(res.status, 400);
+    assert.strictEqual(body.message, 'Validation failed');
     assert.strictEqual(Array.isArray(body.errors.mustHave), true);
   });
 
@@ -1411,14 +1414,17 @@ describe('HttpServer.resolveError — registry resolution', () => {
     });
   });
 
-  it('built-in HttpError mapper: explicit body wins over { message }', async () => {
+  it('built-in HttpError mapper: field errors answer { message, errors }', async () => {
     const resolved = await httpServer().resolveError(
-      new HttpError(422, 'Unprocessable', { errors: { csv: 'bad' } }),
+      new HttpError(422, {
+        message: 'Unprocessable',
+        errors: { csv: 'row 17 malformed' },
+      }),
       fakeReq(),
     );
     assert.deepStrictEqual(resolved, {
       status: 422,
-      body: { errors: { csv: 'bad' } },
+      body: { message: 'Unprocessable', errors: { csv: ['row 17 malformed'] } },
       logLevel: 'verbose',
     });
   });
@@ -1442,7 +1448,10 @@ describe('HttpServer.resolveError — registry resolution', () => {
     );
     assert.deepStrictEqual(matched, {
       status: 400,
-      body: { errors: { name: 'Must be at most 5 characters' } },
+      body: {
+        message: 'Validation failed',
+        errors: { name: ['Must be at most 5 characters'] },
+      },
       logLevel: 'warn',
     });
     assert.ok(!JSON.stringify(matched).includes('SUPERSECRET'));
@@ -1607,11 +1616,12 @@ describe('Error-handler registry over HTTP', () => {
     );
   });
 
-  it('HttpError base with custom body → status + body override', async () => {
+  it('HttpError base with field errors → status + { message, errors }', async () => {
     const res = await get('/customBase');
     assert.strictEqual(res.status, 422);
     assert.deepStrictEqual(await res.json(), {
-      errors: { csv: 'row 17 malformed' },
+      message: 'Unprocessable',
+      errors: { csv: ['row 17 malformed'] },
     });
   });
 
@@ -1807,7 +1817,10 @@ describe('ControllerManager — route `params:` schema', () => {
     assert.strictEqual(res.status, 400);
     // Named by the PARAM (public, in the URL pattern) — never by the internal
     // model path (`ref`), and never echoing the rejected value.
-    assert.deepStrictEqual(body, { errors: { id: 'Must be a valid id' } });
+    assert.deepStrictEqual(body, {
+      message: 'Validation failed',
+      errors: { id: ['Must be a valid id'] },
+    });
     assert.ok(!JSON.stringify(body).includes('ref'));
     assert.ok(!JSON.stringify(body).includes('abc'));
   });
