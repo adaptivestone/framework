@@ -260,7 +260,7 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 - ✅ [Keyed hashing for short secrets](done/short-secret-hashing.md) — `hashSecret` / `verifySecret` in `helpers/crypto.ts`: per-purpose HMAC-SHA256 keyed from `AUTH_SALT` via HKDF, for e-mail/SMS login and reset codes. Additive; implemented 2026-10-01, not yet released.
 - ✅ [Canonical rate-limit request keys](done/rate-limit-request-keys.md) — `consumeKeyComponents.request` values are NFKC + trim + lowercase, field-named and hashed, so spelling variants share one budget and e-mails leave keys/logs; `gerenateConsumeKey` → `generateConsumeKey` (old name deprecated until v6). Behavior change: request-keyed counters reset once. Implemented 2026-10-02.
 - ✅ CORS `exposedHeaders` — `Cors` param + `http.corsExposedHeaders` (default `['Retry-After']`) send `Access-Control-Expose-Headers` on actual responses to allowed origins (no phase doc; 2026-10-02).
-- ✅ [Coded, translatable `HttpError` + one error contract](done/coded-http-errors.md) — every framework error answers `{ error?, message, errors? }`: details form `{ message, code?, i18nKey?, errors? }` (app-named `i18nKey`, server-only; field errors rendered and translated like request validation); validation and safety-net 400s gain `message`, safety-net values become arrays; positional `body` deprecated → v6. Audit follow-ups listed in the plan. Implemented 2026-10-02.
+- ✅ [Coded, translatable `HttpError` + one error contract](done/coded-http-errors.md) — every framework error answers `{ error?, message, errors? }`: details form `{ message, code?, i18nKey?, errors? }` (app-named `i18nKey`, server-only; field errors rendered and translated like request validation); validation and safety-net 400s gain `message`, safety-net values become arrays; explicit custom `{ message, body }` mode (exclusive with the contract fields); positional `body` deprecated → v6. Audit follow-ups listed in the plan. Implemented 2026-10-02.
 
 ## v5.5 target — P1q line
 
@@ -295,7 +295,7 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 - Strict Content-Type by default
 - Case-sensitive + strict trailing-slash by default
 - `YupFile.check` single-file semantics
-- Remove the positional `body` argument of `HttpError` and its subclasses (deprecated in 5.5.0: field errors go in `{ message, errors }`, custom bodies via a registered handler; see [coded-http-errors](done/coded-http-errors.md))
+- Remove the positional `body` argument of `HttpError` and its subclasses (deprecated in 5.5.0 for `{ message, errors }` / `{ message, body }`; see [coded-http-errors](done/coded-http-errors.md))
 
 (Async/await middleware contract — formerly a bullet here — now has its own card: [async-middleware](queued/async-middleware.md), P1m: v5.5 opt-in via `contractVersion = 2`, v6 flip.)
 

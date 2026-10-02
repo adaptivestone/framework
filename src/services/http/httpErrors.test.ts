@@ -77,6 +77,58 @@ describe('httpErrors', () => {
     }
   });
 
+  it('a custom body is exclusive: no contract fields, no warning', async () => {
+    const warnings: string[] = [];
+    const onWarning = (w: Error & { code?: string }) =>
+      warnings.push(w.code ?? '');
+    process.on('warning', onWarning);
+    try {
+      const err = new ConflictError({
+        message: 'Already exists',
+        body: { existingId: 'abc' },
+      });
+      await setTimeout(0);
+      assert.deepStrictEqual(err.body, { existingId: 'abc' });
+      assert.strictEqual(err.message, 'Already exists');
+      assert.strictEqual(err.code, undefined);
+      assert.deepStrictEqual(warnings, []);
+    } finally {
+      process.off('warning', onWarning);
+    }
+  });
+
+  it('body mixed with contract fields: body wins, warns once per class', async () => {
+    const warnings: { code?: string; message: string }[] = [];
+    const onWarning = (w: Error & { code?: string }) =>
+      warnings.push({ code: w.code, message: w.message });
+    process.on('warning', onWarning);
+    try {
+      class MixedError extends BadRequestError {}
+      const mixed = {
+        message: 'Bad',
+        body: { custom: true },
+        code: 'X',
+        errors: { a: 'b' },
+      };
+      // @ts-expect-error body cannot be combined with code/i18nKey/errors
+      const err = new MixedError(mixed);
+      // @ts-expect-error same rule on the base class
+      new MixedError({ message: 'Bad', body: {}, i18nKey: 'k' });
+      await setTimeout(0);
+
+      assert.deepStrictEqual(err.body, { custom: true });
+      assert.strictEqual(err.code, undefined);
+      assert.strictEqual(err.issues, undefined);
+      const ours = warnings.filter(
+        (w) => w.code === 'ASF_HTTP_ERROR_BODY_MIXED',
+      );
+      assert.strictEqual(ours.length, 1);
+      assert.match(ours[0]?.message ?? '', /MixedError.*code, errors/);
+    } finally {
+      process.off('warning', onWarning);
+    }
+  });
+
   it('accepts a details object with a code and an i18n key', () => {
     const err = new HttpError(422, {
       code: 'UNSUPPORTED_COUNTRY',

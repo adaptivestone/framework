@@ -5,8 +5,8 @@ import {
   type ValidationErrorPayload,
 } from '../validate/ValidationError.ts';
 
-/** Details form: answered as `{ error?: code, message, errors? }`; `i18nKey` stays on the server. */
-export interface HttpErrorDetails {
+/** Contract form: answered as `{ error?: code, message, errors? }`; `i18nKey` stays on the server. */
+export interface HttpErrorContractDetails {
   /** English text: the log line, and the response message unless `i18nKey` translates it. */
   message: string;
   /** Machine-readable code, answered as `{ error: code, message }`. */
@@ -19,12 +19,35 @@ export interface HttpErrorDetails {
    * `errors: { field: [msg] }`; i18n-key messages are translated.
    */
   errors?: ValidationErrorPayload | ReadonlyArray<ValidationIssue>;
+  body?: never;
 }
+
+/** Custom form: `body` IS the response — the contract fields cannot be combined with it. */
+export interface HttpErrorBodyDetails {
+  /** English text for the log line; not sent. */
+  message: string;
+  /** The whole response body, sent as-is (no `error`/`message`/`errors` added). */
+  body: unknown;
+  code?: never;
+  i18nKey?: never;
+  errors?: never;
+}
+
+export type HttpErrorDetails = HttpErrorContractDetails | HttpErrorBodyDetails;
+
+const CONTRACT_FIELDS = ['code', 'i18nKey', 'errors'] as const;
+
+const warnBodyMixed = makeOncePerClassWarner(
+  'ASF_HTTP_ERROR_BODY_MIXED',
+  (name, ignored) =>
+    `${name} received body together with ${String(ignored)}. body replaces the whole response, so those are ignored. Pass body alone, or drop it to answer { error?, message, errors? }.`,
+  'Warning',
+);
 
 const warnBodyArgument = makeOncePerClassWarner(
   'ASF_DEP_HTTP_ERROR_BODY',
   (name) =>
-    `${name} received the positional body argument, which is deprecated. Put field errors in the details object ({ message, errors }), or register an error handler for a custom body. The argument will be removed in v6.`,
+    `${name} received the positional body argument, which is deprecated. Use the details object instead: { message, errors } for field errors, or { message, body } for a custom body. The argument will be removed in v6.`,
 );
 
 /**
@@ -33,15 +56,15 @@ const warnBodyArgument = makeOncePerClassWarner(
  * resolve through the error-handler registry
  * (`HttpServer.registerErrorHandler`) via a built-in mapper:
  * `status` + `{ error?: code, message, errors? }` (message translated via
- * `i18nKey`, field errors like request validation), logged at `verbose`
- * (control flow, not a defect).
+ * `i18nKey`, field errors like request validation) or a custom `body`, logged
+ * at `verbose` (control flow, not a defect).
  * Subclass for other statuses, or construct the base directly:
  * `new HttpError(422, 'Unprocessable')`.
  */
 export class HttpError extends Error {
   readonly status: number;
 
-  /** @deprecated Positional body override (wins over everything); removed in v6. */
+  /** Custom response body (`{ message, body }`); when set, the contract fields are unused. */
   readonly body?: unknown;
 
   readonly code?: string;
@@ -52,7 +75,7 @@ export class HttpError extends Error {
   readonly issues?: ReadonlyArray<ValidationIssue>;
 
   constructor(status: number, message: string | HttpErrorDetails);
-  /** @deprecated Use `{ message, errors }` for field errors, or a registered error handler for a custom body. Removed in v6. */
+  /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
   constructor(
     status: number,
     message: string | HttpErrorDetails,
@@ -71,6 +94,16 @@ export class HttpError extends Error {
     }
     this.name = new.target.name;
     this.status = status;
+    if (details.body !== undefined) {
+      // Custom form: the body is the response, so the contract fields are
+      // dropped. Types forbid mixing; this guards plain-JS / cast callers.
+      const ignored = CONTRACT_FIELDS.filter((k) => details[k] !== undefined);
+      if (ignored.length) {
+        warnBodyMixed(new.target, ignored.join(', '));
+      }
+      this.body = details.body;
+      return;
+    }
     this.body = body;
     this.code = details.code;
     this.i18nKey = details.i18nKey;
@@ -85,7 +118,7 @@ export class HttpError extends Error {
 
 export class BadRequestError extends HttpError {
   constructor(message?: string | HttpErrorDetails);
-  /** @deprecated Use `{ message, errors }` for field errors, or a registered error handler for a custom body. Removed in v6. */
+  /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(
     message: string | HttpErrorDetails = 'Bad request',
@@ -97,7 +130,7 @@ export class BadRequestError extends HttpError {
 
 export class UnauthorizedError extends HttpError {
   constructor(message?: string | HttpErrorDetails);
-  /** @deprecated Use `{ message, errors }` for field errors, or a registered error handler for a custom body. Removed in v6. */
+  /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(
     message: string | HttpErrorDetails = 'Unauthorized',
@@ -109,7 +142,7 @@ export class UnauthorizedError extends HttpError {
 
 export class ForbiddenError extends HttpError {
   constructor(message?: string | HttpErrorDetails);
-  /** @deprecated Use `{ message, errors }` for field errors, or a registered error handler for a custom body. Removed in v6. */
+  /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(
     message: string | HttpErrorDetails = 'Forbidden',
@@ -121,7 +154,7 @@ export class ForbiddenError extends HttpError {
 
 export class NotFoundError extends HttpError {
   constructor(message?: string | HttpErrorDetails);
-  /** @deprecated Use `{ message, errors }` for field errors, or a registered error handler for a custom body. Removed in v6. */
+  /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(
     message: string | HttpErrorDetails = 'Not found',
@@ -133,7 +166,7 @@ export class NotFoundError extends HttpError {
 
 export class ConflictError extends HttpError {
   constructor(message?: string | HttpErrorDetails);
-  /** @deprecated Use `{ message, errors }` for field errors, or a registered error handler for a custom body. Removed in v6. */
+  /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(message: string | HttpErrorDetails = 'Conflict', body?: unknown) {
     super(409, message, body);

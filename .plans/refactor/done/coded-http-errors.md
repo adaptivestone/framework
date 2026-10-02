@@ -13,7 +13,8 @@ field on `HttpError`: NO for v1" and "i18n of error messages: out of scope".
 Every framework error response follows `{ error?: string, message: string, errors?: { [path]: string[] } }`:
 `error` = machine code, `message` = human text, `errors` = field errors, always arrays per path
 (`pathToString` form, as request validation). The maintainer's rule: the frontend can rely on
-`body.errors` for field errors everywhere; no API lets an app put an arbitrary shape there.
+`body.errors` for field errors everywhere. The only way out of the contract is an explicit custom
+`body`, which cannot be mixed with the contract fields.
 
 ## Decision
 
@@ -40,9 +41,14 @@ throw new ConflictError({
   `err.issues`, rendered with `issuesToPayload`, and translated by the SAME key allow-list rule as
   request validation (`translateIssues`, moved from `ValidateService` into `ValidationError.ts`;
   key-like messages translated, free text verbatim). Empty `errors` is dropped.
-- No `body` in the details object. The positional `body` argument is deprecated
-  (`ASF_DEP_HTTP_ERROR_BODY`, `@deprecated` overloads) and removed in v6; after that only a
-  registered error handler can send a custom shape — a deliberate, visible exception.
+- Custom form `{ message, body }`: `body` IS the response (sent as-is; `message` only logged). It is
+  exclusive with `code`/`i18nKey`/`errors` — a TypeScript error (union with `never` fields); at
+  runtime `body` wins and `ASF_HTTP_ERROR_BODY_MIXED` (a `Warning`, once per class) names the
+  ignored fields. Warning, not throw: a throw inside the app's own error construction would turn
+  the intended 4xx into a 500. A named `details` extension slot was rejected (its relation to
+  `errors` and to the body is unclear to developers and agents).
+- The positional `body` argument is deprecated (`ASF_DEP_HTTP_ERROR_BODY`, `@deprecated`
+  overloads) and removed in v6, leaving: a message string, the contract form, or the custom form.
 - Alignment shipped with it (user-approved, CHANGELOG "Changed"): request-validation 400s gain
   `message` (`http.validationFailed` → "Validation failed"), and the Mongoose safety nets answer
   `{ message, errors: { field: [msg] } }` (values were plain strings).
@@ -59,8 +65,6 @@ throw new ConflictError({
 - Root-level validation issues are keyed `''` (v6 decision).
 - OpenAPI emits description-only error stubs — the contract enables one shared `ErrorResponse`
   schema ([openapi-responses](../queued/openapi-responses.md)).
-- Optional named extension slot (`details?: JsonValue`) for structured extras was proposed and NOT
-  adopted; revisit only on a concrete need.
 
 ## Rejected
 
@@ -77,4 +81,5 @@ top-level message (i18n-defaults decision); response envelopes (`data: null` →
 
 Details form on every class; `{ error?, message, errors? }` with translated message and field errors;
 `i18nKey` never in a body; literal English fallback; validation and safety-net 400s carry `message` +
-arrays; positional `body` works and warns once per class; the AGENTS.md gates pass.
+arrays; custom `body` is exclusive (type error; runtime warning); positional `body` works and warns
+once per class; the AGENTS.md gates pass.

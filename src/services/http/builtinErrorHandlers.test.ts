@@ -333,6 +333,17 @@ describe('builtInErrorHandlers', () => {
       });
     });
 
+    it('a custom body is answered verbatim', async () => {
+      const err = new HttpError(409, {
+        message: 'Already exists',
+        body: { existingId: 'abc' },
+      });
+      assert.deepStrictEqual(await map(err), {
+        status: 409,
+        body: { existingId: 'abc' },
+      });
+    });
+
     it('a deprecated positional body still replaces the response', async () => {
       const err = new HttpError(400, details, { custom: true });
       assert.deepStrictEqual((await map(err))?.body, { custom: true });
