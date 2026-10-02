@@ -454,7 +454,13 @@ function collectSecurity(
 ): Obj[] {
   const requirements: Obj[] = [];
   const seen = new Set<string>();
+  let isRequired = false;
   for (const mw of middlewares) {
+    if (
+      (mw.Class as unknown as { requiresAuth?: unknown }).requiresAuth === true
+    ) {
+      isRequired = true;
+    }
     const params = (mw.Class as unknown as { usedAuthParameters?: unknown })
       .usedAuthParameters;
     if (!Array.isArray(params)) {
@@ -470,7 +476,12 @@ function collectSecurity(
       }
     }
   }
-  return requirements;
+  // A token reader with no middleware rejecting anonymous requests (e.g.
+  // `GetUserByToken` without `Auth`): the empty requirement `{}` tells
+  // clients an anonymous request is valid too.
+  return isRequired || requirements.length === 0
+    ? requirements
+    : [{}, ...requirements];
 }
 
 function toSecurityScheme(param: AuthParameter): Obj {

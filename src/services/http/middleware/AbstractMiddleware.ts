@@ -31,13 +31,22 @@ class AbstractMiddleware extends Base {
   }
 
   /**
-   * Security schemes this middleware enforces, declared **statically** so the
-   * OpenAPI generator can read them off the class with zero instantiation.
-   * Default `[]` (the middleware contributes no auth requirement). Override on
-   * subclasses that gate requests (e.g. token/bearer auth).
+   * Security schemes this middleware reads credentials from (e.g. a token
+   * header), declared **statically** so the OpenAPI generator can read them off
+   * the class with zero instantiation. Default `[]`. Reading alone documents
+   * auth as optional; see {@link requiresAuth}.
    */
   static get usedAuthParameters(): AuthParameter[] {
     return [];
+  }
+
+  /**
+   * Whether this middleware rejects requests without an authenticated user
+   * (`Auth`, `Role`). One such middleware anywhere in a route's chain makes
+   * the route's OpenAPI security required; without one it is optional.
+   */
+  static get requiresAuth(): boolean {
+    return false;
   }
 
   /**
