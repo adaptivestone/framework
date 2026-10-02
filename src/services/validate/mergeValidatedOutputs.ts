@@ -1,17 +1,9 @@
-/**
- * A validator output can be any JavaScript value. Only combining several
- * validator outputs requires an object shape: the framework's established
- * merge is a shallow, ordered merge of plain objects.
- */
-export function isPlainObject(
-  value: unknown,
-): value is Record<PropertyKey, unknown> {
-  if (value === null || typeof value !== 'object') {
-    return false;
-  }
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
-}
+import { isPlainObject } from '../../helpers/objects.ts';
+
+// Re-exported: this module was the public home of `isPlainObject` before it
+// moved to helpers/objects.ts. A validator output can be any JavaScript value;
+// only combining several outputs requires the plain-object shape.
+export { isPlainObject };
 
 /**
  * Preserve a single validator output exactly. When several schemas contribute
