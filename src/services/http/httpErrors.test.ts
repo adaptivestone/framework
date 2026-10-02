@@ -46,6 +46,39 @@ describe('httpErrors', () => {
     assert.deepStrictEqual(err.body, { code: 'BOAT_MISSING' });
   });
 
+  it('accepts a details object with a code and an i18n key', () => {
+    const err = new HttpError(422, {
+      code: 'UNSUPPORTED_COUNTRY',
+      i18nKey: 'errors.unsupportedCountry',
+      message: 'The selected country is not supported.',
+    });
+    assert.strictEqual(err.status, 422);
+    assert.strictEqual(err.message, 'The selected country is not supported.');
+    assert.strictEqual(err.code, 'UNSUPPORTED_COUNTRY');
+    assert.strictEqual(err.i18nKey, 'errors.unsupportedCountry');
+    assert.strictEqual(err.body, undefined);
+  });
+
+  testEach(
+    [
+      [BadRequestError, 400],
+      [UnauthorizedError, 401],
+      [ForbiddenError, 403],
+      [NotFoundError, 404],
+      [ConflictError, 409],
+    ] as const,
+    'subclass accepts a details object %#',
+    (Cls, status) => {
+      const err = new Cls({ code: 'X', message: 'English' });
+      assert.ok(err instanceof HttpError);
+      assert.strictEqual(err.status, status);
+      assert.strictEqual(err.message, 'English');
+      assert.strictEqual(err.code, 'X');
+      assert.strictEqual(err.i18nKey, undefined);
+      assert.strictEqual(err.name, Cls.name);
+    },
+  );
+
   it('a consumer subclass keeps the instanceof chain and its own name', () => {
     class PaymentRequiredError extends HttpError {
       constructor(message = 'Subscription expired') {

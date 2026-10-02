@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import i18next from 'i18next';
 import mongoose from 'mongoose';
+import { stubI18n } from '../../tests/mocks.ts';
 import { testEach } from '../../tests/parameterized.ts';
 import {
   builtInErrorHandlers,
@@ -247,6 +249,69 @@ describe('builtInErrorHandlers', () => {
       await httpHandler?.handler(new HttpError(418, 'Teapot'), request()),
       { status: 418, body: { message: 'Teapot' } },
     );
+  });
+
+  describe('coded HttpError', () => {
+    const map = (err: HttpError, i18n?: unknown) =>
+      builtInErrorHandlers()[0]?.handler(err, {
+        appInfo: { i18n },
+      } as unknown as FrameworkRequest);
+    const details = {
+      code: 'LOGIN_CODE_EXPIRED',
+      i18nKey: 'accounts.errors.LOGIN_CODE_EXPIRED',
+      message: 'This code has expired.',
+    };
+
+    it('answers { error, message } and never sends the i18n key', async () => {
+      const result = await map(new HttpError(400, details));
+      assert.deepStrictEqual(result, {
+        status: 400,
+        body: {
+          error: 'LOGIN_CODE_EXPIRED',
+          message: 'This code has expired.',
+        },
+      });
+      assert.ok(!JSON.stringify(result).includes('accounts.errors'));
+    });
+
+    it('translates the i18n key when the locale has it', async () => {
+      const i18n = stubI18n({
+        'accounts.errors.LOGIN_CODE_EXPIRED': 'Срок действия кода истёк.',
+      });
+      assert.deepStrictEqual(
+        (await map(new HttpError(400, details), i18n))?.body,
+        {
+          error: 'LOGIN_CODE_EXPIRED',
+          message: 'Срок действия кода истёк.',
+        },
+      );
+    });
+
+    it('omits error without a code and translates nothing without a key', async () => {
+      const i18n = stubI18n({ 'Plain text': 'translated' });
+      assert.deepStrictEqual(
+        (await map(new HttpError(400, { message: 'Plain text' }), i18n))?.body,
+        { message: 'Plain text' },
+      );
+    });
+
+    it('keeps an explicit body over the code and key', async () => {
+      const err = new HttpError(400, details, { custom: true });
+      assert.deepStrictEqual((await map(err))?.body, { custom: true });
+    });
+
+    it('never interprets the English message as i18next syntax', async () => {
+      const i18n = i18next.createInstance();
+      await i18n.init({
+        lng: 'en',
+        resources: { en: { translation: { secret: 'CATALOG' } } },
+      });
+      const message = 'No user $t(secret) {{x}}';
+      assert.deepStrictEqual(
+        (await map(new HttpError(404, { ...details, message }), i18n))?.body,
+        { error: 'LOGIN_CODE_EXPIRED', message },
+      );
+    });
   });
 
   it('returns null from the Mongoose handler when client fields do not match', async () => {

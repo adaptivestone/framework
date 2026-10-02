@@ -293,8 +293,9 @@ export function matchedClientCastError(
 /**
  * Framework built-in registry entries, checked AFTER any consumer-registered
  * handlers ("yours win"):
- *   1. `HttpError` → its own status / `body ?? { message }`; `verbose`
- *      (deliberate control flow, not a defect).
+ *   1. `HttpError` → its own status / `body ?? { error?: code, message }`,
+ *      message translated via `i18nKey`; `verbose` (deliberate control flow,
+ *      not a defect).
  *   2. Escaped Mongoose `ValidationError` → the safety net above; `warn`
  *      (signals a route schema missing a constraint the model enforces).
  *   3. Standalone Mongoose `CastError` → {@link matchedClientCastError}; `warn`
@@ -308,11 +309,27 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
       errorClass: HttpError,
       // Entries are stored type-erased (`ErrorHandlerFn`); `resolveError`
       // guarantees `instanceof errorClass` before the call.
-      handler: (err) => {
+      handler: (err, req) => {
         const httpErr = err as HttpError;
+        if (httpErr.body != null) {
+          return { status: httpErr.status, body: httpErr.body };
+        }
+        let { message } = httpErr;
+        if (httpErr.i18nKey) {
+          // `skipInterpolation`: a missing key falls back to the English text
+          // literally — it may embed request data, so i18next must not expand
+          // `$t(...)` or `{{…}}` inside it.
+          const translated = req.appInfo?.i18n?.t(httpErr.i18nKey, {
+            defaultValue: message,
+            skipInterpolation: true,
+          });
+          if (typeof translated === 'string') {
+            message = translated;
+          }
+        }
         return {
           status: httpErr.status,
-          body: httpErr.body ?? { message: httpErr.message },
+          body: httpErr.code ? { error: httpErr.code, message } : { message },
         };
       },
       logLevel: 'verbose',

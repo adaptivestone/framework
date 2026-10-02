@@ -130,7 +130,7 @@ Recommended controller style:
 ```ts
 async get(req: GetUserRequest): Promise<JsonResponse<200, UserDto>> {
   const user = await findUser(req.params.id);
-  if (!user) throw new NotFoundError('user.notFound');
+  if (!user) throw new NotFoundError({ code: 'USER_NOT_FOUND', i18nKey: 'user.notFound', message: 'User not found' });
   return HttpResponse.json(200, user);
 }
 ```

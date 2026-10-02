@@ -260,6 +260,7 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 - ✅ [Keyed hashing for short secrets](done/short-secret-hashing.md) — `hashSecret` / `verifySecret` in `helpers/crypto.ts`: per-purpose HMAC-SHA256 keyed from `AUTH_SALT` via HKDF, for e-mail/SMS login and reset codes. Additive; implemented 2026-10-01, not yet released.
 - ✅ [Canonical rate-limit request keys](done/rate-limit-request-keys.md) — `consumeKeyComponents.request` values are NFKC + trim + lowercase, field-named and hashed, so spelling variants share one budget and e-mails leave keys/logs; `gerenateConsumeKey` → `generateConsumeKey` (old name deprecated until v6). Behavior change: request-keyed counters reset once. Implemented 2026-10-02.
 - ✅ CORS `exposedHeaders` — `Cors` param + `http.corsExposedHeaders` (default `['Retry-After']`) send `Access-Control-Expose-Headers` on actual responses to allowed origins (no phase doc; 2026-10-02).
+- ✅ [Coded, translatable `HttpError`](done/coded-http-errors.md) — details form `{ message, code?, i18nKey? }` answers `{ error?: code, message }`, message translated from the app-named `i18nKey` (server-only), English fallback used literally. Reverses two P1p v1 decisions. Implemented 2026-10-02.
 
 ## v5.5 target — P1q line
 
