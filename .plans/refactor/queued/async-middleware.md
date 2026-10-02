@@ -1,13 +1,13 @@
 # P1m — Async/await middleware contract (breaking)
 
-**Status**: ⏸ queued — RE-SCOPED 2026-08-31 (user-approved): **v5.5 opt-in bridge via `static contractVersion = 2`, v6 flips the default and drops v1.** Linear direction (Option A) settled by
-[P1q universal HTTP responses](./universal-http-responses.md); co-designed and landed WITH P1q in v5.5.
-**Depends on**: P1b ✅ (tree router / `ExpressAdapter`) and P1q (v5.5) response bridge — the v2 contract's
+**Status**: ⏸ queued — RE-SCOPED 2026-08-31 (user-approved): **v5.6 opt-in bridge via `static contractVersion = 2`, v6 flips the default and drops v1.** (Retargeted 5.5 → 5.6 on 2026-10-03 together with P1q.) Linear direction (Option A) settled by
+[P1q universal HTTP responses](./universal-http-responses.md); co-designed and landed WITH P1q in v5.6.
+**Depends on**: P1b ✅ (tree router / `ExpressAdapter`) and P1q (v5.6) response bridge — the v2 contract's
 returned `HttpResponse` rides P1q's writer, so the two ship in the same minor. The v6 half (default flip,
 v1 removal, built-in migration) still lands alongside [static-middleware-cutover](../later/static-middleware-cutover.md) —
 both touch `AbstractMiddleware` + the adapter, so one breaking-doc migration note for users.
 
-## v5.5 opt-in bridge (approved 2026-08-31)
+## v5.6 opt-in bridge (approved 2026-08-31 for v5.5; retargeted 2026-10-03)
 
 - `AbstractMiddleware` gets `static get contractVersion(): 1 | 2` defaulting to `1` — the house
   static-getter pattern (`usedAuthParameters`), readable by adapter and codegen with zero instantiation.
@@ -19,8 +19,8 @@ both touch `AbstractMiddleware` + the adapter, so one breaking-doc migration not
   signature would break every consumer subclass overriding it (contractVersion is inherited statically while
   the override keeps the old arity → `next` is undefined at runtime). Built-ins migrate in v6 with the flip.
   Dogfood candidates before that, if desired: app-level internals nobody subclasses (`PrepareAppInfo`, `IpDetector`).
-- v5.5 docs mark v1 deprecated with the mechanical migration table below; consumers migrate class-by-class
-  at their own pace across v5.5 → v6 instead of a big-bang rewrite.
+- v5.6 docs mark v1 deprecated with the mechanical migration table below; consumers migrate class-by-class
+  at their own pace across v5.6 → v6 instead of a big-bang rewrite.
 - v6: default flips to 2, v1 dispatch + the Promise bridge are deleted, built-ins migrate, `contractVersion`
   itself becomes vestigial (kept one major as a no-op or dropped — decide at cutover).
 **Time**: ~1 day (signature + adapter simplification + response returns) + framework middleware

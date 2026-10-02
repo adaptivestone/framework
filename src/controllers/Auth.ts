@@ -1,5 +1,6 @@
 import type { Response } from 'express';
 import mongoose from 'mongoose';
+import { translateWithDefault } from '../helpers/translate.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken } from '../models/User.ts';
 import AbstractController from '../modules/AbstractController.ts';
@@ -331,9 +332,11 @@ class Auth extends AbstractController {
     );
     if (!userResult) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('auth.errorUPValid', {
-          defaultValue: EN['auth.errorUPValid'],
-        }),
+        message: translateWithDefault(
+          req,
+          'auth.errorUPValid',
+          EN['auth.errorUPValid'],
+        ),
       });
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
@@ -343,9 +346,13 @@ class Auth extends AbstractController {
     );
     if (isAuthWithVerificationFlow && !user.isVerified) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.notVerified', {
-          defaultValue: EN['email.notVerified'],
-        }),
+        error: 'EMAIL_NOT_VERIFIED',
+        message: translateWithDefault(
+          req,
+          'email.notVerified',
+          EN['email.notVerified'],
+        ),
+        // @deprecated in favor of `error`; removed in v6.
         notVerified: true,
       });
     }
@@ -361,9 +368,11 @@ class Auth extends AbstractController {
         err instanceof mongoose.Error.DocumentNotFoundError
       ) {
         return res.status(400).json({
-          message: req.appInfo.i18n?.t('auth.errorUPValid', {
-            defaultValue: EN['auth.errorUPValid'],
-          }),
+          message: translateWithDefault(
+            req,
+            'auth.errorUPValid',
+            EN['auth.errorUPValid'],
+          ),
         });
       }
       throw err;
@@ -384,9 +393,11 @@ class Auth extends AbstractController {
     )) as InstanceType<TUser>;
     if (user) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.registered', {
-          defaultValue: EN['email.registered'],
-        }),
+        message: translateWithDefault(
+          req,
+          'email.registered',
+          EN['email.registered'],
+        ),
       });
     }
     if (req.appInfo.request.nickName) {
@@ -395,9 +406,11 @@ class Auth extends AbstractController {
       })) as InstanceType<TUser>;
       if (user) {
         return res.status(400).json({
-          message: req.appInfo.i18n?.t('auth.nicknameExists', {
-            defaultValue: EN['auth.nicknameExists'],
-          }),
+          message: translateWithDefault(
+            req,
+            'auth.nicknameExists',
+            EN['auth.nicknameExists'],
+          ),
         });
       }
     }
@@ -421,16 +434,20 @@ class Auth extends AbstractController {
       const dupFields = duplicateKeyFields(err);
       if (dupFields?.includes('email')) {
         return res.status(400).json({
-          message: req.appInfo.i18n?.t('email.registered', {
-            defaultValue: EN['email.registered'],
-          }),
+          message: translateWithDefault(
+            req,
+            'email.registered',
+            EN['email.registered'],
+          ),
         });
       }
       if (dupFields?.includes('name.nick')) {
         return res.status(400).json({
-          message: req.appInfo.i18n?.t('auth.nicknameExists', {
-            defaultValue: EN['auth.nicknameExists'],
-          }),
+          message: translateWithDefault(
+            req,
+            'auth.nicknameExists',
+            EN['auth.nicknameExists'],
+          ),
         });
       }
       throw err;
@@ -477,17 +494,21 @@ class Auth extends AbstractController {
       )) as unknown as UserInstance;
     } catch {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken', {
-          defaultValue: EN['email.alreadyVerifiedOrWrongToken'],
-        }),
+        message: translateWithDefault(
+          req,
+          'email.alreadyVerifiedOrWrongToken',
+          EN['email.alreadyVerifiedOrWrongToken'],
+        ),
       });
     }
     this.logger?.debug(`Verify user ${user?.id}`);
     if (!user) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('email.alreadyVerifiedOrWrongToken', {
-          defaultValue: EN['email.alreadyVerifiedOrWrongToken'],
-        }),
+        message: translateWithDefault(
+          req,
+          'email.alreadyVerifiedOrWrongToken',
+          EN['email.alreadyVerifiedOrWrongToken'],
+        ),
       });
     }
 
@@ -516,9 +537,11 @@ class Auth extends AbstractController {
       this.logger?.error(e);
     }
     return res.status(200).json({
-      message: req.appInfo.i18n?.t('auth.recoveryEmailSent', {
-        defaultValue: EN['auth.recoveryEmailSent'],
-      }),
+      message: translateWithDefault(
+        req,
+        'auth.recoveryEmailSent',
+        EN['auth.recoveryEmailSent'],
+      ),
     });
   }
 
@@ -532,9 +555,11 @@ class Auth extends AbstractController {
 
     if (!user) {
       return res.status(400).json({
-        message: req.appInfo.i18n?.t('password.wrongToken', {
-          defaultValue: EN['password.wrongToken'],
-        }),
+        message: translateWithDefault(
+          req,
+          'password.wrongToken',
+          EN['password.wrongToken'],
+        ),
       });
     }
 
@@ -565,9 +590,11 @@ class Auth extends AbstractController {
       this.logger?.error(e);
     }
     return res.status(200).json({
-      message: req.appInfo.i18n?.t('auth.verificationEmailSent', {
-        defaultValue: EN['auth.verificationEmailSent'],
-      }),
+      message: translateWithDefault(
+        req,
+        'auth.verificationEmailSent',
+        EN['auth.verificationEmailSent'],
+      ),
     });
   }
 

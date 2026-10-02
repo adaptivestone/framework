@@ -8,6 +8,14 @@ import {
 import type { FrameworkRequest } from './HttpServer.ts';
 import { HttpError } from './httpErrors.ts';
 
+/** The `message` of every framework 500 response. */
+export const serverErrorMessage = (req: FrameworkRequest) =>
+  translateWithDefault(
+    req,
+    'http.serverError',
+    'Something went wrong. Please try again later.',
+  );
+
 /** The `message` of every framework field-error (400) response. */
 export const validationFailedMessage = (req: FrameworkRequest) =>
   translateWithDefault(req, 'http.validationFailed', 'Validation failed');

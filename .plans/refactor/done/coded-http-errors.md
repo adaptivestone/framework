@@ -56,10 +56,14 @@ throw new ConflictError({
 ## Audit (2026-10-02, Fable + independent inventory) — follow-ups, not in this change
 
 31 framework error sites, 6 body shapes before this change. Remaining deviations:
-- Untranslated texts: 405, "Malformed URL" 400, 415, RateLimiter 500, the handler-path 500
-  ("Platform error…" vs the sink's "Something broke!" — two different 500 texts); 404 default is "404".
-- `controllers/Auth.ts` uses raw `i18n?.t` (no `translateWithDefault` guard) and answers
-  `{ message, notVerified: true }` — candidate `error: 'EMAIL_NOT_VERIFIED'`, drop `notVerified` in v6.
+- ✅ 2026-10-03 (5.5): 405, "Malformed URL" 400, 415, 404 and both 500 paths translate through
+  `http.methodNotAllowed` / `http.malformedUrl` / `http.unsupportedContentType` (`{{types}}`) /
+  `http.notFound` / `http.serverError`; one 500 text everywhere ("Something went wrong. Please try
+  again later."), 404 default "Not found". RateLimiter's operator-facing 500 stays untranslated by
+  design (documented in the i18n chapter).
+- ✅ 2026-10-03 (5.5): `controllers/Auth.ts` translates through `translateWithDefault`; unverified login
+  answers `{ error: 'EMAIL_NOT_VERIFIED', message, notVerified: true }` — `notVerified` deprecated,
+  removed in v6.
 - Only one machine code exists (`AUTH001`); Role 401/403 and RateLimiter 429 have none.
 - Middleware throws bypass the registry (→ 500) — [middleware-errors-registry](../queued/middleware-errors-registry.md).
 - Root-level validation issues are keyed `''` (v6 decision).

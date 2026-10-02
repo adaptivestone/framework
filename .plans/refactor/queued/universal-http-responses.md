@@ -1,9 +1,9 @@
 # P1q — Universal typed HTTP responses (v5.x bridge → v6 cutover)
 
 **Status**: ✅ design direction settled 2026-07-18 · implementation not started · `transformResponse` hook folded in 2026-08-10  
-**Target**: next minor (5.4+), additive; ordinary controller `res` removal is v6
+**Target**: 5.6 (moved out of 5.5 on 2026-10-03), additive; ordinary controller `res` removal is v6
 **Depends on**: [tree-router](../done/tree-router.md) ✅, [error-handler-registry](../done/error-handler-registry.md) ✅  
-**Feeds**: [OpenAPI responses](openapi-responses.md), [async middleware](./async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) ships in the same v5.5 minor and returns `HttpResponse` through this plan's writer** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
+**Feeds**: [OpenAPI responses](openapi-responses.md), [async middleware](./async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) ships in the same v5.6 minor and returns `HttpResponse` through this plan's writer** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
 **Origin**: an authorized file-delivery workaround exposed the immediate stream/file gap. The wider design discussion showed that a file-only helper would preserve the real problem: controllers would still use Express for JSON, statuses, headers, redirects, and errors.
 
 ## Goal
