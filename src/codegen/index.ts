@@ -11,11 +11,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { IApp } from '../server.ts';
-import {
-  type CodegenLogger,
-  generateAppTypes,
-  getTemplate,
-} from './appTypes.ts';
+import { type CodegenLogger, getTemplate } from './appTypes.ts';
 import {
   deleteOrphans,
   generateRouteTypesViaAst,
@@ -25,7 +21,7 @@ import {
 } from './astEmit.ts';
 
 export type { CodegenLogger };
-export { generateAppTypes, generateRouteTypesViaAst };
+export { generateRouteTypesViaAst };
 
 export interface GenerateAllOptions {
   /** Verify-only (CI drift guard): compare rendered output against disk, write
