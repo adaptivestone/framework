@@ -7,7 +7,9 @@
  */
 
 import type { NextFunction, Request, Response } from 'express';
+import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
+import type { FrameworkRequest } from '../HttpServer.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import { getMatchedNode, MalformedPathError } from './match.ts';
 import type { MatchResult, MiddlewareEntry, RouteNode } from './RouteNode.ts';
@@ -35,7 +37,13 @@ export function createExpressAdapter(
       result = registry.match(req.method, req.path);
     } catch (err) {
       if (err instanceof MalformedPathError) {
-        res.status(400).json({ message: 'Malformed URL' });
+        res.status(400).json({
+          message: translateWithDefault(
+            req as FrameworkRequest,
+            'http.malformedUrl',
+            'Malformed URL',
+          ),
+        });
         return;
       }
       return next(err);
@@ -49,7 +57,13 @@ export function createExpressAdapter(
     if (result.entry === null) {
       // 405 — path matched, method didn't.
       res.setHeader('Allow', result.allowedMethods.join(', '));
-      res.status(405).json({ message: 'Method not allowed' });
+      res.status(405).json({
+        message: translateWithDefault(
+          req as FrameworkRequest,
+          'http.methodNotAllowed',
+          'Method not allowed',
+        ),
+      });
       return;
     }
 

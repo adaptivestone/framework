@@ -13,6 +13,7 @@ import {
   assertTextMatch,
   pattern,
 } from '../../../tests/assertions.ts';
+import { stubI18n } from '../../../tests/mocks.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
@@ -122,6 +123,34 @@ describe('createExpressAdapter — 405 with Allow', () => {
     assert.ok(allow);
     assertTextMatch(allow, /GET/);
     assertTextMatch(allow, /POST/);
+    assert.deepStrictEqual(res.body, { message: 'Method not allowed' });
+  });
+
+  it('translates the 405 and malformed-URL messages', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/users', { handler: async () => {} });
+    const adapter = createExpressAdapter(r, fakeApp);
+    const i18n = stubI18n({
+      'http.methodNotAllowed': 'Метод не разрешён',
+      'http.malformedUrl': 'Неверный URL',
+    });
+
+    const methodRes = makeRes();
+    await adapter(
+      { ...makeReq('DELETE', '/users'), appInfo: { i18n } },
+      asExpressRes(methodRes),
+      mock.fn(),
+    );
+    assert.deepStrictEqual(methodRes.body, { message: 'Метод не разрешён' });
+
+    const malformedRes = makeRes();
+    await adapter(
+      { ...makeReq('GET', '/users/%E0%A4%A'), appInfo: { i18n } },
+      asExpressRes(malformedRes),
+      mock.fn(),
+    );
+    assert.strictEqual(malformedRes.statusCode, 400);
+    assert.deepStrictEqual(malformedRes.body, { message: 'Неверный URL' });
   });
 });
 

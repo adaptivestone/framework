@@ -291,6 +291,10 @@ describe('middlewares correct works', () => {
         body: 'rawbytes',
       });
       assert.strictEqual(res.status, 415);
+      const { message } = await res.json();
+      // The {{types}} placeholder is filled with the route's content types.
+      assert.match(message, /^Unsupported Content-Type\. Expected one of: \S/);
+      assert.ok(!message.includes('{{types}}'));
     });
 
     it('matches the Content-Type case-insensitively', async () => {

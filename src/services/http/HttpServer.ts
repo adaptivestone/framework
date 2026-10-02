@@ -19,6 +19,7 @@ import {
   type ErrorHandlerResult,
   type ErrorLogLevel,
   type RegisteredErrorHandler,
+  serverErrorMessage,
 } from './builtinErrorHandlers.ts';
 import Cors from './middleware/Cors.ts';
 import I18nMiddleware from './middleware/I18n.ts';
@@ -229,7 +230,7 @@ class HttpServer extends Base {
         message: translateWithDefault(
           req as FrameworkRequest,
           'http.notFound',
-          '404',
+          'Not found',
         ),
       });
     });
@@ -250,11 +251,7 @@ class HttpServer extends Base {
           return next(err);
         }
         res.status(500).json({
-          message: translateWithDefault(
-            req as FrameworkRequest,
-            'http.serverError',
-            'Something broke!',
-          ),
+          message: serverErrorMessage(req as FrameworkRequest),
         });
       },
     );

@@ -1127,7 +1127,7 @@ describe('ControllerManager — validated output runtime parity', () => {
     const response = await invoke('/incompatible');
     assert.strictEqual(response.statusCode, 500);
     assert.deepStrictEqual(response.body, {
-      message: 'Platform error. Please check later or contact support',
+      message: 'Something went wrong. Please try again later.',
     });
   });
 
@@ -1143,7 +1143,7 @@ describe('ControllerManager — validated output runtime parity', () => {
     const response = await invoke('/content-array');
     assert.strictEqual(response.statusCode, 500);
     assert.deepStrictEqual(response.body, {
-      message: 'Platform error. Please check later or contact support',
+      message: 'Something went wrong. Please try again later.',
     });
   });
 });
@@ -1658,7 +1658,7 @@ describe('Error-handler registry over HTTP', () => {
     const res = await get('/plain');
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(await res.json(), {
-      message: 'Platform error. Please check later or contact support',
+      message: 'Something went wrong. Please try again later.',
     });
     assert.deepStrictEqual(
       logsMatching(/unmapped plain error/).map((r) => r.level),
@@ -1742,7 +1742,7 @@ describe('ControllerManager — validation-phase error leak', () => {
     assert.ok(!JSON.stringify(body).includes('s3cret'));
     // Generic 500 body, consistent with the framework's other 500 sink.
     assert.deepStrictEqual(body, {
-      message: 'Platform error. Please check later or contact support',
+      message: 'Something went wrong. Please try again later.',
     });
     // The server-side defect IS logged at error, in full, for the developer.
     assert.deepStrictEqual(
@@ -1831,7 +1831,7 @@ describe('ControllerManager — route `params:` schema', () => {
 
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(body, {
-      message: 'Platform error. Please check later or contact support',
+      message: 'Something went wrong. Please try again later.',
     });
   });
 

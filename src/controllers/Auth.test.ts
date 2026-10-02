@@ -500,6 +500,7 @@ describe('auth controller failure paths', () => {
 
     assert.strictEqual(state.status, 400);
     assert.deepStrictEqual(state.body, {
+      error: 'EMAIL_NOT_VERIFIED',
       message: 'Your email is not verified',
       notVerified: true,
     });

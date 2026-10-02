@@ -2,11 +2,13 @@ import path from 'node:path';
 import * as url from 'node:url';
 import type { NextFunction, Response } from 'express';
 import { makeOncePerClassWarner } from '../helpers/deprecation.ts';
+import { translateWithDefault } from '../helpers/translate.ts';
 import type AbstractController from '../modules/AbstractController.ts';
 import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import {
+  serverErrorMessage,
   toLoggableError,
   validationFailedMessage,
 } from '../services/http/builtinErrorHandlers.ts';
@@ -422,9 +424,11 @@ class ControllerManager extends Base {
               : undefined;
           if (!matched) {
             return res.status(415).json({
-              message: `Unsupported Content-Type. Expected one of: ${entryRequestMapKeys.join(
-                ', ',
-              )}`,
+              message: translateWithDefault(
+                req,
+                'http.unsupportedContentType',
+                'Unsupported Content-Type. Expected one of: {{types}}',
+              ).replace('{{types}}', entryRequestMapKeys.join(', ')),
             });
           }
           requestSchemas.push(matched);
@@ -487,7 +491,7 @@ class ControllerManager extends Base {
         }
         logger?.error(err);
         return res.status(500).json({
-          message: 'Platform error. Please check later or contact support',
+          message: serverErrorMessage(req),
         });
       }
 
@@ -520,7 +524,7 @@ class ControllerManager extends Base {
         }
         logger?.error(err);
         return res.status(500).json({
-          message: 'Platform error. Please check later or contact support',
+          message: serverErrorMessage(req),
         });
       }
     };

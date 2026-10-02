@@ -19,7 +19,7 @@ describe('HttpServer — 404 fallthrough', () => {
     const res = await fetch(getTestServerURL('/this-path-does-not-exist'));
     assert.strictEqual(res.status, 404);
     const body = await res.json();
-    assert.deepStrictEqual(body, { message: '404' });
+    assert.deepStrictEqual(body, { message: 'Not found' });
   });
 });
 
@@ -123,7 +123,7 @@ describe('HttpServer — translatable sink messages', () => {
     const captured = run404(await i18nService.getI18nForLang('en'));
 
     assert.strictEqual(captured.status, 404);
-    assert.deepStrictEqual(captured.payload, { message: '404' });
+    assert.deepStrictEqual(captured.payload, { message: 'Not found' });
   });
 
   it('404 uses the app translation when the key resolves', () => {
@@ -138,7 +138,9 @@ describe('HttpServer — translatable sink messages', () => {
     const captured = run500(await i18nService.getI18nForLang('en'));
 
     assert.strictEqual(captured.status, 500);
-    assert.deepStrictEqual(captured.payload, { message: 'Something broke!' });
+    assert.deepStrictEqual(captured.payload, {
+      message: 'Something went wrong. Please try again later.',
+    });
   });
 
   it('500 uses the app translation when the key resolves', () => {
@@ -151,8 +153,10 @@ describe('HttpServer — translatable sink messages', () => {
   });
 
   it('both sinks fall back to English when the request carries no i18n', () => {
-    assert.deepStrictEqual(run404().payload, { message: '404' });
-    assert.deepStrictEqual(run500().payload, { message: 'Something broke!' });
+    assert.deepStrictEqual(run404().payload, { message: 'Not found' });
+    assert.deepStrictEqual(run500().payload, {
+      message: 'Something went wrong. Please try again later.',
+    });
   });
 });
 
