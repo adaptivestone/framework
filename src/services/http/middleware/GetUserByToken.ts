@@ -24,7 +24,7 @@ class GetUserByToken extends AbstractMiddleware {
     return {} as { user?: AppUser };
   }
 
-  static get usedAuthParameters() {
+  static get authSchemes() {
     return [
       {
         name: 'Authorization',
@@ -43,7 +43,7 @@ class GetUserByToken extends AbstractMiddleware {
 
   // Back-compat for any runtime reader of the instance form (removed in v6).
   get usedAuthParameters() {
-    return GetUserByToken.usedAuthParameters;
+    return GetUserByToken.authSchemes;
   }
 
   /**

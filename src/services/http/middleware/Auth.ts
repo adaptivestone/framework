@@ -9,6 +9,10 @@ class AuthMiddleware extends AbstractMiddleware {
     return 'Allow to pass only if the user provided. Please use any middleware that provide user instance before';
   }
 
+  static get requiresAuth() {
+    return true;
+  }
+
   /**
    * Type-only phantom (codegen reads it; runtime ignores it — see
    * `GetUserByToken.provides`). Auth rejects unauthenticated requests at

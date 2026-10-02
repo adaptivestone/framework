@@ -9,6 +9,10 @@ class RoleMiddleware extends AbstractMiddleware {
     return 'Check user role (user.roles property). If the user has no role then stop request and return error. OR logic (any role will pass user)';
   }
 
+  static get requiresAuth() {
+    return true;
+  }
+
   async middleware(
     req: FrameworkRequest &
       GetUserByTokenAppInfo & { user: InstanceType<TUser> },

@@ -31,19 +31,34 @@ class AbstractMiddleware extends Base {
   }
 
   /**
-   * Security schemes this middleware enforces, declared **statically** so the
-   * OpenAPI generator can read them off the class with zero instantiation.
-   * Default `[]` (the middleware contributes no auth requirement). Override on
-   * subclasses that gate requests (e.g. token/bearer auth).
+   * How requests send the credentials this middleware reads (a bearer token,
+   * an API-key header, …), as OpenAPI security schemes. Declared
+   * **statically** so the generator reads them off the class with zero
+   * instantiation. Default `[]`. Reading alone documents auth as optional;
+   * see {@link requiresAuth}.
    */
-  static get usedAuthParameters(): AuthParameter[] {
+  static get authSchemes(): AuthParameter[] {
     return [];
+  }
+
+  /** @deprecated Renamed to {@link authSchemes}; removed in v6. */
+  static get usedAuthParameters(): AuthParameter[] {
+    // `this` is the concrete subclass, so its `authSchemes` override answers.
+    return this.authSchemes;
+  }
+
+  /**
+   * Whether this middleware rejects requests without an authenticated user
+   * (`Auth`, `Role`). One such middleware anywhere in a route's chain makes
+   * the route's OpenAPI security required; without one it is optional.
+   */
+  static get requiresAuth(): boolean {
+    return false;
   }
 
   /**
    * @deprecated Since 5.0.0 — declare auth schemes **statically**
-   * (`static get usedAuthParameters()`). The instance form is read only as a
-   * fallback and will be removed in v6.
+   * (`static get authSchemes()`). The instance form will be removed in v6.
    */
   get usedAuthParameters(): AuthParameter[] {
     return [];

@@ -25,6 +25,14 @@ describe('getUserByToken middleware methods', () => {
     assert.strictEqual(params[0].name, 'Authorization');
   });
 
+  it('declares its schemes as authSchemes, with the old static name as an alias', () => {
+    assert.strictEqual(GetUserByToken.authSchemes.length, 2);
+    assert.deepStrictEqual(
+      GetUserByToken.usedAuthParameters,
+      GetUserByToken.authSchemes,
+    );
+  });
+
   it('should not called twice', async () => {
     const middleware = new GetUserByToken(appInstance);
     let isCalled = false;
