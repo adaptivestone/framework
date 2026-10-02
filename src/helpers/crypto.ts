@@ -1,4 +1,5 @@
 import {
+  createHash,
   createHmac,
   hkdfSync,
   randomBytes,
@@ -115,6 +116,15 @@ export const hashPassword = async (password: string) => {
 
 const timingSafeEqualBuffers = (a: Buffer, b: Buffer) =>
   a.length === b.length && timingSafeEqual(a, b);
+
+const sha256 = (value: string) => createHash('sha256').update(value).digest();
+
+/**
+ * Compare two secret strings (tokens, API keys, webhook signatures) in constant
+ * time. Hashing first gives equal-length inputs, so the length isn't leaked either.
+ */
+export const timingSafeEqualStrings = (a: string, b: string) =>
+  timingSafeEqual(sha256(a), sha256(b));
 
 /**
  * Verify a password against a stored hash of any scheme version.

@@ -10,7 +10,7 @@
 
 Build traces, log correlation and operational diagnostics on the normalized route and metrics
 foundation: OTel HTTP + mongoose spans, framework `LogRecord` trace-ID enrichment,
-`/livez` + `/readyz` with a check registry,
+a health-check registry on top of the shipped `/health/live` + `/health/ready` ([health-endpoints](../done/health-endpoints.md), 5.5.0 — replaces the `/livez` + `/readyz` sketch),
 `diagnostics_channel` namespace, slow-handler/query logging and Pyroscope route auto-tag.
 
 Prometheus export, `/metrics`, parameterized-route HTTP RED metrics and runtime process metrics are

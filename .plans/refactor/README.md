@@ -261,6 +261,7 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 - ✅ [Canonical rate-limit request keys](done/rate-limit-request-keys.md) — `consumeKeyComponents.request` values are NFKC + trim + lowercase, field-named and hashed, so spelling variants share one budget and e-mails leave keys/logs; `gerenateConsumeKey` → `generateConsumeKey` (old name deprecated until v6). Behavior change: request-keyed counters reset once. Implemented 2026-10-02.
 - ✅ CORS `exposedHeaders` — `Cors` param + `http.corsExposedHeaders` (default `['Retry-After']`) send `Access-Control-Expose-Headers` on actual responses to allowed origins (no phase doc; 2026-10-02).
 - ✅ [Coded, translatable `HttpError` + one error contract](done/coded-http-errors.md) — every framework error answers `{ error?, message, errors? }`: details form `{ message, code?, i18nKey?, errors? }` (app-named `i18nKey`, server-only; field errors rendered and translated like request validation); validation and safety-net 400s gain `message`, safety-net values become arrays; explicit custom `{ message, body }` mode (exclusive with the contract fields); positional `body` deprecated → v6. Audit follow-ups listed in the plan. Implemented 2026-10-02.
+- ✅ [Built-in health endpoints](done/health-endpoints.md) — `Health` controller: `GET /health/live` (process only) and `GET /health/ready` (Mongo ping, 503 on failure); optional `HEALTH_TOKEN` (header or `?token=`, 401); successful probes not request-logged. First slice of P2b. Implemented 2026-10-02.
 
 ## v5.5 target — P1q line
 

@@ -12,10 +12,18 @@ class RequestLogger extends AbstractMiddleware {
     // Log the path only, not `req.url` — the query string can carry secrets
     // (e.g. `/auth/verify?verification_token=…`).
     const text = `Request is  [${req.method}] ${req.path}`;
-    this.logger?.info(text);
+    // Probes hit the built-in Health controller (default mount) every few
+    // seconds: log them only when they fail.
+    const isProbe = req.path.startsWith('/health/');
+    if (!isProbe) {
+      this.logger?.info(text);
+    }
     res.on('finish', () => {
+      if (isProbe && res.statusCode < 400) {
+        return;
+      }
       const end = performance.now();
-      this.logger?.info(
+      this.logger?.[isProbe ? 'warn' : 'info'](
         `Finished ${text}. Status: ${res.statusCode}.  [${(end - startTime).toFixed(2)} ms]`,
       );
     });
