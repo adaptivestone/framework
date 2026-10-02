@@ -31,13 +31,20 @@ class AbstractMiddleware extends Base {
   }
 
   /**
-   * Security schemes this middleware reads credentials from (e.g. a token
-   * header), declared **statically** so the OpenAPI generator can read them off
-   * the class with zero instantiation. Default `[]`. Reading alone documents
-   * auth as optional; see {@link requiresAuth}.
+   * How requests send the credentials this middleware reads (a bearer token,
+   * an API-key header, …), as OpenAPI security schemes. Declared
+   * **statically** so the generator reads them off the class with zero
+   * instantiation. Default `[]`. Reading alone documents auth as optional;
+   * see {@link requiresAuth}.
    */
-  static get usedAuthParameters(): AuthParameter[] {
+  static get authSchemes(): AuthParameter[] {
     return [];
+  }
+
+  /** @deprecated Renamed to {@link authSchemes}; removed in v6. */
+  static get usedAuthParameters(): AuthParameter[] {
+    // `this` is the concrete subclass, so its `authSchemes` override answers.
+    return this.authSchemes;
   }
 
   /**
@@ -51,8 +58,7 @@ class AbstractMiddleware extends Base {
 
   /**
    * @deprecated Since 5.0.0 — declare auth schemes **statically**
-   * (`static get usedAuthParameters()`). The instance form is read only as a
-   * fallback and will be removed in v6.
+   * (`static get authSchemes()`). The instance form will be removed in v6.
    */
   get usedAuthParameters(): AuthParameter[] {
     return [];

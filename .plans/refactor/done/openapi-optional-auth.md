@@ -19,7 +19,11 @@ enforcement lives in `Auth` (401 without a user) and `Role` (401/403), which dec
 - Generator rule (maintainer): one `requiresAuth` middleware anywhere in the chain → the whole route
   requires auth (`security: [{ scheme: [] }, …]`); only readers → optional (`[{}, …]`, OpenAPI's
   "anonymous allowed"); no reader → no `security`.
-- `usedAuthParameters` JSDoc/docs corrected: schemes a middleware *reads*, not *enforces*.
+- `usedAuthParameters` renamed to `authSchemes` (maintainer: the old name did not say what it is or
+  how it is used). Reuse for "required" was rejected: the reader (`GetUserByToken`) sits on public and
+  protected routes alike, and the enforcers (`Auth`, `Role`) read no credentials. Old name = deprecated
+  alias until v6: the base static getter returns `this.authSchemes`; the generator falls back to a
+  subclass that overrides only `usedAuthParameters` (`ASF_DEP_MW_USED_AUTH_PARAMETERS`, once per class).
 
 ## Not here
 
@@ -30,6 +34,6 @@ full responses work, which can build on `requiresAuth`.
 
 ## Files
 
-`src/services/http/middleware/AbstractMiddleware.ts`, `Auth.ts`, `Role.ts`,
+`src/services/http/middleware/AbstractMiddleware.ts`, `Auth.ts`, `Role.ts`, `GetUserByToken.ts` (+ test),
 `src/services/documentation/OpenApiGenerator.ts` (+ test), `CHANGELOG.md`; docs repo
 `17-openapi.md`, `06-Controllers/03-middleware.md`.

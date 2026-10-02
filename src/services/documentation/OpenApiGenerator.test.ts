@@ -12,6 +12,7 @@ import {
   assertTextMatch,
   pattern,
 } from '../../tests/assertions.ts';
+import AbstractMiddleware from '../http/middleware/AbstractMiddleware.ts';
 import Auth from '../http/middleware/Auth.ts';
 import GetUserByToken from '../http/middleware/GetUserByToken.ts';
 import Pagination from '../http/middleware/Pagination.ts';
@@ -49,7 +50,7 @@ function operationIds(doc: AnyDoc): string[] {
 // A synthetic middleware carrying a static auth scheme (read with no instance).
 function authMiddleware(): MiddlewareEntry {
   const Class = {
-    get usedAuthParameters() {
+    get authSchemes() {
       return [
         {
           name: 'Authorization',
@@ -396,6 +397,42 @@ describe('generateOpenApi', () => {
     ]);
   });
 
+  it('still reads the deprecated usedAuthParameters, warning once', async () => {
+    const warnings: string[] = [];
+    const onWarning = (w: Error & { code?: string }) => {
+      warnings.push(w.code ?? '');
+    };
+    process.on('warning', onWarning);
+    try {
+      class LegacyAuth extends AbstractMiddleware {
+        static get usedAuthParameters() {
+          return [{ name: 'Legacy', type: 'apiKey', description: 'old' }];
+        }
+      }
+      const legacy = {
+        Class: LegacyAuth as unknown as MiddlewareEntry['Class'],
+      };
+      const doc = await generateOpenApi(
+        [
+          route({ method: 'GET', path: '/a', middlewares: [legacy] }),
+          route({ method: 'GET', path: '/b', middlewares: [legacy] }),
+        ],
+        { info: { title: 't', version: '1' } },
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.deepStrictEqual((doc as AnyDoc).paths['/a'].get.security, [
+        {},
+        { Legacy: [] },
+      ]);
+      assert.strictEqual(
+        warnings.filter((c) => c === 'ASF_DEP_MW_USED_AUTH_PARAMETERS').length,
+        1,
+      );
+    } finally {
+      process.off('warning', onWarning);
+    }
+  });
+
   it('an enforcing middleware anywhere in the chain makes auth required', async () => {
     const enforcer = {
       Class: { requiresAuth: true } as unknown as MiddlewareEntry['Class'],
@@ -718,7 +755,7 @@ describe('generateOpenApi', () => {
 
   it('passes through custom middleware security scheme types', async () => {
     const Class = {
-      get usedAuthParameters() {
+      get authSchemes() {
         return [
           {
             name: 'PartnerOAuth',

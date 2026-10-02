@@ -31,7 +31,7 @@ const fakeApp = (registry: RouteRegistry): IApp =>
   }) as AnyDoc;
 
 class TokenAuth extends AbstractMiddleware {
-  static get usedAuthParameters() {
+  static get authSchemes() {
     return [
       {
         name: 'bearerAuth',

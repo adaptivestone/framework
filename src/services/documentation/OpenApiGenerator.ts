@@ -13,6 +13,7 @@
  * throwaway.
  */
 
+import { makeOncePerClassWarner } from '../../helpers/deprecation.ts';
 import type { AuthParameter } from '../http/middleware/AbstractMiddleware.ts';
 import type { FlatRoute, MiddlewareEntry } from '../http/routing/RouteNode.ts';
 import { isContentTypeRequestMap } from '../validate/contentType.ts';
@@ -448,6 +449,12 @@ async function buildRequestBody(
   return { content: { [mediaType]: { schema } } };
 }
 
+const warnUsedAuthParameters = makeOncePerClassWarner(
+  'ASF_DEP_MW_USED_AUTH_PARAMETERS',
+  (name) =>
+    `Middleware "${name}" declares the deprecated static usedAuthParameters. Rename it to authSchemes — the old name will be removed in v6.`,
+);
+
 function collectSecurity(
   middlewares: MiddlewareEntry[],
   securitySchemes: Obj,
@@ -456,13 +463,25 @@ function collectSecurity(
   const seen = new Set<string>();
   let isRequired = false;
   for (const mw of middlewares) {
-    if (
-      (mw.Class as unknown as { requiresAuth?: unknown }).requiresAuth === true
-    ) {
+    const Class = mw.Class as unknown as {
+      name: string;
+      requiresAuth?: unknown;
+      authSchemes?: unknown;
+      usedAuthParameters?: unknown;
+    };
+    if (Class.requiresAuth === true) {
       isRequired = true;
     }
-    const params = (mw.Class as unknown as { usedAuthParameters?: unknown })
-      .usedAuthParameters;
+    let params = Class.authSchemes;
+    // A middleware written before the rename overrides only the old name.
+    if (
+      !(Array.isArray(params) && params.length) &&
+      Array.isArray(Class.usedAuthParameters) &&
+      Class.usedAuthParameters.length
+    ) {
+      warnUsedAuthParameters(Class);
+      params = Class.usedAuthParameters;
+    }
     if (!Array.isArray(params)) {
       continue;
     }
