@@ -8,6 +8,8 @@ class Cors extends AbstractMiddleware {
     app: IApp,
     params: {
       origins: (string | RegExp)[];
+      /** Response headers browser code may read, e.g. `Retry-After`. */
+      exposedHeaders?: string[];
     },
   ) {
     super(app);
@@ -63,6 +65,14 @@ class Cors extends AbstractMiddleware {
           res.set('Content-Length', '0');
           res.status(204);
           return res.end();
+        }
+
+        // Only the actual response needs it; a preflight ignores it.
+        const exposedHeaders = this.params?.exposedHeaders as
+          | string[]
+          | undefined;
+        if (exposedHeaders?.length) {
+          res.set('Access-Control-Expose-Headers', exposedHeaders.join(', '));
         }
       }
     }

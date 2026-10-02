@@ -7,6 +7,7 @@ import express from 'express';
 import Transport from 'winston-transport';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { assertThrowsLike } from '../../../tests/assertions.ts';
+import { getTestServerURL } from '../../../tests/testHelpers.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import Cors from './Cors.ts';
 
@@ -329,5 +330,76 @@ describe('cors middleware over HTTP', () => {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+
+  describe('exposed headers', () => {
+    const exposedFor = async (
+      params: ConstructorParameters<typeof Cors>[1],
+      init: { origin: string; method?: string },
+    ) => {
+      const app = express();
+      app.use(new Cors(appInstance, params).getMiddleware() as Handler);
+      app.use((_req, res) => {
+        res.set('Retry-After', '40').json({ ok: true });
+      });
+      const server = createServer(app);
+      await new Promise<void>((resolve) => server.listen(0, resolve));
+      const { port } = server.address() as AddressInfo;
+      try {
+        const response = await fetch(`http://localhost:${port}/`, {
+          method: init.method ?? 'GET',
+          headers: { Origin: init.origin },
+        });
+        return response.headers.get('access-control-expose-headers');
+      } finally {
+        server.closeAllConnections();
+        await new Promise((resolve) => server.close(resolve));
+      }
+    };
+    const origins = ['https://localhost'];
+
+    it('lists them on responses to an allowed origin', async () => {
+      assert.strictEqual(
+        await exposedFor(
+          { origins, exposedHeaders: ['Retry-After', 'X-Request-Id'] },
+          { origin: 'https://localhost' },
+        ),
+        'Retry-After, X-Request-Id',
+      );
+    });
+
+    it('omits them for other origins, preflights and an empty list', async () => {
+      const exposedHeaders = ['Retry-After'];
+      assert.strictEqual(
+        await exposedFor(
+          { origins, exposedHeaders },
+          { origin: 'https://evil.example' },
+        ),
+        null,
+      );
+      assert.strictEqual(
+        await exposedFor(
+          { origins, exposedHeaders },
+          { origin: 'https://localhost', method: 'OPTIONS' },
+        ),
+        null,
+      );
+      assert.strictEqual(
+        await exposedFor({ origins }, { origin: 'https://localhost' }),
+        null,
+      );
+    });
+
+    it('exposes Retry-After from the default http config', async () => {
+      const [origin] = appInstance.getConfig('http').corsDomains as string[];
+      const response = await fetch(getTestServerURL('/'), {
+        headers: { Origin: origin },
+      });
+      await response.arrayBuffer();
+      assert.strictEqual(
+        response.headers.get('access-control-expose-headers'),
+        'Retry-After',
+      );
+    });
   });
 });
