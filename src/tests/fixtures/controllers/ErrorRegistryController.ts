@@ -40,7 +40,8 @@ class ErrorRegistryController extends AbstractController {
   }
 
   async throwCustomBase(_req: FrameworkRequest, _res: Response) {
-    throw new HttpError(422, 'Unprocessable', {
+    throw new HttpError(422, {
+      message: 'Unprocessable',
       errors: { csv: 'row 17 malformed' },
     });
   }

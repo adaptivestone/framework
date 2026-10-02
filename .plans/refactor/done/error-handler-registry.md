@@ -89,12 +89,12 @@ app.httpServer.registerErrorHandler(mongoose.Error.ValidationError, () =>
 ## Open questions (resolved)
 
 - Method name: **`registerErrorHandler`** — settled by collision: `HttpServer` already has an `addErrorHandler()` (the Express 4-arg error sink, `HttpServer.ts:143`).
-- `code` field on `HttpError`: NO for v1 (the `body` override covers machine-readable codes).
+- `code` field on `HttpError`: NO for v1 (the `body` override covers machine-readable codes). **Superseded in 5.5.0** by [coded-http-errors](coded-http-errors.md).
 
 ## Out of scope
 
 - Per-controller handler scoping (app-global only in v1).
-- i18n of error messages (thrower/handler supplies final strings).
+- i18n of error messages (thrower/handler supplies final strings). **Superseded in 5.5.0** by [coded-http-errors](coded-http-errors.md) (`i18nKey`).
 - Errors outside the wrapped handler (middleware chain, boot, static serving) — existing paths unchanged.
 - Removing/reordering built-ins via API (consumer-first ordering already lets you intercept them).
 
