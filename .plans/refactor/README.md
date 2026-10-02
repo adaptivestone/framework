@@ -264,6 +264,7 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 - ✅ [Built-in health endpoints](done/health-endpoints.md) — `Health` controller: `GET /health/live` (process only) and `GET /health/ready` (Mongo ping, 503 on failure); optional `HEALTH_TOKEN` (header or `?token=`, 401); successful probes not request-logged. First slice of P2b. Implemented 2026-10-02.
 - ✅ [Config types keep spread env keys](done/config-override-env-types.md) — codegen also reads the framework config an app config overrides, filling ONLY keys that are `undefined` at gen time (`...originalAuth` → `saltSecret: string | undefined` in every environment); valued keys keep their type. Implemented 2026-10-02.
 - ✅ [OpenAPI required vs optional auth](done/openapi-optional-auth.md) — `requiresAuth` on `Auth`/`Role` (and app middleware) makes a route's security required; a token reader alone (`GetUserByToken`) documents it as optional `[{}, …]`. Implemented 2026-10-02.
+- ✅ [Log redaction on Winston](done/log-redaction.md) — P1z rule 5 shipped early: `config/log.ts` `redact` (default authorization/cookie/password/secret/token) replaces matching field values before every transport; same key carries to v6. Implemented 2026-10-02.
 
 ## v5.5 target — P1q line
 

@@ -17,6 +17,7 @@ import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
 import Cache from './services/cache/Cache.ts';
 import type HttpServer from './services/http/HttpServer.ts';
 import type { I18n } from './services/i18n/I18n.ts';
+import { createRedactFormat } from './services/logging/redaction.ts';
 
 interface AppCache {
   configs: Map<string, unknown>;
@@ -784,7 +785,7 @@ class Server {
           }`,
       ),
     );
-    const { transports } = this.app.getConfig('log') as TLogConfig;
+    const { transports, redact = [] } = this.app.getConfig('log') as TLogConfig;
     function IsConstructor(f: (...args: never) => unknown) {
       try {
         Reflect.construct(String, [], f);
@@ -795,7 +796,14 @@ class Server {
     }
 
     const logger = winston.createLogger({
-      format: winston.format.errors({ stack: true }),
+      // Logger-level formats run before every transport, so redaction covers
+      // console, Sentry and custom transports alike.
+      format: redact.length
+        ? winston.format.combine(
+            winston.format.errors({ stack: true }),
+            createRedactFormat(redact),
+          )
+        : winston.format.errors({ stack: true }),
       level: 'silly',
     });
 

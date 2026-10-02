@@ -168,7 +168,10 @@ Winston levels.
 4. `SentrySink` imports `@sentry/node` lazily and uses `withScope`. It receives the native Error
    before JSON serialization, preserving `captureException(error)`. The initial cutover preserves
    the existing issue/message severity policy; changing alert policy belongs to P2b.
-5. Redaction is centralized and applies to nested case-insensitive keys including authorization,
+5. **Shipped early in 5.5 on Winston** ([log-redaction](../done/log-redaction.md)): the `redact` key in
+   `config/log.ts` and `src/services/logging/redaction.ts` (`redactValue`) — Phase 1 reuses both and
+   their tests, so the app-facing config does not change at the cutover.
+   Redaction is centralized and applies to nested case-insensitive keys including authorization,
    cookie, password, secret, token and configured application paths. Tests cover both logs and
    Sentry extras. Error messages/stacks are not mutated by string replacement; application code
    must not put credentials in exception messages.
