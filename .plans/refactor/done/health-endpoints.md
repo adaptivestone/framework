@@ -35,8 +35,9 @@ A built-in `Health` controller (`src/controllers/Health.ts`), overridable by fil
 
 ## Out of scope
 
-The check registry (`app.health.register`) and `/startupz` — P2b, on demand. Redis/cache checks
-(apps add them in an override). Metrics.
+The check registry and `/startupz` — P2b, on demand; the open problem (how optional services such
+as Redis get registered for readiness) is recorded there under "Known problem". Until then, apps
+add checks in a `Health` override. Metrics.
 
 ## Files
 

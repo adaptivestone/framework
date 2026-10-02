@@ -12,6 +12,8 @@ interface getFilesPathWithInheritanceProps {
    * paths stay physical; only the internal-vs-external identity key changes.
    */
   normalizeOverridePath?: (relativePath: string) => string;
+  /** Called for each internal file skipped because an external one overrides it. */
+  onOverridden?: (internal: { path: string; file: string }) => void;
   filter?: {
     startWithCapital?: boolean;
     notTests?: boolean;
@@ -25,6 +27,7 @@ const getFilesPathWithInheritance = async ({
   logger,
   loggerFileType = '',
   normalizeOverridePath = (relativePath) => relativePath,
+  onOverridden,
   filter: { startWithCapital = true, notTests = true, notHidden = true } = {},
 }: getFilesPathWithInheritanceProps) => {
   const readDir = (folder: string, which: string) =>
@@ -105,6 +108,7 @@ const getFilesPathWithInheritance = async ({
           loggerFileType ? `of type ${loggerFileType}` : ''
         } as it override by EXTERNAL ONE`,
       );
+      onOverridden?.({ path: join(internalFolder, file), file });
     } else {
       filesToLoad.push({
         path: join(internalFolder, file),

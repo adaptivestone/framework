@@ -120,6 +120,74 @@ describe('appTypes — config type emission (shape-derived)', () => {
     assert.ok(!out.includes('super-secret-from-env'));
   });
 
+  describe('an app config that overrides a framework config', () => {
+    const frameworkAuth = fileURLToPath(
+      new URL('../config/auth.ts', import.meta.url),
+    );
+    const appAuth = fileURLToPath(
+      new URL('./__fixtures__/config/authOverride.ts', import.meta.url),
+    );
+    const render = (value: Record<string, unknown>) =>
+      getTemplate(
+        new Map<string, unknown>([['auth', value]]),
+        [],
+        new Map<string, string[]>([['auth', [appAuth]]]),
+        new Map<string, string[]>([['auth', [frameworkAuth]]]),
+      );
+
+    it('keeps a spread env key that is unset at gen time', async () => {
+      // The env read lives only in the framework file; without it the key
+      // was dropped whenever AUTH_SALT was unset (CI) and typed `string`
+      // where it was set.
+      const out = await render({
+        hashRounds: 64,
+        saltSecret: undefined,
+        isAuthWithVerificationFlow: false,
+      });
+      assert.ok(out.includes('"saltSecret": string | undefined'));
+      assert.ok(out.includes('"isAuthWithVerificationFlow": boolean'));
+    });
+
+    it('never retypes an overridden key that has a value', async () => {
+      // The framework file only fills keys whose value is undefined: an app
+      // value (here a number) keeps its own type.
+      const out = await render({ hashRounds: 64, saltSecret: 5000 });
+      assert.ok(out.includes('"saltSecret": number'));
+    });
+
+    describe('nested objects', () => {
+      const nested = fileURLToPath(
+        new URL('./__fixtures__/config/nested.ts', import.meta.url),
+      );
+      const value = { db: { url: undefined, pool: 5 } };
+      const expected = '"db": { "url": string | undefined; "pool": number }';
+
+      it('types a nested env key from the config own source', async () => {
+        const out = await getTemplate(
+          new Map<string, unknown>([['db', value]]),
+          [],
+          new Map<string, string[]>([['db', [nested]]]),
+        );
+        assert.ok(out.includes(expected));
+      });
+
+      it('types a nested env key from the overridden framework config', async () => {
+        const out = await getTemplate(
+          new Map<string, unknown>([['db', value]]),
+          [],
+          new Map<string, string[]>([['db', [appAuth]]]),
+          new Map<string, string[]>([['db', [nested]]]),
+        );
+        assert.ok(out.includes(expected));
+      });
+    });
+
+    it('adds no key the app value does not have', async () => {
+      const out = await render({ hashRounds: 64 });
+      assert.ok(!out.includes('saltSecret'));
+    });
+  });
+
   it('emits no import() — the type is fully inline (compiler-robust)', async () => {
     const out = await get('auth', { secret: 'shh', salt: 10 });
     assert.ok(!out.includes('import('));
