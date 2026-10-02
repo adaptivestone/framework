@@ -223,7 +223,7 @@ codebase carries exactly **one** codegen front-end.
 | `astEmit.ts` | Discovers controllers via the runtime `getFilesPathWithInheritance` (framework-internal + user folder, user overrides win), registers **all** of them — including framework-internal — into one `RouteRegistry` (cross-controller bleed resolves exactly like runtime), `flatten()`s once, filters each chain to the controller's own importable bindings, and renders via `emit.renderGenFile`. Emits gen files for **user** controllers only (never writes into the installed package). |
 | `astModel.ts` | Detects `extends BaseModel` from source (chain walk, basename match) — used by `appTypes.ts` so the app-types scan does **zero** model `import()` (no Mongoose load). |
 | `emit.ts` | Pure renderer (`renderGenFile`) — unchanged output shape; the boot-era `emitGenFile`/`EmitInput` were removed. |
-| `index.ts` | `generateAll` = `generateAppTypes` + `generateRouteTypesViaAst`; **throws** (naming the controllers) if any are `needsBoot`. |
+| `index.ts` | `generateAll` = app types (`getTemplate` from `appTypes.ts`) + route types (`planRouteTypes`); **throws** (naming the controllers) if any are `needsBoot`. |
 
 ### What changed vs. the proposal
 

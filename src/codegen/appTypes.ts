@@ -5,9 +5,7 @@
  * model files.
  */
 
-import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { IApp } from '../server.ts';
 import {
   type EnvShape,
   envShapeToType,
@@ -35,21 +33,6 @@ export interface CodegenLogger {
   info?(msg: string): void;
   warn?(msg: string): void;
   error?(msg: string): void;
-}
-
-/** Generate the app-level `genTypes.d.ts` file. */
-export async function generateAppTypes(
-  app: IApp,
-  logger?: CodegenLogger | null,
-): Promise<void> {
-  const template = await getTemplate(
-    app.internalFilesCache.configs,
-    app.internalFilesCache.modelPaths,
-    app.internalFilesCache.configPaths,
-    app.internalFilesCache.overriddenConfigPaths,
-  );
-  await fs.writeFile(`${process.cwd()}/genTypes.d.ts`, template);
-  logger?.info?.('TypeScript types generated successfully at genTypes.d.ts');
 }
 
 /**
