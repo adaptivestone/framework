@@ -46,6 +46,7 @@ export async function generateAppTypes(
     app.internalFilesCache.configs,
     app.internalFilesCache.modelPaths,
     app.internalFilesCache.configPaths,
+    app.internalFilesCache.overriddenConfigPaths,
   );
   await fs.writeFile(`${process.cwd()}/genTypes.d.ts`, template);
   logger?.info?.('TypeScript types generated successfully at genTypes.d.ts');
@@ -67,8 +68,17 @@ export async function generateAppTypes(
  * whether or not the var happened to be set during codegen (deterministic
  * output, no `as` cast at the read site). Keys with a value at gen time and no
  * env-shape entry (literals, `process.env.X || default`) are typed from value.
+ *
+ * `fallback` is the env shape of the framework config an app config
+ * overrides. It fills ONLY keys whose value is `undefined` and that the app's
+ * own source does not read from env — e.g. `saltSecret` reaching the app
+ * through `...frameworkAuth`. A key with a value keeps its value type.
  */
-function valueToTypeString(value: unknown, env?: EnvShape): string {
+function valueToTypeString(
+  value: unknown,
+  env?: EnvShape,
+  fallback?: EnvShape,
+): string {
   if (value === null) {
     return 'null';
   }
@@ -119,12 +129,20 @@ function valueToTypeString(value: unknown, env?: EnvShape): string {
           rendered.set(k, e);
           continue;
         }
+        const f = fallback?.[k];
         if (v === undefined) {
-          continue; // recovered from a nested `env` shape below, if any
+          if (typeof f === 'string') {
+            rendered.set(k, f);
+          }
+          continue; // else recovered from a nested `env` shape below, if any
         }
         rendered.set(
           k,
-          valueToTypeString(v, typeof e === 'object' ? e : undefined),
+          valueToTypeString(
+            v,
+            typeof e === 'object' ? e : undefined,
+            typeof f === 'object' ? f : undefined,
+          ),
         );
       }
       // Recover env-only keys that never appeared in the value (dropped because
@@ -155,29 +173,37 @@ function valueToTypeString(value: unknown, env?: EnvShape): string {
  *
  * `configPaths` (config name → contributing source files) is optional: when
  * present, env-only keys dropped by the value pass are recovered from source
- * (see {@link valueToTypeString}). Omitted by unit tests that pass raw values. */
+ * (see {@link valueToTypeString}). Omitted by unit tests that pass raw values.
+ * `overriddenConfigPaths` (config name → framework files an app config
+ * replaced) supplies the fallback env shape for undefined spread keys. */
 export async function getTemplate(
   configs: Map<string, unknown>,
   modelPaths: { file: string; path: string }[],
   configPaths?: Map<string, string[]>,
+  overriddenConfigPaths?: Map<string, string[]>,
 ): Promise<string> {
   const dir = process.cwd();
 
   // Parse each config's source(s) once for env-only keys (no value import).
-  const envByConfig = new Map<string, EnvShape>();
-  if (configPaths) {
-    await Promise.all(
-      Array.from(configPaths, async ([name, paths]) => {
-        const shapes = await Promise.all(paths.map(extractConfigEnvShape));
-        envByConfig.set(name, mergeEnvShapes(shapes));
-      }),
-    );
-  }
+  const envShapes = async (pathsByConfig?: Map<string, string[]>) => {
+    const byConfig = new Map<string, EnvShape>();
+    if (pathsByConfig) {
+      await Promise.all(
+        Array.from(pathsByConfig, async ([name, paths]) => {
+          const shapes = await Promise.all(paths.map(extractConfigEnvShape));
+          byConfig.set(name, mergeEnvShapes(shapes));
+        }),
+      );
+    }
+    return byConfig;
+  };
+  const envByConfig = await envShapes(configPaths);
+  const fallbackByConfig = await envShapes(overriddenConfigPaths);
 
   const configTypes = Array.from(configs)
     .map(
       ([name, value]) =>
-        `    getConfig(configName: ${sq(name)}): ${valueToTypeString(value, envByConfig.get(name))};`,
+        `    getConfig(configName: ${sq(name)}): ${valueToTypeString(value, envByConfig.get(name), fallbackByConfig.get(name))};`,
     )
     .join('\n');
 

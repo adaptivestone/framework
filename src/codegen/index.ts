@@ -56,6 +56,7 @@ export async function generateAll(
     app.internalFilesCache.configs,
     app.internalFilesCache.modelPaths,
     app.internalFilesCache.configPaths,
+    app.internalFilesCache.overriddenConfigPaths,
   );
   const plan = await planRouteTypes(app, logger, { skipNonAnalyzable: true });
   if (plan.needsBoot.length > 0) {

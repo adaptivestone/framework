@@ -24,6 +24,10 @@ interface AppCache {
    * Read by codegen to recover env-only keys from source (`process.env.X` with
    * no default) that the value-based pass can't see. */
   configPaths: Map<string, string[]>;
+  /** Config name → framework config file(s) an app config overrides. Read by
+   * codegen to type spread keys (`...frameworkAuth`) that are `undefined`
+   * at gen time. */
+  overriddenConfigPaths: Map<string, string[]>;
   models: Map<string, AppModel>;
   modelConstructors: Map<string, typeof AbstractModel | typeof BaseModel>;
   modelPaths: { path: string; file: string }[];
@@ -157,6 +161,7 @@ class Server {
   cache: AppCache = {
     configs: new Map<string, unknown>(),
     configPaths: new Map<string, string[]>(),
+    overriddenConfigPaths: new Map<string, string[]>(),
     models: new Map<string, AppModel>(),
     modelConstructors: new Map<
       string,
@@ -563,6 +568,14 @@ class Server {
       externalFolder: this.app.foldersConfig.config,
       loggerFileType: 'CONFIG',
       logger: (m) => consoleLogger('info', m),
+      // Remember the framework base config an app config replaces (`auth.ts`,
+      // not `auth.test.ts`): its env reads type keys the app spreads in.
+      onOverridden: ({ path: internalPath, file }) => {
+        const parts = file.split('.');
+        if (parts.length === 2) {
+          this.cache.overriddenConfigPaths.set(parts[0], [internalPath]);
+        }
+      },
       filter: {
         startWithCapital: false,
       },
