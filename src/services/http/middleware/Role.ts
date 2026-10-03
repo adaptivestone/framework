@@ -1,6 +1,7 @@
 import type { NextFunction, Response } from 'express';
 import type { TUser } from '../../../models/User.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { ForbiddenError, UnauthorizedError } from '../httpErrors.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
@@ -16,18 +17,17 @@ class RoleMiddleware extends AbstractMiddleware {
   async middleware(
     req: FrameworkRequest &
       GetUserByTokenAppInfo & { user: InstanceType<TUser> },
-    res: Response,
+    _res: Response,
     next: NextFunction,
   ) {
     const { user } = req.appInfo;
 
     if (!user) {
-      return res.status(401).json({
-        message: this.translate(
-          req,
-          'middleware.role.userRequired',
-          'User should be provided',
-        ),
+      // Same meaning for the client as the Auth 401: log in first.
+      throw new UnauthorizedError({
+        code: 'AUTH001',
+        i18nKey: 'middleware.role.userRequired',
+        message: 'User should be provided',
       });
     }
 
@@ -42,12 +42,10 @@ class RoleMiddleware extends AbstractMiddleware {
     });
 
     if (!hasRole) {
-      return res.status(403).json({
-        message: this.translate(
-          req,
-          'middleware.role.noAccess',
-          'You do not have access',
-        ),
+      throw new ForbiddenError({
+        code: 'NO_ACCESS',
+        i18nKey: 'middleware.role.noAccess',
+        message: 'You do not have access',
       });
     }
     return next();

@@ -64,8 +64,8 @@ throw new ConflictError({
 - ✅ 2026-10-03 (5.5): `controllers/Auth.ts` translates through `translateWithDefault`; unverified login
   answers `{ error: 'EMAIL_NOT_VERIFIED', message, notVerified: true }` — `notVerified` deprecated,
   removed in v6.
-- Only one machine code exists (`AUTH001`); Role 401/403 and RateLimiter 429 have none.
-- Middleware throws bypass the registry (→ 500) — [middleware-errors-registry](../queued/middleware-errors-registry.md).
+- ✅ 2026-10-03 (5.5): Role 401 answers `AUTH001`, Role 403 `NO_ACCESS`, RateLimiter 429 `TOO_MANY_REQUESTS`.
+- ✅ 2026-10-03 (5.5): middleware errors resolve through the registry — [middleware-errors-registry](middleware-errors-registry.md).
 - Root-level validation issues are keyed `''` (v6 decision).
 - OpenAPI emits description-only error stubs — the contract enables one shared `ErrorResponse`
   schema ([openapi-responses](../queued/openapi-responses.md)).

@@ -1,7 +1,7 @@
 # middleware-errors-registry — the registry finally reaches the middleware layer
 
-**Status**: ⏸ queued — v5.5 candidate, non-breaking on the wire. Origin:  agent's 5.4 source review (2026-09-01); this is "option C" from the i18n-defaults design round, made v5-viable by the byte-identical-body trick.
-**Depends on**: [error-handler-registry](../done/error-handler-registry.md) (P1p) ✅. **Co-design with**: [async-middleware](async-middleware.md) (P1m — its v2 contract routes throws through the registry at the adapter level; this plan covers the v1/global layer via the sink) and [P1q](universal-http-responses.md).
+**Status**: ✅ implemented 2026-10-03; unreleased (5.5.0), non-breaking on the wire. Origin: a 5.4 source review (2026-09-01); this is "option C" from the i18n-defaults design round, made v5-viable by the byte-identical-body trick.
+**Depends on**: [error-handler-registry](../done/error-handler-registry.md) (P1p) ✅. **Co-design with**: [async-middleware](../queued/async-middleware.md) (P1m — its v2 contract routes throws through the registry at the adapter level; this plan covers the v1/global layer via the sink) and [P1q](../queued/universal-http-responses.md).
 
 ## Problem
 
@@ -25,3 +25,22 @@ P1m v2 adapter dispatch (its own card); handler-path behavior (already registry-
 ## Done when
 
 Sink consults the registry; built-in middleware throw typed errors with byte-identical wire responses (tests prove it); `headers` lands on `ErrorHandlerResult`; app override of a middleware 401 demonstrated in a test; full battery green.
+
+## As shipped (2026-10-03)
+
+- The final sink (`HttpServer.addErrorHandler`) checks `headersSent` first, then calls
+  `resolveError`; a match is logged at its entry's level (`toLoggableError`) and sent, anything
+  else keeps the 500 + error log.
+- `ErrorHandlerResult.headers` plus `HttpError` details `headers` (both the contract and the custom
+  `body` form): the built-in mapper copies them into the result. One sender,
+  `sendErrorResult(res, result)`, serves the two controller catches and the sink.
+- Built-ins throw: Auth → `UnauthorizedError` `AUTH001` (byte-identical); Role 401 →
+  `UnauthorizedError` `AUTH001` (same meaning for the client: log in), Role 403 → `ForbiddenError`
+  `NO_ACCESS`, RateLimiter 429 → `HttpError(429)` `TOO_MANY_REQUESTS` with `Retry-After` in
+  `headers`. The codes are the only wire change (an added `error` field). Existing log lines kept.
+- Not migrated: RateLimiter's operator-facing 500 (untranslated by design), RequestParser 413/400
+  (the optional follow-up).
+- Tests: unit tests resolve the thrown error through the real registry; end to end, the `Auth`
+  401 body is exact, an app `registerErrorHandler(UnauthorizedError, …)` reshapes it, and the
+  429 carries its body and `Retry-After`; sink tests cover headers, an app handler and the
+  `headersSent` hand-off.

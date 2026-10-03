@@ -3,6 +3,7 @@ import { before, describe, it } from 'node:test';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { TUser } from '../../../models/User.ts';
 import { hashToken } from '../../../models/User.ts';
+import { UnauthorizedError } from '../../../services/http/httpErrors.ts';
 import { getTestServerURL } from '../../../tests/testHelpers.ts';
 import SomeController from './SomeController.ts';
 
@@ -28,21 +29,39 @@ describe('middlewares correct works', () => {
     });
   });
 
-  it('authMiddleware on route works correctly (without token)', async () => {
-    const { status } = await fetch(
-      getTestServerURL('/test/somecontroller/userAvatar'),
-      {
-        method: 'PATCH',
-        headers: {
-          'Content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          avatar: 'newAvatar',
-        }),
+  const patchAvatarWithoutToken = () =>
+    fetch(getTestServerURL('/test/somecontroller/userAvatar'), {
+      method: 'PATCH',
+      headers: {
+        'Content-type': 'application/json',
       },
-    );
+      body: JSON.stringify({
+        avatar: 'newAvatar',
+      }),
+    });
 
-    assert.strictEqual(status, 401);
+  it('authMiddleware on route works correctly (without token)', async () => {
+    const response = await patchAvatarWithoutToken();
+
+    assert.strictEqual(response.status, 401);
+    assert.deepStrictEqual(await response.json(), {
+      error: 'AUTH001',
+      message: 'Please login to application',
+    });
+  });
+
+  it('an app error handler reshapes the authMiddleware 401', async () => {
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      UnauthorizedError,
+      () => ({ status: 401, body: { reason: 'login' } }),
+    );
+    try {
+      const response = await patchAvatarWithoutToken();
+      assert.strictEqual(response.status, 401);
+      assert.deepStrictEqual(await response.json(), { reason: 'login' });
+    } finally {
+      unregister?.();
+    }
   });
 
   it('authMiddleware on route works correctly (with token)', async () => {
@@ -72,9 +91,14 @@ describe('middlewares correct works', () => {
     );
 
     const responses = await Promise.all(requests);
-    const statusCodes = responses.map((response) => response.status);
+    const limited = responses.find((response) => response.status === 429);
 
-    assert.ok(statusCodes.includes(429));
+    assert.ok(limited);
+    assert.match(limited.headers.get('retry-after') ?? '', /^\d+$/);
+    assert.deepStrictEqual(await limited.json(), {
+      error: 'TOO_MANY_REQUESTS',
+      message: 'Too Many Requests',
+    });
   });
 
   it('checkFlag middleware works correctly with other middleware', async () => {

@@ -100,7 +100,6 @@ repository; Markdown remains the reviewed source of truth.
 | File | Ref | Summary |
 |---|---|---|
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.6 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.5; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
-| [middleware-errors-registry](queued/middleware-errors-registry.md) | v5.5 | **Registry reaches the middleware layer.** Registry-aware 500 sink + built-ins throw typed HttpErrors carrying their exact current bodies (byte-identical wire, app override power for 401/403/429) + additive `headers` on ErrorHandlerResult (Retry-After). Origin: insailing agent review; co-designed with P1m/P1q. |
 | [async-middleware](queued/async-middleware.md) | P1m | **Async middleware contract — v5.6 opt-in, v6 flip.** `static contractVersion = 2` (default 1): v2 = `middleware(ctx)`, return→continue / `HttpResponse`→P1q writer / throw→error registry; v1 keeps the Express bridge. Built-ins stay v1 through v5 (subclass safety); v6 flips default, drops v1, lands with static-middleware-cutover. Co-designed with P1q. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
@@ -129,6 +128,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [middleware-errors-registry](done/middleware-errors-registry.md) | v5.5 | Implemented 2026-10-03: the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded `HttpError`s (same bodies plus `error` codes, `Retry-After` via the new `headers`). |
 | [release-5.4.2](done/release-5.4.2.md) | Release | Prepared 2026-10-01 (not yet published): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
 | [vitest-to-node-test](done/vitest-to-node-test.md) | Side | Shipped in 5.3.0: the framework's own suite runs on `node:test`; vitest stays only for the published `setupVitest` helper. |
 | [release-5.4.1](done/release-5.4.1.md) | Release | Published to npm and GitHub on 2026-09-11. All five local gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Documentation site deployment is separate. |
@@ -267,7 +267,7 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 - ✅ [Log redaction on Winston](done/log-redaction.md) — P1z rule 5 shipped early: `config/log.ts` `redact` (default authorization/cookie/password/secret/token) replaces matching field values before every transport; same key carries to v6. Implemented 2026-10-02.
 - ✅ [`createEnv` CLI command](done/create-env-command.md) — creates `.env` from `.env.example` with a fresh `AUTH_SALT`; no-op when `.env` exists. Implemented 2026-10-02.
 - ✅ Error-contract follow-ups ([coded-http-errors](done/coded-http-errors.md) audit) — 404/405/415/malformed-URL/500 texts translatable (`http.*` keys), one 500 text, Auth controller on `translateWithDefault`, unverified login answers `error: 'EMAIL_NOT_VERIFIED'` (`notVerified` deprecated). Implemented 2026-10-03.
-- ⏸ [Middleware errors through the registry](queued/middleware-errors-registry.md) — next 5.5 item (one PR at a time).
+- ✅ [Middleware errors through the registry](done/middleware-errors-registry.md) — the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded errors (`AUTH001`, `NO_ACCESS`, `TOO_MANY_REQUESTS`); `headers` on `HttpError` and handler results carries `Retry-After`. Implemented 2026-10-03.
 
 ## v5.6 target — P1q line
 

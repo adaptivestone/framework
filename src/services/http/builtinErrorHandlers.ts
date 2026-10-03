@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import mongoose from 'mongoose';
 import { translateWithDefault } from '../../helpers/translate.ts';
 import {
@@ -34,6 +35,19 @@ export type ErrorLogLevel =
 export interface ErrorHandlerResult {
   status: number;
   body: unknown;
+  /** Response headers, e.g. `{ 'Retry-After': '30' }` on a 429. */
+  headers?: Record<string, string>;
+}
+
+/** Answer a resolved error: its headers, status and JSON body. */
+export function sendErrorResult(
+  res: Response,
+  { status, body, headers }: ErrorHandlerResult,
+) {
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    res.setHeader(name, value);
+  }
+  return res.status(status).json(body);
 }
 
 export type ErrorHandlerFn<E extends Error = Error> = (
@@ -311,9 +325,9 @@ export function matchedClientCastError(
 /**
  * Framework built-in registry entries, checked AFTER any consumer-registered
  * handlers ("yours win"):
- *   1. `HttpError` → its own status / `body ?? { error?: code, message }`,
- *      message translated via `i18nKey`; `verbose` (deliberate control flow,
- *      not a defect).
+ *   1. `HttpError` → its own status, headers and
+ *      `body ?? { error?: code, message }`, message translated via `i18nKey`;
+ *      `verbose` (deliberate control flow, not a defect).
  *   2. Escaped Mongoose `ValidationError` → the safety net above; `warn`
  *      (signals a route schema missing a constraint the model enforces).
  *   3. Standalone Mongoose `CastError` → {@link matchedClientCastError}; `warn`
@@ -329,9 +343,12 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
       // guarantees `instanceof errorClass` before the call.
       handler: (err, req) => {
         const httpErr = err as HttpError;
+        const { status } = httpErr;
+        const headers = httpErr.headers && { headers: httpErr.headers };
         if (httpErr.body != null) {
-          // Deprecated positional body: answered verbatim until v6.
-          return { status: httpErr.status, body: httpErr.body };
+          // Custom `{ message, body }` or the deprecated positional body:
+          // answered verbatim.
+          return { status, body: httpErr.body, ...headers };
         }
         let { message } = httpErr;
         if (httpErr.i18nKey) {
@@ -354,7 +371,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
             t ? translateIssues(httpErr.issues, t) : httpErr.issues,
           );
         }
-        return { status: httpErr.status, body };
+        return { status, body, ...headers };
       },
       logLevel: 'verbose',
     },

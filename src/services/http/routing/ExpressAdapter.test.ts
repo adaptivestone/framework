@@ -14,6 +14,7 @@ import {
   pattern,
 } from '../../../tests/assertions.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
+import { HttpError } from '../httpErrors.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
@@ -537,15 +538,20 @@ describe('registered route rate-limit budgets', () => {
       const res = makeRes();
       const next = mock.fn();
       await adapter(req, asExpressRes(res), next);
-      assertNotCalled(next);
-      return { req, res };
+      // A limited request leaves as a thrown 429 for the final sink to answer.
+      const [err] = next.mock.calls[0]?.arguments ?? [];
+      if (err && !(err instanceof HttpError)) {
+        throw err;
+      }
+      const status = err instanceof HttpError ? err.status : res.statusCode;
+      return { req, status };
     };
     return { registry, handler, send };
   };
 
   it('shares one budget across case, encoding, trailing slashes, IDs and implicit HEAD', async () => {
     const { send } = setup();
-    assert.strictEqual((await send('GET', '/users/1')).res.statusCode, 200);
+    assert.strictEqual((await send('GET', '/users/1')).status, 200);
     for (const [method, path] of [
       ['GET', '/USERS/1'],
       ['GET', '/%75sers/1'],
@@ -553,7 +559,7 @@ describe('registered route rate-limit budgets', () => {
       ['GET', '/users/2'],
       ['HEAD', '/users/3'],
     ]) {
-      assert.strictEqual((await send(method, path)).res.statusCode, 429);
+      assert.strictEqual((await send(method, path)).status, 429);
     }
   });
 
@@ -566,13 +572,13 @@ describe('registered route rate-limit budgets', () => {
       ['HEAD', '/users/3'],
       ['GET', '/other'],
     ]) {
-      const { req, res } = await send(method, path);
-      assert.strictEqual(res.statusCode, 200);
+      const { req, status } = await send(method, path);
+      assert.strictEqual(status, 200);
       assert.strictEqual(
         req.route.path,
         path === '/other' ? '/other' : '/users/:id',
       );
-      assert.strictEqual((await send(method, path)).res.statusCode, 429);
+      assert.strictEqual((await send(method, path)).status, 429);
     }
   });
 
@@ -587,19 +593,19 @@ describe('registered route rate-limit budgets', () => {
       ['HEAD', '/shared/2', '/shared/:id'],
       ['GET', '/alias/3', '/alias/:id'],
     ]) {
-      const { req, res } = await send(method, path);
+      const { req, status } = await send(method, path);
       assert.strictEqual(req.route.path, template);
-      assert.strictEqual(res.statusCode, 200);
-      assert.strictEqual((await send(method, path)).res.statusCode, 429);
+      assert.strictEqual(status, 200);
+      assert.strictEqual((await send(method, path)).status, 429);
     }
   });
 
   it('exposes templates for routes registered after mounting', async () => {
     const { registry, handler, send } = setup();
     registry.registerRoute('GET', '/late/:id', { handler });
-    const { req, res } = await send('GET', '/late/42');
+    const { req, status } = await send('GET', '/late/42');
     assert.strictEqual(req.route.path, '/late/:id');
-    assert.strictEqual(res.statusCode, 200);
-    assert.strictEqual((await send('GET', '/late/43')).res.statusCode, 429);
+    assert.strictEqual(status, 200);
+    assert.strictEqual((await send('GET', '/late/43')).status, 429);
   });
 });

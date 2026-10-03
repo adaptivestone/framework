@@ -1,6 +1,7 @@
 import type { NextFunction, Response } from 'express';
 import type { AppUser } from '../../../models/User.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { UnauthorizedError } from '../httpErrors.ts';
 import type { GetUserByTokenAppInfo } from '../middleware/GetUserByToken.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
@@ -28,18 +29,15 @@ class AuthMiddleware extends AbstractMiddleware {
 
   async middleware(
     req: FrameworkRequest & GetUserByTokenAppInfo,
-    res: Response,
+    _res: Response,
     next: NextFunction,
   ) {
     if (!req.appInfo.user) {
       this.logger?.info('User try to access resource without credentials');
-      return res.status(401).json({
-        error: 'AUTH001',
-        message: this.translate(
-          req,
-          'middleware.auth.notLoggedIn',
-          'Please login to application',
-        ),
+      throw new UnauthorizedError({
+        code: 'AUTH001',
+        i18nKey: 'middleware.auth.notLoggedIn',
+        message: 'Please login to application',
       });
     }
     return next();

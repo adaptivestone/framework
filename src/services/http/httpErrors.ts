@@ -19,6 +19,8 @@ export interface HttpErrorContractDetails {
    * `errors: { field: [msg] }`; i18n-key messages are translated.
    */
   errors?: ValidationErrorPayload | ReadonlyArray<ValidationIssue>;
+  /** Response headers, e.g. `{ 'Retry-After': '30' }` on a 429. */
+  headers?: Record<string, string>;
   body?: never;
 }
 
@@ -28,6 +30,8 @@ export interface HttpErrorBodyDetails {
   message: string;
   /** The whole response body, sent as-is (no `error`/`message`/`errors` added). */
   body: unknown;
+  /** Response headers, e.g. `{ 'Retry-After': '30' }` on a 429. */
+  headers?: Record<string, string>;
   code?: never;
   i18nKey?: never;
   errors?: never;
@@ -52,8 +56,8 @@ const warnBodyArgument = makeOncePerClassWarner(
 
 /**
  * Throwable HTTP errors — the deliberate way to produce a status from deep
- * business logic without threading `res`. Thrown under a route handler, they
- * resolve through the error-handler registry
+ * business logic without threading `res`. Thrown from a route handler or a
+ * middleware, they resolve through the error-handler registry
  * (`HttpServer.registerErrorHandler`) via a built-in mapper:
  * `status` + `{ error?: code, message, errors? }` (message translated via
  * `i18nKey`, field errors like request validation) or a custom `body`, logged
@@ -73,6 +77,8 @@ export class HttpError extends Error {
 
   /** Field errors from `details.errors`, normalized to validation issues. */
   readonly issues?: ReadonlyArray<ValidationIssue>;
+  /** Response headers from `details.headers`. */
+  readonly headers?: Record<string, string>;
 
   constructor(status: number, message: string | HttpErrorDetails);
   /** @deprecated Use `{ message, errors }` for field errors, or `{ message, body }` for a custom body. Removed in v6. */
@@ -94,6 +100,7 @@ export class HttpError extends Error {
     }
     this.name = new.target.name;
     this.status = status;
+    this.headers = details.headers;
     if (details.body !== undefined) {
       // Custom form: the body is the response, so the contract fields are
       // dropped. Types forbid mixing; this guards plain-JS / cast callers.

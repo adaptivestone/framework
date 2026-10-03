@@ -15,6 +15,7 @@ import type rateLimiterConfig from '../../../config/rateLimiter.js';
 import { makeOncePerClassWarner } from '../../../helpers/deprecation.ts';
 import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpError } from '../httpErrors.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
@@ -231,16 +232,12 @@ class RateLimiter extends AbstractMiddleware {
       return next();
     }
 
-    return res
-      .status(429)
-      .setHeader('Retry-After', String(consumeResult.retryAfter))
-      .json({
-        message: this.translate(
-          req,
-          'middleware.rateLimiter.tooManyRequests',
-          'Too Many Requests',
-        ),
-      });
+    throw new HttpError(429, {
+      code: 'TOO_MANY_REQUESTS',
+      i18nKey: 'middleware.rateLimiter.tooManyRequests',
+      message: 'Too Many Requests',
+      headers: { 'Retry-After': String(consumeResult.retryAfter) },
+    });
   }
 }
 
