@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-10-03
+
 ### Added
 
 - **`hashSecret` / `verifySecret` for short codes.** E-mail login, SMS and reset codes are too short for `hashToken`: a leaked SHA-256 of a 6-digit code is reversed in under a second. `hashSecret(code, { purpose })` from `helpers/crypto.js` returns a base64url HMAC-SHA256 keyed from `AUTH_SALT`, so a leaked hash is useless without the secret, and `verifySecret(code, stored, { purpose })` checks a candidate in constant time. `purpose` names the feature; a hash made for one purpose never verifies under another. Rotating `AUTH_SALT` invalidates outstanding codes. Keep `hashToken` for long random tokens and `hashPassword` for passwords.

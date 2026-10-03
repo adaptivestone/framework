@@ -70,6 +70,34 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.5.0)
+
+See the [5.5.0 release notes](CHANGELOG.md) for everything new. Check these when
+you upgrade:
+
+- Logs are redacted by default: fields named `authorization`, `cookie`,
+  `password`, `secret` or `token` are written as `[REDACTED]`. Your own
+  `redact` list in `config/log.ts` replaces the default, so keep these names in
+  it; `redact: []` turns redaction off.
+- A few error responses changed. Field-error 400s always carry `message` and
+  per-field arrays (safety-net `errors.<field>` used to be a string), every 500
+  has one text, the default 404 text is `Not found`, and the `Role` and
+  `RateLimiter` responses carry `error` codes. Tests that compare whole bodies
+  may need updating.
+- Errors thrown in middleware go through the error-handler registry: an
+  `HttpError` from a middleware answers with its own status instead of a 500.
+  The built-in `Auth`, `Role` and `RateLimiter` now throw instead of writing
+  the response, so tests that call them directly must expect a thrown error.
+- Built-in health endpoints answer at `/health/live` and `/health/ready`. Your
+  own `controllers/Health.ts` replaces them; `GET /health` itself stays free.
+- Counters of request-keyed rate limits (`consumeKeyComponents.request`) reset
+  on deploy: their keys are now normalized and hashed.
+- New: `npm run cli createEnv` creates `.env` with a fresh `AUTH_SALT` on a
+  fresh clone.
+- Deprecated, removed in v6: `usedAuthParameters` (now `authSchemes`), the
+  positional `body` argument of `HttpError`, `RateLimiter.gerenateConsumeKey`,
+  and `notVerified` in the unverified-login response.
+
 ## Upgrade notes (5.4.2)
 
 See the [5.4.2 release notes](CHANGELOG.md) for all fixes. Most need no action:
