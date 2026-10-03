@@ -29,6 +29,8 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
 5.4.2 (shipped) ────→ session-race/i18n/boot-order/cache/parser fixes
                       + createuser --token + Sentry 11 / vitest 5 peers
                       └──→ npm published 2026-10-01 (GitHub release not cut yet)
+5.5.0 (prepared) ───→ coded/translatable error contract + middleware errors via registry
+                      + health endpoints, log redaction, hashSecret, createEnv
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           P1q (v5.6) is unblocked by 5.4.0 shipping and remains queued
@@ -49,7 +51,8 @@ flowchart LR
     Released --> Unreleased["✅ 5.4.1 shipped: declaration + validation + security fixes"]
 
     Unreleased --> Patch542["✅ 5.4.2 shipped: review fixes + peer updates"]
-    Patch542 --> Responses["⏸ v5.6 universal responses"]
+    Patch542 --> Minor550["🔄 5.5.0 prepared: error contract + health + redaction"]
+    Minor550 --> Responses["⏸ v5.6 universal responses"]
     Responses --> OpenAPI["⏸ v5.7 OpenAPI response contracts"]
 
     BunRelease["Bun stable release with fix"] --> BunSupport["✅ Bun support — shipped 5.4.0"]
@@ -129,6 +132,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
+| [release-5.5.0](done/release-5.5.0.md) | Release | Prepared 2026-10-03 (not yet published): version 5.5.0, dated release notes, README upgrade notes. |
 | [middleware-errors-registry](done/middleware-errors-registry.md) | v5.5 | Implemented 2026-10-03: the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded `HttpError`s (same bodies plus `error` codes, `Retry-After` via the new `headers`). |
 | [release-5.4.2](done/release-5.4.2.md) | Release | Published to npm 2026-10-01 (GitHub release not cut yet): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
 | [vitest-to-node-test](done/vitest-to-node-test.md) | Side | Shipped in 5.3.0: the framework's own suite runs on `node:test`; vitest stays only for the published `setupVitest` helper. |
@@ -256,7 +260,10 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
-## Unreleased — next minor (5.5.0)
+## 5.5.0 — prepared 2026-10-03
+
+User-scoped minor release. See [release preparation](done/release-5.5.0.md) and `CHANGELOG.md`.
+
 
 - ✅ [Keyed hashing for short secrets](done/short-secret-hashing.md) — `hashSecret` / `verifySecret` in `helpers/crypto.ts`: per-purpose HMAC-SHA256 keyed from `AUTH_SALT` via HKDF, for e-mail/SMS login and reset codes. Additive; implemented 2026-10-01, not yet released.
 - ✅ [Canonical rate-limit request keys](done/rate-limit-request-keys.md) — `consumeKeyComponents.request` values are NFKC + trim + lowercase, field-named and hashed, so spelling variants share one budget and e-mails leave keys/logs; `gerenateConsumeKey` → `generateConsumeKey` (old name deprecated until v6). Behavior change: request-keyed counters reset once. Implemented 2026-10-02.
