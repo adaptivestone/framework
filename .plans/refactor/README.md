@@ -26,8 +26,9 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
 5.4.1 (shipped) ────→ optional-i18n declarations + model/validation typing
                       + request/auth/rate-limit/cache fixes
                       └──→ npm + GitHub release published 2026-09-11
-5.4.2 (prepared) ───→ session-race/i18n/boot-order/cache/parser fixes
+5.4.2 (shipped) ────→ session-race/i18n/boot-order/cache/parser fixes
                       + createuser --token + Sentry 11 / vitest 5 peers
+                      └──→ npm published 2026-10-01 (GitHub release not cut yet)
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           P1q (v5.6) is unblocked by 5.4.0 shipping and remains queued
@@ -47,7 +48,7 @@ flowchart LR
     Patch --> Released["✅ 5.4.0: i18n defaults + email modules + Bun"]
     Released --> Unreleased["✅ 5.4.1 shipped: declaration + validation + security fixes"]
 
-    Unreleased --> Patch542["🔄 5.4.2 prepared: review fixes + peer updates"]
+    Unreleased --> Patch542["✅ 5.4.2 shipped: review fixes + peer updates"]
     Patch542 --> Responses["⏸ v5.6 universal responses"]
     Responses --> OpenAPI["⏸ v5.7 OpenAPI response contracts"]
 
@@ -129,7 +130,7 @@ repository; Markdown remains the reviewed source of truth.
 | File | Ref | Summary |
 |---|---|---|
 | [middleware-errors-registry](done/middleware-errors-registry.md) | v5.5 | Implemented 2026-10-03: the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded `HttpError`s (same bodies plus `error` codes, `Retry-After` via the new `headers`). |
-| [release-5.4.2](done/release-5.4.2.md) | Release | Prepared 2026-10-01 (not yet published): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
+| [release-5.4.2](done/release-5.4.2.md) | Release | Published to npm 2026-10-01 (GitHub release not cut yet): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
 | [vitest-to-node-test](done/vitest-to-node-test.md) | Side | Shipped in 5.3.0: the framework's own suite runs on `node:test`; vitest stays only for the published `setupVitest` helper. |
 | [release-5.4.1](done/release-5.4.1.md) | Release | Published to npm and GitHub on 2026-09-11. All five local gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Documentation site deployment is separate. |
 | [i18n-default-values](done/i18n-default-values.md) | P1y-bridge | Shipped in 5.4.0: English defaults and optional translation peers. Declaration checking without those peers is fixed in 5.4.1. |
@@ -245,7 +246,7 @@ parity, security/cache fixes and the optional oxc-parser ^0.149.0 peer update.
 Published to npm and [GitHub Releases](https://github.com/adaptivestone/framework/releases/tag/5.4.1).
 Documentation site deployment remains separate.
 
-## 5.4.2 — prepared 2026-10-01
+## 5.4.2 — released 2026-10-01 (npm; GitHub release not cut yet)
 
 User-selected patch release. See [release preparation](done/release-5.4.2.md) and
 `CHANGELOG.md`. Race-safe session issuance (password reset, concurrent
@@ -278,8 +279,11 @@ Moved out of 5.5 on 2026-10-03 so the finished 5.5 batch is not held back by the
 - [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
 - **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
   ResponseWriter is the instrumentation seam, and adding it afterwards means reopening the hot path.
-- Resolve `bodyParsing` — `'raw'`/`'none'` are accepted by the type, do nothing, and the JSDoc still
-  promises v5.1. Implement (the request-side half of P1q's thesis) or remove them from the type.
+- Resolve `bodyParsing` — `'raw'`/`'none'` are accepted by the type and do nothing (the JSDoc says
+  so, without a version promise since 2026-10-03). Implement (the request-side half of P1q's thesis) or
+  remove them from the type.
+- `RequestParser` 413/400 → coded `HttpError`s through the registry (the optional follow-up of
+  [middleware-errors-registry](done/middleware-errors-registry.md)); deferred from 5.5 on 2026-10-03.
 
 The former "small independent items" were already done when checked on 2026-10-03: Redis-dependent
 tests skip when Redis is unreachable (`src/tests/redisAvailability.ts`), `OpenApiGenerator.ts` has no

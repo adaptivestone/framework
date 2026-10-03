@@ -32,15 +32,14 @@ export type HttpMethod = (typeof HTTP_METHODS)[number];
  * - `'parsed'` (default): Content-Type-aware parser dispatch. **The only mode
  *   that takes effect today.**
  *
- * `'raw'` and `'none'` are **reserved and not yet implemented** (planned for
- * v5.1). The matcher resolves and propagates the mode, but the request pipeline
- * does not act on it: `RequestParser` is mounted globally, so every body is
- * parsed regardless — `req.rawBody` is never set and the stream is always
- * consumed. Do not rely on them until v5.1 (the parser-registry design lives in
- * the refactor plans).
+ * `'raw'` and `'none'` are **reserved and not implemented yet**. The matcher
+ * resolves and propagates the mode, but the request pipeline does not act on
+ * it: `RequestParser` is mounted globally, so every body is parsed regardless —
+ * `req.rawBody` is never set and the stream is always consumed. Do not rely on
+ * them until they ship (the parser-registry design lives in the refactor plans).
  *
- * - `'raw'` *(v5.1)*: capture bytes into `req.rawBody: Buffer`, skip parsing.
- * - `'none'` *(v5.1)*: pass-through, leave the request stream untouched.
+ * - `'raw'` *(reserved)*: capture bytes into `req.rawBody: Buffer`, skip parsing.
+ * - `'none'` *(reserved)*: pass-through, leave the request stream untouched.
  */
 export type BodyParsingMode = 'parsed' | 'raw' | 'none';
 

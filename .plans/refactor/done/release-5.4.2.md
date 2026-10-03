@@ -67,3 +67,8 @@ results and moves to done.
 Preparation complete. Changes remain in both working trees; no commit, tag,
 push, package publication, site deployment or GitHub release was created. Next:
 the user publishes, then the example project is updated.
+
+## Publication
+
+The user published 5.4.2 to npm on 2026-10-01 (checked 2026-10-03). The GitHub release was
+not cut yet: the latest GitHub release is still 5.4.1.
