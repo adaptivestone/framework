@@ -23,6 +23,13 @@ Changelog (`### Changed`):
 
 Docs at release: one line in `06-Controllers/04-error-handling.md` that validation failures go through the registry.
 
+## Prerequisite bug: `ValidationError` declaration under `skipLibCheck: false`
+
+Found 2026-10-06; older than this plan, not fixed in 5.5.1. `ValidationError.ts` hides its `message` widening behind `@ts-expect-error`, but the directive does not reach the emitted `dist/services/validate/ValidationError.d.ts`. An app with `skipLibCheck: false` that imports `ValidationError` gets `TS2416: Property 'message' … is not assignable to the same property in base type 'Error'` from the framework's declaration. The packaging smoke test promises that setting works, but its core entry never reaches this file, so it misses it. This plan tells apps to import `ValidationError` for `registerErrorHandler`, so fix it in the same release:
+
+- Make the emitted declaration valid. Candidate: extend a base typed `new () => Omit<Error, 'message'>` (still `Error` at runtime) instead of `@ts-expect-error`; check the effect on `instanceof` narrowing in consumer code before choosing.
+- Have the smoke test import `ValidationError` under `skipLibCheck: false`, so the promise is tested.
+
 ## Relation to P1q
 
 Complementary to [universal-http-responses](universal-http-responses.md): this lets a handler reshape one error class; P1q Phase 2 routes the validation 400 through the writer and `transformResponse`. Ship together in 5.6.
