@@ -29,8 +29,9 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
 5.4.2 (shipped) ────→ session-race/i18n/boot-order/cache/parser fixes
                       + createuser --token + Sentry 11 / vitest 5 peers
                       └──→ npm published 2026-10-01 (GitHub release not cut yet)
-5.5.0 (prepared) ───→ coded/translatable error contract + middleware errors via registry
+5.5.0 (shipped) ────→ coded/translatable error contract + middleware errors via registry
                       + health endpoints, log redaction, hashSecret, createEnv
+5.5.1 (prepared) ───→ Auth/Role subclass return type + generateToken race 400
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           P1q (v5.6) is unblocked by 5.4.0 shipping and remains queued
@@ -51,8 +52,9 @@ flowchart LR
     Released --> Unreleased["✅ 5.4.1 shipped: declaration + validation + security fixes"]
 
     Unreleased --> Patch542["✅ 5.4.2 shipped: review fixes + peer updates"]
-    Patch542 --> Minor550["🔄 5.5.0 prepared: error contract + health + redaction"]
-    Minor550 --> Responses["⏸ v5.6 universal responses"]
+    Patch542 --> Minor550["✅ 5.5.0 shipped: error contract + health + redaction"]
+    Minor550 --> Patch551["🔄 5.5.1 prepared: consumer review fixes"]
+    Patch551 --> Responses["⏸ v5.6 universal responses"]
     Responses --> OpenAPI["⏸ v5.7 OpenAPI response contracts"]
 
     BunRelease["Bun stable release with fix"] --> BunSupport["✅ Bun support — shipped 5.4.0"]
@@ -104,6 +106,7 @@ repository; Markdown remains the reviewed source of truth.
 | File | Ref | Summary |
 |---|---|---|
 | [universal-http-responses](queued/universal-http-responses.md) | P1q | **v5.6 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.5; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path. |
+| [validation-errors-registry](queued/validation-errors-registry.md) | v5.6 | Request-validation 400s walk the error registry first (400 fallback unchanged); structural `RegistrableError` so `registerErrorHandler(ValidationError, …)` compiles. Implemented and verified, held back from 5.5.1 (catch-all `Error` handlers start seeing validation errors); a local patch is kept. Ships with P1q. |
 | [async-middleware](queued/async-middleware.md) | P1m | **Async middleware contract — v5.6 opt-in, v6 flip.** `static contractVersion = 2` (default 1): v2 = `middleware(ctx)`, return→continue / `HttpResponse`→P1q writer / throw→error registry; v1 keeps the Express bridge. Built-ins stay v1 through v5 (subclass safety); v6 flips default, drops v1, lands with static-middleware-cutover. Co-designed with P1q. |
 | [openapi-responses](queued/openapi-responses.md) | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data. |
 | [metrics-seam](queued/metrics-seam.md) | P1s | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout. |
@@ -132,7 +135,9 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
-| [release-5.5.0](done/release-5.5.0.md) | Release | Prepared 2026-10-03 (not yet published): version 5.5.0, dated release notes, README upgrade notes. |
+| [release-5.5.1](done/release-5.5.1.md) | Release | Prepared 2026-10-06 (not yet published): version 5.5.1, dated notes, README upgrade notes; all gates, Bun suite and Bun packed consumer pass. |
+| [consumer-review-fixes](done/consumer-review-fixes.md) | Post-5.5 | Ships in 5.5.1: `Auth`/`Role` return type restored for subclasses; `generateToken` stale-password race rejects with the wrong-password `BadRequestError`; 5.5.0 notes amended (Health override, `error` field). The validation-registry change moved to queued/ for 5.6. |
+| [release-5.5.0](done/release-5.5.0.md) | Release | Published to npm 2026-10-03: version 5.5.0, dated release notes, README upgrade notes. |
 | [middleware-errors-registry](done/middleware-errors-registry.md) | v5.5 | Implemented 2026-10-03: the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded `HttpError`s (same bodies plus `error` codes, `Retry-After` via the new `headers`). |
 | [release-5.4.2](done/release-5.4.2.md) | Release | Published to npm 2026-10-01 (GitHub release not cut yet): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
 | [vitest-to-node-test](done/vitest-to-node-test.md) | Side | Shipped in 5.3.0: the framework's own suite runs on `node:test`; vitest stays only for the published `setupVitest` helper. |
@@ -260,7 +265,11 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
-## 5.5.0 — prepared 2026-10-03
+## 5.5.1 — prepared 2026-10-06
+
+User-selected patch release. See [release preparation](done/release-5.5.1.md) and `CHANGELOG.md`: `Auth`/`Role` subclasses may return a response again, and a login racing a password change answers the wrong-password 400 from `generateToken` itself. The validation-registry change waits for 5.6 ([validation-errors-registry](queued/validation-errors-registry.md)).
+
+## 5.5.0 — released 2026-10-03 (npm)
 
 User-scoped minor release. See [release preparation](done/release-5.5.0.md) and `CHANGELOG.md`.
 

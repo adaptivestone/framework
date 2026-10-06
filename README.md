@@ -70,6 +70,17 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.5.1)
+
+See the [5.5.1 release notes](CHANGELOG.md). Most need no action:
+
+- When the password changed after the user was read, `user.generateToken()`
+  rejects with a 400 `BadRequestError` (the same answer as a wrong password)
+  instead of a Mongoose `VersionError` or `DocumentNotFoundError`. A catch you
+  added for those around `generateToken` can go.
+- Subclasses of `Auth` and `Role` may return a response from `middleware()`
+  again.
+
 ## Upgrade notes (5.5.0)
 
 See the [5.5.0 release notes](CHANGELOG.md) for everything new. Check these when
