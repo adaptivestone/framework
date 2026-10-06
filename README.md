@@ -74,6 +74,8 @@ npm install @adaptivestone/framework
 
 See the [5.5.1 release notes](CHANGELOG.md). Most need no action:
 
+- Projects that run `npm run gen` must update the optional peer:
+  `npm i -D oxc-parser@^0.153.0`.
 - When the password changed after the user was read, `user.generateToken()`
   rejects with a 400 `BadRequestError` (the same answer as a wrong password)
   instead of a Mongoose `VersionError` or `DocumentNotFoundError`. A catch you

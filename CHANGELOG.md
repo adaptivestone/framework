@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.5.1] - 2026-10-06
 
+### Changed
+
+- **Code generation now requires `oxc-parser` `^0.153.0`.** Projects that run `npm run gen` should update their optional development peer with `npm i -D oxc-parser@^0.153.0`. Runtime-only consumers do not need it.
+
 ### Fixed
 
 - **A login racing a password change no longer needs its own catch.** When the stored password changed after the user was read, `user.generateToken()` now rejects with a `BadRequestError` that answers exactly like a wrong password (`400 { message: 'User/password not valid' }`, translated via `auth.errorUPValid`), instead of a raw Mongoose `VersionError` or `DocumentNotFoundError`. A custom login handler that did not catch those answered 500. Code that catches them around `generateToken` should catch `BadRequestError` instead.
