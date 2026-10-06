@@ -6,6 +6,9 @@ import { assertCalledTimes } from '../../../tests/assertions.ts';
 import { mockImplementation } from '../../../tests/mocks.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
+import Auth from './Auth.ts';
+import RateLimiter from './RateLimiter.ts';
+import Role from './Role.ts';
 
 /**
  * Base class every middleware extends. Covers its real default behavior: a
@@ -142,5 +145,40 @@ describe('AbstractMiddleware translate()', () => {
     assert.deepStrictEqual(calls, [
       ['middleware.some.key', { defaultValue: 'English default' }],
     ]);
+  });
+});
+
+// A built-in that only throws must keep the base return type, or a subclass
+// answering with `res.json(...)` stops compiling (`check:types:tests`).
+describe('built-in middleware subclasses', () => {
+  it('may answer with a response instead of calling next()', async () => {
+    const answered = { answered: true } as unknown as Response;
+    const answer = (res: Response) => res.status(401).json({});
+    class MyAuth extends Auth {
+      async middleware(_req: FrameworkRequest, res: Response) {
+        return answer(res);
+      }
+    }
+    class MyRole extends Role {
+      async middleware(_req: FrameworkRequest, res: Response) {
+        return answer(res);
+      }
+    }
+    class MyRateLimiter extends RateLimiter {
+      async middleware(_req: FrameworkRequest, res: Response) {
+        return answer(res);
+      }
+    }
+    const res = {
+      status: () => res,
+      json: () => answered,
+    } as unknown as Response;
+    for (const Mw of [MyAuth, MyRole, MyRateLimiter]) {
+      const result = await new Mw(appInstance).middleware(
+        {} as FrameworkRequest,
+        res,
+      );
+      assert.strictEqual(result, answered);
+    }
   });
 });

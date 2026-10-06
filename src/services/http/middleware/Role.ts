@@ -19,7 +19,9 @@ class RoleMiddleware extends AbstractMiddleware {
       GetUserByTokenAppInfo & { user: InstanceType<TUser> },
     _res: Response,
     next: NextFunction,
-  ) {
+  ): // Base return type, so a subclass may still answer with a response.
+  // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
+  Promise<void | Response> {
     const { user } = req.appInfo;
 
     if (!user) {

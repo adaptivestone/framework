@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomBytes, scrypt } from 'node:crypto';
 import { describe, it, mock } from 'node:test';
-import mongoose from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import {
   hashPassword,
   scryptAsyncWithSaltAsString,
 } from '../helpers/crypto.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
+import { BadRequestError } from '../services/http/httpErrors.ts';
 import {
   assertCalledTimes,
   assertNotCalled,
@@ -278,6 +278,15 @@ describe('token security (doc 01)', () => {
 
   describe('concurrent session writes', () => {
     const password = 'session race password';
+    // The same 400 as a wrong password, so a client cannot tell the two apart.
+    const isWrongPasswordError = (err: unknown) => {
+      assert.ok(err instanceof BadRequestError);
+      assert.strictEqual(err.status, 400);
+      assert.strictEqual(err.i18nKey, 'auth.errorUPValid');
+      assert.strictEqual(err.message, 'User/password not valid');
+      assert.strictEqual(err.code, undefined);
+      return true;
+    };
     const expired = () => ({
       token: hashToken('expired-session'),
       valid: new Date(Date.now() - 1000),
@@ -305,12 +314,22 @@ describe('token security (doc 01)', () => {
       reset.set('sessionTokens', []);
       await reset.save();
 
-      await assertRejectsLike(
-        staleLogin.generateToken(),
-        mongoose.Error.VersionError,
-      );
+      await assert.rejects(staleLogin.generateToken(), isWrongPasswordError);
       const stored = await model.findOne({ email }).orFail();
       assert.strictEqual(stored.sessionTokens.length, 0);
+    });
+
+    it('answers a password changed after the read like a wrong password', async () => {
+      const model = getUserModel();
+      const email = 'session-race-password-only@test.com';
+      await model.create({ email, password });
+      const staleLogin = await model.getUserByEmailAndPassword(email, password);
+      assert.ok(staleLogin);
+
+      // Only the hash changes: the conditioned write matches no document.
+      await model.updateOne({ email }, { $set: { password: 'changed-hash' } });
+
+      await assert.rejects(staleLogin.generateToken(), isWrongPasswordError);
     });
 
     it('keeps both sessions of two concurrent logins and prunes expired ones', async () => {

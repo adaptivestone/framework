@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { HydratedDocument, Model, Schema } from 'mongoose';
+import mongoose from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import {
   burnPasswordVerify,
@@ -12,6 +13,7 @@ import type {
   GetModelTypeLiteFromSchema,
 } from '../modules/BaseModel.ts';
 import { BaseModel } from '../modules/BaseModel.ts';
+import { BadRequestError } from '../services/http/httpErrors.ts';
 import type { TI18n } from '../services/i18n/types.ts';
 
 /** A fresh, unguessable bearer token (43-char base64url, 256 bits). */
@@ -402,7 +404,7 @@ class User extends BaseModel {
     return {
       /**
        * Generate a session token for the user and save the document. Rejects
-       * (Mongoose `VersionError`/`DocumentNotFoundError`) when the stored
+       * with a 400 `BadRequestError`, the wrong-password answer, when the stored
        * password changed after this document was read.
        * @returns {Object}
        */
@@ -435,6 +437,19 @@ class User extends BaseModel {
         }
         try {
           await this.save();
+        } catch (err) {
+          // No match: the password changed meanwhile. Answer exactly like a
+          // wrong password, so the race reveals nothing.
+          if (
+            err instanceof mongoose.Error.VersionError ||
+            err instanceof mongoose.Error.DocumentNotFoundError
+          ) {
+            throw new BadRequestError({
+              i18nKey: 'auth.errorUPValid',
+              message: 'User/password not valid',
+            });
+          }
+          throw err;
         } finally {
           this.$where = previousWhere;
         }

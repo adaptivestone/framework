@@ -1,5 +1,4 @@
 import type { Response } from 'express';
-import mongoose from 'mongoose';
 import { translateWithDefault } from '../helpers/translate.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken } from '../models/User.ts';
@@ -356,27 +355,8 @@ class Auth extends AbstractController {
         notVerified: true,
       });
     }
-    let token: Awaited<ReturnType<typeof user.generateToken>>;
-    try {
-      token = await user.generateToken();
-    } catch (err) {
-      // The session write is conditioned on the verified password hash. No
-      // match means the password changed meanwhile (e.g. a concurrent reset):
-      // answer exactly like a wrong password.
-      if (
-        err instanceof mongoose.Error.VersionError ||
-        err instanceof mongoose.Error.DocumentNotFoundError
-      ) {
-        return res.status(400).json({
-          message: translateWithDefault(
-            req,
-            'auth.errorUPValid',
-            EN['auth.errorUPValid'],
-          ),
-        });
-      }
-      throw err;
-    }
+    // A password changed meanwhile rejects with the wrong-password 400.
+    const token = await user.generateToken();
 
     return res.status(200).json({ data: { token, user: user.getPublic() } });
   }
