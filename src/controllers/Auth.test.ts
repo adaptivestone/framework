@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { before, describe, it, mock } from 'node:test';
 import type { Response } from 'express';
-import mongoose from 'mongoose';
 import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
@@ -448,31 +447,7 @@ describe('auth controller failure paths', () => {
     assert.deepStrictEqual(state.body, { message: 'User/password not valid' });
   });
 
-  it('answers a login whose password changed meanwhile like a wrong password', async () => {
-    for (const conflict of [
-      new mongoose.Error.VersionError({ _doc: { _id: 'u1' } } as never, 1, [
-        'sessionTokens',
-      ]),
-      new mongoose.Error.DocumentNotFoundError('{ _id: "u1" }'),
-    ]) {
-      const state = await runEn(
-        {
-          getUserByEmailAndPassword: mockResolvedValue(mock.fn(), {
-            isVerified: true,
-            generateToken: mockRejectedValue(mock.fn(), conflict),
-          }),
-        },
-        (auth, req, res) => auth.postLogin(req, res),
-      );
-
-      assert.strictEqual(state.status, 400);
-      assert.deepStrictEqual(state.body, {
-        message: 'User/password not valid',
-      });
-    }
-  });
-
-  it('rethrows any other session-issue failure', async () => {
+  it('rethrows a session-issue failure for the error handler', async () => {
     const failure = new Error('db down');
     await assertRejectsValue(
       runEn(
@@ -1347,6 +1322,54 @@ describe('auth', () => {
         emailSpy.mock.restore();
         createSpy.mock.restore();
       }
+    });
+  });
+
+  describe('login racing a password change', () => {
+    it('answers exactly like a wrong password', async () => {
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'race-login-reset@test.com';
+      await UserModel.create({
+        email,
+        password: userPassword,
+        isVerified: true,
+      });
+      const login = (password: string) =>
+        fetch(getTestServerURL('/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+      // The password changes between the credential check and the session write.
+      const original = UserModel.getUserByEmailAndPassword.bind(UserModel);
+      const spy = mock.method(
+        UserModel,
+        'getUserByEmailAndPassword',
+        async (...args: Parameters<typeof original>) => {
+          const user = await original(...args);
+          if (!user) {
+            throw new Error('the credential check must pass before the race');
+          }
+          await UserModel.updateOne(
+            { email },
+            { $set: { password: 'changed-hash' } },
+          );
+          return user;
+        },
+      );
+      let raced: Awaited<ReturnType<typeof login>>;
+      try {
+        raced = await login(userPassword);
+        assertCalledTimes(spy, 1);
+      } finally {
+        spy.mock.restore();
+      }
+      const wrong = await login('WrongPassword123$');
+
+      assert.strictEqual(raced.status, 400);
+      assert.strictEqual(wrong.status, 400);
+      assert.deepStrictEqual(await raced.json(), await wrong.json());
     });
   });
 });

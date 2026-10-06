@@ -31,7 +31,9 @@ class AuthMiddleware extends AbstractMiddleware {
     req: FrameworkRequest & GetUserByTokenAppInfo,
     _res: Response,
     next: NextFunction,
-  ) {
+  ): // Base return type, so a subclass may still answer with a response.
+  // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
+  Promise<void | Response> {
     if (!req.appInfo.user) {
       this.logger?.info('User try to access resource without credentials');
       throw new UnauthorizedError({
