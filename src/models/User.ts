@@ -335,14 +335,22 @@ class User extends BaseModel {
         return data;
       },
       /**
-       * Get user by password recovery token
+       * Get user by password recovery token and consume the token. Pass
+       * `{ save: false }` to skip the write: the token is removed only from the
+       * returned document, and your own `save()` persists it with your changes.
        * @param {string} passwordRecoveryToken
-       * @returns {Promise<InstanceType<UserModelLite> | false>}
+       * @param {{ save?: boolean }} [options]
+       * @returns {Promise<InstanceType<UserModelLite>>}
+       * @throws {Error} `User not exists` when no live token matches.
        */
       getUserByPasswordRecoveryToken:
         async function getUserByPasswordRecoveryToken<
           T extends UserAuthModel<'passwordRecoveryTokens'>,
-        >(this: T, passwordRecoveryToken: string) {
+        >(
+          this: T,
+          passwordRecoveryToken: string,
+          options: { save?: boolean } = {},
+        ) {
           const hashed = hashToken(String(passwordRecoveryToken));
           const data = await this.findOne<InstanceType<T>>({
             passwordRecoveryTokens: {
@@ -363,17 +371,24 @@ class User extends BaseModel {
             (t) => t.token !== hashed,
           ) as typeof data.passwordRecoveryTokens;
 
+          if (options.save === false) {
+            return data;
+          }
           const result = await data.save();
           return result;
         },
       /**
-       * Get user by verification token
+       * Get user by verification token and consume the token. Pass
+       * `{ save: false }` to skip the write: the token is removed only from the
+       * returned document, and your own `save()` persists it with your changes.
        * @param {string} verificationToken
-       * @returns {Promise<InstanceType<UserModelLite> | false>}
+       * @param {{ save?: boolean }} [options]
+       * @returns {Promise<InstanceType<UserModelLite>>}
+       * @throws {Error} `User not exists` when no live token matches.
        */
       getUserByVerificationToken: async function getUserByVerificationToken<
         T extends UserAuthModel<'verificationTokens'>,
-      >(this: T, verificationToken: string) {
+      >(this: T, verificationToken: string, options: { save?: boolean } = {}) {
         const hashed = hashToken(String(verificationToken));
         const data = await this.findOne<InstanceType<T>>({
           verificationTokens: {
@@ -394,6 +409,9 @@ class User extends BaseModel {
           (t) => t.token !== hashed,
         ) as typeof data.verificationTokens;
 
+        if (options.save === false) {
+          return data;
+        }
         const result = await data.save();
         return result;
       },

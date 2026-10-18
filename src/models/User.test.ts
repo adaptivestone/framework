@@ -144,6 +144,36 @@ describe('user model', () => {
 
       assert.strictEqual(user.id, globalUser.id);
     });
+
+    it('with `save: false` consumes the token only on the caller save', async () => {
+      const created = await getUserModel().create({
+        email: 'verify-deferred@test.com',
+        password: userPassword,
+      });
+      const { token } =
+        await userHelpers.generateUserVerificationToken(created);
+
+      const user = await getUserModel().getUserByVerificationToken(token, {
+        save: false,
+      });
+
+      assert.strictEqual(user.id, created.id);
+      assert.ok(
+        !user.verificationTokens.some((t) => t.token === hashToken(token)),
+      );
+      // Nothing was written yet: the same link still matches in the database.
+      const stored = await getUserModel().getUserByVerificationToken(token, {
+        save: false,
+      });
+      assert.strictEqual(stored.id, created.id);
+
+      await user.save();
+
+      await assertRejectsValue(
+        getUserModel().getUserByVerificationToken(token),
+        new Error('User not exists'),
+      );
+    });
   });
 
   describe('getUserByPasswordRecoveryToken', () => {
@@ -163,6 +193,39 @@ describe('user model', () => {
       );
 
       assert.strictEqual(user.id, globalUser.id);
+    });
+
+    it('with `save: false` consumes the token only on the caller save', async () => {
+      const created = await getUserModel().create({
+        email: 'recover-deferred@test.com',
+        password: userPassword,
+      });
+      const { token } =
+        await userHelpers.generateUserPasswordRecoveryToken(created);
+
+      const user = await getUserModel().getUserByPasswordRecoveryToken(token, {
+        save: false,
+      });
+
+      assert.strictEqual(user.id, created.id);
+      assert.ok(
+        !user.passwordRecoveryTokens.some((t) => t.token === hashToken(token)),
+      );
+      // Nothing was written yet: the same link still matches in the database.
+      const stored = await getUserModel().getUserByPasswordRecoveryToken(
+        token,
+        {
+          save: false,
+        },
+      );
+      assert.strictEqual(stored.id, created.id);
+
+      await user.save();
+
+      await assertRejectsValue(
+        getUserModel().getUserByPasswordRecoveryToken(token),
+        new Error('User not exists'),
+      );
     });
   });
 });

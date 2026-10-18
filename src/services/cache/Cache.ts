@@ -67,8 +67,10 @@ class Cache extends Base {
     // Short circuit before touching the driver or the in-flight map so a `<= 0`
     // storeTime can never write a never-expiring entry — a negative value (e.g.
     // `(expiresAt - Date.now())/1000` once the source is expired) is the hazard
-    // memory keeps immortal while redis rejects `EX <= 0`.
-    if (storeTime <= 0) {
+    // memory keeps immortal while redis rejects `EX <= 0`. Negated `> 0` so a
+    // `NaN` TTL (an `undefined` expiry in that arithmetic) takes the same path
+    // — `NaN <= 0` is false, which would store it.
+    if (!(storeTime > 0)) {
       return onNotFound();
     }
     await this.whenReady;

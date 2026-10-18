@@ -35,7 +35,9 @@ class MemoryDriver implements CacheDriver {
     // A non-positive TTL never stores (issue #10): storing without a timer would
     // strand an immortal entry, so converge on redis' `EX <= 0` = no-cache and
     // leave any existing entry untouched (redis rejects the write, not the key).
-    if (ttlSeconds <= 0) {
+    // Negated `> 0` so a `NaN` TTL is refused too: `NaN <= 0` is false, and a
+    // `NaN` expiry never reads as expired while its timer re-arms every 1 ms.
+    if (!(ttlSeconds > 0)) {
       return;
     }
     const existing = this.#store.get(key);

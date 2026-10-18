@@ -66,6 +66,24 @@ describe('cache', () => {
     assert.strictEqual(counter, 2);
   });
 
+  it('a NaN storeTime skips the cache instead of storing an immortal entry', async () => {
+    const { cache } = appInstance;
+    let counter = 0;
+    const compute = async () => {
+      counter += 1;
+      return counter;
+    };
+
+    // `(undefined - Date.now()) / 1000` is NaN; `NaN <= 0` is false, so a plain
+    // non-positive guard would have stored a never-expiring entry.
+    const first = await cache.getSetValue('NAN_TTL', compute, Number.NaN);
+    const second = await cache.getSetValue('NAN_TTL', compute, Number.NaN);
+
+    assert.strictEqual(first, 1);
+    assert.strictEqual(second, 2);
+    assert.strictEqual(counter, 2);
+  });
+
   it('can get set values', async () => {
     const { cache } = appInstance;
 

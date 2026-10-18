@@ -53,13 +53,23 @@ describe('ValidationError', () => {
       ValidationError.isValidationError(new ValidationError([])),
       true,
     );
-    // a plain Error whose name was set (e.g. crossed a module boundary)
-    const ducked = Object.assign(new Error(), { name: 'ValidationError' });
+    // a plain Error shaped like ours (e.g. crossed a module boundary)
+    const ducked = Object.assign(new Error(), {
+      name: 'ValidationError',
+      issues: [],
+    });
     assert.strictEqual(ValidationError.isValidationError(ducked), true);
     assert.strictEqual(
       ValidationError.isValidationError(new Error('nope')),
       false,
     );
+    // Mongoose's ValidationError shares the name but carries `errors`, not
+    // `issues`, and its string message embeds the rejected value.
+    const mongooseLike = Object.assign(new Error('Path `email` (`x@y`) ...'), {
+      name: 'ValidationError',
+      errors: {},
+    });
+    assert.strictEqual(ValidationError.isValidationError(mongooseLike), false);
     assert.strictEqual(
       ValidationError.isValidationError({ name: 'ValidationError' }),
       false,

@@ -144,6 +144,8 @@ export async function additive(M: AdditiveHandle) {
   await M.getUserByToken('t');
   await M.getUserByVerificationToken('t');
   await M.getUserByPasswordRecoveryToken('t');
+  await (await M.getUserByVerificationToken('t', { save: false })).save();
+  await (await M.getUserByPasswordRecoveryToken('t', { save: false })).save();
 }
 
 export async function divergent(M: DivergentHandle) {
@@ -159,6 +161,8 @@ export async function divergent(M: DivergentHandle) {
   await M.getUserByToken('t');
   await M.getUserByVerificationToken('t');
   await M.getUserByPasswordRecoveryToken('t');
+  await (await M.getUserByVerificationToken('t', { save: false })).save();
+  await (await M.getUserByPasswordRecoveryToken('t', { save: false })).save();
   // NOTE: `getPublic` is intentionally NOT reused here — this model reshapes
   // `name` (i18n), so its public shape differs and it overrides `getPublic`
   // with its own. The auth statics above, which don't touch `name`, are reused.

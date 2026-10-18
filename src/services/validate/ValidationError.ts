@@ -56,11 +56,16 @@ export class ValidationError extends Error {
    * Cross-realm-safe duck check. Mirrors `yup.ValidationError.isError`.
    * Use this in framework code instead of `instanceof` when the error
    * may have crossed a module-graph boundary.
+   *
+   * The name alone is not enough: Mongoose's `ValidationError` (and yup's) share
+   * it, and their `.message` is a string that embeds the rejected value. The
+   * framework error is the only one carrying a structured `issues` array.
    */
   static isValidationError(err: unknown): err is ValidationError {
     return (
       err instanceof Error &&
-      (err as { name?: unknown }).name === 'ValidationError'
+      (err as { name?: unknown }).name === 'ValidationError' &&
+      Array.isArray((err as { issues?: unknown }).issues)
     );
   }
 }
