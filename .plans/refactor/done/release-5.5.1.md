@@ -31,3 +31,7 @@ Prepare the [consumer review fixes](consumer-review-fixes.md) as **5.5.1**, the 
 ## Completion
 
 Preparation complete. Changes remain in both working trees; no commit, tag, push, package publication, site deployment or GitHub release was created. Next: the user publishes 5.5.1, cuts its GitHub release and pastes the two amended 5.5.0 bullets into the 5.5.0 GitHub release. The example project then moves to `oxc-parser` ^0.153.0.
+
+## Publication
+
+The user merged #75 and published 5.5.1 to npm on 2026-10-06 (`latest`; packed manifest has `oxc-parser` ^0.153.0). The GitHub release was cut on the existing `5.5.1` tag on 2026-10-18 (Latest; notes from the changelog and the verification above). The two amended 5.5.0 bullets are not yet in the 5.5.0 GitHub release. Docs #24 merged before the `10-cli` `oxc-parser` commit was pushed, so that note follows in docs #25.

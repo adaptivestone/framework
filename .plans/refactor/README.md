@@ -28,10 +28,10 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
                       └──→ npm + GitHub release published 2026-09-11
 5.4.2 (shipped) ────→ session-race/i18n/boot-order/cache/parser fixes
                       + createuser --token + Sentry 11 / vitest 5 peers
-                      └──→ npm published 2026-10-01 (GitHub release not cut yet)
+                      └──→ npm 2026-10-01, GitHub release 2026-10-03
 5.5.0 (shipped) ────→ coded/translatable error contract + middleware errors via registry
                       + health endpoints, log redaction, hashSecret, createEnv
-5.5.1 (prepared) ───→ Auth/Role subclass return type + generateToken race 400
+5.5.1 (shipped) ────→ Auth/Role subclass return type + generateToken race 400
                       + oxc-parser ^0.153.0 peer, mongoose 9.11 lock
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
@@ -54,7 +54,7 @@ flowchart LR
 
     Unreleased --> Patch542["✅ 5.4.2 shipped: review fixes + peer updates"]
     Patch542 --> Minor550["✅ 5.5.0 shipped: error contract + health + redaction"]
-    Minor550 --> Patch551["🔄 5.5.1 prepared: consumer review fixes"]
+    Minor550 --> Patch551["✅ 5.5.1 shipped: consumer review fixes"]
     Patch551 --> Responses["⏸ v5.6 universal responses"]
     Responses --> OpenAPI["⏸ v5.7 OpenAPI response contracts"]
 
@@ -136,11 +136,11 @@ repository; Markdown remains the reviewed source of truth.
 
 | File | Ref | Summary |
 |---|---|---|
-| [release-5.5.1](done/release-5.5.1.md) | Release | Prepared 2026-10-06 (not yet published): version 5.5.1, dated notes, README upgrade notes; optional `oxc-parser` peer ^0.153.0; all gates, Bun suite and Bun packed consumer pass. |
+| [release-5.5.1](done/release-5.5.1.md) | Release | Published to npm 2026-10-06, GitHub release 2026-10-18: version 5.5.1, dated notes, README upgrade notes; optional `oxc-parser` peer ^0.153.0; all gates, Bun suite and Bun packed consumer pass. |
 | [consumer-review-fixes](done/consumer-review-fixes.md) | Post-5.5 | Ships in 5.5.1: `Auth`/`Role` return type restored for subclasses; `generateToken` stale-password race rejects with the wrong-password `BadRequestError`; 5.5.0 notes amended (Health override, `error` field). The validation-registry change moved to queued/ for 5.6. |
 | [release-5.5.0](done/release-5.5.0.md) | Release | Published to npm 2026-10-03: version 5.5.0, dated release notes, README upgrade notes. |
 | [middleware-errors-registry](done/middleware-errors-registry.md) | v5.5 | Implemented 2026-10-03: the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded `HttpError`s (same bodies plus `error` codes, `Retry-After` via the new `headers`). |
-| [release-5.4.2](done/release-5.4.2.md) | Release | Published to npm 2026-10-01 (GitHub release not cut yet): version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
+| [release-5.4.2](done/release-5.4.2.md) | Release | Published to npm 2026-10-01, GitHub release 2026-10-03: version 5.4.2, release notes, docs version wording; all gates, Bun suite and packed consumers pass. |
 | [vitest-to-node-test](done/vitest-to-node-test.md) | Side | Shipped in 5.3.0: the framework's own suite runs on `node:test`; vitest stays only for the published `setupVitest` helper. |
 | [release-5.4.1](done/release-5.4.1.md) | Release | Published to npm and GitHub on 2026-09-11. All five local gates pass, plus 813 Bun tests and packed MongoDB smoke; 838 Node tests pass with isolated Redis. Documentation site deployment is separate. |
 | [i18n-default-values](done/i18n-default-values.md) | P1y-bridge | Shipped in 5.4.0: English defaults and optional translation peers. Declaration checking without those peers is fixed in 5.4.1. |
@@ -256,7 +256,7 @@ parity, security/cache fixes and the optional oxc-parser ^0.149.0 peer update.
 Published to npm and [GitHub Releases](https://github.com/adaptivestone/framework/releases/tag/5.4.1).
 Documentation site deployment remains separate.
 
-## 5.4.2 — released 2026-10-01 (npm; GitHub release not cut yet)
+## 5.4.2 — released 2026-10-01 (npm; GitHub release 2026-10-03)
 
 User-selected patch release. See [release preparation](done/release-5.4.2.md) and
 `CHANGELOG.md`. Race-safe session issuance (password reset, concurrent
@@ -266,9 +266,9 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
-## 5.5.1 — prepared 2026-10-06
+## 5.5.1 — released 2026-10-06 (npm; GitHub release 2026-10-18)
 
-User-selected patch release. See [release preparation](done/release-5.5.1.md) and `CHANGELOG.md`: `Auth`/`Role` subclasses may return a response again, and a login racing a password change answers the wrong-password 400 from `generateToken` itself. The validation-registry change waits for 5.6 ([validation-errors-registry](queued/validation-errors-registry.md)).
+User-selected patch release. See [release preparation](done/release-5.5.1.md) and `CHANGELOG.md`: `Auth`/`Role` subclasses may return a response again, and a login racing a password change answers the wrong-password 400 from `generateToken` itself. The validation-registry change waits for 5.6 ([validation-errors-registry](queued/validation-errors-registry.md)). [GitHub release](https://github.com/adaptivestone/framework/releases/tag/5.5.1).
 
 ## 5.5.0 — released 2026-10-03 (npm)
 
