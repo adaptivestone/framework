@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `NaN` cache TTL no longer stores a never-expiring entry.** `cache.getSetValue(key, fn, NaN)` (for example `(expiresAt - Date.now()) / 1000` with an `undefined` expiry) skips the cache like a zero or negative TTL. Before, the memory driver stored the value, never read it as expired, and re-armed its cleanup timer every millisecond.
+- **A per-mount `RateLimiter` `consumeKeyComponents.request` list replaces the configured one.** The middleware parameters were deep-merged with array concatenation, so `[RateLimiter, { consumeKeyComponents: { request: ['phone'] } }]` on top of a config `['email']` keyed on both fields, and `[]` could not turn the component off. Arrays now replace, as in the config loader.
+- **A Mongoose `ValidationError` thrown inside a request schema is no longer answered as a field-error 400.** `ValidationError.isValidationError` also requires the framework's `issues` array, so a validator that calls `Model.validate()` and lets the Mongoose error escape goes through the error-handler registry (its safety net, or a 500) instead of a 400 whose `errors` was Mongoose's message string, which embeds the submitted values.
+- **`getModel` nudges about a plural name once per name** instead of on every call, so a singular model ending in `s` (`Address`, `Status`) no longer warns on every request.
+
 ## [5.5.1] - 2026-10-06
 
 ### Changed

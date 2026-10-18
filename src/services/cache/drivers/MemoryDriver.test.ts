@@ -38,6 +38,10 @@ describe('MemoryDriver', () => {
     // Zero converges on the same "don't cache" contract as redis' EX <= 0.
     await driver.set('zero', 'v', 0);
     assert.strictEqual(await driver.get('zero'), null);
+    // NaN (`undefined` expiry arithmetic) would store an entry that never reads
+    // as expired while its cleanup timer re-arms every millisecond.
+    await driver.set('nan', 'v', Number.NaN);
+    assert.strictEqual(await driver.get('nan'), null);
   });
 
   it('keeps a key whose TTL exceeds the timer limit (~24.8 days)', async () => {

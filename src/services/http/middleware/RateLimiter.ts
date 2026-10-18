@@ -44,10 +44,13 @@ class RateLimiter extends AbstractMiddleware {
   constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
     const limiterOptions = this.app.getConfig('rateLimiter');
-    this.finalOptions = merge(
-      limiterOptions,
-      params || {},
-    ) as typeof rateLimiterConfig;
+    // Per-mount params override the config. Arrays replace rather than
+    // concatenate (deepmerge's default), matching the config loader: otherwise
+    // `consumeKeyComponents.request: ['phone']` on top of a config `['email']`
+    // keys on both, and `[]` can never switch the component off.
+    this.finalOptions = merge(limiterOptions, params || {}, {
+      arrayMerge: (_destinationArray, sourceArray) => sourceArray,
+    }) as typeof rateLimiterConfig;
 
     switch (this.finalOptions.driver) {
       case 'memory':

@@ -155,6 +155,9 @@ class Server {
 
   #i18nServicePromise?: Promise<I18n>;
 
+  /** Model names already nudged about a plural spelling (warned once each). */
+  #pluralWarned = new Set<string>();
+
   cli: null | BaseCli = null;
 
   config: TFolderConfig;
@@ -898,7 +901,10 @@ class Server {
    * @param {String} modelName name on config file to load
    */
   getModel(modelName: string): AppModel | false {
-    if (modelName.endsWith('s')) {
+    // Once per name: `getModel` runs per request, and a legitimate singular
+    // ending in `s` (`Address`, `Status`) would otherwise warn on every call.
+    if (modelName.endsWith('s') && !this.#pluralWarned.has(modelName)) {
+      this.#pluralWarned.add(modelName);
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
       );
