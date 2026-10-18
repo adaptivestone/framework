@@ -138,7 +138,7 @@ class ControllerManager extends Base {
     // to read schemas, which side-effects (Redis clients, timers, etc.)
     // and keeps the event loop open for codegen-only runs.
     if (!options.skipWrap) {
-      this.#wrapHandlersInSubtree(subtree, []);
+      this.#wrapHandlersInSubtree(subtree, [], instance.constructor.name);
     }
     registry.registerSubtree(instance.getHttpPath(), subtree);
     return instance;
@@ -305,46 +305,73 @@ class ControllerManager extends Base {
   }
 
   /**
-   * Walk the subtree depth-first, accumulating middleware as we descend.
-   * For each handler, wrap with validation that merges route schemas +
-   * schemas declared by middlewares in the chain (`relatedRequestParameters`
-   * / `relatedQueryParameters`).
+   * Walk the subtree depth-first, accumulating middleware (and the route path,
+   * for boot-error messages) as we descend. For each handler, wrap with
+   * validation that merges route schemas + schemas declared by middlewares in
+   * the chain (`relatedRequestParameters` / `relatedQueryParameters`).
    */
   #wrapHandlersInSubtree(
     node: RouteNode,
     accumulated: MiddlewareEntry[],
+    ctrlName: string,
+    parentPath = '',
   ): void {
     const chain = [...accumulated, ...node.middlewares];
+    const nodePath = node.segment
+      ? `${parentPath}/${node.segment}`
+      : parentPath;
     if (node.methods) {
       for (const method of Object.keys(node.methods)) {
         const entry = node.methods[method as keyof typeof node.methods];
         if (entry) {
           const fullChain = [...chain, ...(entry.middlewares ?? [])];
-          this.#wrapHandlerEntry(entry, fullChain);
+          this.#wrapHandlerEntry(
+            entry,
+            fullChain,
+            `Controller ${ctrlName}: route ${method} ${nodePath || '/'}`,
+          );
         }
       }
     }
     for (const child of node.children.values()) {
-      this.#wrapHandlersInSubtree(child, chain);
+      this.#wrapHandlersInSubtree(child, chain, ctrlName, nodePath);
     }
     if (node.paramChild) {
-      this.#wrapHandlersInSubtree(node.paramChild, chain);
+      this.#wrapHandlersInSubtree(node.paramChild, chain, ctrlName, nodePath);
     }
     if (node.splatChild) {
-      this.#wrapHandlersInSubtree(node.splatChild, chain);
+      this.#wrapHandlersInSubtree(node.splatChild, chain, ctrlName, nodePath);
     }
   }
 
-  #wrapHandlerEntry(entry: HandlerEntry, chain: MiddlewareEntry[]): void {
+  #wrapHandlerEntry(
+    entry: HandlerEntry,
+    chain: MiddlewareEntry[],
+    routeLabel: string,
+  ): void {
     const original = entry.handler;
     const app = this.app;
     const logger = this.logger;
 
+    // One validator per schema, built here (boot), not per request: a schema no
+    // driver matches throws now, prefixed with the route so the boot error is
+    // actionable. `validate()` keeps no instance state, so sharing is safe.
+    const buildValidator = (schema: StandardSchemaV1): ValidateService => {
+      try {
+        return new ValidateService(app, schema);
+      } catch (err) {
+        throw new Error(
+          `${routeLabel}: ${err instanceof Error ? err.message : String(err)}`,
+          { cause: err },
+        );
+      }
+    };
+
     // Collect middleware-declared schemas at translation time. Static-first (no
     // instantiation); the instance form is deprecated and only read — via
     // instantiation — when a middleware actually overrides it.
-    const middlewareRequestSchemas: StandardSchemaV1[] = [];
-    const middlewareQuerySchemas: StandardSchemaV1[] = [];
+    const middlewareRequestValidators: ValidateService[] = [];
+    const middlewareQueryValidators: ValidateService[] = [];
     for (const mw of chain) {
       let r = mw.Class.relatedRequestParameters;
       let q = mw.Class.relatedQueryParameters;
@@ -355,17 +382,17 @@ class ControllerManager extends Base {
         q = inst.relatedQueryParameters;
       }
       if (r) {
-        middlewareRequestSchemas.push(r);
+        middlewareRequestValidators.push(buildValidator(r));
       }
       if (q) {
-        middlewareQuerySchemas.push(q);
+        middlewareQueryValidators.push(buildValidator(q));
       }
     }
 
     // Route-entry request schema: a single Standard Schema, or a content-type
-    // map resolved per-request by `Content-Type`. The map is resolved inside
-    // the request handler (it depends on the incoming header); middleware
-    // schemas are content-type-agnostic and resolved once here.
+    // map. Every map entry gets its validator here; which one runs is picked
+    // inside the request handler (it depends on the incoming header). Middleware
+    // schemas are content-type-agnostic and always run.
     //
     // The lookup table is a null-prototype object with lower-cased keys: this
     // makes matching case-insensitive AND prevents a header like `__proto__`
@@ -375,28 +402,34 @@ class ControllerManager extends Base {
       | StandardSchemaV1
       | Record<string, StandardSchemaV1>
       | undefined;
-    let entryRequestMapLookup: Record<string, StandardSchemaV1> | null = null;
+    let entryRequestValidator: ValidateService | null = null;
+    let entryRequestMapLookup: Record<string, ValidateService> | null = null;
     let entryRequestMapKeys: string[] = [];
     if (isContentTypeRequestMap(entryRequest)) {
       entryRequestMapLookup = Object.create(null) as Record<
         string,
-        StandardSchemaV1
+        ValidateService
       >;
       entryRequestMapKeys = Object.keys(entryRequest);
       for (const key of entryRequestMapKeys) {
-        entryRequestMapLookup[key.toLowerCase()] = entryRequest[key];
+        const schema = entryRequest[key];
+        if (schema) {
+          entryRequestMapLookup[key.toLowerCase()] = buildValidator(schema);
+        }
       }
+    } else if (entryRequest) {
+      entryRequestValidator = buildValidator(entryRequest);
     }
 
-    const querySchemas: StandardSchemaV1[] = [];
+    const queryValidators: ValidateService[] = [];
     if (entry.query) {
-      querySchemas.push(entry.query);
+      queryValidators.push(buildValidator(entry.query));
     }
-    querySchemas.push(...middlewareQuerySchemas);
+    queryValidators.push(...middlewareQueryValidators);
 
     // Path params are route-level only — middleware contribute body/query
     // schemas but never param schemas, so there is nothing to merge here.
-    const paramsSchema = entry.params;
+    const paramsValidator = entry.params ? buildValidator(entry.params) : null;
 
     const wrapped = async (
       req: FrameworkRequest,
@@ -408,14 +441,14 @@ class ControllerManager extends Base {
         // coherent, so it should decide the 400 before body/query detail does.
         // Raw `req.params` is left untouched (Express string contract); only
         // `req.appInfo.params` carries the validated, coerced values.
-        if (paramsSchema) {
-          req.appInfo.params = (await new ValidateService(
-            app,
-            paramsSchema,
-          ).validate(req.params, req.appInfo.i18n)) as Record<string, unknown>;
+        if (paramsValidator) {
+          req.appInfo.params = (await paramsValidator.validate(
+            req.params,
+            req.appInfo.i18n,
+          )) as Record<string, unknown>;
         }
 
-        const requestSchemas: StandardSchemaV1[] = [];
+        const requestValidators: ValidateService[] = [];
         let resolvedContentType: string | null = null;
         if (entryRequestMapLookup) {
           const contentType = normalizeContentType(req.headers['content-type']);
@@ -432,17 +465,17 @@ class ControllerManager extends Base {
               ).replace('{{types}}', entryRequestMapKeys.join(', ')),
             });
           }
-          requestSchemas.push(matched);
+          requestValidators.push(matched);
           resolvedContentType = contentType;
-        } else if (entryRequest) {
-          requestSchemas.push(entryRequest as StandardSchemaV1);
+        } else if (entryRequestValidator) {
+          requestValidators.push(entryRequestValidator);
         }
-        requestSchemas.push(...middlewareRequestSchemas);
+        requestValidators.push(...middlewareRequestValidators);
 
-        if (requestSchemas.length > 0) {
+        if (requestValidators.length > 0) {
           const parts = await Promise.all(
-            requestSchemas.map((s) =>
-              new ValidateService(app, s).validate(req.body, req.appInfo.i18n),
+            requestValidators.map((v) =>
+              v.validate(req.body, req.appInfo.i18n),
             ),
           );
           req.appInfo.request = mergeValidatedOutputs(parts) as Record<
@@ -456,11 +489,9 @@ class ControllerManager extends Base {
             );
           }
         }
-        if (querySchemas.length > 0) {
+        if (queryValidators.length > 0) {
           const parts = await Promise.all(
-            querySchemas.map((s) =>
-              new ValidateService(app, s).validate(req.query, req.appInfo.i18n),
-            ),
+            queryValidators.map((v) => v.validate(req.query, req.appInfo.i18n)),
           );
           req.appInfo.query = mergeValidatedOutputs(parts) as Record<
             string,
@@ -473,27 +504,17 @@ class ControllerManager extends Base {
         }
         // Only a framework `ValidationError` is a client 400 — its widened
         // `.message` is the per-field payload. Anything else thrown while
-        // validating is a server-side defect (a validator that threw; a schema
-        // no driver matches): route it through the error-handler registry, same
-        // as the handler catch below, so consumer handlers apply consistently;
-        // otherwise a generic 500 with the detail LOGGED, never echoed.
+        // validating is a server-side defect (a validator that threw): route it
+        // through the error-handler registry, same as the handler catch below,
+        // so consumer handlers apply consistently; otherwise a generic 500 with
+        // the detail LOGGED, never echoed.
         if (ValidationError.isValidationError(err)) {
           return res.status(400).json({
             message: validationFailedMessage(req),
             errors: err.message,
           });
         }
-        const resolved = app.httpServer
-          ? await app.httpServer.resolveError(err, req)
-          : null;
-        if (resolved) {
-          logger?.[resolved.logLevel](toLoggableError(err));
-          return sendErrorResult(res, resolved);
-        }
-        logger?.error(err);
-        return res.status(500).json({
-          message: serverErrorMessage(req),
-        });
+        return answerError(app, logger, err, req, res);
       }
 
       try {
@@ -505,28 +526,8 @@ class ControllerManager extends Base {
           logger?.error(err);
           return next(err);
         }
-        // Error-handler registry: consumer-registered handlers first, then the
-        // built-ins (`HttpError` mapper, mongoose validation safety net) —
-        // first `instanceof` match returning non-null wins. Each entry carries
-        // its own log level: `verbose` for deliberate HttpError control flow,
-        // `warn` for the safety net's schema-gap signal, `warn` default for
-        // consumer entries.
-        const resolved = app.httpServer
-          ? await app.httpServer.resolveError(err, req)
-          : null;
-        if (resolved) {
-          // Handled → the log line rides into log shippers (Sentry,
-          // retention), so a mongoose ValidationError is rebuilt value-free
-          // before logging; everything else logs as-is. The unresolved 500
-          // below keeps the full original error — a server-side defect the
-          // developer needs in complete detail.
-          logger?.[resolved.logLevel](toLoggableError(err));
-          return sendErrorResult(res, resolved);
-        }
-        logger?.error(err);
-        return res.status(500).json({
-          message: serverErrorMessage(req),
-        });
+        // Same registry walk as the validation catch above (see `answerError`).
+        return answerError(app, logger, err, req, res);
       }
     };
 
@@ -579,6 +580,37 @@ export function buildSubtreeFromSpec(
     attachMiddlewares(subtree, m.method, m.path, m.entries, ctx);
   }
   return subtree;
+}
+
+/**
+ * Answer an error thrown while validating or handling a request. Error-handler
+ * registry first: consumer-registered handlers, then the built-ins (`HttpError`
+ * mapper, mongoose safety nets) — the first `instanceof` match returning
+ * non-null wins, logged at the entry's own level (`verbose` for deliberate
+ * HttpError control flow, `warn` for the safety nets' schema-gap signal, `warn`
+ * default for consumer entries). A handled error's log line rides into log
+ * shippers (Sentry, retention), so it is rebuilt value-free by `toLoggableError`
+ * first. Anything unresolved is a server-side defect: logged in full, answered
+ * with a generic 500.
+ */
+async function answerError(
+  app: IApp,
+  logger: ControllerManager['logger'] | undefined,
+  err: unknown,
+  req: FrameworkRequest,
+  res: Response,
+) {
+  const resolved = app.httpServer
+    ? await app.httpServer.resolveError(err, req)
+    : null;
+  if (resolved) {
+    logger?.[resolved.logLevel](toLoggableError(err));
+    return sendErrorResult(res, resolved);
+  }
+  logger?.error(err);
+  return res.status(500).json({
+    message: serverErrorMessage(req),
+  });
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────

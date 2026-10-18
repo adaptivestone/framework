@@ -18,6 +18,8 @@ import {
  * User-extension API: `ValidateService.register(myDriver)` prepends
  * a custom driver, giving it priority over the built-ins. Drivers
  * are matched in order via `canHandle(body)`; first match wins.
+ * Routes build their validators at boot, so register before `startServer()`
+ * (module scope) — not in the `bootHttp` hook, which runs after routes wrap.
  *
  * Built-in resolution order (most specific first):
  *   1. yupDriver            — Standard Schema with `vendor: 'yup'` (strip-unknown)

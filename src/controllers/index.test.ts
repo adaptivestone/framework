@@ -1686,10 +1686,9 @@ describe('Error-handler registry over HTTP', () => {
 // ─── Validation-phase error leak (finding #3) ────────────────────────
 //
 // The pre-handler validation catch must echo ONLY a framework `ValidationError`
-// (per-field 400). Any other error thrown while validating — a validator that
-// throws (YupDriver rethrows non-yup errors raw), or a schema no driver matches
-// (ValidateService constructor throws its developer message) — is a server-side
-// defect: it must become a generic 500 with the detail LOGGED, never echoed.
+// (per-field 400). Any other error thrown while validating — e.g. a validator
+// that throws (YupDriver rethrows non-yup errors raw) — is a server-side defect:
+// it must become a generic 500 with the detail LOGGED, never echoed.
 
 describe('ControllerManager — validation-phase error leak', () => {
   const base = '/test/validationleakcontroller';
@@ -1750,18 +1749,51 @@ describe('ControllerManager — validation-phase error leak', () => {
       ['error'],
     );
   });
+});
 
-  it('a schema no driver matches → 500 (not 400), migration message not echoed', async () => {
-    const res = await post('/noDriver', { anything: 1 });
-    const body = await res.json();
+// ─── a schema no driver matches fails at boot ────────────────────────
+//
+// Validators are built once per route, when the handler is wrapped — so a schema
+// no `ValidatorDriver` matches throws during registration (boot), naming the
+// route, instead of answering every request with a 500. Covers each slot the
+// wrapper builds a validator for.
 
-    assert.strictEqual(res.status, 500);
-    assert.ok(!JSON.stringify(body).includes('No ValidatorDriver'));
-    assert.deepStrictEqual(
-      logsMatching(/No ValidatorDriver/).map((r) => r.level),
-      ['error'],
-    );
-  });
+describe('ControllerManager — schema no driver matches', () => {
+  // No `~standard`, and its keys are not media types: no driver matches it.
+  const noDriverSchema = { notASchema: true } as unknown as StandardSchemaV1;
+
+  class NoDriverMiddleware extends AbstractMiddleware {
+    static get relatedRequestParameters() {
+      return noDriverSchema;
+    }
+  }
+
+  const slots: [string, Record<string, unknown>][] = [
+    ['params', { params: noDriverSchema }],
+    ['request', { request: noDriverSchema }],
+    ['content-type map', { request: { 'application/json': noDriverSchema } }],
+    ['query', { query: noDriverSchema }],
+    ['middleware', { middleware: [NoDriverMiddleware] }],
+  ];
+
+  for (const [slot, spec] of slots) {
+    it(`a ${slot} schema throws at registration, naming the route`, () => {
+      class BadSchemaController extends AbstractController {
+        get routes() {
+          return { post: { '/bad/:id': { handler: handlerStub, ...spec } } };
+        }
+        static get middleware() {
+          return new Map();
+        }
+      }
+      const { cm } = setup();
+
+      assertThrowsLike(
+        () => cm.registerController(BadSchemaController),
+        /^Controller BadSchemaController: route POST \/bad\/:id: No ValidatorDriver matches this schema/,
+      );
+    });
+  }
 });
 
 describe('ControllerManager — route `params:` schema', () => {
