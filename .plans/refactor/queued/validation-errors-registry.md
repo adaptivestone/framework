@@ -15,7 +15,7 @@ The validation catch in `src/controllers/index.ts` answers a framework `Validati
 
 ## Implementation
 
-A verified patch is kept locally (gitignored) at `.superpowers/sdd/validation-registry-5.6.patch`: `git apply` it, or redo from this description. Files: `src/controllers/index.ts`, `src/controllers/index.test.ts` (test: a handler registered for `ValidationError` turns the route-level 400 into a 422), `src/services/http/builtinErrorHandlers.ts`, `src/services/http/HttpServer.ts`.
+A verified patch is kept locally (gitignored) at `.superpowers/sdd/validation-registry-5.6.patch`: `git apply` it, or redo from this description. Since the 2026-10-17 review fixes extracted the shared registry walk into `answerError()` in `src/controllers/index.ts`, the patch's `src/controllers/index.ts` hunk no longer applies (the other three files still do): redo that part against `answerError` — registry first, then the `ValidationError` 400, then the generic 500 (an optional fallback on `answerError`, or inline in the validation catch). Files: `src/controllers/index.ts`, `src/controllers/index.test.ts` (test: a handler registered for `ValidationError` turns the route-level 400 into a 422), `src/services/http/builtinErrorHandlers.ts`, `src/services/http/HttpServer.ts`.
 
 Changelog (`### Changed`):
 

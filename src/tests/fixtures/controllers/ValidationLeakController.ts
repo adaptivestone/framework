@@ -6,7 +6,6 @@ import type {
 } from '../../../modules/AbstractController.ts';
 import AbstractController from '../../../modules/AbstractController.ts';
 import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
-import type { StandardSchemaV1 } from '../../../services/validate/types.ts';
 
 /** The internal detail a leaking validation catch would echo to the client. */
 export const LEAK_SECRET =
@@ -21,11 +20,6 @@ const throwingSchema = object().shape({
   }),
 });
 
-// A value no `ValidatorDriver` matches (no `~standard`, keys are not media
-// types): `new ValidateService(app, schema)` throws its developer-facing "No
-// ValidatorDriver matches…" message at construction — a server-side config bug.
-const noDriverSchema = { notASchema: true } as unknown as StandardSchemaV1;
-
 class ValidationLeakController extends AbstractController {
   get routes(): RouteParams {
     return {
@@ -33,10 +27,6 @@ class ValidationLeakController extends AbstractController {
         '/throwingValidator': {
           handler: this.ok,
           request: throwingSchema,
-        },
-        '/noDriver': {
-          handler: this.ok,
-          request: noDriverSchema,
         },
       },
     };

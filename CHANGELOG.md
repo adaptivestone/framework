@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **Route validators are built at boot, not per request.** Each `params:`, `request:` and `query:` schema (route-level and middleware-declared) resolves its `ValidatorDriver` once when the route is registered. A schema no driver matches now fails `startServer()` with the migration message prefixed by the controller and route (before: a 500 on the first request). Register custom drivers (`ValidateService.register`) before `startServer()`, at module scope as documented — a driver registered inside the `bootHttp` hook no longer reaches already-registered routes.
+
 ### Fixed
 
 - **Password recovery and email verification persist in one write.** `recoverPassword` and `verifyUser` used to consume the token in one `save()` and apply the change in a second, so a failing second save (a validator on a customized `User` model, a transient database error) burned the link without resetting the password or verifying the account. `getUserByPasswordRecoveryToken` and `getUserByVerificationToken` take an optional `{ save: false }` that removes the token from the returned document only; the built-in routes use it and save once, so a failed write leaves the same link usable for a retry. The default call still consumes and saves.
