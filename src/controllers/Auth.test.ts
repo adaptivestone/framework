@@ -17,6 +17,7 @@ import {
 import {
   mockImplementation,
   mockRejectedValue,
+  mockRejectedValueOnce,
   mockResolvedValue,
   stubI18n,
 } from '../tests/mocks.ts';
@@ -413,6 +414,70 @@ describe('auth controller failure paths', () => {
     assert.deepStrictEqual(state.body, {
       message: 'email.alreadyVerifiedOrWrongToken',
     });
+  });
+
+  // The lookup leaves the token consumption unsaved, so the handler's own
+  // single write persists it together with the account change.
+  const tokenUser = () => ({
+    id: 'token-user',
+    password: 'old hash',
+    isVerified: false,
+    set: mock.fn(),
+    save: mockResolvedValue(mock.fn(), undefined),
+  });
+
+  it('verifies with one write that also consumes the token', async () => {
+    const user = tokenUser();
+    const User = {
+      getUserByVerificationToken: mockResolvedValue(mock.fn(), user),
+    };
+    const app = fakeApp(User);
+    const auth = new Auth(app, '');
+    const { res, state } = response();
+
+    await auth.verifyUser(
+      {
+        appInfo: { app, request: {}, i18n: stubI18n({}) },
+        query: { verification_token: 'raw-verification' },
+      } as never,
+      res,
+    );
+
+    assert.strictEqual(state.status, 200);
+    assertCalledTimes(User.getUserByVerificationToken, 1);
+    assertCalledWith(User.getUserByVerificationToken, 'raw-verification', {
+      save: false,
+    });
+    assert.strictEqual(user.isVerified, true);
+    assertCalledTimes(user.save, 1);
+  });
+
+  it('recovers with one write that also consumes the token', async () => {
+    const user = tokenUser();
+    const User = {
+      getUserByPasswordRecoveryToken: mockResolvedValue(mock.fn(), user),
+    };
+    const app = fakeApp(User);
+    const auth = new Auth(app, '');
+    const { res, state } = response();
+
+    await auth.recoverPassword(
+      request(app, {
+        password: 'new recovery passphrase',
+        passwordRecoveryToken: 'raw-recovery',
+      }),
+      res,
+    );
+
+    assert.strictEqual(state.status, 200);
+    assertCalledTimes(User.getUserByPasswordRecoveryToken, 1);
+    assertCalledWith(User.getUserByPasswordRecoveryToken, 'raw-recovery', {
+      save: false,
+    });
+    assert.strictEqual(user.password, 'new recovery passphrase');
+    assert.strictEqual(user.isVerified, true);
+    assertCalledWith(user.set, 'sessionTokens', []);
+    assertCalledTimes(user.save, 1);
   });
 
   // Each controller message is emitted with its English text as an in-code
@@ -826,6 +891,120 @@ describe('auth', () => {
       assert.ok(!isVerified);
     });
 
+    it('keeps the verification link usable when the write fails', async () => {
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'verify-retry@example.com';
+      const created = await UserModel.create({
+        email,
+        password: 'userPassword',
+        name: { nick: 'verifyRetryNick' },
+      });
+      const { token } =
+        await userHelpers.generateUserVerificationToken(created);
+      const verify = () =>
+        fetch(
+          `${getTestServerURL('/auth/verify')}?verification_token=${token}`,
+          {
+            method: 'POST',
+          },
+        );
+
+      // The handler's write fails once (a validator, a transient error).
+      const original = UserModel.getUserByVerificationToken.bind(UserModel);
+      const spy = mock.method(
+        UserModel,
+        'getUserByVerificationToken',
+        async (...args: Parameters<typeof original>) => {
+          const user = await original(...args);
+          mockRejectedValueOnce(
+            mock.method(user, 'save'),
+            new Error('transient write failure'),
+          );
+          return user;
+        },
+      );
+      let failed: Awaited<ReturnType<typeof verify>>;
+      try {
+        failed = await verify();
+      } finally {
+        spy.mock.restore();
+      }
+      const retried = await verify();
+      const reused = await verify();
+
+      assert.strictEqual(failed.status, 500);
+      assert.strictEqual(retried.status, 200);
+      assert.strictEqual(reused.status, 400);
+      assert.ok((await UserModel.findOne({ email }).orFail()).isVerified);
+    });
+
+    // Releases both lookups only once both have read the user, so the two
+    // handlers race to save the same document version.
+    const bothLookupsRead = () => {
+      let arrived = 0;
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return async () => {
+        arrived += 1;
+        if (arrived === 2) {
+          release();
+        }
+        await gate;
+      };
+    };
+
+    it('answers a concurrent second use of a verification link with 400', async () => {
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'verify-race@example.com';
+      const created = await UserModel.create({
+        email,
+        password: 'userPassword',
+        name: { nick: 'verifyRaceNick' },
+      });
+      const { token } =
+        await userHelpers.generateUserVerificationToken(created);
+      const verify = () =>
+        fetch(
+          `${getTestServerURL('/auth/verify')}?verification_token=${token}`,
+          {
+            method: 'POST',
+          },
+        );
+
+      const original = UserModel.getUserByVerificationToken.bind(UserModel);
+      const waitForBoth = bothLookupsRead();
+      const spy = mock.method(
+        UserModel,
+        'getUserByVerificationToken',
+        async (...args: Parameters<typeof original>) => {
+          const user = await original(...args);
+          await waitForBoth();
+          return user;
+        },
+      );
+      let answers: Awaited<ReturnType<typeof verify>>[];
+      try {
+        answers = await Promise.all([verify(), verify()]);
+      } finally {
+        spy.mock.restore();
+      }
+
+      assert.deepStrictEqual(answers.map((r) => r.status).sort(), [200, 400]);
+      const loser = answers.find((r) => r.status === 400);
+      assert.ok(loser);
+      assert.deepStrictEqual(await loser.json(), {
+        message:
+          'Your email is already verified or your verification token is wrong',
+      });
+      assert.ok((await UserModel.findOne({ email }).orFail()).isVerified);
+      await assertRejectsValue(
+        UserModel.getUserByVerificationToken(token, { save: false }),
+        new Error('User not exists'),
+      );
+    });
+
     it('send-recovery-email is identical for known and unknown emails (no enumeration, doc 19)', async () => {
       const post = (email: string) =>
         fetch(getTestServerURL('/auth/send-recovery-email'), {
@@ -984,6 +1163,104 @@ describe('auth', () => {
       );
 
       assert.strictEqual(status, 400);
+    });
+
+    it('keeps the recovery link usable when the write fails', async () => {
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'recover-retry@example.com';
+      const created = await UserModel.create({
+        email,
+        password: 'userPassword',
+        name: { nick: 'recoverRetryNick' },
+      });
+      const { token } =
+        await userHelpers.generateUserPasswordRecoveryToken(created);
+      const recover = () =>
+        fetch(getTestServerURL('/auth/recover-password'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({
+            password: 'new recovery passphrase',
+            passwordRecoveryToken: token,
+          }),
+        });
+
+      // The handler's write fails once (a validator, a transient error).
+      const original = UserModel.getUserByPasswordRecoveryToken.bind(UserModel);
+      const spy = mock.method(
+        UserModel,
+        'getUserByPasswordRecoveryToken',
+        async (...args: Parameters<typeof original>) => {
+          const user = await original(...args);
+          mockRejectedValueOnce(
+            mock.method(user, 'save'),
+            new Error('transient write failure'),
+          );
+          return user;
+        },
+      );
+      let failed: Awaited<ReturnType<typeof recover>>;
+      try {
+        failed = await recover();
+      } finally {
+        spy.mock.restore();
+      }
+      const retried = await recover();
+      const reused = await recover();
+
+      assert.strictEqual(failed.status, 500);
+      assert.strictEqual(retried.status, 200);
+      assert.strictEqual(reused.status, 400);
+    });
+
+    it('answers a concurrent second use of a recovery link with 400', async () => {
+      const UserModel = appInstance.getModel('User') as unknown as TUser;
+      const email = 'recover-race@example.com';
+      const created = await UserModel.create({
+        email,
+        password: 'userPassword',
+        name: { nick: 'recoverRaceNick' },
+      });
+      const { token } =
+        await userHelpers.generateUserPasswordRecoveryToken(created);
+      const recover = (password: string) =>
+        fetch(getTestServerURL('/auth/recover-password'), {
+          method: 'POST',
+          headers: { 'Content-type': 'application/json' },
+          body: JSON.stringify({ password, passwordRecoveryToken: token }),
+        });
+
+      const original = UserModel.getUserByPasswordRecoveryToken.bind(UserModel);
+      const waitForBoth = bothLookupsRead();
+      const spy = mock.method(
+        UserModel,
+        'getUserByPasswordRecoveryToken',
+        async (...args: Parameters<typeof original>) => {
+          const user = await original(...args);
+          await waitForBoth();
+          return user;
+        },
+      );
+      let answers: Awaited<ReturnType<typeof recover>>[];
+      try {
+        answers = await Promise.all([
+          recover('first recovery passphrase'),
+          recover('second recovery passphrase'),
+        ]);
+      } finally {
+        spy.mock.restore();
+      }
+
+      assert.deepStrictEqual(answers.map((r) => r.status).sort(), [200, 400]);
+      const loser = answers.find((r) => r.status === 400);
+      assert.ok(loser);
+      assert.deepStrictEqual(await loser.json(), {
+        message: 'Password recovery token is not valid',
+      });
+      await assertRejectsValue(
+        UserModel.getUserByPasswordRecoveryToken(token, { save: false }),
+        new Error('User not exists'),
+      );
     });
 
     it('can login with normal creds and NOT verifyed email if option isAuthWithVerificationFlow is set', async () => {

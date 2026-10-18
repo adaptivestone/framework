@@ -1,4 +1,5 @@
 import type { Response } from 'express';
+import mongoose from 'mongoose';
 import { translateWithDefault } from '../helpers/translate.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken } from '../models/User.ts';
@@ -469,8 +470,11 @@ class Auth extends AbstractController {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user: UserInstance;
     try {
+      // Consume the token in the same write as the verification, so a failed
+      // save leaves the link usable for a retry.
       user = (await User.getUserByVerificationToken(
         req.query.verification_token as string,
+        { save: false },
       )) as unknown as UserInstance;
     } catch {
       return res.status(400).json({
@@ -493,7 +497,24 @@ class Auth extends AbstractController {
     }
 
     user.isVerified = true;
-    await user.save();
+    try {
+      await user.save();
+    } catch (err) {
+      // A concurrent use of the same link saved first: answer like a used link.
+      if (
+        err instanceof mongoose.Error.VersionError ||
+        err instanceof mongoose.Error.DocumentNotFoundError
+      ) {
+        return res.status(400).json({
+          message: translateWithDefault(
+            req,
+            'email.alreadyVerifiedOrWrongToken',
+            EN['email.alreadyVerifiedOrWrongToken'],
+          ),
+        });
+      }
+      throw err;
+    }
     return res.status(200).json();
   }
 
@@ -527,8 +548,11 @@ class Auth extends AbstractController {
 
   async recoverPassword(req: RecoverPasswordRequest, res: Response) {
     const User = this.app.getModel('User') as unknown as TUser;
+    // Consume the token in the same write as the new password, so a failed
+    // save leaves the link usable for a retry.
     const user = await User.getUserByPasswordRecoveryToken(
       req.appInfo.request.passwordRecoveryToken,
+      { save: false },
     ).catch((e: Error) => {
       this.logger?.error(e);
     });
@@ -551,7 +575,24 @@ class Auth extends AbstractController {
     // precisely because the account is compromised, so any token issued before
     // the reset must stop working.
     user.set('sessionTokens', []);
-    await user.save();
+    try {
+      await user.save();
+    } catch (err) {
+      // A concurrent use of the same link saved first: answer like a used link.
+      if (
+        err instanceof mongoose.Error.VersionError ||
+        err instanceof mongoose.Error.DocumentNotFoundError
+      ) {
+        return res.status(400).json({
+          message: translateWithDefault(
+            req,
+            'password.wrongToken',
+            EN['password.wrongToken'],
+          ),
+        });
+      }
+      throw err;
+    }
     return res.status(200).json();
   }
 
