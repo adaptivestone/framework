@@ -71,4 +71,4 @@ the user publishes, then the example project is updated.
 ## Publication
 
 The user published 5.4.2 to npm on 2026-10-01 (checked 2026-10-03). The GitHub release was
-not cut yet: the latest GitHub release is still 5.4.1.
+not cut yet: the latest GitHub release is still 5.4.1. It was cut on 2026-10-03.

@@ -70,6 +70,23 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.6.0)
+
+See the [5.6.0 release notes](CHANGELOG.md). Check these when you upgrade:
+
+- Register custom validator drivers (`ValidateService.register`) at module
+  scope, before `startServer()`. Routes now pick their driver once at boot, so
+  a driver registered inside the `bootHttp` hook no longer reaches them, and a
+  schema no driver matches fails `startServer()` instead of answering 500.
+- A static route answers only for the methods it defines. With
+  `GET /events/new` and `DELETE /events/:slug`, `DELETE /events/new` now reaches
+  the `:slug` route instead of answering 405.
+- A per-mount `RateLimiter` `consumeKeyComponents.request` list replaces the
+  configured list instead of adding to it. A mount that relied on both lists
+  must name every field.
+- Projects that run `npm run gen` must update the optional peer:
+  `npm i -D oxc-parser@^0.156.0`.
+
 ## Upgrade notes (5.5.1)
 
 See the [5.5.1 release notes](CHANGELOG.md). Most need no action:

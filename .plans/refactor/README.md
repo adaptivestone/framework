@@ -33,9 +33,14 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
                       + health endpoints, log redaction, hashSecret, createEnv
 5.5.1 (shipped) ────→ Auth/Role subclass return type + generateToken race 400
                       + oxc-parser ^0.153.0 peer, mongoose 9.11 lock
+5.6.0 (prepared) ───→ route validators built at boot + per-method route matching
+                      + single-write recovery/verify, NaN TTL, RateLimiter arrays
+                      + oxc-parser ^0.156.0 peer, i18next 26.5 types, Biome 2.6
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
           P1q (v5.6) is unblocked by 5.4.0 shipping and remains queued
+          Version labels: 5.6.0 took the validators-at-boot change (PR #77), so
+            work labelled v5.6 / v5.7 in queued/ lands in the next minors
           OpenAPI response contracts (v5.7) waits on P1q landing + real usage
           v6 cutover blocked by all v5.1 active + queued work
           Bun support shipped in 5.4.0 — floor/latest certification continues in CI
@@ -55,7 +60,8 @@ flowchart LR
     Unreleased --> Patch542["✅ 5.4.2 shipped: review fixes + peer updates"]
     Patch542 --> Minor550["✅ 5.5.0 shipped: error contract + health + redaction"]
     Minor550 --> Patch551["✅ 5.5.1 shipped: consumer review fixes"]
-    Patch551 --> Responses["⏸ v5.6 universal responses"]
+    Patch551 --> Minor560["🔜 5.6.0 prepared: validators at boot + routing fix"]
+    Minor560 --> Responses["⏸ v5.6 universal responses"]
     Responses --> OpenAPI["⏸ v5.7 OpenAPI response contracts"]
 
     BunRelease["Bun stable release with fix"] --> BunSupport["✅ Bun support — shipped 5.4.0"]
@@ -136,6 +142,7 @@ repository; Markdown remains the reviewed source of truth.
 
 | File                                                                         | Ref          | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [release-5.6.0](done/release-5.6.0.md)                                       | Release      | Prepared 2026-10-27, not published: version 5.6.0 (validators at boot, per-method route matching, post-5.5.1 fixes); all dependencies updated in range, `oxc-parser` ^0.156.0, i18next 26.5 `TranslationFunction` fix, Markdown reformat for Biome 2.6 in its own commit; all gates, Bun suite and Bun packed consumer pass.                                                                                                                                                                                                                                                                                                                                                               |
 | [release-5.5.1](done/release-5.5.1.md)                                       | Release      | Published to npm 2026-10-06, GitHub release 2026-10-18: version 5.5.1, dated notes, README upgrade notes; optional `oxc-parser` peer ^0.153.0; all gates, Bun suite and Bun packed consumer pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | [consumer-review-fixes](done/consumer-review-fixes.md)                       | Post-5.5     | Ships in 5.5.1: `Auth`/`Role` return type restored for subclasses; `generateToken` stale-password race rejects with the wrong-password `BadRequestError`; 5.5.0 notes amended (Health override, `error` field). The validation-registry change moved to queued/ for 5.6.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | [release-5.5.0](done/release-5.5.0.md)                                       | Release      | Published to npm 2026-10-03: version 5.5.0, dated release notes, README upgrade notes.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |

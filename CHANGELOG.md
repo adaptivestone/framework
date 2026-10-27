@@ -6,8 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-10-27
+
 ### Changed
 
+- **Code generation now requires `oxc-parser` `^0.156.0`.** Projects that run `npm run gen` should update their optional development peer with `npm i -D oxc-parser@^0.156.0`. Runtime-only consumers do not need it.
 - **Route validators are built at boot, not per request.** Each `params:`, `request:` and `query:` schema (route-level and middleware-declared) resolves its `ValidatorDriver` once when the route is registered. A schema no driver matches now fails `startServer()` with the migration message prefixed by the controller and route (before: a 500 on the first request). Register custom drivers (`ValidateService.register`) before `startServer()`, at module scope as documented — a driver registered inside the `bootHttp` hook no longer reaches already-registered routes.
 
 ### Fixed
@@ -18,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **A per-mount `RateLimiter` `consumeKeyComponents.request` list replaces the configured one.** The middleware parameters were deep-merged with array concatenation, so `[RateLimiter, { consumeKeyComponents: { request: ['phone'] } }]` on top of a config `['email']` keyed on both fields, and `[]` could not turn the component off. Arrays now replace, as in the config loader.
 - **A Mongoose `ValidationError` thrown inside a request schema is no longer answered as a field-error 400.** `ValidationError.isValidationError` also requires the framework's `issues` array, so a validator that calls `Model.validate()` and lets the Mongoose error escape goes through the error-handler registry (its safety net, or a 500) instead of a 400 whose `errors` was Mongoose's message string, which embeds the submitted values.
 - **`getModel` nudges about a plural name once per name** instead of on every call, so a singular model ending in `s` (`Address`, `Status`) no longer warns on every request.
+- **`TranslationFunction` accepts the i18next 26.5 translator.** i18next 26.5 split its `t(key, defaultValue, options?)` signature into two overloads, so assigning an i18next instance or its `t` to `I18nBaseInstance`, `TI18n` or `TranslationFunction` failed to compile (TS2322). `TranslationFunction` makes the same split. Calls are unchanged, and earlier i18next 26 releases still fit.
 
 ## [5.5.1] - 2026-10-06
 
