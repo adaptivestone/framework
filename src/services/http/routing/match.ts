@@ -10,12 +10,16 @@
  * Documented trade-off — handle the rare encoded-slash case in `'raw'`
  * body mode if needed.
  *
- * Two deliberate semantics:
+ * Deliberate semantics:
  * - A `{*splat}` matches ZERO trailing segments, so `/api/{*rest}` matches
  *   `/api` (with `rest: ''`).
  * - A method-less structural node is NOT a match: walking to a dead end fails
  *   and backtracks to param/splat siblings (so `/users/me` still matches
  *   `/users/:id` even when `/users/me/avatar` created a method-less `me` node).
+ * - Matching is method-aware: a node without the request's method does not
+ *   end the walk either, so `DELETE /events/new` reaches `DELETE /events/:slug`
+ *   next to a GET-only `/events/new`. 405 only when no route matching the path
+ *   has the method; `Allow` lists the methods of all of them.
  */
 
 import type {
@@ -46,6 +50,7 @@ export class MalformedPathError extends Error {
 
 interface WalkResult {
   node: RouteNode;
+  handler: HandlerEntry | null;
   middlewares: MiddlewareEntry[];
   params: Record<string, string>;
   paramValues: string[];
@@ -54,7 +59,8 @@ interface WalkResult {
 
 /**
  * - `null` → no path match (404).
- * - `{ entry: null, allowedMethods }` → path matched, method didn't (405).
+ * - `{ entry: null, allowedMethods }` → path matched, but no matching route
+ *   has the method (405).
  * - full result → success.
  */
 export function match(
@@ -71,21 +77,18 @@ export function match(
     return null;
   }
 
-  const result = walk(root, segments, 0, [], {}, [], undefined);
+  // Path matches whose node lacks the method, most specific first.
+  const misses: WalkResult[] = [];
+  const hit = walk(root, upMethod, segments, 0, [], {}, [], undefined, misses);
+  const result = hit ?? misses[0];
   if (!result) {
     return null;
   }
 
-  const methods = result.node.methods;
-  if (!methods || Object.keys(methods).length === 0) {
-    return null;
-  }
-
-  const handler = resolveHandler(methods, upMethod);
-  const allowedMethods = Object.keys(methods) as HttpMethod[];
-  if (methods.GET && !methods.HEAD) {
-    allowedMethods.push('HEAD');
-  }
+  const handler = result.handler;
+  const allowedMethods = hit
+    ? allowedMethodsOf(hit.node)
+    : [...new Set(misses.flatMap((miss) => allowedMethodsOf(miss.node)))];
 
   let params = result.params;
   if (handler?.paramNames && result.paramValues.length > 0) {
@@ -108,8 +111,13 @@ export function match(
   return matched;
 }
 
-function nodeHasMethods(node: RouteNode): boolean {
-  return !!node.methods && Object.keys(node.methods).length > 0;
+function allowedMethodsOf(node: RouteNode): HttpMethod[] {
+  const methods = node.methods ?? {};
+  const allowed = Object.keys(methods) as HttpMethod[];
+  if (methods.GET && !methods.HEAD) {
+    allowed.push('HEAD');
+  }
+  return allowed;
 }
 
 function resolveHandler(
@@ -126,43 +134,79 @@ function resolveHandler(
   return null;
 }
 
+/**
+ * End of the path at `node`. Returns a hit when the node serves `method`;
+ * a node with other methods is recorded in `misses` (405 candidate) and the
+ * walk goes on. A method-less node is a dead end: the caller falls through to
+ * its param/splat siblings instead of reporting a spurious 404.
+ */
+function arrive(
+  node: RouteNode,
+  method: HttpMethod,
+  middlewares: MiddlewareEntry[],
+  params: Record<string, string>,
+  paramValues: string[],
+  bodyParsing: BodyParsingMode | undefined,
+  misses: WalkResult[],
+): WalkResult | null {
+  const methods = node.methods;
+  if (!methods || Object.keys(methods).length === 0) {
+    return null;
+  }
+  const handler = resolveHandler(methods, method);
+  const result = {
+    node,
+    handler,
+    middlewares,
+    params,
+    paramValues,
+    bodyParsing,
+  };
+  if (handler) {
+    return result;
+  }
+  misses.push(result);
+  return null;
+}
+
 function walk(
   node: RouteNode,
+  method: HttpMethod,
   segments: string[],
   index: number,
   parentMw: MiddlewareEntry[],
   parentParams: Record<string, string>,
   parentParamValues: string[],
   parentBodyParsing: BodyParsingMode | undefined,
+  misses: WalkResult[],
 ): WalkResult | null {
   const middlewares = [...parentMw, ...node.middlewares];
   const bodyParsing = node.bodyParsing ?? parentBodyParsing;
 
   if (index === segments.length) {
-    if (nodeHasMethods(node)) {
-      return {
-        node,
-        middlewares,
-        params: parentParams,
-        paramValues: parentParamValues,
-        bodyParsing,
-      };
+    const exact = arrive(
+      node,
+      method,
+      middlewares,
+      parentParams,
+      parentParamValues,
+      bodyParsing,
+      misses,
+    );
+    if (exact || !node.splatChild) {
+      return exact;
     }
-    // Zero-segment splat: a method-less node with a splat child that HAS
-    // methods matches the splat as ''.
-    if (node.splatChild && nodeHasMethods(node.splatChild)) {
-      const splatName = node.splatChild.segment.slice(1);
-      return {
-        node: node.splatChild,
-        middlewares: [...middlewares, ...node.splatChild.middlewares],
-        params: { ...parentParams, [splatName]: '' },
-        paramValues: [...parentParamValues, ''],
-        bodyParsing: node.splatChild.bodyParsing ?? bodyParsing,
-      };
-    }
-    // Dead-end structural node: fail so the caller falls through to its
-    // param/splat siblings instead of reporting a spurious 404.
-    return null;
+    // Zero-segment splat: the splat child matches the empty rest as ''.
+    const splatName = node.splatChild.segment.slice(1);
+    return arrive(
+      node.splatChild,
+      method,
+      [...middlewares, ...node.splatChild.middlewares],
+      { ...parentParams, [splatName]: '' },
+      [...parentParamValues, ''],
+      node.splatChild.bodyParsing ?? bodyParsing,
+      misses,
+    );
   }
 
   const seg = segments[index] as string;
@@ -171,12 +215,14 @@ function walk(
   if (staticChild) {
     const result = walk(
       staticChild,
+      method,
       segments,
       index + 1,
       middlewares,
       parentParams,
       parentParamValues,
       bodyParsing,
+      misses,
     );
     if (result) {
       return result;
@@ -187,12 +233,14 @@ function walk(
     const paramName = node.paramChild.segment.slice(1);
     const result = walk(
       node.paramChild,
+      method,
       segments,
       index + 1,
       middlewares,
       { ...parentParams, [paramName]: seg },
       [...parentParamValues, seg],
       bodyParsing,
+      misses,
     );
     if (result) {
       return result;
@@ -204,12 +252,14 @@ function walk(
     const splatValue = segments.slice(index).join('/');
     const result = walk(
       node.splatChild,
+      method,
       segments,
       segments.length,
       middlewares,
       { ...parentParams, [splatName]: splatValue },
       [...parentParamValues, splatValue],
       bodyParsing,
+      misses,
     );
     if (result) {
       return result;

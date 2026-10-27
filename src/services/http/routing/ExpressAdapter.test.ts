@@ -127,6 +127,40 @@ describe('createExpressAdapter — 405 with Allow', () => {
     assert.deepStrictEqual(res.body, { message: 'Method not allowed' });
   });
 
+  it('routes to a param sibling when the static route lacks the method', async () => {
+    let captured: { params: unknown; template: unknown } | null = null;
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/editor/event', { handler: async () => {} });
+    r.registerRoute('DELETE', '/editor/:slug', {
+      handler: async (req: Request, res: Response) => {
+        captured = { params: req.params, template: req.route.path };
+        res.end();
+      },
+    });
+
+    const adapter = createExpressAdapter(r, fakeApp);
+    const res = makeRes();
+    await adapter(
+      makeReq('DELETE', '/editor/event'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    assert.strictEqual(res.statusCode, 200);
+    assert.deepStrictEqual(captured, {
+      params: { slug: 'event' },
+      template: '/editor/:slug',
+    });
+
+    const postRes = makeRes();
+    await adapter(
+      makeReq('POST', '/editor/event'),
+      asExpressRes(postRes),
+      mock.fn(),
+    );
+    assert.strictEqual(postRes.statusCode, 405);
+    assert.strictEqual(postRes.getHeader('allow'), 'GET, HEAD, DELETE');
+  });
+
   it('translates the 405 and malformed-URL messages', async () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/users', { handler: async () => {} });
