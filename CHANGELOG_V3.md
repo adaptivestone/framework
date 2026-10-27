@@ -229,6 +229,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 - **[BREAKING]** Mongoose v6. Than a lot of changes:[mongoDB drive changes](https://github.com/mongodb/node-mongodb-native/blob/4.0/docs/CHANGES_4.0.0.md), [Mongoose changes](https://mongoosejs.com/docs/migrating_to_6.html).
   Notable changes from migration
   Removed `execPopulate()`[link](https://mongoosejs.com/docs/migrating_to_6.html#removed-execpopulate)
+
   ```js
   // Document#populate() now returns a promise and is now no longer chainable.
   //Replace
@@ -253,6 +254,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 - **[REMOVED]** Removed deprecated `Base.loadFilesWithInheritance` please use `getFilesPathWithInheritance` that produce almost the same output.
 - **[BREAKING]** Removed "success" field on Auth contreoller. Please use http status instead.
 - **[BREAKING]** Auth controller - "error" error response renamed to "message".
+
   ```js
   // Before
   {
@@ -269,4 +271,3 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 - **[NEW]** Request also works with `req.query`, but `req.body` have bigger priority.
 
 ---
-

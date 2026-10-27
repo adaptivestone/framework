@@ -24,7 +24,7 @@ Today `HttpServer` does `http.createServer(this.express)` and mounts global midd
 `express.use(...)`, so the request enters Express before the adapter. That makes h2 a **P4-and-later**
 capability (framework owns the listener), not merely P3 (router replaced).
 
-What was verified as *not* a blocker:
+What was verified as _not_ a blocker:
 
 - **Body parsing** — formidable parsed multipart over raw `node:http2`, no Express (`200 via 2`).
   Web `Request.formData()` also works, after filtering `Symbol(sensitiveHeaders)` and `:pseudo`

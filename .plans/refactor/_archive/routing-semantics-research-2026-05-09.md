@@ -6,69 +6,69 @@ See `decisions.md` → "Routing semantics (v5, resolved)" for the resulting v5 d
 
 ## 1. Trailing slash policy
 
-| Framework | Default | How to Configure |
-|---|---|---|
-| Express 5 | `/users` == `/users/` (lenient; `strict: false`) | `app.enable('strict routing')` or `Router({ strict: true })` |
-| Fastify 5 | `/users` != `/users/` (strict) | `fastify({ ignoreTrailingSlash: true })`; pair with `ignoreDuplicateSlashes` |
-| Hono | Strict (different routes) | `trimTrailingSlash()` or `appendTrailingSlash()` middleware |
-| Koa (@koa/router) | `/users` == `/users/` (`strict: false`) | `new Router({ strict: true })` |
-| Laravel | `/users` == `/users/` | Default `.htaccess` strips trailing slash before routing |
-| Symfony | Auto-redirects 301/308 between forms (GET/HEAD only) | `trailing_slash_on_root` import option |
-| Rails | `/users` == `/users/` (matches both) | `default_url_options[:trailing_slash] = true` for generation |
-| Sinatra | Strict (different routes) | `set :strict_paths, false` (Sinatra 2.0+); or `/foo/?` regex |
-| Django | Auto-appends slash via 301 redirect | `APPEND_SLASH = True` (default); requires `CommonMiddleware` |
-| FastAPI/Starlette | Auto-redirect (307) between forms | `FastAPI(redirect_slashes=False)` |
-| Spring Boot 3+ | Strict (`/users/` returns 404) | `setUseTrailingSlashMatch(true)` (deprecated). Default flipped from `true` to `false` in Spring Framework 6 |
-| Actix Web | Strict | `NormalizePath::trim()` middleware; `TrailingSlash::{Trim,Always,MergeOnly}` enum |
-| Axum | Auto-redirects 308 between forms | `NormalizePathLayer::trim_trailing_slash`; `route_with_tsr` from axum-extra |
-| ASP.NET Core | Lenient (matches both) | `RouteOptions.AppendTrailingSlash` for URL generation |
-| Gin | Auto-redirect (301/307) | `engine.RedirectTrailingSlash = false` to disable |
-| Echo | Strict | `e.Pre(middleware.RemoveTrailingSlash())` or `AddTrailingSlash()` |
-| Chi | Strict | `middleware.RedirectSlashes` or `StripSlashes` |
+| Framework         | Default                                              | How to Configure                                                                                            |
+| ----------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Express 5         | `/users` == `/users/` (lenient; `strict: false`)     | `app.enable('strict routing')` or `Router({ strict: true })`                                                |
+| Fastify 5         | `/users` != `/users/` (strict)                       | `fastify({ ignoreTrailingSlash: true })`; pair with `ignoreDuplicateSlashes`                                |
+| Hono              | Strict (different routes)                            | `trimTrailingSlash()` or `appendTrailingSlash()` middleware                                                 |
+| Koa (@koa/router) | `/users` == `/users/` (`strict: false`)              | `new Router({ strict: true })`                                                                              |
+| Laravel           | `/users` == `/users/`                                | Default `.htaccess` strips trailing slash before routing                                                    |
+| Symfony           | Auto-redirects 301/308 between forms (GET/HEAD only) | `trailing_slash_on_root` import option                                                                      |
+| Rails             | `/users` == `/users/` (matches both)                 | `default_url_options[:trailing_slash] = true` for generation                                                |
+| Sinatra           | Strict (different routes)                            | `set :strict_paths, false` (Sinatra 2.0+); or `/foo/?` regex                                                |
+| Django            | Auto-appends slash via 301 redirect                  | `APPEND_SLASH = True` (default); requires `CommonMiddleware`                                                |
+| FastAPI/Starlette | Auto-redirect (307) between forms                    | `FastAPI(redirect_slashes=False)`                                                                           |
+| Spring Boot 3+    | Strict (`/users/` returns 404)                       | `setUseTrailingSlashMatch(true)` (deprecated). Default flipped from `true` to `false` in Spring Framework 6 |
+| Actix Web         | Strict                                               | `NormalizePath::trim()` middleware; `TrailingSlash::{Trim,Always,MergeOnly}` enum                           |
+| Axum              | Auto-redirects 308 between forms                     | `NormalizePathLayer::trim_trailing_slash`; `route_with_tsr` from axum-extra                                 |
+| ASP.NET Core      | Lenient (matches both)                               | `RouteOptions.AppendTrailingSlash` for URL generation                                                       |
+| Gin               | Auto-redirect (301/307)                              | `engine.RedirectTrailingSlash = false` to disable                                                           |
+| Echo              | Strict                                               | `e.Pre(middleware.RemoveTrailingSlash())` or `AddTrailingSlash()`                                           |
+| Chi               | Strict                                               | `middleware.RedirectSlashes` or `StripSlashes`                                                              |
 
 ## 2. Case sensitivity
 
-| Framework | Default | How to Configure |
-|---|---|---|
-| Express 5 | Insensitive (`caseSensitive: false`) | `app.enable('case sensitive routing')` or `Router({ caseSensitive: true })` |
-| Fastify 5 | Sensitive | `fastify({ caseSensitive: false })` — also lowercases captured params |
-| Hono | Sensitive | No first-class option; URLPattern-style regex needed |
-| Koa router | Insensitive (`sensitive: false`) | `new Router({ sensitive: true })` |
-| Laravel | Sensitive | Custom route validator with `i` regex flag |
-| Symfony | Sensitive | No built-in toggle; use `(?i)` in requirements |
-| Rails | Sensitive | No built-in option; gems like `route_downcaser` |
-| Sinatra | Sensitive | No built-in option |
-| Django | Sensitive | Use `(?i)` regex prefix in URL pattern |
-| FastAPI | Sensitive | No built-in option |
-| Spring Boot | Sensitive | `PathPatternParser.setCaseSensitive(false)` |
-| Actix Web | Sensitive | No built-in option |
-| Axum | Sensitive | No built-in option (matchit is case-sensitive) |
-| ASP.NET Core | Insensitive | Default; route arg names must still match controller param case |
-| Gin | Sensitive | `engine.RedirectFixedPath = true` for case-insensitive redirect lookup |
-| Echo | Sensitive | No built-in option |
-| Chi | Sensitive | No built-in option |
+| Framework    | Default                              | How to Configure                                                            |
+| ------------ | ------------------------------------ | --------------------------------------------------------------------------- |
+| Express 5    | Insensitive (`caseSensitive: false`) | `app.enable('case sensitive routing')` or `Router({ caseSensitive: true })` |
+| Fastify 5    | Sensitive                            | `fastify({ caseSensitive: false })` — also lowercases captured params       |
+| Hono         | Sensitive                            | No first-class option; URLPattern-style regex needed                        |
+| Koa router   | Insensitive (`sensitive: false`)     | `new Router({ sensitive: true })`                                           |
+| Laravel      | Sensitive                            | Custom route validator with `i` regex flag                                  |
+| Symfony      | Sensitive                            | No built-in toggle; use `(?i)` in requirements                              |
+| Rails        | Sensitive                            | No built-in option; gems like `route_downcaser`                             |
+| Sinatra      | Sensitive                            | No built-in option                                                          |
+| Django       | Sensitive                            | Use `(?i)` regex prefix in URL pattern                                      |
+| FastAPI      | Sensitive                            | No built-in option                                                          |
+| Spring Boot  | Sensitive                            | `PathPatternParser.setCaseSensitive(false)`                                 |
+| Actix Web    | Sensitive                            | No built-in option                                                          |
+| Axum         | Sensitive                            | No built-in option (matchit is case-sensitive)                              |
+| ASP.NET Core | Insensitive                          | Default; route arg names must still match controller param case             |
+| Gin          | Sensitive                            | `engine.RedirectFixedPath = true` for case-insensitive redirect lookup      |
+| Echo         | Sensitive                            | No built-in option                                                          |
+| Chi          | Sensitive                            | No built-in option                                                          |
 
 ## 3. URL parameter / path decoding
 
-| Framework | Auto-decode params? | Encoded slash (`%2F`) in segment |
-|---|---|---|
-| Express 5 | Yes (`decodeURIComponent` via path-to-regexp v8 `decode` option) | Decoded by Node URL parser before routing; `%2F` becomes `/` and is treated as separator |
-| Fastify 5 | Not by router; URI must be pre-decoded | Default raw matching; `rewriteUrl: req => decodeURI(req.url)` workaround |
-| Hono | Yes (params decoded) | `%2F` becomes `/`; need regex catchall `:id{.+}` to match |
-| Koa router | Yes (path-to-regexp) | `%2F` decoded; same Express semantics |
-| Laravel | Yes | `%2F` decoded by router; intended behavior — double-encode workaround |
-| Symfony | Yes (segment-by-segment) | Default param regex `[^/]+` rejects `/`; require `.+` to allow |
-| Rails | Yes | URL helpers escape; `id: /[^\/]+/` constraint to control |
-| Sinatra | Yes | Standard Rack decoding |
-| Django | Yes | `str` converter excludes `/`; `path` converter accepts; decoded before pattern match |
-| FastAPI/Starlette | Yes (ASGI passes decoded path) | Routing operates on decoded path; use `{var:path}` converter |
-| Spring Boot (PathPatternParser) | Yes, **per-segment** | Encoded `/` and `;` cannot alter path structure — decoded after segmentation |
-| Actix Web | Yes | `%2F` decoded; encoded slash treated as separator unless escaped path used |
-| Axum | Yes | Standard Tower/hyper decoding |
-| ASP.NET Core | Mostly yes — **except `/`** | `%2F` deliberately NOT decoded in route values (preserved as `%2F`) |
-| Gin | Yes (configurable) | `UseRawPath`, `UseEscapedPath`, `UnescapePathValues` flags |
-| Echo | Yes | Uses `RawPath` if available; otherwise decoded `Path` |
-| Chi | Yes | Standard `net/http` URL decoding |
+| Framework                       | Auto-decode params?                                              | Encoded slash (`%2F`) in segment                                                         |
+| ------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Express 5                       | Yes (`decodeURIComponent` via path-to-regexp v8 `decode` option) | Decoded by Node URL parser before routing; `%2F` becomes `/` and is treated as separator |
+| Fastify 5                       | Not by router; URI must be pre-decoded                           | Default raw matching; `rewriteUrl: req => decodeURI(req.url)` workaround                 |
+| Hono                            | Yes (params decoded)                                             | `%2F` becomes `/`; need regex catchall `:id{.+}` to match                                |
+| Koa router                      | Yes (path-to-regexp)                                             | `%2F` decoded; same Express semantics                                                    |
+| Laravel                         | Yes                                                              | `%2F` decoded by router; intended behavior — double-encode workaround                    |
+| Symfony                         | Yes (segment-by-segment)                                         | Default param regex `[^/]+` rejects `/`; require `.+` to allow                           |
+| Rails                           | Yes                                                              | URL helpers escape; `id: /[^\/]+/` constraint to control                                 |
+| Sinatra                         | Yes                                                              | Standard Rack decoding                                                                   |
+| Django                          | Yes                                                              | `str` converter excludes `/`; `path` converter accepts; decoded before pattern match     |
+| FastAPI/Starlette               | Yes (ASGI passes decoded path)                                   | Routing operates on decoded path; use `{var:path}` converter                             |
+| Spring Boot (PathPatternParser) | Yes, **per-segment**                                             | Encoded `/` and `;` cannot alter path structure — decoded after segmentation             |
+| Actix Web                       | Yes                                                              | `%2F` decoded; encoded slash treated as separator unless escaped path used               |
+| Axum                            | Yes                                                              | Standard Tower/hyper decoding                                                            |
+| ASP.NET Core                    | Mostly yes — **except `/`**                                      | `%2F` deliberately NOT decoded in route values (preserved as `%2F`)                      |
+| Gin                             | Yes (configurable)                                               | `UseRawPath`, `UseEscapedPath`, `UnescapePathValues` flags                               |
+| Echo                            | Yes                                                              | Uses `RawPath` if available; otherwise decoded `Path`                                    |
+| Chi                             | Yes                                                              | Standard `net/http` URL decoding                                                         |
 
 ## Cross-cutting synthesis
 

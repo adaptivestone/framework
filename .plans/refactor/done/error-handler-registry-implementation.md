@@ -248,7 +248,10 @@ describe('HttpServer.resolveError — registry resolution', () => {
       'name',
       new mongoose.Error.ValidatorError({ message: 'too long', path: 'name' }),
     );
-    const matched = await httpServer().resolveError(vErr, fakeReq({ name: 'x' }));
+    const matched = await httpServer().resolveError(
+      vErr,
+      fakeReq({ name: 'x' }),
+    );
     expect(matched).toEqual({
       status: 400,
       body: { errors: { name: 'too long' } },
@@ -259,7 +262,9 @@ describe('HttpServer.resolveError — registry resolution', () => {
   });
 
   it('unmatched error class → null', async () => {
-    expect(await httpServer().resolveError(new Error('x'), fakeReq())).toBeNull();
+    expect(
+      await httpServer().resolveError(new Error('x'), fakeReq()),
+    ).toBeNull();
   });
 
   it('consumer handler wins over built-ins and unregister restores them', async () => {
@@ -268,19 +273,26 @@ describe('HttpServer.resolveError — registry resolution', () => {
       body: { message: 'teapot' },
     }));
     unregisters.push(unregister);
-    const overridden = await httpServer().resolveError(new NotFoundError('x'), fakeReq());
+    const overridden = await httpServer().resolveError(
+      new NotFoundError('x'),
+      fakeReq(),
+    );
     expect(overridden?.status).toBe(418);
     expect(overridden?.logLevel).toBe('warn'); // consumer default
     unregister();
-    const restored = await httpServer().resolveError(new NotFoundError('x'), fakeReq());
+    const restored = await httpServer().resolveError(
+      new NotFoundError('x'),
+      fakeReq(),
+    );
     expect(restored?.status).toBe(404);
   });
 
   it('null return falls through to the next entry (consumer → built-in)', async () => {
-    unregisters.push(
-      httpServer().registerErrorHandler(HttpError, () => null),
+    unregisters.push(httpServer().registerErrorHandler(HttpError, () => null));
+    const resolved = await httpServer().resolveError(
+      new NotFoundError('x'),
+      fakeReq(),
     );
-    const resolved = await httpServer().resolveError(new NotFoundError('x'), fakeReq());
     expect(resolved?.status).toBe(404); // built-in still reached
   });
 
@@ -293,8 +305,15 @@ describe('HttpServer.resolveError — registry resolution', () => {
         body: { message: 'second' },
       })),
     );
-    const resolved = await httpServer().resolveError(new OrderedError(), fakeReq());
-    expect(resolved).toEqual({ status: 410, body: { message: 'second' }, logLevel: 'warn' });
+    const resolved = await httpServer().resolveError(
+      new OrderedError(),
+      fakeReq(),
+    );
+    expect(resolved).toEqual({
+      status: 410,
+      body: { message: 'second' },
+      logLevel: 'warn',
+    });
   });
 
   it('async handler result is awaited; opts.logLevel overrides the default', async () => {
@@ -306,8 +325,15 @@ describe('HttpServer.resolveError — registry resolution', () => {
         { logLevel: 'info' },
       ),
     );
-    const resolved = await httpServer().resolveError(new AsyncMapped(), fakeReq());
-    expect(resolved).toEqual({ status: 402, body: { message: 'later' }, logLevel: 'info' });
+    const resolved = await httpServer().resolveError(
+      new AsyncMapped(),
+      fakeReq(),
+    );
+    expect(resolved).toEqual({
+      status: 402,
+      body: { message: 'later' },
+      logLevel: 'info',
+    });
   });
 
   it('a throwing handler aborts the walk → null (500 at the caller)', async () => {
@@ -584,10 +610,7 @@ import type {
 } from '../../../modules/AbstractController.ts';
 import AbstractController from '../../../modules/AbstractController.ts';
 import type { FrameworkRequest } from '../../../services/http/HttpServer.ts';
-import {
-  HttpError,
-  NotFoundError,
-} from '../../../services/http/httpErrors.ts';
+import { HttpError, NotFoundError } from '../../../services/http/httpErrors.ts';
 
 /** An "unowned" third-party-style error; the test registers a handler for it. */
 export class FakeDriverError extends Error {
@@ -748,8 +771,9 @@ describe('Error-handler registry over HTTP', () => {
   it('a throwing consumer handler → 500, both errors logged at error', async () => {
     const res = await get('/handlerCrash');
     expect(res.status).toBe(500);
-    expect(logsMatching(/handler exploded|HandlerCrashError/).length)
-      .toBeGreaterThanOrEqual(1);
+    expect(
+      logsMatching(/handler exploded|HandlerCrashError/).length,
+    ).toBeGreaterThanOrEqual(1);
     expect(logsMatching(/boom/).map((r) => r.level)).toEqual(['error']);
   });
 

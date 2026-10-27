@@ -23,11 +23,11 @@ both touch `AbstractMiddleware` + the adapter, so one breaking-doc migration not
   at their own pace across v5.6 → v6 instead of a big-bang rewrite.
 - v6: default flips to 2, v1 dispatch + the Promise bridge are deleted, built-ins migrate, `contractVersion`
   itself becomes vestigial (kept one major as a no-op or dropped — decide at cutover).
-**Time**: ~1 day (signature + adapter simplification + response returns) + framework middleware
-migration + docs.
-**Origin**: the middleware contract still threads Express's `res` and `next`. P1q makes returned
-responses real before v6; the breaking cutover can then remove both Express-specific arguments
-instead of preserving `res` while only deleting `next`.
+  **Time**: ~1 day (signature + adapter simplification + response returns) + framework middleware
+  migration + docs.
+  **Origin**: the middleware contract still threads Express's `res` and `next`. P1q makes returned
+  responses real before v6; the breaking cutover can then remove both Express-specific arguments
+  instead of preserving `res` while only deleting `next`.
 
 ## Current contract (what we have)
 
@@ -43,14 +43,14 @@ async middleware(req, res, next): Promise<void | Response> {
 
 `ExpressAdapter.runMiddleware` wraps each call in a `new Promise` that settles when the middleware calls `next()`, when `res` emits `finish`/`close`, or when it throws; the dispatch loop `await`s it and stops early on `res.writableEnded || res.destroyed`.
 
-**Key observation:** the current model is already *linear*, not onion. `next()` only resolves the bridge promise so the loop advances — a middleware **cannot** run code after the downstream handler completes (anything after `next()` runs detached, before the handler). So removing `next` in favor of return-to-continue is **semantics-preserving**, while a Koa-style awaitable `next()` would be a *new* capability, not a preservation.
+**Key observation:** the current model is already _linear_, not onion. `next()` only resolves the bridge promise so the loop advances — a middleware **cannot** run code after the downstream handler completes (anything after `next()` runs detached, before the handler). So removing `next` in favor of return-to-continue is **semantics-preserving**, while a Koa-style awaitable `next()` would be a _new_ capability, not a preservation.
 
 ## D1 — settled direction
 
-| Option | Contract | Continue / error / stop | Notes |
-|---|---|---|---|
-| **A — Linear, no `res`/`next` (chosen)** | `async middleware(ctx): Promise<void \| HttpResponse>` | `void` → continue · response → stop · `throw` → error registry | Faithful to today's linear ordering and P1q's portable response boundary. The Promise bridge and response-event bookkeeping disappear from registry middleware dispatch. |
-| **B — Awaitable `next()` (rejected until demanded)** | `async middleware(ctx, next): Promise<void \| HttpResponse>` | `await next()` runs downstream then returns control | New onion capability (post-handler timing/cleanup) with continuation machinery nobody currently needs. |
+| Option                                               | Contract                                                     | Continue / error / stop                                        | Notes                                                                                                                                                                    |
+| ---------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **A — Linear, no `res`/`next` (chosen)**             | `async middleware(ctx): Promise<void \| HttpResponse>`       | `void` → continue · response → stop · `throw` → error registry | Faithful to today's linear ordering and P1q's portable response boundary. The Promise bridge and response-event bookkeeping disappear from registry middleware dispatch. |
+| **B — Awaitable `next()` (rejected until demanded)** | `async middleware(ctx, next): Promise<void \| HttpResponse>` | `await next()` runs downstream then returns control            | New onion capability (post-handler timing/cleanup) with continuation machinery nobody currently needs.                                                                   |
 
 **Option A is settled.** It matches current linear ordering, removes both Express parameters, and
 uses the returned-response path already exercised in v5.3. Reopen B only with a concrete
@@ -107,12 +107,12 @@ factory return.
 
 ## What this removes / simplifies
 
-| Today | After (A) |
-|---|---|
-| `runMiddleware` `new Promise` + `settle` + `res.once('finish'/'close')` bookkeeping | gone — `await instance.middleware(ctx)` |
-| `next()` / `next(err)` / mutate `res` | `void` / `throw` / return `HttpResponse` |
-| Express `res` and `next` threaded through every registry middleware | absent |
-| Transport completion detected indirectly from Express events | explicit returned response; writer owns transport completion |
+| Today                                                                               | After (A)                                                    |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `runMiddleware` `new Promise` + `settle` + `res.once('finish'/'close')` bookkeeping | gone — `await instance.middleware(ctx)`                      |
+| `next()` / `next(err)` / mutate `res`                                               | `void` / `throw` / return `HttpResponse`                     |
+| Express `res` and `next` threaded through every registry middleware                 | absent                                                       |
+| Transport completion detected indirectly from Express events                        | explicit returned response; writer owns transport completion |
 
 ## Out of scope
 

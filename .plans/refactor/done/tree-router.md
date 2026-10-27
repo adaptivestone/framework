@@ -59,7 +59,7 @@ Behavior preserved exactly — wire-level outputs of every existing test must ma
   - `'before-controllers'` (default) — synonym for `'after-builtins'`; the common case for user middlewares that need parsed body/query.
   - `{ before: 'CorsMiddleware' }` / `{ after: 'I18nMiddleware' }` — fine-grained insertion relative to a named built-in or previously-registered middleware. Throws `ConfigError` if the named middleware isn't found.
   - `'first'` / `'last'` — shorthand for the absolute extremes of `root.middlewares`. Useful for plugins that need to be unconditionally first/last.
-  - **Timing constraint**: `useGlobal` MUST be called *before* `initControllers` runs (i.e. before the framework's first controller binds via `app.httpServer.express.use(httpPath, this.router)` at `AbstractController.ts:314`). If called later, throws `ConfigError("useGlobal called after controllers were initialized — register globals during app boot, before initControllers")`. Validated at call time by checking a flag set when `initControllers` starts.
+  - **Timing constraint**: `useGlobal` MUST be called _before_ `initControllers` runs (i.e. before the framework's first controller binds via `app.httpServer.express.use(httpPath, this.router)` at `AbstractController.ts:314`). If called later, throws `ConfigError("useGlobal called after controllers were initialized — register globals during app boot, before initControllers")`. Validated at call time by checking a flag set when `initControllers` starts.
   - **Scope: registry-global middleware only.** The `position` API governs middleware on `registry.root.middlewares`. Per-controller middleware (declared in `static get middleware()` Map) is per-route-scoped by `translateController` at registration time — array order in the Map is the order; no cross-source `position` semantics apply at the controller level.
 - `src/services/http/ProjectBootHook.ts` (new) — looks for user's `src/controllers/index.ts` (path resolved via `folderConfig`). If present, imports and calls its default export `bootHttp(app)` after the registry is initialized but before the Express adapter mounts. If absent, returns an inline synthesized default `bootHttp = (app) => app.controllerManager.loadAll()` — no separate file is created on disk; the synthesis lives in this module. Boot order: `HttpServer` → registry init → `ProjectBootHook.resolveAndRun(app)` → adapter mount. **⚠️ SHIPPED DIFFERENTLY (2026-06-22):** NOT a discovered file — it's an **explicit `Server` constructor option** `bootHttp(app)` (type `BootHttpHook`). File auto-discovery was dropped: every framework folder is already owned (config/ merges its files, controllers/ auto-loads its files), so there's no conflict-free folder to scan. Runs in `startServer` before mount; auto-load still runs unconditionally via `initControllers` (no synthesized `loadAll()` default). HTTP-specific. **No separate `ProjectBootHook.ts`** — the `BootHttpHook` type and the (trivial) call are inlined in `server.ts`. `useGlobal`/global middleware still deferred. See [glossary](../reference/glossary.md) + README.
 - `src/services/http/middleware/RequestParser.ts` — read `req.routeMeta.bodyParsing` (`'parsed' | 'raw' | 'none'`, default `'parsed'`). When `'parsed'`: dispatch to a registered parser by Content-Type (json / multipart / urlencoded built-in; lenient fallback in v5). When `'raw'`: capture the request stream into `req.rawBody: Buffer` and skip parsing. When `'none'`: pass-through. Works because the dispatcher runs match-then-walk — matcher populates `req.routeMeta` BEFORE any middleware runs.
@@ -116,7 +116,7 @@ function createExpressAdapter(registry: RouteRegistry) {
     const m = registry.match(req.method, req.path);
     if (!m) return next();
     req.params = m.params;
-    req.routeMeta = m.entry;     // route-aware downstream (BodyParser, ValidationStage, OTel, …)
+    req.routeMeta = m.entry; // route-aware downstream (BodyParser, ValidationStage, OTel, …)
 
     // Step 2: walk middlewares with knowledge of the matched route
     try {
@@ -150,8 +150,8 @@ export default async function bootHttp(app: IApp) {
   // 4. Ad-hoc routes (escape hatch — webhooks, healthchecks, OAuth callbacks)
   app.routeRegistry.registerRoute('POST', '/webhooks/stripe', {
     handler: stripeWebhookHandler,
-    bodyParsing: 'raw',     // raw bytes for signature verification
-    middleware: [],         // no auth — verified by signature in handler
+    bodyParsing: 'raw', // raw bytes for signature verification
+    middleware: [], // no auth — verified by signature in handler
   });
 }
 ```
@@ -162,22 +162,22 @@ export default async function bootHttp(app: IApp) {
 
 ### What stays / what moves
 
-| Lines (today) | Responsibility | After P1b |
-|---|---|---|
-| 1-33 | Imports + types (`TMiddleware`, `RouteParams`, `RouteObject`) | **Stays** |
-| 46-52 | Constructor — creates `express.Router({ mergeParams })` | **Deleted** |
-| 53-89 | Read `routes`, build per-route middleware map, parse middlewares | → private method on `ControllerManager` |
-| 96-104 | Register controller-level middleware on the router | → `RouteRegistry.registerSubtree()` |
-| 109-256 | Route-registration loop (validation closure + handler wrap + 500 error) | → `pipeline/Pipeline.ts` + `ValidationStage.ts` + `ErrorBoundary.ts` |
-| 262-285 | Build "Controller registered" log report | → `routing/RouteReporter.ts` |
-| 286 | `app.httpServer?.express.use(httpPath, this.router)` | **Deleted** — single global mount in HttpServer boot |
-| 298-336 | `#validateRouteSlot` | → `pipeline/ValidationStage.ts` |
-| 341-398 | `parseMiddlewares` | → `routing/middlewareScope.ts` |
-| 414-417 | `get routes()` default | **Stays** |
-| 432-434 | `static get middleware` default | **Stays** |
-| 439-446 | `getConstructorName()` | **Stays** |
-| 451-453 | `getHttpPath()` | **Stays** — default URL derivation, overridable in subclasses |
-| 455-457 | `static get loggerGroup` | **Stays** |
+| Lines (today) | Responsibility                                                          | After P1b                                                            |
+| ------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1-33          | Imports + types (`TMiddleware`, `RouteParams`, `RouteObject`)           | **Stays**                                                            |
+| 46-52         | Constructor — creates `express.Router({ mergeParams })`                 | **Deleted**                                                          |
+| 53-89         | Read `routes`, build per-route middleware map, parse middlewares        | → private method on `ControllerManager`                              |
+| 96-104        | Register controller-level middleware on the router                      | → `RouteRegistry.registerSubtree()`                                  |
+| 109-256       | Route-registration loop (validation closure + handler wrap + 500 error) | → `pipeline/Pipeline.ts` + `ValidationStage.ts` + `ErrorBoundary.ts` |
+| 262-285       | Build "Controller registered" log report                                | → `routing/RouteReporter.ts`                                         |
+| 286           | `app.httpServer?.express.use(httpPath, this.router)`                    | **Deleted** — single global mount in HttpServer boot                 |
+| 298-336       | `#validateRouteSlot`                                                    | → `pipeline/ValidationStage.ts`                                      |
+| 341-398       | `parseMiddlewares`                                                      | → `routing/middlewareScope.ts`                                       |
+| 414-417       | `get routes()` default                                                  | **Stays**                                                            |
+| 432-434       | `static get middleware` default                                         | **Stays**                                                            |
+| 439-446       | `getConstructorName()`                                                  | **Stays**                                                            |
+| 451-453       | `getHttpPath()`                                                         | **Stays** — default URL derivation, overridable in subclasses        |
+| 455-457       | `static get loggerGroup`                                                | **Stays**                                                            |
 
 ### Concrete sketch (target ~50 lines)
 
@@ -188,8 +188,13 @@ import Auth from '../services/http/middleware/Auth.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import Base from './Base.ts';
 
-type MiddlewareWithParamsTuple = [typeof AbstractMiddleware, Record<string, unknown>];
-export type TMiddleware = Array<typeof AbstractMiddleware | MiddlewareWithParamsTuple>;
+type MiddlewareWithParamsTuple = [
+  typeof AbstractMiddleware,
+  Record<string, unknown>,
+];
+export type TMiddleware = Array<
+  typeof AbstractMiddleware | MiddlewareWithParamsTuple
+>;
 type RouteHandler = Function;
 type RouteObject = {
   handler: RouteHandler;
@@ -228,7 +233,9 @@ class AbstractController extends Base {
       : this.constructor.name;
   }
 
-  static get loggerGroup() { return 'controller'; }
+  static get loggerGroup() {
+    return 'controller';
+  }
 }
 
 export default AbstractController;
@@ -259,7 +266,7 @@ export default AbstractController;
 
 - find-my-way / radix router (P2c).
 - `fast-json-stringify` (P2c).
-- Pre-compiled middleware chains as a *perf* optimization (P2c). The flat-array structure lands here; the perf-tuned compilation is P2c.
+- Pre-compiled middleware chains as a _perf_ optimization (P2c). The flat-array structure lands here; the perf-tuned compilation is P2c.
 - Codegen integration (orthogonal — runs in P1a tracks).
 - Streaming response helpers (P3).
 - OTel `OtelStage` (P2b).

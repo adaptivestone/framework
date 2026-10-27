@@ -8,7 +8,7 @@ Type and concept names that appear across multiple phase docs. Update this file 
 - **`RequestContext`** — `BaseRequestContext` after `AppInfoExtensions` augmentation; what handlers see when they don't import a per-handler `<MethodName>Request`.
 - **`AppInfoExtensions`** — empty interface users augment via `declare module '@adaptivestone/framework'` to add globally-available `appInfo` fields (e.g. `requestId`, `sentryTransaction`).
 - **`ProvidesOf<T>`** — type extractor pulling the `appInfo` shape a middleware adds (declared via `static get provides() { return {} as { ... }; }`).
-- **`UnionAppInfoProvides<MWs>`** — reduces a tuple of middleware classes to the intersection of their `provides` shapes; intersected *into* `appInfo`, not at the request root.
+- **`UnionAppInfoProvides<MWs>`** — reduces a tuple of middleware classes to the intersection of their `provides` shapes; intersected _into_ `appInfo`, not at the request root.
 
 ## Routing (P1b — tree-based)
 
@@ -36,11 +36,11 @@ Type and concept names that appear across multiple phase docs. Update this file 
 
 A schema/validator participates in three orthogonal concerns. The split:
 
-| Concern | Where it lives | Mechanism |
-|---|---|---|
-| Runtime validation + cast | Driver | `driver.validate(body, data)` |
+| Concern                                    | Where it lives                     | Mechanism                                     |
+| ------------------------------------------ | ---------------------------------- | --------------------------------------------- |
+| Runtime validation + cast                  | Driver                             | `driver.validate(body, data)`                 |
 | Compile-time TypeScript types for handlers | Schema (Standard Schema spec slot) | `StandardSchemaV1.InferOutput<typeof schema>` |
-| JSON Schema export for OpenAPI | Driver | `driver.toJsonSchema?(body)` |
+| JSON Schema export for OpenAPI             | Driver                             | `driver.toJsonSchema?(body)`                  |
 
 ## Body parsing (P1b)
 
@@ -74,7 +74,7 @@ A schema/validator participates in three orthogonal concerns. The split:
 - **`get routes()`** — instance getter returning `{ method: { path: { request?, query?, handler, middleware?, bodyParsing?, ... } } }`. Stays instance — `static` would break `handler: this.method`. **Canonical authoring shape across v5 and v6** (no `get routeTree()` planned).
 - **`static get middleware()`** — static getter returning `Map<patternKey, TMiddleware>` with path/method-scoped entries. Map shape preserved from today.
 - **`static authMiddleware = true`** — phantom flag on a middleware class indicating that its presence in a route's middleware stack constitutes "authentication." Used by MCP authz (P2d) `requires` registration-time validation.
-- **`static get provides()`** — instance phantom on middleware: returns `{} as <shape>` typing what the middleware *adds to `req.appInfo`*. Codegen reads this shape; runtime ignores it.
+- **`static get provides()`** — instance phantom on middleware: returns `{} as <shape>` typing what the middleware _adds to `req.appInfo`_. Codegen reads this shape; runtime ignores it.
 
 ## Workflow
 

@@ -16,9 +16,9 @@
 }
 ```
 
-**2. Standalone `CastError` floor (NOT in the original plan).** A `CastError` is a *sibling* of `ValidationError`, not a subclass, so the P1o safety net structurally could not see it — and its failing path is an internal model field (`_id`) that must never be echoed. A third built-in registry entry now resolves it: when the rejected value is one the client actually supplied (matched by value against path params ∪ validated body ∪ query), it becomes a **400** keyed by that public input name, logged at `warn`. A cast failure on a server-computed value matches nothing and keeps its honest **500** at `error`. Message rebuilt from the cast `kind`; `toLoggableError` sanitizes standalone `CastError`s too, since a path param can carry PII.
+**2. Standalone `CastError` floor (NOT in the original plan).** A `CastError` is a _sibling_ of `ValidationError`, not a subclass, so the P1o safety net structurally could not see it — and its failing path is an internal model field (`_id`) that must never be echoed. A third built-in registry entry now resolves it: when the rejected value is one the client actually supplied (matched by value against path params ∪ validated body ∪ query), it becomes a **400** keyed by that public input name, logged at `warn`. A cast failure on a server-computed value matches nothing and keeps its honest **500** at `error`. Message rebuilt from the cast `kind`; `toLoggableError` sanitizes standalone `CastError`s too, since a path param can carry PII.
 
-*Why it was added:* `params:` alone is opt-in — a route without a schema still 500'd. The floor makes the default correct.
+_Why it was added:_ `params:` alone is opt-in — a route without a schema still 500'd. The floor makes the default correct.
 
 **3. OpenAPI path-parameter typing (NOT in the original plan).** Path params were emitted from the URL pattern alone as `schema: { type: 'string' }`. A declared `params:` schema now types them through the same `toJsonSchema` driver seam used for `request:`/`query:`. `required` stays `true` regardless of schema optionality (a path param is part of the URL; OpenAPI 3.1 forbids an optional one). Omitted params and un-introspectable schemas degrade to `string`. A `params:` key with no matching path segment warns — it can never be populated.
 

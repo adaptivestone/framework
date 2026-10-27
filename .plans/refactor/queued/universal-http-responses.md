@@ -205,7 +205,7 @@ Promise<
   | JsonResponse<200, UserDto>
   | JsonResponse<202, JobAccepted>
   | EmptyResponse<304>
->
+>;
 ```
 
 The syntactic OXC pass can reliably extract response kind, literal status, media type, and the

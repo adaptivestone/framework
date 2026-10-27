@@ -33,14 +33,22 @@ Static getters separate (1) from (2). Zero side effects to read metadata.
 
 ```ts
 class AbstractMiddleware extends Base {
-  static get relatedRequestParameters(): StandardSchemaV1 | null { return null; }
-  static get relatedQueryParameters(): StandardSchemaV1 | null { return null; }
+  static get relatedRequestParameters(): StandardSchemaV1 | null {
+    return null;
+  }
+  static get relatedQueryParameters(): StandardSchemaV1 | null {
+    return null;
+  }
 
   // existing instance getters stay, deprecated:
   /** @deprecated migrate to `static get relatedRequestParameters()`. */
-  get relatedRequestParameters(): StandardSchemaV1 | null { return null; }
+  get relatedRequestParameters(): StandardSchemaV1 | null {
+    return null;
+  }
   /** @deprecated migrate to `static get relatedQueryParameters()`. */
-  get relatedQueryParameters(): StandardSchemaV1 | null { return null; }
+  get relatedQueryParameters(): StandardSchemaV1 | null {
+    return null;
+  }
 }
 ```
 
@@ -72,14 +80,14 @@ Documented migration: change `get relatedRequestParameters() { ... }` → `stati
 
 ## What this fixes
 
-| Symptom | Status after v5.x | Status after v6 |
-|---|---|---|
-| Redis opened at boot when reading schemas | Fixed for migrated middlewares; one-time-only for legacy | Fully fixed |
-| 5-second shutdown stall in codegen | Fixed (no per-route instantiation anymore) | Fully fixed |
-| `skipWrap` codegen escape hatch | Becomes unnecessary | Remove |
-| `process.exit` workaround in user `cli.ts` | Optional | Optional |
-| ~500 redundant instantiations at boot | Drops to 1-per-unmigrated-class | Drops to 0 |
-| `runMiddleware` instance cache by `MiddlewareEntry` | Separate fix (see "Out of scope") | Separate fix |
+| Symptom                                             | Status after v5.x                                        | Status after v6 |
+| --------------------------------------------------- | -------------------------------------------------------- | --------------- |
+| Redis opened at boot when reading schemas           | Fixed for migrated middlewares; one-time-only for legacy | Fully fixed     |
+| 5-second shutdown stall in codegen                  | Fixed (no per-route instantiation anymore)               | Fully fixed     |
+| `skipWrap` codegen escape hatch                     | Becomes unnecessary                                      | Remove          |
+| `process.exit` workaround in user `cli.ts`          | Optional                                                 | Optional        |
+| ~500 redundant instantiations at boot               | Drops to 1-per-unmigrated-class                          | Drops to 0      |
+| `runMiddleware` instance cache by `MiddlewareEntry` | Separate fix (see "Out of scope")                        | Separate fix    |
 
 ## Out of scope (separate phase)
 

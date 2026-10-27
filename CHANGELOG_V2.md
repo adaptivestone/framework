@@ -45,6 +45,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 ## [2.14.0] - 2021-08-10
 
 - **[NEW]** Add `Sequence`. It provide ability to easily generate sequences for given types. It save to use on distributed environments.
+
   ```javascript
   const SequenceModel = this.app.getModel('Sequence');
   // will be 1
@@ -67,6 +68,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 ## [2.13.0] - 2021-08-10
 
 - **[NEW]** Rate limited middleware - ability to include request components (`req.body`) for key generation. Please not that you have no access to `req.appInfo.request` on this stage.
+
   ```javascript
   static get middleware() {
     return new Map([
@@ -86,6 +88,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 - **[UPDATE]** Update deps.
 - **[NEW]** Rate limited middleware.
   As rate limited we using <https://github.com/animir/node-rate-limiter-flexible>
+
   ```javascript
   static get middleware() {
     return new Map([
@@ -97,8 +100,10 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
     ]);
   }
   ```
+
   Be default rate key generated based on Route, IP and userID. But you can adjust it vie config (global) or via middleware parameters (see v 2.10.0)
   Rate limiter have multiple backends (memory, redis and mongo). Buy default 'memory' backend activated
+
   ```javascript
   static get middleware() {
     return new Map([
@@ -132,6 +137,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 
 - **[UPDATE]** Update deps.
 - **[NEW]** Ability to pass parameters to middleware.
+
   ```javascript
   static get middleware() {
     return new Map([
@@ -143,6 +149,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
     ]);
   }
   ```
+
   All this params goes to constructor as a second paramater.
 
 ---
@@ -262,6 +269,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 
 - **[UPDATE]** Deps update.
 - **[NEW]** New cache system (alpha, subject of change).
+
   ```javascript
   const cacheTime = 60 * 5;
   this.app.cache.getSetValue(
@@ -285,6 +293,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 ## [2.5.0] - 2021-03-31
 
 - **[NEW]** New route handler format with request validations and casting (yup based).
+
   ```javascript
   get routes() {
     return {
@@ -341,6 +350,7 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 
 - **[BREAKING]** Possible that bug fix of middleware can affect your code. Previous route middleware was GLOBAL (`router.use`) now in router level only (`route.any`). Previous Home controller (`/` route be default) middleware affect ANY routes on app. Right now that fixed.
 - **[NEW]** Controller middleware now support methods. Previous only `ALL` was supported. Possible to start router with any method that supported by Express and middleware will be scoped by this method. If middleware route started from "/" then `ALL` method will be used (like previous bahaviour).
+
   ```javascript
   static get middleware() {
     return new Map([['GET/*', [PrepareAppInfo, GetUserByToken]]]);
@@ -530,4 +540,3 @@ For current releases see [CHANGELOG.md](./CHANGELOG.md).
 - **[BREAKING]** Change config format of log config. Now configs can be only objects.
 
 ---
-

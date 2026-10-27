@@ -41,9 +41,7 @@ const { policy } = app.getConfig('rateLimiter');
 
 export default class AuthController extends AbstractController {
   static get middleware(): Map<string, TMiddleware> {
-    return new Map([
-      ['POST/login', [[RateLimiter, policy.loginAttempt]]],
-    ]);
+    return new Map([['POST/login', [[RateLimiter, policy.loginAttempt]]]]);
   }
 }
 ```

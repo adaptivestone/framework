@@ -42,7 +42,7 @@ Living plan for the validator/controller/router refactor. Started 2026-05-03.
 
 ### Cache
 
-- Redis-only (`Cache.ts:7-30`). The file literally has the TODO: *"only redis. refactor for drives support in future"*.
+- Redis-only (`Cache.ts:7-30`). The file literally has the TODO: _"only redis. refactor for drives support in future"_.
 
 ### Tickets folded in
 
@@ -58,9 +58,9 @@ Living plan for the validator/controller/router refactor. Started 2026-05-03.
 After exploring three candidates (lean module-augmentation only / full tuple-typed phantoms / codegen) and reviewing Hono and TanStack Router for prior art, we picked:
 
 - **Standard Schema** ([standardschema.dev](https://standardschema.dev/)) for the validator interface. Yup ≥1.7 and Zod ≥3.24 already implement it. Zero glue needed for either.
-- **Declarative pattern, instance for routes (current shape preserved), static for class-level metadata.** `get routes()` stays as an *instance* getter — required because `static this.postLogin` is `undefined` (instance methods live on the prototype). `static get middleware()` stays as a `Map<string, TMiddleware>` — required because `SomeController.ts:163-167` uses path/method-scoped entries with parameterized middleware tuples. New static metadata for codegen: `static get provides()` on middlewares (typed phantom for what they add to `appInfo`), and an optional `static httpPath` on controllers (overrides the file-path-derived default — replaces today's `getHttpPath()` override pattern, e.g. `Home.ts:19`). Reuse `ExtractProperty` from `BaseModel.ts:18-22`.
+- **Declarative pattern, instance for routes (current shape preserved), static for class-level metadata.** `get routes()` stays as an _instance_ getter — required because `static this.postLogin` is `undefined` (instance methods live on the prototype). `static get middleware()` stays as a `Map<string, TMiddleware>` — required because `SomeController.ts:163-167` uses path/method-scoped entries with parameterized middleware tuples. New static metadata for codegen: `static get provides()` on middlewares (typed phantom for what they add to `appInfo`), and an optional `static httpPath` on controllers (overrides the file-path-derived default — replaces today's `getHttpPath()` override pattern, e.g. `Home.ts:19`). Reuse `ExtractProperty` from `BaseModel.ts:18-22`.
 - **Codegen** (TanStack-style) over runtime tuple-recursion. AST-scan controllers + middlewares, emit a `<File>.routes.gen.ts` next to each controller plus a global `routes.gen.ts` for tooling. Methods read types from the per-file `.gen.ts`.
-- **`handler: this.method` stays.** No `defineRoute` is required for the inference story — the codegen carries the types instead. We *may* still ship `defineRoute` as an opt-in helper for inline route definitions, but it's not the primary path.
+- **`handler: this.method` stays.** No `defineRoute` is required for the inference story — the codegen carries the types instead. We _may_ still ship `defineRoute` as an opt-in helper for inline route definitions, but it's not the primary path.
 - **`Pipeline` + `RouterAdapter`** as the engine-neutral seam. Phase 1 ships `ExpressAdapter` only; later phases add `NodeAdapter`, then `BunAdapter`/`DenoAdapter`/`WorkersAdapter`. Internal request shape is **Web Fetch standard** (`Request`/`Response`); Express types are an escape hatch only.
 - **`find-my-way` (radix tree) router**, the same one Fastify uses. Drop-in for Express's router behind `ExpressAdapter` in Phase 2c — closes most of the perf gap without dropping Express. Hono's RegExpRouter pattern (single compiled regex, O(1)) stays as a Phase 5+ option behind `SmartRouter`.
 - **Pre-compiled middleware chains.** `RouteRegistry` flattens [global stages] + [controller MWs] + [route MWs] + [validation] + [handler] into a single array at registration; `Pipeline.dispatch` walks the array index-by-index. No per-request closure allocation.
@@ -70,15 +70,15 @@ After exploring three candidates (lean module-augmentation only / full tuple-typ
 
 ### What this gets us vs. the alternatives
 
-| | Lean (no codegen) | Tuples + phantoms | Codegen (chosen) |
-|---|---|---|---|
-| `handler: this.method` works | ✓ | ✓ | ✓ |
-| Per-route precision for MW types | ✗ | ✓ | ✓ |
-| Per-route precision for schemas | ✓ | ✓ | ✓ |
-| TS compile speed | fast | slow on big MW tuples | fast (flat types) |
-| External tools read route tree | ✗ | ✗ | ✓ |
-| Drives docs / OpenAPI / client SDK | ✗ | ✗ | ✓ |
-| Build step required | no | no | **yes** |
+|                                    | Lean (no codegen) | Tuples + phantoms     | Codegen (chosen)  |
+| ---------------------------------- | ----------------- | --------------------- | ----------------- |
+| `handler: this.method` works       | ✓                 | ✓                     | ✓                 |
+| Per-route precision for MW types   | ✗                 | ✓                     | ✓                 |
+| Per-route precision for schemas    | ✓                 | ✓                     | ✓                 |
+| TS compile speed                   | fast              | slow on big MW tuples | fast (flat types) |
+| External tools read route tree     | ✗                 | ✗                     | ✓                 |
+| Drives docs / OpenAPI / client SDK | ✗                 | ✗                     | ✓                 |
+| Build step required                | no                | no                    | **yes**           |
 
 The build step is the only cost. Given the repo already ships `genTypes.d.ts`, runs `node --watch`, and is on Node ≥24, this is a fair trade.
 
@@ -93,8 +93,8 @@ A schema is anything that conforms to Standard Schema. Yup ≥1.7 and Zod ≥3.2
 import { objectIdSchema } from '@adaptivestone/framework/validators/objectId';
 
 // works with any Standard Schema schema:
-import { object, string } from 'yup';      // or
-import { z } from 'zod';                    // or
+import { object, string } from 'yup'; // or
+import { z } from 'zod'; // or
 import * as v from 'valibot';
 ```
 
@@ -103,7 +103,7 @@ The framework throws a framework-owned `ValidationError` (in `src/services/valid
 ### Controllers
 
 ```ts
-import type { Request } from './Auth.routes.gen.ts';  // generated sibling
+import type { Request } from './Auth.routes.gen.ts'; // generated sibling
 
 class Auth extends AbstractController {
   // Instance getter — unchanged from today. `this.postLogin` works because
@@ -116,9 +116,9 @@ class Auth extends AbstractController {
             email: string().email().required('auth.emailProvided'),
             password: string().required('auth.passwordProvided'),
           }),
-          handler: this.postLogin,                // method ref preserved
+          handler: this.postLogin, // method ref preserved
         },
-        '/logout': this.postLogout,                // bare ref still works
+        '/logout': this.postLogout, // bare ref still works
       },
     } as const;
   }
@@ -137,9 +137,9 @@ class Auth extends AbstractController {
   // static httpPath = '/auth';
 
   async postLogin(req: Request<'post', '/login'>, res: Response) {
-    req.appInfo.request.email;     // string, from generated types
-    req.appInfo.request.password;  // string, from generated types
-    req.appInfo.user;              // UserInstance | undefined (from middleware Map)
+    req.appInfo.request.email; // string, from generated types
+    req.appInfo.request.password; // string, from generated types
+    req.appInfo.user; // UserInstance | undefined (from middleware Map)
   }
 }
 ```
@@ -157,7 +157,7 @@ class GetUserByToken extends AbstractMiddleware {
 
   // optional: schemas this middleware injects into validation
   static get relatedRequest() {
-    return null;  // or a Standard Schema — replaces today's empty yup `object({})`
+    return null; // or a Standard Schema — replaces today's empty yup `object({})`
   }
 
   async middleware(req, res, next) {
@@ -188,7 +188,7 @@ declare module '@adaptivestone/framework' {
 
 ```ts
 class Cache extends Base {
-  driver: CacheDriver;        // Memory | Redis | (user-defined)
+  driver: CacheDriver; // Memory | Redis | (user-defined)
   // ...
 }
 
@@ -221,7 +221,10 @@ The two-`Auth` case (root + `admin/`) coexists because each gets its own sibling
 ```ts
 // AUTOGENERATED — do not edit
 // src/controllers/admin/Auth.routes.gen.ts
-import type { BaseRequestContext, UnionAppInfoProvides } from '@adaptivestone/framework';
+import type {
+  BaseRequestContext,
+  UnionAppInfoProvides,
+} from '@adaptivestone/framework';
 import type GetUserByToken from '../../services/http/middleware/GetUserByToken.ts';
 import type RateLimiter from '../../services/http/middleware/RateLimiter.ts';
 
@@ -245,27 +248,29 @@ export type Routes = {
         sideEffect: 'read' | 'write' | 'destructive';
         requires: 'public' | 'authenticated' | 'admin' | string[];
       };
-      response?: { /* response schema's output type, when declared */ };
+      response?: {
+        /* response schema's output type, when declared */
+      };
     };
   };
 };
 
 // `provides` is intersected *into* appInfo — matches the runtime, which sets
 // `req.appInfo.user = ...`, not `req.user`.
-export type Request<M extends keyof Routes, P extends keyof Routes[M]> =
-  BaseRequestContext & {
-    appInfo:
-      & UnionAppInfoProvides<Routes[M][P]['middlewares']>
-      & {
-          request: Routes[M][P]['request'];
-          query: Routes[M][P]['query'];
-        };
+export type Request<
+  M extends keyof Routes,
+  P extends keyof Routes[M],
+> = BaseRequestContext & {
+  appInfo: UnionAppInfoProvides<Routes[M][P]['middlewares']> & {
+    request: Routes[M][P]['request'];
+    query: Routes[M][P]['query'];
   };
+};
 ```
 
 Notes:
-- `UnionAppInfoProvides<MWs>` reduces a tuple of MW classes to the intersection of their `provides()` shapes — which are declared at the *appInfo* level (§4 Middlewares).
-- The flat per-route `middlewares` tuple is computed by the codegen by *evaluating the Map's path/method scoping rules at build time*: for each route, walk every entry in `static get middleware()`, check whether the entry's method/path pattern matches this route, and append the entries that match. This preserves today's Map semantics without leaking them into per-route types.
+- `UnionAppInfoProvides<MWs>` reduces a tuple of MW classes to the intersection of their `provides()` shapes — which are declared at the _appInfo_ level (§4 Middlewares).
+- The flat per-route `middlewares` tuple is computed by the codegen by _evaluating the Map's path/method scoping rules at build time_: for each route, walk every entry in `static get middleware()`, check whether the entry's method/path pattern matches this route, and append the entries that match. This preserves today's Map semantics without leaking them into per-route types.
 - Middlewares declared with parameters (`[RoleMiddleware, { roles: ['client'] }]`, `SomeController.ts:165`) reduce to `typeof RoleMiddleware` for type purposes — the params don't affect the `provides` shape.
 
 ### Global `routes.gen.ts` (for tooling)
@@ -288,7 +293,7 @@ For each controller file:
 
 1. AST-parse with TypeScript compiler API (or `oxc-parser` for speed).
 2. Find `get routes()` (instance getter), walk the object literal it returns.
-3. For each `[method][path]` entry, capture `request`/`query` schema as `typeof <import>` references; the *output type* is computed by TS at compile time, not at codegen time.
+3. For each `[method][path]` entry, capture `request`/`query` schema as `typeof <import>` references; the _output type_ is computed by TS at compile time, not at codegen time.
 4. Find `static get middleware()` returning a `Map`, walk the Map literal, parse each entry's path/method pattern (`'/{*splat}'`, `'PATCH/userAvatar'`, etc.).
 5. **Compute the URL prefix.** Same algorithm as runtime, in priority order: (a) `static httpPath = '/...'` literal if declared; (b) `getHttpPath()` if its body is a single literal-string return (codegen AST-extracts it; emits a deprecation warning); (c) otherwise file-path-derived (`src/controllers/admin/Auth.ts` → `/admin/auth`). If `getHttpPath()` exists with a dynamic body, codegen errors out — see §12 for the migration path.
 6. **Resolve middleware-Map scoping per route.** For each route registered in step 2, iterate each Map entry in step 4: parse the entry's pattern (`{splat}`, leading method, etc.), check whether the route's full method+path matches, and if so, append the entry's middleware classes to that route's effective MW tuple. Emit the resolved flat tuple per-route in `.gen.ts`.
@@ -307,13 +312,13 @@ forward:  controller → { middlewares: [...], schemas: [...] }
 reverse:  middleware/schema → [controllers using it]
 ```
 
-| Change | Action |
-|---|---|
-| Controller `.ts` saved | Regen its one `.gen.ts`. Update forward entry. Sync reverse. |
-| Middleware `.ts` saved | Reverse-lookup → regen affected controllers' `.gen.ts`. |
-| File deleted | Remove its `.gen.ts`. Drop from indexes. |
-| New file created | AST-scan, add to indexes, generate. |
-| Output unchanged | Skip write (output-hash short-circuit). Saves downstream HMR cycles. |
+| Change                 | Action                                                               |
+| ---------------------- | -------------------------------------------------------------------- |
+| Controller `.ts` saved | Regen its one `.gen.ts`. Update forward entry. Sync reverse.         |
+| Middleware `.ts` saved | Reverse-lookup → regen affected controllers' `.gen.ts`.              |
+| File deleted           | Remove its `.gen.ts`. Drop from indexes.                             |
+| New file created       | AST-scan, add to indexes, generate.                                  |
+| Output unchanged       | Skip write (output-hash short-circuit). Saves downstream HMR cycles. |
 
 Persist `forward + outputHashes` to `.cache/routes.json`. On boot, compare current `mtime + content hash` against cached → regen only stale.
 
@@ -436,9 +441,9 @@ These three capabilities all hang off the same primitives — `RouteRegistry` an
 `RouteRegistry` is the runtime source of truth for every route. Expose it as a programmatic API:
 
 ```ts
-app.routeRegistry.list();                     // RouteEntry[] — every route
-app.routeRegistry.find('POST /auth/login');   // RouteEntry | undefined
-app.routeRegistry.findByController(Auth);     // RouteEntry[] for one controller
+app.routeRegistry.list(); // RouteEntry[] — every route
+app.routeRegistry.find('POST /auth/login'); // RouteEntry | undefined
+app.routeRegistry.findByController(Auth); // RouteEntry[] for one controller
 ```
 
 Each `RouteEntry` carries: `method`, `path`, `fullPath`, `controller`, the merged middleware stack (global + controller + route), `request`/`query` schema instances, and optional metadata (`description`, `deprecated`, `tags`, `openapi` overrides).
@@ -466,13 +471,15 @@ import { createTestApp } from '@adaptivestone/framework/testing';
 
 const app = await createTestApp({
   controllers: [Auth],
-  config: { /* overrides */ },
-  middlewareOverrides: new Map([
-    [GetUserByToken, MockGetUserByToken],
-  ]),
+  config: {
+    /* overrides */
+  },
+  middlewareOverrides: new Map([[GetUserByToken, MockGetUserByToken]]),
 });
 
-const res = await app.fetch('POST', '/auth/login', { body: { email, password } });
+const res = await app.fetch('POST', '/auth/login', {
+  body: { email, password },
+});
 expect(res.status).toBe(200);
 ```
 
@@ -522,10 +529,10 @@ class OtelStage implements PipelineStage {
       attributes: {
         // Current OTel HTTP semconv (1.x stable) attribute names:
         'http.request.method': ctx.method,
-        'http.route': ctx.routePath,           // parameterized, e.g. /users/:id
+        'http.route': ctx.routePath, // parameterized, e.g. /users/:id
         'url.path': ctx.url.pathname,
         'url.scheme': ctx.url.protocol.slice(0, -1),
-        'url.full': ctx.url.toString(),        // optional; redact if URL contains creds
+        'url.full': ctx.url.toString(), // optional; redact if URL contains creds
       },
     });
     return context.with(trace.setSpan(context.active(), span), async () => {
@@ -610,7 +617,9 @@ The OTel HTTP semconv is strict about cardinality: `http.route` MUST be paramete
 
 ```ts
 // auto-wired when @adaptivestone/framework/metrics import is present
-app.useMetrics({ defaultBuckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10] });
+app.useMetrics({
+  defaultBuckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+});
 ```
 
 - `collectDefaultMetrics()` for Node internals (event-loop lag, GC, heap).
@@ -644,7 +653,9 @@ Default thresholds: 500 ms for handlers, 100 ms for mongoose queries. Output is 
 Optional peer dep `@grafana/pyroscope-nodejs`. Framework auto-tags the active profile with `route` (parameterized) — flamegraphs become filterable per endpoint, which is the single biggest continuous-profiling productivity unlock.
 
 ```ts
-app.useProfiler({ pyroscope: { serverAddress: '...', applicationName: 'api' } });
+app.useProfiler({
+  pyroscope: { serverAddress: '...', applicationName: 'api' },
+});
 ```
 
 ## 8. Performance
@@ -700,8 +711,8 @@ Node 22+'s `fetch` is undici under the hood, but `undici.request` direct + a sha
 
 Framework exposes:
 ```ts
-app.http.request(url, opts)   // direct undici call, shared pool
-app.http.fetch(url, opts)     // standard fetch, same dispatcher
+app.http.request(url, opts); // direct undici call, shared pool
+app.http.fetch(url, opts); // standard fetch, same dispatcher
 ```
 
 ### 8g. Streaming responses
@@ -743,7 +754,7 @@ import { startMcpServer } from '@adaptivestone/framework/mcp';
 
 await startMcpServer(app, {
   transport: 'stdio',
-  include: ['users.*', '!users.delete*'],   // tag/path filters
+  include: ['users.*', '!users.delete*'], // tag/path filters
   defaults: { responseFormat: ['concise', 'detailed'] },
 });
 ```
@@ -821,11 +832,11 @@ Non-interactive (no prompts — agents can't answer). Prints created file paths 
 
 ### 9f. AGENTS.md generator
 
-The Linux Foundation AGENTS.md spec is now standard across Claude Code/Cursor/Codex/Copilot/Windsurf. The framework's generator emits a **minimal, factual** template (under 50 lines) covering only non-inferable details: how to run dev/test/gen, where routes/controllers/middlewares live, the `*.gen.ts` "do not edit" contract, the scaffolding commands. Anecdotal reports suggest verbose AGENTS.md files can *reduce* agent success rates and add inference cost — verify before citing in user-facing docs; the conservative version of the rule ("keep it tight, document only non-inferable specifics") stands regardless.
+The Linux Foundation AGENTS.md spec is now standard across Claude Code/Cursor/Codex/Copilot/Windsurf. The framework's generator emits a **minimal, factual** template (under 50 lines) covering only non-inferable details: how to run dev/test/gen, where routes/controllers/middlewares live, the `*.gen.ts` "do not edit" contract, the scaffolding commands. Anecdotal reports suggest verbose AGENTS.md files can _reduce_ agent success rates and add inference cost — verify before citing in user-facing docs; the conservative version of the rule ("keep it tight, document only non-inferable specifics") stands regardless.
 
 ### 9g. Authorization model — deny-by-default
 
-`hidden` is *opt-out for visibility*, not authorization. The MCP surface needs a real authz story before Phase 2d ships, otherwise `app.toMcpServer()` is exposure-by-default.
+`hidden` is _opt-out for visibility_, not authorization. The MCP surface needs a real authz story before Phase 2d ships, otherwise `app.toMcpServer()` is exposure-by-default.
 
 **Default policy: deny.** A route is exposed via MCP **only if both**:
 1. It is not `hidden` (default false for routes with no auth middleware; default `true` for routes whose middleware stack includes any class declared as `static authMiddleware = true`).
@@ -833,18 +844,22 @@ The Linux Foundation AGENTS.md spec is now standard across Claude Code/Cursor/Co
 
 ```ts
 class GetUserByToken extends AbstractMiddleware {
-  static authMiddleware = true;          // ← marks this MW as auth-gating
-  static get provides() { return {} as { user?: UserInstance }; }
+  static authMiddleware = true; // ← marks this MW as auth-gating
+  static get provides() {
+    return {} as { user?: UserInstance };
+  }
 }
 
 await startMcpServer(app, {
   transport: 'stdio',
-  allow: ['public.*'],                   // explicit allow, not regex on description
-  authBridge: {                          // how MCP requests carry app credentials
-    type: 'header',                      //   - header: { type: 'header', name: 'Authorization' }
-    name: 'Authorization',               //   - oauth: { type: 'oauth', issuer, audience }
+  allow: ['public.*'], // explicit allow, not regex on description
+  authBridge: {
+    // how MCP requests carry app credentials
+    type: 'header', //   - header: { type: 'header', name: 'Authorization' }
+    name: 'Authorization', //   - oauth: { type: 'oauth', issuer, audience }
   },
-  resourceFilter: (req, route) => {      // per-request filter (e.g. tenant scoping)
+  resourceFilter: (req, route) => {
+    // per-request filter (e.g. tenant scoping)
     return route.tags?.includes(req.user?.role ?? 'guest');
   },
 });
@@ -866,9 +881,12 @@ await startMcpServer(app, {
 
 ```ts
 User.toMcpResource({
-  expose: false,                                              // ← default
+  expose: false, // ← default
   // Or explicit per-method:
-  read: { allow: 'authenticated', filter: (q, ctx) => ({ ...q, _id: ctx.user._id }) },
+  read: {
+    allow: 'authenticated',
+    filter: (q, ctx) => ({ ...q, _id: ctx.user._id }),
+  },
   list: { allow: 'admin' },
   redact: ['password', 'sessionTokens', 'verificationTokens'],
 });
@@ -886,11 +904,11 @@ User.toMcpResource({
 
 ### 9h. Tier rollout
 
-| Tier | Capability |
-|---|---|
-| **v1 (Phase 2)** | `app.toMcpServer()`, three meta-tools, typed-client export from `routes.gen.ts`, errors-as-instructions, scaffolding CLI, AGENTS.md generator, mongoose `toMcpResource`. |
+| Tier               | Capability                                                                                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **v1 (Phase 2)**   | `app.toMcpServer()`, three meta-tools, typed-client export from `routes.gen.ts`, errors-as-instructions, scaffolding CLI, AGENTS.md generator, mongoose `toMcpResource`.                                         |
 | **v1.x (Phase 3)** | Tag/path filters, `responseFormat: 'concise'\|'detailed'`, token-budget guardrails (default cap 25k), code-mode bundle (`app.toCodeModeBundle()`), Vercel AI SDK adapter (`app.toAiSdkTools()`), Mastra adapter. |
-| **v2+** | Auto-namespaced sub-MCP servers per Mongoose model, tool-quality lint (`framework lint:tools`), per-tool eval harness, AG-UI streaming surface for SSE/WebSocket routes. |
+| **v2+**            | Auto-namespaced sub-MCP servers per Mongoose model, tool-quality lint (`framework lint:tools`), per-tool eval harness, AG-UI streaming surface for SSE/WebSocket routes.                                         |
 
 ## 10. Edge / runtime portability
 
@@ -915,23 +933,23 @@ The Phase 1 work that **enables this for free**:
 
 ## 11. Phased plan
 
-| Phase | Scope | Tickets | Risk |
-|---|---|---|---|
-| **−1** *(baseline — hard prerequisite)* | Run `npm run benchmark` (and the realistic-workload variant — see §11.bench-fixtures) against current `main`. Pin numbers in `bench/baseline.json`. **Phase 0 cannot start** until this file exists and CI is configured to read it. ~½ day. | — | None |
-| **0** *(type contracts — sequential prelude)* | Land the **type-only** contract surface that Phase 1a-codegen's output references: `BaseRequestContext`, `RequestContext`, `Pipeline`, `Stage`, `RouteEntry`, `RouterAdapter` (must be shaped to fit Express now and Bun/Deno/Workers later — non-trivial), `ProvidesOf`, `UnionAppInfoProvides`, `ValidationError`, `StandardSchemaV1` re-export, `AppInfoExtensions`. **No runtime code, no tests** — just types in `src/services/http/types.ts` and `src/services/validate/types.ts`. Pure additive; nothing else depends on these existing yet. ~250-300 lines. ~1 day. | — | Low |
-| **1a-runtime** *(validators, no codegen)* | Standard Schema runtime; framework `ValidationError` runtime (replaces `import { ValidationError } from 'yup'` at `CustomValidator.js:1`); lib-agnostic `objectIdSchema`; `static get provides()` on `AbstractMiddleware` (typed phantom only — codegen reads it later in 1a-codegen). **Yup-import elimination from built-ins**: replace `object().shape({})` defaults at `AbstractMiddleware.ts:2,29-37` with `null`; remove yup imports from `ValidateService.js:1` and `CustomValidator.js:1`; `YupValidator` lazy-imports yup only when a yup schema is actually used. Yup `^1.0.0` → `^1.7.0` (Standard Schema requirement); moves to `peerDependenciesMeta` as optional. Add Zod likewise. **Existing tests pass unchanged** — yup still works because yup ≥1.7 is a Standard Schema. | **#9** | Med |
-| **1a-codegen** *(types DX, depends on 1a-runtime)* | Codegen MVP — AST scan + per-controller `.gen.ts` + global `routes.gen.ts`. Zod 3.24 vs Zod 4 dispatch for OpenAPI introspection (3.24+ uses [`zod-to-json-schema`](https://www.npmjs.com/package/zod-to-json-schema), Zod 4 uses native `z.toJSONSchema()` — codegen detects via `package.json` resolution). `framework gen` CLI + watcher + `postinstall` hook + lefthook pre-commit hook. Migrate `Auth.ts` handlers to `req: Request<'method', '/path'>` (annotation-only — `get routes()` stays instance). `Home.ts` and `SomeController.ts` migrate in 1a-codegen-extras (or P3.5 in the small-phase split). | — | Med |
-| **1b** *(controller carving, parallel)* | `RouteRegistry`, `MiddlewareParser`, `Pipeline` (flat-array stages, no per-request closures), `ValidationStage`, `ErrorBoundary`, `ExpressAdapter`, `defineMiddleware`. `HttpServer` exposes `useGlobal()` for app-level middlewares. `AppInfoExtensions` augmentation point. **`RouteRegistry` programmatic API** (`list/find/findByController`). **`RequestContext` with hidden-class-stable construction** (every field initialized in constructor). | **#12** | Med |
-| **1c** *(cache drivers, parallel)* | `CacheDriver` interface, `MemoryDriver` (default), `RedisDriver` lazy-imports `@redis/client` only when constructed. `redis` → optional peer; `Cache.ts` constructor no longer hard-imports `@redis/client` at module top. Zero-TTL short-circuit. | **#13, #10** | Low |
-| **1b-extras** *(rate limiter, follows 1b)* | `RateLimiter` middleware: lazy-import `rate-limiter-flexible` only when constructed; in-memory backend default; redis backend opt-in. (Cross-phase note: this lives in 1b — `RateLimiter` is HTTP middleware, not cache — but logically follows 1c's lazy-import pattern.) | — | Low |
-| **2a** *(codegen + testing)* | Codegen incremental rebuild + dep graph + cache. `RequestContext` becomes public; Express types behind escape hatch. Cache `getUserByToken`. **Testing utilities** (`createTestApp`, `routeRegistry.register`, `middleware.replace`). **`OpenApiGenerator`** replaces `DocumentationGenerator.js`; `framework docs` / `docs:static` CLI. **Typed-client export** from `routes.gen.ts` (`@adaptivestone/framework/client`). | **#14** | Med |
-| **2b** *(observability — full set)* | `OtelStage` + mongoose auto-instrumentation. `instrumentation-winston` for trace_id auto-injection. `/livez`, `/readyz` with check registry. `/metrics` (prom-client) with parameterized-route RED histograms. `diagnostics_channel` namespace with documented payloads. Slow-handler/query logger. Sentry adapter with isolation scope. Pyroscope hook with route auto-tag. | — | Med |
-| **2c** *(perf — Express-still-default)* | Replace Express's router with `find-my-way` *behind* `ExpressAdapter` (registry binds find-my-way; Express handles transport only). Pre-compiled middleware chains. `Object.create(null)` hot-path maps. Lazy-getter `RequestContext`. `fast-json-stringify` per-route opt-in via `response` schema. Mongoose pool defaults. Benchmark gate: ≥3× current baseline. | — | Med |
-| **2d** *(LLM surface)* | `app.toMcpServer({ transport })` derived from `routes.gen.ts`. Three meta-tools (`list_endpoints`, `get_endpoint_schema`, `invoke_endpoint`). Errors-as-instructions formatter. `framework add controller/middleware/field/gen/agents-md` CLI (non-interactive). Mongoose `Model.toMcpResource()`. Vercel AI SDK adapter. | — | Med |
-| **3** | `NodeAdapter` (native `node:http`, no Express). `URLPatternAdapter` option. CI runs both alongside `ExpressAdapter`. Streaming response helpers (`streamSSE`, `streamJSON`). `undici` default outbound HTTP with shared Agent. Code-mode bundle (`app.toCodeModeBundle()`). | — | Low |
-| **4** | Default to `NodeAdapter`. Deprecate `ExpressAdapter` (still buildable for one release). Tag/path filters in MCP server. Token-budget guardrails. | — | Low |
-| **5** | Drop `express` dep. Web Fetch handler signature `(ctx) => Response` becomes canonical. `BunAdapter`, `DenoAdapter` ship. Cloudflare Containers adapter. Sub-MCP servers per Mongoose model. Tool-quality lint + eval harness. | — | Strategic |
-| **side** | Mongo ER diagram. | **#11** | — |
+| Phase                                              | Scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Tickets      | Risk      |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------- |
+| **−1** _(baseline — hard prerequisite)_            | Run `npm run benchmark` (and the realistic-workload variant — see §11.bench-fixtures) against current `main`. Pin numbers in `bench/baseline.json`. **Phase 0 cannot start** until this file exists and CI is configured to read it. ~½ day.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | —            | None      |
+| **0** _(type contracts — sequential prelude)_      | Land the **type-only** contract surface that Phase 1a-codegen's output references: `BaseRequestContext`, `RequestContext`, `Pipeline`, `Stage`, `RouteEntry`, `RouterAdapter` (must be shaped to fit Express now and Bun/Deno/Workers later — non-trivial), `ProvidesOf`, `UnionAppInfoProvides`, `ValidationError`, `StandardSchemaV1` re-export, `AppInfoExtensions`. **No runtime code, no tests** — just types in `src/services/http/types.ts` and `src/services/validate/types.ts`. Pure additive; nothing else depends on these existing yet. ~250-300 lines. ~1 day.                                                                                                                                                                                                                  | —            | Low       |
+| **1a-runtime** _(validators, no codegen)_          | Standard Schema runtime; framework `ValidationError` runtime (replaces `import { ValidationError } from 'yup'` at `CustomValidator.js:1`); lib-agnostic `objectIdSchema`; `static get provides()` on `AbstractMiddleware` (typed phantom only — codegen reads it later in 1a-codegen). **Yup-import elimination from built-ins**: replace `object().shape({})` defaults at `AbstractMiddleware.ts:2,29-37` with `null`; remove yup imports from `ValidateService.js:1` and `CustomValidator.js:1`; `YupValidator` lazy-imports yup only when a yup schema is actually used. Yup `^1.0.0` → `^1.7.0` (Standard Schema requirement); moves to `peerDependenciesMeta` as optional. Add Zod likewise. **Existing tests pass unchanged** — yup still works because yup ≥1.7 is a Standard Schema. | **#9**       | Med       |
+| **1a-codegen** _(types DX, depends on 1a-runtime)_ | Codegen MVP — AST scan + per-controller `.gen.ts` + global `routes.gen.ts`. Zod 3.24 vs Zod 4 dispatch for OpenAPI introspection (3.24+ uses [`zod-to-json-schema`](https://www.npmjs.com/package/zod-to-json-schema), Zod 4 uses native `z.toJSONSchema()` — codegen detects via `package.json` resolution). `framework gen` CLI + watcher + `postinstall` hook + lefthook pre-commit hook. Migrate `Auth.ts` handlers to `req: Request<'method', '/path'>` (annotation-only — `get routes()` stays instance). `Home.ts` and `SomeController.ts` migrate in 1a-codegen-extras (or P3.5 in the small-phase split).                                                                                                                                                                           | —            | Med       |
+| **1b** _(controller carving, parallel)_            | `RouteRegistry`, `MiddlewareParser`, `Pipeline` (flat-array stages, no per-request closures), `ValidationStage`, `ErrorBoundary`, `ExpressAdapter`, `defineMiddleware`. `HttpServer` exposes `useGlobal()` for app-level middlewares. `AppInfoExtensions` augmentation point. **`RouteRegistry` programmatic API** (`list/find/findByController`). **`RequestContext` with hidden-class-stable construction** (every field initialized in constructor).                                                                                                                                                                                                                                                                                                                                      | **#12**      | Med       |
+| **1c** _(cache drivers, parallel)_                 | `CacheDriver` interface, `MemoryDriver` (default), `RedisDriver` lazy-imports `@redis/client` only when constructed. `redis` → optional peer; `Cache.ts` constructor no longer hard-imports `@redis/client` at module top. Zero-TTL short-circuit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **#13, #10** | Low       |
+| **1b-extras** _(rate limiter, follows 1b)_         | `RateLimiter` middleware: lazy-import `rate-limiter-flexible` only when constructed; in-memory backend default; redis backend opt-in. (Cross-phase note: this lives in 1b — `RateLimiter` is HTTP middleware, not cache — but logically follows 1c's lazy-import pattern.)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | —            | Low       |
+| **2a** _(codegen + testing)_                       | Codegen incremental rebuild + dep graph + cache. `RequestContext` becomes public; Express types behind escape hatch. Cache `getUserByToken`. **Testing utilities** (`createTestApp`, `routeRegistry.register`, `middleware.replace`). **`OpenApiGenerator`** replaces `DocumentationGenerator.js`; `framework docs` / `docs:static` CLI. **Typed-client export** from `routes.gen.ts` (`@adaptivestone/framework/client`).                                                                                                                                                                                                                                                                                                                                                                   | **#14**      | Med       |
+| **2b** _(observability — full set)_                | `OtelStage` + mongoose auto-instrumentation. `instrumentation-winston` for trace_id auto-injection. `/livez`, `/readyz` with check registry. `/metrics` (prom-client) with parameterized-route RED histograms. `diagnostics_channel` namespace with documented payloads. Slow-handler/query logger. Sentry adapter with isolation scope. Pyroscope hook with route auto-tag.                                                                                                                                                                                                                                                                                                                                                                                                                 | —            | Med       |
+| **2c** _(perf — Express-still-default)_            | Replace Express's router with `find-my-way` _behind_ `ExpressAdapter` (registry binds find-my-way; Express handles transport only). Pre-compiled middleware chains. `Object.create(null)` hot-path maps. Lazy-getter `RequestContext`. `fast-json-stringify` per-route opt-in via `response` schema. Mongoose pool defaults. Benchmark gate: ≥3× current baseline.                                                                                                                                                                                                                                                                                                                                                                                                                           | —            | Med       |
+| **2d** _(LLM surface)_                             | `app.toMcpServer({ transport })` derived from `routes.gen.ts`. Three meta-tools (`list_endpoints`, `get_endpoint_schema`, `invoke_endpoint`). Errors-as-instructions formatter. `framework add controller/middleware/field/gen/agents-md` CLI (non-interactive). Mongoose `Model.toMcpResource()`. Vercel AI SDK adapter.                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | —            | Med       |
+| **3**                                              | `NodeAdapter` (native `node:http`, no Express). `URLPatternAdapter` option. CI runs both alongside `ExpressAdapter`. Streaming response helpers (`streamSSE`, `streamJSON`). `undici` default outbound HTTP with shared Agent. Code-mode bundle (`app.toCodeModeBundle()`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | —            | Low       |
+| **4**                                              | Default to `NodeAdapter`. Deprecate `ExpressAdapter` (still buildable for one release). Tag/path filters in MCP server. Token-budget guardrails.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | —            | Low       |
+| **5**                                              | Drop `express` dep. Web Fetch handler signature `(ctx) => Response` becomes canonical. `BunAdapter`, `DenoAdapter` ship. Cloudflare Containers adapter. Sub-MCP servers per Mongoose model. Tool-quality lint + eval harness.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | —            | Strategic |
+| **side**                                           | Mongo ER diagram.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | **#11**      | —         |
 
 **Phase ordering**: Phase 0 lands first (sequential prelude — half a day). Then Phase 1 tracks (1a, 1b, 1c) are independent and parallelizable. Phase 2 tracks (2a-d) depend on Phase 1b's runtime `Pipeline` + `RouteRegistry` but are independent of each other — four people can take one each.
 
@@ -939,12 +957,12 @@ The Phase 1 work that **enables this for free**:
 
 ### Performance gates per phase
 
-| Phase | Plaintext req/s, Node 24, M-series Mac | Realistic workload (mongoose query + Standard Schema validation + i18n + Sentry isolation scope) | Reference |
-|---|---|---|---|
-| Today (baseline) | **TBD** — must be measured first | TBD | Express + yup + winston |
-| End of Phase 2c | ≥3× baseline | ≥1.5× baseline | find-my-way + flat pipeline |
-| End of Phase 4 | ≥45k | ≥1× Phase 2c realistic | NodeAdapter, no Express |
-| End of Phase 5 | ≥50k+ | regression-free | + `fast-json-stringify` + tuning |
+| Phase            | Plaintext req/s, Node 24, M-series Mac | Realistic workload (mongoose query + Standard Schema validation + i18n + Sentry isolation scope) | Reference                        |
+| ---------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------- |
+| Today (baseline) | **TBD** — must be measured first       | TBD                                                                                              | Express + yup + winston          |
+| End of Phase 2c  | ≥3× baseline                           | ≥1.5× baseline                                                                                   | find-my-way + flat pipeline      |
+| End of Phase 4   | ≥45k                                   | ≥1× Phase 2c realistic                                                                           | NodeAdapter, no Express          |
+| End of Phase 5   | ≥50k+                                  | regression-free                                                                                  | + `fast-json-stringify` + tuning |
 
 **Phase −1 (above) gates this**: `bench/baseline.json` must exist before Phase 0 starts. Until those numbers exist, every gate above is unanchored.
 
@@ -998,7 +1016,6 @@ End state per controller: typically -10 to -50 lines (manual type duplication re
 > - **Codegen output is co-located** as `<File>.routes.gen.ts` next to source, gitignored via `**/*.gen.ts`. Plus a global `routes.gen.ts` for tooling.
 > - **`AppInfoExtensions`** is the module-augmentation point for app-wide globals; per-route precision comes from the codegen artefacts.
 > - **MCP authz is deny-by-default** with explicit `requires` per route and mandatory `filter` on resource reads (§9g).
-
 1. **Schema introspection for OpenAPI** — Standard Schema doesn't expose schema shape; codegen extracts what it can via AST + per-lib introspectors (yup uses `describe()`, zod uses `z.toJSONSchema()`). Lazy-imported per `~standard.vendor`. Decision: include yup + zod introspectors in Phase 1a; valibot/others later.
 2. **`defineMiddleware` helper.** Mirror of `defineRoute` for engine-neutral middleware authoring. Useful in Phase 1b but could land in Phase 2. Decision: ship in 1b alongside the Pipeline so the Pipeline's stage type is the canonical middleware shape from day one.
 3. **Multipart strategy for Phase 3.** `formidable` is Express-coupled. Options: swap to `busboy` (cleaner, transport-neutral) or keep formidable behind the adapter (less change, more glue). Decision: defer; investigate during Phase 3.
@@ -1016,7 +1033,6 @@ End state per controller: typically -10 to -50 lines (manual type duplication re
 ## 14. Reference points
 
 > **Note:** local research clones live at `~/Work/framework-ideas/{hono,router}` (outside this repo). The line numbers below were captured against those clones' state at the time of writing — pin to the GitHub permalinks before the plan is shared, since upstream files move.
-
 - **Hono** — [`honojs/hono`](https://github.com/honojs/hono). Files of interest (paths relative to repo root): `src/types.ts` (chainable type accumulation), `src/validator/validator.ts` (validator middleware), `src/context.ts` (Variables augmentation, lazy getters), `src/helper/factory/index.ts` (createHandlers separated), `src/router/smart-router/router.ts` (lazy build + rebind), `src/router/reg-exp-router/router.ts` (single-regex compile), `src/compose.ts` (recursive middleware dispatch), `src/utils/stream.ts` (Web Streams + onAbort). Read for: validator output → handler input via `Input` generics; `Env['Variables']` augmentation; production-grade router/composer/streaming techniques.
 - **TanStack Router** — [`TanStack/router`](https://github.com/TanStack/router). Files of interest: `packages/router-plugin/src/vite.ts` (file watcher), `packages/router-generator/src/generator.ts` (codegen entry), `packages/react-router/src/fileRoute.ts` (`createFileRoute` literal-string-constrained signature), example `routeTree.gen.ts` outputs under `examples/`. Read for: AST-based codegen, module-augmentation as user-side API, per-file route convention.
 - **Mongoose pattern in this repo** — `BaseModel.ts:18-22` (`ExtractProperty`), `:25-79` (`GetModelTypeFromClass`), `User.ts:33-76` (`static get modelSchema()` with `as const`). The codegen Request types reuse `ExtractProperty` directly.

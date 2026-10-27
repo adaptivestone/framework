@@ -29,11 +29,11 @@ These were debated and settled. Don't relitigate without proposing an amendment 
 
 - **Validators serve three concerns and the design splits responsibility cleanly between the schema and the driver.** Conflating them caused the architectural confusion in earlier iterations of this plan.
 
-  | Concern | Lives on | API |
-  |---|---|---|
-  | Runtime validation + cast | Driver | `driver.validate(body, data) → Promise<unknown>` (throws `ValidationError`) |
-  | Compile-time TypeScript types for handlers | Schema (Standard Schema spec) | `StandardSchemaV1.InferOutput<typeof schema>` |
-  | JSON Schema for OpenAPI export | Driver | `driver.toJsonSchema?(body) → unknown \| null` |
+  | Concern                                    | Lives on                      | API                                                                         |
+  | ------------------------------------------ | ----------------------------- | --------------------------------------------------------------------------- |
+  | Runtime validation + cast                  | Driver                        | `driver.validate(body, data) → Promise<unknown>` (throws `ValidationError`) |
+  | Compile-time TypeScript types for handlers | Schema (Standard Schema spec) | `StandardSchemaV1.InferOutput<typeof schema>`                               |
+  | JSON Schema for OpenAPI export             | Driver                        | `driver.toJsonSchema?(body) → unknown \| null`                              |
 
   Types live on the **schema** because Standard Schema's `~standard.types.output` slot is the canonical TypeScript bridge — every conformant lib (yup ≥1.7, zod, valibot, arktype) populates it. JSON Schema lives on the **driver** because export logic is genuinely per-vendor (zod v4 has native `z.toJSONSchema()`; yup needs hand-rolled mapping from `schema.describe()`; valibot uses `@valibot/to-json-schema`). The driver is the right vendor-aware adapter.
 
@@ -82,7 +82,7 @@ These were debated and settled. Don't relitigate without proposing an amendment 
 
 - **Single-mount Express integration.** The framework calls `app.express.use(adapter)` exactly once. The adapter delegates path matching, method dispatch, parameter extraction, and middleware execution to our `RouteRegistry`. Express keeps HTTP lifecycle (`app.listen`), body parsing, and the third-party middleware ecosystem (`cors`, `helmet`, `compression`). Through v5.1 it also owns the response API (`res.json`, `res.status`); P1q/v5.3 adds a framework `ResponseWriter` while preserving those legacy calls. It stops being a router. Trade-off: ~50 lines of matcher in our code. Gains: `http.route` populated directly from the registry (no regex reverse-engineering for OTel); middleware spans named from `MiddlewareEntry.Class.name`; engine-neutral dispatch (Express adapter is swappable by re-implementing request conversion + response writing); future find-my-way swap-in is a `match()` replacement, not an adapter rewrite.
 
-- **One global `RouteRegistry`, not per-controller.** Controllers contribute *subtrees* to a single registry rooted at the app. `ControllerManager` owns the translation (private method) — reads `get routes()` + `static middleware()` Map, builds a `RouteNode` subtree, mounts via `registerSubtree(prefix, node)`. Cross-controller middleware composition (parent `/admin` middleware applying to nested `/admin/users/foo`) is a tree-walk semantic, not Express mount-and-fall-through. Resolves OQ #13.
+- **One global `RouteRegistry`, not per-controller.** Controllers contribute _subtrees_ to a single registry rooted at the app. `ControllerManager` owns the translation (private method) — reads `get routes()` + `static middleware()` Map, builds a `RouteNode` subtree, mounts via `registerSubtree(prefix, node)`. Cross-controller middleware composition (parent `/admin` middleware applying to nested `/admin/users/foo`) is a tree-walk semantic, not Express mount-and-fall-through. Resolves OQ #13.
 
 - **Tree-based `RouteNode` shape.** Each node carries `{ segment, middlewares, methods, children, paramChild?, splatChild?, meta }`. Walk semantics: enter node → run its middlewares → descend. Specificity ordering is structural — separate `paramChild` and `splatChild` slots, plus the static `children` map. Static segments win, then param, then splat. Encoded by structure, not regex priority. Precedence is per method: a node that matches the path but lacks the request's method does not end the walk, so `DELETE /events/new` reaches `DELETE /events/:slug` next to a GET-only `/events/new` (Express/find-my-way behavior; the earlier "static node with another method answers 405" choice was reversed — it made any slug equal to a sibling static segment unreachable).
 
@@ -159,28 +159,28 @@ gated on the adapter work rather than on the parser.
 
 **Heap — the deciding measurement.** 200 MB upload, peak RSS delta:
 
-| parser | delta | scaling | spools to disk |
-|---|---|---|---|
-| formidable | **+35 MB** | O(1) | yes |
-| Web `Request.formData()` | **+190 MB** | O(payload) | no |
+| parser                   | delta       | scaling    | spools to disk |
+| ------------------------ | ----------- | ---------- | -------------- |
+| formidable               | **+35 MB**  | O(1)       | yes            |
+| Web `Request.formData()` | **+190 MB** | O(payload) | no             |
 
 `Request.formData()` is therefore **disqualified for file uploads**: at the shipped
 `maxTotalFileSize: 50MB` it costs ~50 MB RSS per concurrent upload with no backpressure and no
 mid-parse abort — a cheap unauthenticated DoS. A limiting stream can reject an oversized body but
 cannot stop an accepted one from sitting in the heap.
 
-**Throughput — not a factor either.** formidable does ~505–616 MB/s end-to-end *including* the disk
+**Throughput — not a factor either.** formidable does ~505–616 MB/s end-to-end _including_ the disk
 spool (≈4.4 Gbps on one core). A gigabit link delivers 125 MB/s, so parsing uses ~a quarter of one
 core at line rate. Boundary scanning already bottoms out in `Buffer.indexOf` (native SIMD memchr).
 
 **Decision: prefer `busboy`, on merits that are actually true** — streaming (O(1) heap), byte-precise
-limits, no temp-file lifecycle, and *you own the output shape*, which kills the always-array wart
+limits, no temp-file lifecycle, and _you own the output shape_, which kills the always-array wart
 independently of the parser (see "Multipart parser is always-array"). Web standards keep a place for
 **non-file bodies** (JSON/urlencoded, capped at `maxFieldsSize: 2MB`) via the `app.parsers` registry.
 
 **Rejected: a native (Rust/C++ napi) parser.** No CPU bottleneck to attack (4× headroom at line
 rate), and it would add a mandatory runtime prebuild matrix to every consumer — the opposite of the
-decision to make `oxc-parser` an optional *dev-time* peer, and incompatible with the edge-compatible
+decision to make `oxc-parser` an optional _dev-time_ peer, and incompatible with the edge-compatible
 direction of P3/P5. If a Rust HTTP engine ever clears `http-engine-spike`'s bar, the parser comes
 with it for free and without an N-API crossing; the engine leads, never the parser.
 

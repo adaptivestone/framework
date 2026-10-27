@@ -66,24 +66,34 @@ New `src/services/http/httpErrors.ts`:
 ```ts
 // Own code — no res threading:
 import { NotFoundError } from '@adaptivestone/framework/services/http/httpErrors.js';
-throw new NotFoundError('Boat not found');        // → 404 { message: 'Boat not found' }
+throw new NotFoundError('Boat not found'); // → 404 { message: 'Boat not found' }
 
 // Unowned errors — project bootHttp hook (Server option, receives live app):
-new Server({ ...folderConfig, bootHttp: async (app) => {
-  app.httpServer.registerErrorHandler(MongoServerError, (err) =>
-    err.code === 11000 ? { status: 409, body: { message: 'Already exists' } } : null, // null = falls through
-  );
-}});
+new Server({
+  ...folderConfig,
+  bootHttp: async (app) => {
+    app.httpServer.registerErrorHandler(
+      MongoServerError,
+      (err) =>
+        err.code === 11000
+          ? { status: 409, body: { message: 'Already exists' } }
+          : null, // null = falls through
+    );
+  },
+});
 
 // Custom status — subclass once (or one-off `new HttpError(422, msg, body?)`):
 export class PaymentRequiredError extends HttpError {
-  constructor(message = 'Subscription expired') { super(402, message); }
+  constructor(message = 'Subscription expired') {
+    super(402, message);
+  }
 }
 
 // Overriding a built-in (consumer tier is checked first):
-app.httpServer.registerErrorHandler(mongoose.Error.ValidationError, () =>
-  ({ status: 400, body: { message: 'Invalid data' } }),
-);
+app.httpServer.registerErrorHandler(mongoose.Error.ValidationError, () => ({
+  status: 400,
+  body: { message: 'Invalid data' },
+}));
 ```
 
 ## Open questions (resolved)

@@ -32,7 +32,7 @@ Node-only, as of Bun 1.4:
 - **`cluster.js` / `runCluster`** — the multi-process production entry point. It
   imports fine under Bun, but only the Node path is tested; run single-process
   under Bun (or put the process manager outside the app).
-- **Node's test-runner CLI.** Bun implements the `node:test` *API* but not
+- **Node's test-runner CLI.** Bun implements the `node:test` _API_ but not
   `node --test`, so a Bun project runs its suite with `bun test` and the
   framework preloads rather than the flags the Node docs show. Four framework
   test files need `mock.module()` (Node's `--experimental-test-module-mocks`),

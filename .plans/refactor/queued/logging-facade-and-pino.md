@@ -50,13 +50,13 @@ The 2026-08-01 review compared the exact installable releases Pino 10.3.1, LogTa
 tslog 5.1.0, LogLayer 9.4.0 and the installed Winston 3.19.0. The fixture logged a custom `Error`
 with `cause`, enumerable fields, an `AggregateError`, and a circular custom property.
 
-| Candidate | Error result in the fixture | Decision |
-|---|---|---|
-| Pino | Preserved stack, custom fields, cause and aggregate members; circular-safe when the Error is passed in Pino's supported `err` position | First JSON sink; adapter owns the call shape |
-| LogTape | Preserved ordinary Error data; JSON Lines overflowed on the circular Error property | Re-evaluate after upstream behavior/config ownership are suitable |
-| tslog | Preserved stack/cause and handled the cycle; omitted arbitrary custom Error fields | No current reason to prefer it over Pino |
-| LogLayer | Result depends on the selected backend and error serializer | Useful only if backend swapping is itself a product requirement |
-| Winston | Current formatting remains shape-sensitive and loses useful cause/aggregate detail | Remove at the v6 cutover |
+| Candidate | Error result in the fixture                                                                                                            | Decision                                                          |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Pino      | Preserved stack, custom fields, cause and aggregate members; circular-safe when the Error is passed in Pino's supported `err` position | First JSON sink; adapter owns the call shape                      |
+| LogTape   | Preserved ordinary Error data; JSON Lines overflowed on the circular Error property                                                    | Re-evaluate after upstream behavior/config ownership are suitable |
+| tslog     | Preserved stack/cause and handled the cycle; omitted arbitrary custom Error fields                                                     | No current reason to prefer it over Pino                          |
+| LogLayer  | Result depends on the selected backend and error serializer                                                                            | Useful only if backend swapping is itself a product requirement   |
+| Winston   | Current formatting remains shape-sensitive and loses useful cause/aggregate detail                                                     | Remove at the v6 cutover                                          |
 
 Pino also silently drops a message-first second-argument Error (`logger.error('message', error)`).
 That is why framework code never calls Pino directly: `PinoSink` keeps the native Error available
@@ -69,16 +69,16 @@ because their primary abstraction does not match the framework's required role. 
 prevents “not selected” from being misread as “bad library”. It is the complete pre-lab screen for
 this review, not a claim that every logger published to npm was evaluated.
 
-| Candidate | Why it did not match this implementation | Reconsider when |
-|---|---|---|
-| [Bunyan](https://www.npmjs.com/package/bunyan) | It occupies the same server JSON/child-logger niche as Pino, but its 1.8.15 npm release was six years old at the review snapshot. Taking its record format would still leak another vendor API. | Active releases demonstrate a correctness, compatibility or operational advantage over the Pino sink. |
-| [Roarr](https://www.npmjs.com/package/roarr) | It is an active, fast Node/browser JSON logger, but uses process-global `ROARR` configuration, all-or-none Node output and an opinionated schema without arbitrary top-level properties. The framework would still need its own filtering, sink and record adapter. | Browser parity or Roarr's fixed schema becomes a framework requirement, or it clearly wins the same conformance/benchmark suite. |
-| [log4js-node](https://log4js-node.github.io/log4js-node/) | Categories, appenders, layouts, rolling files and centralized configuration recreate the transport-heavy surface being removed from Winston. It is broader than the required stdout JSON plus explicit sink contract. | The framework decides to own file rotation or a large built-in appender catalogue instead of delegating collection to the deployment. |
-| [consola](https://github.com/unjs/consola) | Its strongest fit is polished human/CLI output and customizable reporters. It does not remove the need for a strict production record/Error contract, and its rich console message shapes are not the API the framework wants to standardize. | The development pretty sink needs capabilities that cannot stay small and isolated. |
-| [Signale](https://github.com/klaudiosinani/signale) | Interactive status lines, badges, timers and many presentation-oriented log types solve terminal UX rather than durable structured service logging. | It is considered only as inspiration or an implementation for the optional development pretty sink. |
-| [`debug`](https://www.npmjs.com/package/debug) | It is a namespace-controlled debugging utility around formatted stderr output, not a multi-level structured logger with Error serialization, redaction, fan-out and lifecycle. | Never as the production logger; it may remain appropriate for opt-in internal diagnostics in a different package. |
-| [OpenTelemetry Logs API/SDK](https://opentelemetry.io/docs/languages/js/) | It is a telemetry signal/export pipeline rather than the framework's ergonomic application logger. At the review snapshot, the official JavaScript status listed logs as “Development”, and its `Logger.emit` API is intended for appenders. | P2b adds an optional OTel sink/bridge after the framework record and OTel JS Logs are stable enough for the compatibility policy. |
-| [Sentry Logs](https://docs.sentry.io/platforms/javascript/guides/node/logs/) | Sentry is an optional hosted destination for exceptions and events; making its API primary would couple every call site to one vendor and would not provide the default stdout JSON contract. | It remains a direct optional sink; it is not reconsidered as `IApp.logger`. |
+| Candidate                                                                    | Why it did not match this implementation                                                                                                                                                                                                                            | Reconsider when                                                                                                                       |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| [Bunyan](https://www.npmjs.com/package/bunyan)                               | It occupies the same server JSON/child-logger niche as Pino, but its 1.8.15 npm release was six years old at the review snapshot. Taking its record format would still leak another vendor API.                                                                     | Active releases demonstrate a correctness, compatibility or operational advantage over the Pino sink.                                 |
+| [Roarr](https://www.npmjs.com/package/roarr)                                 | It is an active, fast Node/browser JSON logger, but uses process-global `ROARR` configuration, all-or-none Node output and an opinionated schema without arbitrary top-level properties. The framework would still need its own filtering, sink and record adapter. | Browser parity or Roarr's fixed schema becomes a framework requirement, or it clearly wins the same conformance/benchmark suite.      |
+| [log4js-node](https://log4js-node.github.io/log4js-node/)                    | Categories, appenders, layouts, rolling files and centralized configuration recreate the transport-heavy surface being removed from Winston. It is broader than the required stdout JSON plus explicit sink contract.                                               | The framework decides to own file rotation or a large built-in appender catalogue instead of delegating collection to the deployment. |
+| [consola](https://github.com/unjs/consola)                                   | Its strongest fit is polished human/CLI output and customizable reporters. It does not remove the need for a strict production record/Error contract, and its rich console message shapes are not the API the framework wants to standardize.                       | The development pretty sink needs capabilities that cannot stay small and isolated.                                                   |
+| [Signale](https://github.com/klaudiosinani/signale)                          | Interactive status lines, badges, timers and many presentation-oriented log types solve terminal UX rather than durable structured service logging.                                                                                                                 | It is considered only as inspiration or an implementation for the optional development pretty sink.                                   |
+| [`debug`](https://www.npmjs.com/package/debug)                               | It is a namespace-controlled debugging utility around formatted stderr output, not a multi-level structured logger with Error serialization, redaction, fan-out and lifecycle.                                                                                      | Never as the production logger; it may remain appropriate for opt-in internal diagnostics in a different package.                     |
+| [OpenTelemetry Logs API/SDK](https://opentelemetry.io/docs/languages/js/)    | It is a telemetry signal/export pipeline rather than the framework's ergonomic application logger. At the review snapshot, the official JavaScript status listed logs as “Development”, and its `Logger.emit` API is intended for appenders.                        | P2b adds an optional OTel sink/bridge after the framework record and OTel JS Logs are stable enough for the compatibility policy.     |
+| [Sentry Logs](https://docs.sentry.io/platforms/javascript/guides/node/logs/) | Sentry is an optional hosted destination for exceptions and events; making its API primary would couple every call site to one vendor and would not provide the default stdout JSON contract.                                                                       | It remains a direct optional sink; it is not reconsidered as `IApp.logger`.                                                           |
 
 HTTP-only access-log middleware such as Morgan or `pino-http` was also outside the candidate set:
 it cannot replace application/module logging, and an Express-specific logger would work against the
@@ -190,7 +190,11 @@ export default {
   redact: ['authorization', 'cookie', 'password', 'secret', 'token'],
   sinks: [
     { sink: 'console', enabled: true },
-    { sink: 'sentry', level: 'error', enabled: process.env.SENTRY_ENABLED === 'true' },
+    {
+      sink: 'sentry',
+      level: 'error',
+      enabled: process.env.SENTRY_ENABLED === 'true',
+    },
   ],
 } satisfies TLogConfig;
 ```

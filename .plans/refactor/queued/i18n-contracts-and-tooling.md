@@ -53,12 +53,12 @@ flowchart LR
 
 ## Outcomes / acceptance contract
 
-| Concern | Authoring-time | CI | Runtime |
-|---|---|---|---|
-| Referenced key does not exist | generated `TFunction`/`TranslationKey` types reject literals and selectors | extractor reports source location and exits non-zero | development-only missing-key telemetry; production falls back |
-| Catalog key is unused | editor is not responsible | exhaustive static extraction reports it; deletion is opt-in | intentionally not attempted |
-| Locale is incomplete | generated types use the base locale shape | exact key parity, non-empty leaves, placeholder/plural/context parity | configured fallback remains available but cannot make CI pass |
-| Key autocomplete at large scale | selector API with `enableSelector: "optimize"` | generated declarations must be current | no additional lookup cost |
+| Concern                         | Authoring-time                                                             | CI                                                                    | Runtime                                                       |
+| ------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Referenced key does not exist   | generated `TFunction`/`TranslationKey` types reject literals and selectors | extractor reports source location and exits non-zero                  | development-only missing-key telemetry; production falls back |
+| Catalog key is unused           | editor is not responsible                                                  | exhaustive static extraction reports it; deletion is opt-in           | intentionally not attempted                                   |
+| Locale is incomplete            | generated types use the base locale shape                                  | exact key parity, non-empty leaves, placeholder/plural/context parity | configured fallback remains available but cannot make CI pass |
+| Key autocomplete at large scale | selector API with `enableSelector: "optimize"`                             | generated declarations must be current                                | no additional lookup cost                                     |
 
 The base locale is the structural source of truth. “Coverage” means matching leaf keys, non-empty string values, matching interpolation placeholders, and required plural/context variants; it does not claim linguistic quality. Same-as-base values are warnings, not failures. Dynamic keys require an explicit preserve pattern/manifest—no silent guesses.
 

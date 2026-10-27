@@ -44,9 +44,9 @@ Net-new exports; nothing existing changes shape.
 export interface BaseAppInfo {
   app: IApp;
   ip?: string;
-  i18n: { t: TFunction; language: string };   // required, not optional
-  request: Record<string, unknown>;             // populated by ValidationStage
-  query: Record<string, unknown>;               // populated by ValidationStage
+  i18n: { t: TFunction; language: string }; // required, not optional
+  request: Record<string, unknown>; // populated by ValidationStage
+  query: Record<string, unknown>; // populated by ValidationStage
 }
 
 export interface BaseRequestContext {
@@ -57,14 +57,17 @@ export interface BaseRequestContext {
   appInfo: BaseAppInfo & AppInfoExtensions;
 }
 
-export interface AppInfoExtensions {}  // user augments via `declare module`
+export interface AppInfoExtensions {} // user augments via `declare module`
 
-export type ProvidesOf<T> =
-  T extends { provides: infer P }
-    ? P
-    : T extends abstract new (...a: any[]) => any
-      ? T extends { provides: infer P } ? P : {}
-      : {};
+export type ProvidesOf<T> = T extends { provides: infer P }
+  ? P
+  : T extends abstract new (
+        ...a: any[]
+      ) => any
+    ? T extends { provides: infer P }
+      ? P
+      : {}
+    : {};
 
 export type UnionAppInfoProvides<MWs extends readonly unknown[]> =
   MWs extends readonly [infer Head, ...infer Tail]

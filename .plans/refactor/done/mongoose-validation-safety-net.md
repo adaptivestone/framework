@@ -1,7 +1,7 @@
 # P1o — Mongoose validation safety net (escaped model errors → 400 when provably client data)
 
 **Status**: ✅ done — shipped 2026-07-05 (commit 905b217; v5.1 behavior change, flagged in CHANGELOG Unreleased)
-**Depends on**: nothing hard. Complements [params-validation](params-validation.md) (P1b+) — that one is *query-side* CastError, this one is *save-side* ValidationError.
+**Depends on**: nothing hard. Complements [params-validation](params-validation.md) (P1b+) — that one is _query-side_ CastError, this one is _save-side_ ValidationError.
 **Origin**: 2026-07-05. Route validates `request:`/`query:` → 400 with field errors. But when a route schema doesn't mirror a model constraint (e.g. `name` with `maxLength: 50`, client sends 100 chars), the value passes route validation and `doc.save()` throws a Mongoose `ValidationError`, which falls into the wrapped handler's generic catch (`src/controllers/index.ts` ~458) → blanket **500 "Platform error"**. The client did nothing "server-error" worthy, but gets a 500 and no clue what to fix.
 
 Naive fix (echo Mongoose field errors as 400) is unsafe: Mongoose errors are keyed by **model paths**, and the API field ↔ model path mapping lives only in controller code (`name` outside can be `userName` inside; internal fields exist that the client never sees). Echoing them would leak non-public field names and misattribute server-side bugs to the client.
@@ -22,7 +22,7 @@ In the wrapped-handler catch (`src/controllers/index.ts` ~458–468), before the
    - **Route input keys** = keys of `req.appInfo.request` ∪ `req.appInfo.query`. Exclude the framework-injected `contentType` key (it's not client data).
    - A path **matches** when its first segment (`path.split('.')[0]`) is a route input key. Nested paths report under the full path (`profile.name`) — not a leak, the client owns that subtree.
    - **ALL paths match** → `400` with the standard shape `{ errors: { <path>: message } }` (same as route validation). Messages pass through from Mongoose; per-schema custom messages are the customization point.
-   - **ANY path unmatched** (renamed / internal) → keep today's `500`. Strict on purpose: 400 only when the failure is provably *entirely* the client's data. A mixed failure includes a server-side bug; a 400 would tell the client "fix your field" only for them to hit the 500 anyway.
+   - **ANY path unmatched** (renamed / internal) → keep today's `500`. Strict on purpose: 400 only when the failure is provably _entirely_ the client's data. A mixed failure includes a server-side bug; a 400 would tell the client "fix your field" only for them to hit the 500 anyway.
    - Corollary: a route with no `request:`/`query:` schema has no input keys → nothing matches → 500 stays. Without a declared contract the framework can't attribute anything to the client.
 3. **Logging**: matched → `logger.warn` with the full error (handled, but signals the route schema is missing a constraint the developer should mirror). Unmatched → `logger.error`, exactly as today.
 

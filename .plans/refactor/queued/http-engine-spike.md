@@ -7,16 +7,16 @@
 
 ## Roadmap fit
 
-The pluggable HTTP module **is already the plan**: `ExpressAdapter` today; P3 adds `NodeAdapter` (+`URLPatternAdapter`), P4 makes it default, P5 drops Express and ships `BunAdapter`/`DenoAdapter` with the Web-Fetch `(ctx) => Response` handler contract. A Rust engine would simply be **one more adapter in that family** — so this spike doesn't design new architecture; it measures whether a *native* adapter earns its place, and what each step up actually buys:
+The pluggable HTTP module **is already the plan**: `ExpressAdapter` today; P3 adds `NodeAdapter` (+`URLPatternAdapter`), P4 makes it default, P5 drops Express and ships `BunAdapter`/`DenoAdapter` with the Web-Fetch `(ctx) => Response` handler contract. A Rust engine would simply be **one more adapter in that family** — so this spike doesn't design new architecture; it measures whether a _native_ adapter earns its place, and what each step up actually buys:
 
 - **Rung 1 below is a minimal P3 `NodeAdapter` prototype** — its numbers tell us whether P2c (find-my-way glue, explicitly "may be skipped entirely") is worth doing at all, and de-risk P3 early.
 - **Rung 3 (Rust)** would target the same adapter contract (eventually P5's `(ctx) => Response`), never a parallel architecture.
 
 ## Question the spike answers
 
-Does a native HTTP engine speed up framework apps enough — over the *already-planned* JS `NodeAdapter` — to justify maintaining one?
+Does a native HTTP engine speed up framework apps enough — over the _already-planned_ JS `NodeAdapter` — to justify maintaining one?
 
-Honest prior (to be confirmed/refuted by numbers): Node's HTTP parser is already native (llhttp); tree match is sub-µs; precompiled validation ~1–2µs; the bulk of today's overhead is likely Express layer machinery, which P3 removes anyway. Real apps are Mongo-dominated (1–3ms/query), so native wins would appear in max throughput, CPU headroom, and p99 tails — not typical latency. napi/IPC kill-risk: the boundary crossing (building JS request data from Rust, or UDS round-trip) can eat the margin; measured before anything is built around it. Middleware stays JS regardless (`Auth`/`GetUserByToken`→Mongo, `RateLimiter`→Redis, `I18n`). Prior art: uWebSockets.js proves the native-core-under-JS-handlers shape; the open question is the marginal gain of *our own* Rust engine over adopting an existing native core.
+Honest prior (to be confirmed/refuted by numbers): Node's HTTP parser is already native (llhttp); tree match is sub-µs; precompiled validation ~1–2µs; the bulk of today's overhead is likely Express layer machinery, which P3 removes anyway. Real apps are Mongo-dominated (1–3ms/query), so native wins would appear in max throughput, CPU headroom, and p99 tails — not typical latency. napi/IPC kill-risk: the boundary crossing (building JS request data from Rust, or UDS round-trip) can eat the margin; measured before anything is built around it. Middleware stays JS regardless (`Auth`/`GetUserByToken`→Mongo, `RateLimiter`→Redis, `I18n`). Prior art: uWebSockets.js proves the native-core-under-JS-handlers shape; the open question is the marginal gain of _our own_ Rust engine over adopting an existing native core.
 
 ## Decision rule (agreed before running)
 
@@ -42,7 +42,7 @@ All rungs serve identical routes with identical responses:
 
 ## Standard Schema vs native validation
 
-Route validators are **Standard Schema** (`ValidateService` → `StandardSchemaDriver`): arbitrary JS functions, not inherently serializable. Per-library JSON Schema export is widely available (TypeBox *is* JSON Schema; zod 4 `z.toJSONSchema()`; Valibot `@valibot/to-json-schema`; ArkType native) — and the framework already has the vendor-neutral `toJsonSchema` driver seam from P2a (openapi-generator). Hard caveats: the Standard Schema spec defines no export interface (per-library dispatch — the P2a seam), and `.refine()`/`.transform()`/coercions can't convert. A real native engine therefore needs **per-route fallback: non-convertible schema → validate in JS**; realistic coverage for declarative CRUD schemas is high. W-val below uses a JSON-Schema-expressible schema deliberately.
+Route validators are **Standard Schema** (`ValidateService` → `StandardSchemaDriver`): arbitrary JS functions, not inherently serializable. Per-library JSON Schema export is widely available (TypeBox _is_ JSON Schema; zod 4 `z.toJSONSchema()`; Valibot `@valibot/to-json-schema`; ArkType native) — and the framework already has the vendor-neutral `toJsonSchema` driver seam from P2a (openapi-generator). Hard caveats: the Standard Schema spec defines no export interface (per-library dispatch — the P2a seam), and `.refine()`/`.transform()`/coercions can't convert. A real native engine therefore needs **per-route fallback: non-convertible schema → validate in JS**; realistic coverage for declarative CRUD schemas is high. W-val below uses a JSON-Schema-expressible schema deliberately.
 
 ## Workloads & measurement
 
