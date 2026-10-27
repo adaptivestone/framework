@@ -10,11 +10,11 @@
 
 `appTypes.ts` emitted `getConfig()` overloads by `JSON.stringify`-ing the **resolved runtime value** — every field already evaluated, including `process.env.*`:
 
-| Config field | At gen time | Emitted type | Bug |
-|---|---|---|---|
-| `host: 'localhost'` | `'localhost'` | `"localhost"` | over-narrow **literal** |
-| `port: process.env.PORT \|\| 3000` | `3000` | `3000` | literal narrowing |
-| `apiSecret: process.env.API_SECRET` | a real value | `"sk-live-…"` | **secret value baked into the file** |
+| Config field                        | At gen time   | Emitted type  | Bug                                  |
+| ----------------------------------- | ------------- | ------------- | ------------------------------------ |
+| `host: 'localhost'`                 | `'localhost'` | `"localhost"` | over-narrow **literal**              |
+| `port: process.env.PORT \|\| 3000`  | `3000`        | `3000`        | literal narrowing                    |
+| `apiSecret: process.env.API_SECRET` | a real value  | `"sk-live-…"` | **secret value baked into the file** |
 
 ## First attempt (REVERTED) — `typeof import()` references
 
@@ -26,14 +26,14 @@ Emitted `getConfig('http'): typeof import('./src/config/http.ts').default`. Solv
 
 ## Fix (shipped) — inline value-**shape** types
 
-Walk the resolved config **value** and emit its structure with value *types* (`string`, `number`), never the literals, never an `import()`:
+Walk the resolved config **value** and emit its structure with value _types_ (`string`, `number`), never the literals, never an `import()`:
 
 ```ts
 // value: { domains: [ { 'insailing.com': 'en' }, … ] }
 getConfig(configName: 'siteMap'): { "domains": [{ "insailing.com": string }, { "insailing.ru": string }, { "insailing.de": string }] };
 ```
 
-- **No leak** — value *types*, not values.
+- **No leak** — value _types_, not values.
 - **No literal narrowing** — `string`, not `"localhost"`.
 - **Inline** — no module resolution, so it can't degrade to `any` on any compiler/preview.
 - **Structure-preserving** — arrays stay **tuples**, so `Object.values(config.list[0])` keeps precise per-element types (the regression fix, validated in the container).
@@ -42,12 +42,12 @@ Trade-off carried over from the original: an `undefined`-valued key at gen time 
 
 ## Plumbing
 
-| File | Change |
-|---|---|
-| `src/codegen/appTypes.ts` | `getTemplate(configs, modelPaths)` reads `cache.configs` (values); new `valueToTypeString(value)` recursively renders the value-shape type (objects → `{ "k": T }`, arrays → tuples, scalars → their type, exotic → `unknown`, `undefined` keys dropped). |
-| `src/codegen/appTypes.test.ts` | 5 unit tests: value-types-not-literals, array-stays-tuple (the siteMap case), undefined-key dropped, no `import()`, exotic/empty handling. |
-| `src/server.ts` | reverted the first attempt's `configPaths` cache field + population (unused again). |
-| `CHANGELOG.md` | `[FIX]` entry (value-shape form). |
+| File                           | Change                                                                                                                                                                                                                                                    |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/codegen/appTypes.ts`      | `getTemplate(configs, modelPaths)` reads `cache.configs` (values); new `valueToTypeString(value)` recursively renders the value-shape type (objects → `{ "k": T }`, arrays → tuples, scalars → their type, exotic → `unknown`, `undefined` keys dropped). |
+| `src/codegen/appTypes.test.ts` | 5 unit tests: value-types-not-literals, array-stays-tuple (the siteMap case), undefined-key dropped, no `import()`, exotic/empty handling.                                                                                                                |
+| `src/server.ts`                | reverted the first attempt's `configPaths` cache field + population (unused again).                                                                                                                                                                       |
+| `CHANGELOG.md`                 | `[FIX]` entry (value-shape form).                                                                                                                                                                                                                         |
 
 ## Done when
 

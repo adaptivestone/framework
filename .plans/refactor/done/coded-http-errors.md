@@ -20,7 +20,7 @@ Every framework error response follows `{ error?: string, message: string, error
 
 ```ts
 throw new ConflictError({
-  code: 'ALREADY_CONFIRMED',                    // sent as `error`
+  code: 'ALREADY_CONFIRMED', // sent as `error`
   i18nKey: 'accounts.errors.alreadyConfirmed', // server-only: what to translate
   message: 'This account is already confirmed.', // English fallback + log line
   errors: { email: 'accounts.errors.emailTaken' }, // optional field errors

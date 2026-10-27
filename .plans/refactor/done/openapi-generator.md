@@ -41,6 +41,7 @@ OpenAPI reads it at runtime (cold, rare). The schema → JSON Schema projection 
   `GetUserByToken` (read with zero instantiation).
 
 ## Done when (verified)
+
 - `npm run openapi` over the framework's own controllers → valid 3.1 doc (paths,
   `components.securitySchemes` from auth middleware, tags). ✅ (defineSchema bodies correctly
   degrade to placeholders + warnings.)
@@ -48,6 +49,7 @@ OpenAPI reads it at runtime (cold, rare). The schema → JSON Schema projection 
   (1, real ControllerManager registry). Full suite green; tsc + biome clean; `gen --check` clean.
 
 ## Out of scope (re-homed when the P2a card was retired)
+
 - Incremental codegen cache — parked in [performance](../later/performance.md) (obviated by the AST migration).
 - `createTestApp` / testing utilities — folded into [test-helpers](./test-helpers.md) (P1i).
 - Per-vendor valibot/arktype peers beyond the generic seam (added if/when needed).

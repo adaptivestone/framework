@@ -94,12 +94,12 @@ The AST approach keys everything on the **local binding** the source uses, read 
 from the import node — it never deals with the class. So the binding-vs-class-name problem
 (bug 1b, and the reason `importResolution` is complex) simply doesn't arise.
 
-| Source | AST records | Emitted in `.gen.ts` |
-| --- | --- | --- |
-| `import Auth from './Auth.js'` | binding `Auth`, default | `import type Auth from './Auth.js'`; `typeof Auth` |
-| `import AuthMiddleware from './Auth.js'` (renamed default) | binding `AuthMiddleware`, default | `import type AuthMiddleware from './Auth.js'`; `typeof AuthMiddleware` |
-| `import { Auth } from './auth.js'` | binding `Auth`, named | `import type { Auth } from './auth.js'`; `typeof Auth` |
-| `import { Auth as AuthMiddleware } from './auth.js'` | binding `AuthMiddleware`, named, orig `Auth` | `import type { Auth as AuthMiddleware } from './auth.js'`; `typeof AuthMiddleware` |
+| Source                                                     | AST records                                  | Emitted in `.gen.ts`                                                               |
+| ---------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `import Auth from './Auth.js'`                             | binding `Auth`, default                      | `import type Auth from './Auth.js'`; `typeof Auth`                                 |
+| `import AuthMiddleware from './Auth.js'` (renamed default) | binding `AuthMiddleware`, default            | `import type AuthMiddleware from './Auth.js'`; `typeof AuthMiddleware`             |
+| `import { Auth } from './auth.js'`                         | binding `Auth`, named                        | `import type { Auth } from './auth.js'`; `typeof Auth`                             |
+| `import { Auth as AuthMiddleware } from './auth.js'`       | binding `AuthMiddleware`, named, orig `Auth` | `import type { Auth as AuthMiddleware } from './auth.js'`; `typeof AuthMiddleware` |
 
 The middleware `Map` references the local binding (e.g. `[AuthMiddleware]`), the import node
 declares that same binding, and emit reproduces the exact import form (default vs named +
@@ -112,10 +112,10 @@ supported.)
 ## The one real constraint
 
 AST extraction only works when `routes` / `middleware` / `getHttpPath` are **literal
-structures** (`return { … }` / `new Map([ … ])` / `return '/path'`). *Values* may be
+structures** (`return { … }` / `new Map([ … ])` / `return '/path'`). _Values_ may be
 expressions — `request: defineSchema(...)` is fine, since codegen reads only the keys, the
 handler name, and "is `request` present", never evaluating the expression. What breaks is a
-getter that *builds* the object dynamically (loops, conditionals, spreads, computed keys).
+getter that _builds_ the object dynamically (loops, conditionals, spreads, computed keys).
 
 > **Shipped behavior (changed from the proposal):** the original plan was a per-controller
 > **boot fallback** for these. The shipped codegen has **no boot path to fall back to**, so a
@@ -131,7 +131,7 @@ Map) → flagged `needsBoot` (the same hard error), or document as unsupported.
 
 - swc and oxc are **parsers** (syntax + scope/semantics), not TypeScript type-checkers.
   They cannot infer `InferOutput<schema>` or resolve `provides`. Only `tsc` / `tsgo` do.
-- Codegen never *resolves* types anyway — it **emits type expressions**
+- Codegen never _resolves_ types anyway — it **emits type expressions**
   (`StandardSchemaV1.InferOutput<…>`, `typeof X`) that the consumer's `tsc` evaluates.
   So there is nothing to "grab."
 - oxc's speed is available from Node via its napi bindings — no Rust port needed. Porting
@@ -145,7 +145,7 @@ approach is correct and justified while controllers may have dynamic getters. De
 a prototype:
 
 1. Build oxc-extract → `flatten()` for a few real controllers (framework `Auth`/`Home`
-   + a couple of consumer controllers).
+   - a couple of consumer controllers).
 2. Measure parse time vs current boot time.
 3. Confirm declarative extraction covers the real controllers (e.g. `Auth`'s inline
    `defineSchema(...)`), and count how many need the boot fallback.
@@ -162,17 +162,17 @@ A prototype lives in `prototypes/codegen-ast/` (extractor `astExtract.ts`, runne
 oxc** (Phase 0, 2026-06-08) with byte-identical results — confirming the extraction is
 parser-agnostic and oxc is the durable production pick (`ts.createSourceFile` is dropped
 in TS 7's Go port). It ran over 5 representative controllers: the framework's
-`Auth` (literal `routes` with `defineSchema(...)` *values* + bare `this.x` handlers +
+`Auth` (literal `routes` with `defineSchema(...)` _values_ + bare `this.x` handlers +
 top-level regex/helpers) and `Home` (`new Map()` empty middleware), plus the codegen
 fixtures `File` (own middleware, `Auth` binding ≠ `AuthMiddleware` class), `Inherited`
 (no own middleware → inherited), and `Schemas` (schema routes).
 
-| Check | Result |
-| --- | --- |
-| **Coverage** — fully declarative (AST-only, no boot) | **5/5**, 0 fallbacks |
-| **Routes** — AST metadata == the ghost oracle (`method/path/handler/hasRequest`) | **5/5** |
-| **Chain** — AST middleware bindings == the emitted `.gen.ts` `typeof X` set | **5/5** |
-| **Speed** — AST extract vs the boot path's per-controller dynamic `import()` | oxc: **sub-millisecond**/controller vs tens-of-ms→seconds (~97× aggregate; ~50× on the TS API), **before** the one-time app boot |
+| Check                                                                            | Result                                                                                                                           |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Coverage** — fully declarative (AST-only, no boot)                             | **5/5**, 0 fallbacks                                                                                                             |
+| **Routes** — AST metadata == the ghost oracle (`method/path/handler/hasRequest`) | **5/5**                                                                                                                          |
+| **Chain** — AST middleware bindings == the emitted `.gen.ts` `typeof X` set      | **5/5**                                                                                                                          |
+| **Speed** — AST extract vs the boot path's per-controller dynamic `import()`     | oxc: **sub-millisecond**/controller vs tens-of-ms→seconds (~97× aggregate; ~50× on the TS API), **before** the one-time app boot |
 
 What this validates:
 
@@ -181,8 +181,8 @@ What this validates:
   off the import node. A 1-level `extends`-walk recovered the inherited `[GetUserByToken,
   Auth]` for `Inherited`/`Schemas` the same way.
 - **`request: defineSchema(...)` and `request: object().shape(...)` are fine** — the
-  extractor reads only that a `request` key is present, never the value. AST *doesn't*
-  evaluate it; the boot path *does* (importing `Auth` pulled the whole Mongoose model
+  extractor reads only that a `request` key is present, never the value. AST _doesn't_
+  evaluate it; the boot path _does_ (importing `Auth` pulled the whole Mongoose model
   graph — ~5 s — which AST skips entirely).
 - **`routes` and `middleware` extract independently.** The base `AbstractController` has a
   non-literal `routes` (`logger.warn` + `return {}`) but a literal middleware Map — the
@@ -194,7 +194,7 @@ Caveats / not yet exercised (for the real migration):
   synthetic consumer extending `@adaptivestone/framework/modules/AbstractController.js`
   resolves the bare specifier via `createRequire` (honoring the package `exports` map),
   walks into the installed file, and recovers the inherited `[GetUserByToken, Auth]` — no
-  class-identity matching. Still to do: confirm on a *real* installed consumer project.
+  class-identity matching. Still to do: confirm on a _real_ installed consumer project.
 - **Specifier path math** (rebasing relative ancestor imports to the gen-file dir; bare
   rewrites) is orthogonal and shared with the current emit — not reproduced here.
 - Only 5 controllers, all framework/fixtures; a real consumer project (with its own
@@ -215,15 +215,15 @@ codebase carries exactly **one** codegen front-end.
 
 ### Modules (all under `src/codegen/`)
 
-| Module | Responsibility |
-| --- | --- |
-| `astExtract.ts` | One oxc source pass → `{ imports, extends, routes, middleware, httpPath } \| { needsBoot, reason }`. Extracts default/named/aliased/namespace imports (skips type-only), the **exported** class's `extends`, literal `routes` (method/path/handler/`hasRequest`/`hasQuery`/`requestContentTypes`/route-level `middleware`), the static `middleware` Map, and a literal `getHttpPath()`. |
+| Module          | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `astExtract.ts` | One oxc source pass → `{ imports, extends, routes, middleware, httpPath } \| { needsBoot, reason }`. Extracts default/named/aliased/namespace imports (skips type-only), the **exported** class's `extends`, literal `routes` (method/path/handler/`hasRequest`/`hasQuery`/`requestContentTypes`/route-level `middleware`), the static `middleware` Map, and a literal `getHttpPath()`.                                                                                                                                                                |
 | `astResolve.ts` | Walks `extends` (relative **and** bare-package via `createRequire`) to the middleware definer; resolves every `binding → specifier` for both the Map middleware (rebased from the definer) and route-level middleware (from self). Computes `urlPrefix` from the literal `getHttpPath()`, else from the route-bearing folder prefix + class name via the shared `defaultControllerHttpPath`. Fully parenthesized folder segments are organizational route groups and are omitted by that shared helper, so runtime and generated paths stay identical. |
-| `astSpec.ts` | Adapts the extracted data into the shared `ControllerSubtreeSpec` (synthetic name-tagged middleware stubs) consumed by `buildSubtreeFromSpec`. |
-| `astEmit.ts` | Discovers controllers via the runtime `getFilesPathWithInheritance` (framework-internal + user folder, user overrides win), registers **all** of them — including framework-internal — into one `RouteRegistry` (cross-controller bleed resolves exactly like runtime), `flatten()`s once, filters each chain to the controller's own importable bindings, and renders via `emit.renderGenFile`. Emits gen files for **user** controllers only (never writes into the installed package). |
-| `astModel.ts` | Detects `extends BaseModel` from source (chain walk, basename match) — used by `appTypes.ts` so the app-types scan does **zero** model `import()` (no Mongoose load). |
-| `emit.ts` | Pure renderer (`renderGenFile`) — unchanged output shape; the boot-era `emitGenFile`/`EmitInput` were removed. |
-| `index.ts` | `generateAll` = app types (`getTemplate` from `appTypes.ts`) + route types (`planRouteTypes`); **throws** (naming the controllers) if any are `needsBoot`. |
+| `astSpec.ts`    | Adapts the extracted data into the shared `ControllerSubtreeSpec` (synthetic name-tagged middleware stubs) consumed by `buildSubtreeFromSpec`.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `astEmit.ts`    | Discovers controllers via the runtime `getFilesPathWithInheritance` (framework-internal + user folder, user overrides win), registers **all** of them — including framework-internal — into one `RouteRegistry` (cross-controller bleed resolves exactly like runtime), `flatten()`s once, filters each chain to the controller's own importable bindings, and renders via `emit.renderGenFile`. Emits gen files for **user** controllers only (never writes into the installed package).                                                              |
+| `astModel.ts`   | Detects `extends BaseModel` from source (chain walk, basename match) — used by `appTypes.ts` so the app-types scan does **zero** model `import()` (no Mongoose load).                                                                                                                                                                                                                                                                                                                                                                                  |
+| `emit.ts`       | Pure renderer (`renderGenFile`) — unchanged output shape; the boot-era `emitGenFile`/`EmitInput` were removed.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `index.ts`      | `generateAll` = app types (`getTemplate` from `appTypes.ts`) + route types (`planRouteTypes`); **throws** (naming the controllers) if any are `needsBoot`.                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ### What changed vs. the proposal
 
@@ -249,12 +249,12 @@ Per-module units live in `astExtract`/`astResolve`/`astModel`/`astEmit` tests. A
 
 The framework ships **pre-generated** `.routes.gen.ts` files for its own controllers
 (`Auth`, `Home`). Those were generated against the framework's own route tree, so they
-cannot account for middleware that a *particular consumer* bleeds into the framework's
+cannot account for middleware that a _particular consumer_ bleeds into the framework's
 subtrees — e.g. a consumer registering a root-mounted `'/{*splat}'` middleware that, at
 runtime, also wraps `/auth/*`. Codegen registers the framework-internal controllers into the
 shared registry so a consumer's bleed is computed correctly for the consumer's **own** gen
 files, but it deliberately does **not** re-emit the framework's shipped gen files into
-`node_modules`. So the *types* on the built-in `Auth`/`Home` request objects reflect only the
+`node_modules`. So the _types_ on the built-in `Auth`/`Home` request objects reflect only the
 framework's own chain; the extra consumer middleware still runs at runtime, it's just not
 reflected in those shipped types. This is an inherent limit of shipping pre-generated types,
 not a codegen bug.

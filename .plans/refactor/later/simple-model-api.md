@@ -33,11 +33,11 @@ Start with a simple API backed by the existing Mongoose model. Preserve the sema
 
 Future idea: determine capabilities per model **and per operation**, then choose an execution path internally:
 
-| Capability assessment | Proposed execution |
-|---|---|
-| Relevant hooks or behavior require Mongoose | Use Mongoose behind the same simple contract. |
-| Behavior is unknown or unsupported | Keep the Mongoose path, or reject the unsupported simple operation explicitly. |
-| No relevant hooks, and other required behavior has proven parity | Consider an opt-in direct MongoDB driver path. |
+| Capability assessment                                            | Proposed execution                                                             |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Relevant hooks or behavior require Mongoose                      | Use Mongoose behind the same simple contract.                                  |
+| Behavior is unknown or unsupported                               | Keep the Mongoose path, or reject the unsupported simple operation explicitly. |
+| No relevant hooks, and other required behavior has proven parity | Consider an opt-in direct MongoDB driver path.                                 |
 
 Hook discovery should account for inherited, plugin, global and operation-specific registrations after model setup is finalized. Do not infer hook absence solely from an empty model hook method or from source syntax. Discovery belongs to runtime model registration; it must not make type generation boot the application. The supported mechanism for collecting this metadata remains an open design question.
 

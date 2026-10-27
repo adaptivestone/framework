@@ -12,12 +12,12 @@ or “is queue depth growing?”.
 
 ## Why a metrics seam exists separately from logs
 
-| Signal | Best for | Poor at |
-|---|---|---|
-| Log | One event with diagnostic context/stack | Aggregated rates and current state |
-| Counter | Total occurrences; alert on rate increase | Current value or latency distribution |
-| Gauge | Current queue depth/connections/in-flight work | Monotonic event totals |
-| Histogram | Latency/size distribution and percentiles | Explaining one failure |
+| Signal    | Best for                                       | Poor at                               |
+| --------- | ---------------------------------------------- | ------------------------------------- |
+| Log       | One event with diagnostic context/stack        | Aggregated rates and current state    |
+| Counter   | Total occurrences; alert on rate increase      | Current value or latency distribution |
+| Gauge     | Current queue depth/connections/in-flight work | Monotonic event totals                |
+| Histogram | Latency/size distribution and percentiles      | Explaining one failure                |
 
 A degradation contract normally uses both: increment a bounded counter for alerting and log the
 specific error for diagnosis. Parsing logs into metrics is exporter-specific, expensive, and easy
@@ -97,12 +97,12 @@ Controllers do not add instrumentation.
 
 Initial HTTP instruments:
 
-| Instrument | Kind | Bounded attributes |
-|---|---|---|
-| `http.server.requests` | counter | method, parameterized route, status, outcome |
-| `http.server.duration_ms` | histogram | method, parameterized route, status |
-| `http.server.active_requests` | gauge | method |
-| `http.server.response_size_bytes` | histogram | method, parameterized route, status |
+| Instrument                        | Kind      | Bounded attributes                           |
+| --------------------------------- | --------- | -------------------------------------------- |
+| `http.server.requests`            | counter   | method, parameterized route, status, outcome |
+| `http.server.duration_ms`         | histogram | method, parameterized route, status          |
+| `http.server.active_requests`     | gauge     | method                                       |
+| `http.server.response_size_bytes` | histogram | method, parameterized route, status          |
 
 Unmatched requests use a fixed route value such as `unmatched`, never the raw URL. Streaming
 duration ends when the response closes, not when the stream descriptor is returned. Aborted

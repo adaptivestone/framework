@@ -9,7 +9,7 @@
 - Both `Home` and `SomeController` translate cleanly through the new `RouteRegistry`.
 - `SomeController.ts` PUT `/putInfo` route uncommented — previously relied on Express's middleware-only-route quirk (a registered middleware without a handler), which doesn't fit the tree model. Test intent preserved by adding the handler.
 - Codegen runs against both via the registry; gen files (`Auth.routes.gen.ts`, `Home.routes.gen.ts`) are gitignored — regenerated locally on `npm run gen`. `SomeController` is a test fixture; it doesn't need a gen file.
-**Time**: ~½ day
+  **Time**: ~½ day
 
 ## Goal
 
@@ -27,8 +27,12 @@ Bring the other two existing controllers onto the new typed-codegen pattern. Aft
 ```ts
 // Home.ts (unchanged)
 class Home extends AbstractController {
-  get routes() { return { get: { '/': this.getHome } }; }
-  getHttpPath() { return '/'; }
+  get routes() {
+    return { get: { '/': this.getHome } };
+  }
+  getHttpPath() {
+    return '/';
+  }
 }
 ```
 
@@ -61,5 +65,5 @@ All three controllers (`Auth`, `Home`, `SomeController`) use codegen-driven type
 
 ## Notes
 
-- This phase exists separately from P1a-codegen because P1a-codegen targets *one* controller (`Auth`) as the proof; P1d shows the migration scales without surprises. Splitting them lets P1a-codegen finish faster and lets `Home`/`SomeController` slip if needed.
+- This phase exists separately from P1a-codegen because P1a-codegen targets _one_ controller (`Auth`) as the proof; P1d shows the migration scales without surprises. Splitting them lets P1a-codegen finish faster and lets `Home`/`SomeController` slip if needed.
 - P1d now depends on P1b's codegen rewrite shipping first — the original P1a-codegen MVP's parser-based approach was replaced by registry-walking in P1b. Gen file extension is `.gen.d.ts`, not `.gen.ts`.

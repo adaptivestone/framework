@@ -14,13 +14,16 @@ consumer can opt into multi-process supervision without copying cluster code.
 ```ts
 import { runCluster } from '@adaptivestone/framework/cluster.js';
 
-await runCluster(async () => {
-  await import('./server.ts');
-}, {
-  workers: 'auto',
-  shutdownTimeoutMs: 30_000,
-  onEvent: event => observability.record(event.type, event),
-});
+await runCluster(
+  async () => {
+    await import('./server.ts');
+  },
+  {
+    workers: 'auto',
+    shutdownTimeoutMs: 30_000,
+    onEvent: (event) => observability.record(event.type, event),
+  },
+);
 ```
 
 `runCluster` executes the callback only in workers. The primary owns forking, fixed safety policy,

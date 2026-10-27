@@ -62,7 +62,9 @@ const loginSchema = defineSchema<LoginRequest>((value) => {
   if (typeof v.password !== 'string' || !v.password)
     issues.push({ message: 'validation.required', path: ['password'] });
   if (issues.length) return { issues };
-  return { value: { email: v.email as string, password: v.password as string } };
+  return {
+    value: { email: v.email as string, password: v.password as string },
+  };
 });
 ```
 
@@ -80,7 +82,7 @@ No new driver: `standardSchemaDriver` already handles any non-yup `~standard` ob
 
 ## Out of scope
 
-- **No schema-builder combinators** (`string()`, `object()`, `min()`, `email()`). That is rebuilding zod and owning its edge-case bugs — the explicit anti-goal. If `defineSchema`'s `if`-checks ever feel too verbose across *many* schemas, the answer is "install zod," not "grow this helper."
+- **No schema-builder combinators** (`string()`, `object()`, `min()`, `email()`). That is rebuilding zod and owning its edge-case bugs — the explicit anti-goal. If `defineSchema`'s `if`-checks ever feel too verbose across _many_ schemas, the answer is "install zod," not "grow this helper."
 - **Not removing yup support.** `yupDriver` stays shipped; yup stays an optional peer.
 - **File validation.** No built-in validates files, so P1k does not touch it. `YupFile` stays as the yup-specific helper. The vendor-neutral file path (`File` type export, `multipartScalar`, optional `fileSchema()`) is its own track per `decisions.md` → "Standard-Schema-only file validation" / "Multipart parser is always-array" — out of scope here.
 - **Not migrating user apps** or user-facing schemas.
@@ -95,4 +97,4 @@ No new driver: `standardSchemaDriver` already handles any non-yup `~standard` ob
 - **The one cost**: `defineSchema`'s declared `Output` type and its `validate` body are two hand-synced declarations — no `InferType` deriving one from the other, and codegen trusts the declared type without cross-checking `validate`. Acceptable for ~6 fixed, rarely-touched built-in schemas; **not** a pattern to push on large user apps (there, zod).
 - `defineSchema` is a useful **public** export: a zero-dep escape hatch for simple validators. Reinforces the "framework bundles no validator; bring zod/yup for rich needs" story.
 - Stripping is automatic — success `value` only carries the keys you copy, so the yup `stripUnknown` security property (8 spread-into-`Model.create` sites audited in P1a) is preserved by construction.
-- **Migration note (CHANGELOG):** users who use `YupFile` — or any yup schema in their own controllers — must add `yup` to *their own* `dependencies` after P1k. It is no longer provided transitively by the framework. This is correct semantics (depend on the validator you use), but it is a user-visible breaking change to call out.
+- **Migration note (CHANGELOG):** users who use `YupFile` — or any yup schema in their own controllers — must add `yup` to _their own_ `dependencies` after P1k. It is no longer provided transitively by the framework. This is correct semantics (depend on the validator you use), but it is a user-visible breaking change to call out.

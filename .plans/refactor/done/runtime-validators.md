@@ -99,7 +99,7 @@ class ValidateService extends Base {
 
 ## Notes
 
-- The framework's own controllers (`Auth.ts`, `SomeController.ts`) still use yup imports at the call site — these are user-replaceable defaults that demonstrate yup usage. The *framework runtime* (services, drivers, dispatchers) does not import yup at module top.
+- The framework's own controllers (`Auth.ts`, `SomeController.ts`) still use yup imports at the call site — these are user-replaceable defaults that demonstrate yup usage. The _framework runtime_ (services, drivers, dispatchers) does not import yup at module top.
 - `ValidationError.message` is always-array shape: `{ field: ['msg'] }` even for a single error. Constructor accepts `Record<string, string | string[]>` for input flexibility, but normalizes output to `Record<string, string[]>`.
 - Yup-vendor driver and standard-schema dispatch behavior are unit-tested in isolation (each driver is a plain object — pass synthetic schemas, assert outputs).
 - **No `req:` context** — drivers receive `(body, data)`. If a future use case requires it, add via `libraryOptions` per Standard Schema spec, NOT via a private framework convention. Audit found zero current uses.

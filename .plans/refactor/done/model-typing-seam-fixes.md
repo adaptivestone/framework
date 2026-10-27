@@ -104,17 +104,19 @@ single-nested branch (around lines 386-397) that builds
 
 ```ts
 CorrectHydratedSubdocumentElement<
-  InferRawDocType<MutableSchemaForInference<SchemaSingleNestedDefinition<Schema[K]>>>,
+  InferRawDocType<
+    MutableSchemaForInference<SchemaSingleNestedDefinition<Schema[K]>>
+  >,
   SchemaSingleNestedDefinition<Schema[K]>
->
+>;
 ```
 
 A single-nested field spelled `field: { type: { … }, _id: false }` carries the
-marker on the *wrapper*; `SchemaSingleNestedDefinition` unwraps to the inner
+marker on the _wrapper_; `SchemaSingleNestedDefinition` unwraps to the inner
 definition, so by the time `CorrectHydratedSubdocumentElement` tests
 `Schema extends { readonly _id: false }` the marker is gone and the hydrated
 type keeps `_id: ObjectId` while the runtime has none. (The spelling with
-`_id: false` *inside* `type:` works because the marker survives the unwrap.)
+`_id: false` _inside_ `type:` works because the marker survives the unwrap.)
 Re-attach the marker when the wrapper has it — pass, as the second argument,
 
 ```ts
@@ -258,6 +260,6 @@ Follow-up status (2026-09-09; see [type/runtime parity fixes](type-runtime-parit
 Still open:
 
 - **A custom `id` virtual** is intersected with Mongoose's default `id: string`
-  (`AddDefaultId` keys off an `id` schema *path*), so one returning anything but
+  (`AddDefaultId` keys off an `id` schema _path_), so one returning anything but
   a string collapses to `never`. Upstream behaviour; declare it as a path or
   rename it.

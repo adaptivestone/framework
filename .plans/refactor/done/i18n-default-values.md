@@ -29,29 +29,33 @@ Framework middleware returns hardcoded English (`Please login to application`) �
 ## PR 1 — middleware (in flight)
 
 1. **`src/services/i18n/I18n.ts`** — `#i18nFallback.t` honours defaults, both i18next overloads:
+
    ```ts
    t: ((key, options) =>
      typeof options === 'string' ? options : (options?.defaultValue ?? key)) as TFunction,
    ```
+
    Calls without a default keep returning the key (existing behavior).
 2. **`src/services/http/middleware/AbstractMiddleware.ts`** — protected helper (no `params` arg — nothing interpolates yet, and spreading params into `t()` options collides with i18next control keys; add a `replace`-based variant only when needed):
+
    ```ts
    protected translate(req: FrameworkRequest, key: string, defaultValue: string): string {
      const translated = req.appInfo?.i18n?.t(key, { defaultValue });
      return typeof translated === 'string' ? translated : defaultValue;
    }
    ```
+
    Guards: absent `appInfo.i18n` (direct instantiation/tests) and non-string `t()` returns (malformed resource / `returnObjects`).
 3. **Call sites — 6 keys, 7 sites** (defaultValue = current text byte-for-byte):
 
-   | Key | defaultValue | Site |
-   |---|---|---|
-   | `middleware.auth.notLoggedIn` | Please login to application | Auth.ts 401 |
-   | `middleware.role.userRequired` | User should be provided | Role.ts 401 |
-   | `middleware.role.noAccess` | You do not have access | Role.ts 403 |
-   | `middleware.rateLimiter.tooManyRequests` | Too Many Requests | RateLimiter.ts 429 |
-   | `middleware.requestParser.entityTooLarge` | Request entity too large. Your upload exceeds the allowed size or count limits. | RequestParser.ts 413 ×2 |
-   | `middleware.requestParser.parseError` | Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type. | RequestParser.ts 400 |
+   | Key                                       | defaultValue                                                                                                                          | Site                    |
+   | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+   | `middleware.auth.notLoggedIn`             | Please login to application                                                                                                           | Auth.ts 401             |
+   | `middleware.role.userRequired`            | User should be provided                                                                                                               | Role.ts 401             |
+   | `middleware.role.noAccess`                | You do not have access                                                                                                                | Role.ts 403             |
+   | `middleware.rateLimiter.tooManyRequests`  | Too Many Requests                                                                                                                     | RateLimiter.ts 429      |
+   | `middleware.requestParser.entityTooLarge` | Request entity too large. Your upload exceeds the allowed size or count limits.                                                       | RequestParser.ts 413 ×2 |
+   | `middleware.requestParser.parseError`     | Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type. | RequestParser.ts 400    |
 
    Deliberately excluded: RateLimiter 500 `RateLimiter error` (ops-facing, not user language); Pagination schema message (no `req` in scope — parked with P1y). HttpServer 404/500 sinks were excluded from PR 1 but shipped later as a 5.4 rider (`http.notFound`/`http.serverError`, module-level translate in HttpServer.ts).
 4. **Tests**: fallback-`t` both overloads + no-default → key; per middleware: no key → exact current English, stubbed `appInfo.i18n` resolving key → translation wins; one non-string-`t`-return → defaultValue. Existing tests stay green untouched (they lock byte-identical English).

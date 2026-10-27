@@ -1,6 +1,6 @@
 # P1j — Codegen zero-init
 
-**Status**: ✅ DONE (v5.0.0) — the zero-init goal (no controller/middleware/model `new` during `npm run gen`) was delivered by the AST front-end ([[codegen-ast]] / P1n), which **superseded** the ghost-instance mechanism this doc planned. Phase 0 ✅ (beta.49) · Phase 1 ✅ static middleware schemas (beta.52, `relatedRequestParameters`/`relatedQueryParameters` static on `AbstractMiddleware`, instance form deprecated) · Phase 2 ✅ ghost (2026-06-04) **then replaced** — `ghostController.ts` deleted by P1n's AST extractor · Phase 3 ✅ folded into P1n Phase 5 (`astModel.isBaseModelSource` → import-free model scan in `appTypes.ts`; remaining `import(...)` in `appTypes.ts` are *emitted type-text*, not runtime imports) · Phase 4 moot under AST (consumer-only source scan; framework controllers resolve from `node_modules`). **Remaining = Phase 5 (v6 cleanup) only**: `skipWrap` (still in `controllers/index.ts`) + `process.exit(0)` (still in `cliCommand.ts`) + force-shutdown timer — tracked under [[static-middleware-cutover]] / P1n Phase 7.
+**Status**: ✅ DONE (v5.0.0) — the zero-init goal (no controller/middleware/model `new` during `npm run gen`) was delivered by the AST front-end ([[codegen-ast]] / P1n), which **superseded** the ghost-instance mechanism this doc planned. Phase 0 ✅ (beta.49) · Phase 1 ✅ static middleware schemas (beta.52, `relatedRequestParameters`/`relatedQueryParameters` static on `AbstractMiddleware`, instance form deprecated) · Phase 2 ✅ ghost (2026-06-04) **then replaced** — `ghostController.ts` deleted by P1n's AST extractor · Phase 3 ✅ folded into P1n Phase 5 (`astModel.isBaseModelSource` → import-free model scan in `appTypes.ts`; remaining `import(...)` in `appTypes.ts` are _emitted type-text_, not runtime imports) · Phase 4 moot under AST (consumer-only source scan; framework controllers resolve from `node_modules`). **Remaining = Phase 5 (v6 cleanup) only**: `skipWrap` (still in `controllers/index.ts`) + `process.exit(0)` (still in `cliCommand.ts`) + force-shutdown timer — tracked under [[static-middleware-cutover]] / P1n Phase 7.
 **Release-readiness (2026-06-06)**: codegen convergence validated for the 5.0.0 tag — 21/21 codegen tests green; `npm run gen` + `tsc --noEmit` over the framework's own controllers clean (no warnings/deprecations); golden-fixture gate **hardened** with `Schemas` fixture locking the schema-output + params typing paths (`request:`/`query:` → typed `req.appInfo.request`/`.query`; `:id` → `req.params.id`) that the gate previously didn't exercise. No codegen bug surfaced — the recent beta.49–55 churn has settled.
 **Depends on**: P1b ✅ (registry primitives)
 **Time**: ~2 days across phases 1–4 (v5.1); ¼ day for phase 5 (v6)
@@ -44,7 +44,7 @@ Codegen reads each controller's `routes` / `getHttpPath()` from a prototype-only
 
 Audited against two real consumer codebases (`tht-server` 23 ctrls, `xtok-backend-2025` 18 ctrls): every `routes` getter is a declarative map of prototype handler refs → all ghost-safe today; the fallback is insurance. Verified: `npm run gen --throw-deprecation` exits clean (no fallback for framework controllers), generated output byte-identical, 4 tests in `src/codegen/ghostController.test.ts`.
 
-Residual (accepted for v5.x): try/catch catches *throws* — a `routes` getter reading a constructor-set **scalar** without dereferencing it (e.g. `path: this.base + '/x'`) silently yields `undefined`; the v6 ghost-only cutover closes it.
+Residual (accepted for v5.x): try/catch catches _throws_ — a `routes` getter reading a constructor-set **scalar** without dereferencing it (e.g. `path: this.base + '/x'`) silently yields `undefined`; the v6 ghost-only cutover closes it.
 
 ### Phase 3 — Lazy model imports in appTypes
 
@@ -63,27 +63,27 @@ Residual (accepted for v5.x): try/catch catches *throws* — a `routes` getter r
 
 ## Files touched
 
-| File | Phase | Change |
-|---|---|---|
-| `src/codegen/emit.ts` | 0 ✅ | extends-chain walk for import map |
-| `src/codegen/emit.test.ts` | 0 ✅ | 3 tests |
-| `src/services/http/middleware/AbstractMiddleware.ts` | 1 | static defaults + `@deprecated` on instance form |
-| `src/services/http/middleware/Auth.ts` | 1 | migrate to static |
-| `src/services/http/middleware/GetUserByToken.ts` | 1 | migrate to static |
-| `src/services/http/middleware/RequestParser.ts` | 1 | migrate to static |
-| `src/services/http/middleware/RequestLogger.ts` | 1 | migrate to static |
-| `src/services/http/middleware/Pagination.ts` | 1 | migrate `related*Parameters` to static |
-| `src/controllers/index.ts` | 1 ✅, 2 ✅, 4 | `#wrapHandlerEntry` static-first; single-purpose `registerController` + new `registerControllerInstance` seam; public `loadControllerClasses`; runtime middleware-schema helpers (module-internal); (Phase 4) `skipFrameworkControllers` |
-| `src/codegen/ghostController.ts` | 2 ✅ | NEW — `ghostController()` (prototype ghost + fallback + `ASF_DEP_CTOR_ROUTES`), codegen layer |
-| `src/helpers/deprecation.ts` | 1 ✅, 2 ✅ | NEW — neutral `makeOncePerClassWarner`, shared by runtime + codegen warners |
-| `src/codegen/routeTypes.ts` | 2 ✅, 4 | drive `loadControllerClasses` → `ghostController` → `registerControllerInstance`; (Phase 4) `skipFrameworkControllers` |
-| `src/codegen/ghostController.test.ts` | 2 ✅ | ghost-safe (no ctor) + fallback-with-warn + registerControllerInstance + runtime paths |
-| `src/codegen/collectMetadata.ts` | 2 ✅ | unchanged — `extractControllerMeta` reads the ghost as-is (no static variant needed) |
-| `src/codegen/appTypes.ts` | 3 | drop per-model `import()`; regex parse for `BaseModel` detection |
-| `src/modules/BaseModel.ts` | 3 | `static isBaseModel = true` |
-| `cliCommand.ts` | 5 | remove `process.exit(0)` |
-| `src/server.ts` | 5 | clean up force-shutdown timer |
-| `CHANGELOG.md` | each | per-phase entries |
+| File                                                 | Phase         | Change                                                                                                                                                                                                                                   |
+| ---------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/codegen/emit.ts`                                | 0 ✅          | extends-chain walk for import map                                                                                                                                                                                                        |
+| `src/codegen/emit.test.ts`                           | 0 ✅          | 3 tests                                                                                                                                                                                                                                  |
+| `src/services/http/middleware/AbstractMiddleware.ts` | 1             | static defaults + `@deprecated` on instance form                                                                                                                                                                                         |
+| `src/services/http/middleware/Auth.ts`               | 1             | migrate to static                                                                                                                                                                                                                        |
+| `src/services/http/middleware/GetUserByToken.ts`     | 1             | migrate to static                                                                                                                                                                                                                        |
+| `src/services/http/middleware/RequestParser.ts`      | 1             | migrate to static                                                                                                                                                                                                                        |
+| `src/services/http/middleware/RequestLogger.ts`      | 1             | migrate to static                                                                                                                                                                                                                        |
+| `src/services/http/middleware/Pagination.ts`         | 1             | migrate `related*Parameters` to static                                                                                                                                                                                                   |
+| `src/controllers/index.ts`                           | 1 ✅, 2 ✅, 4 | `#wrapHandlerEntry` static-first; single-purpose `registerController` + new `registerControllerInstance` seam; public `loadControllerClasses`; runtime middleware-schema helpers (module-internal); (Phase 4) `skipFrameworkControllers` |
+| `src/codegen/ghostController.ts`                     | 2 ✅          | NEW — `ghostController()` (prototype ghost + fallback + `ASF_DEP_CTOR_ROUTES`), codegen layer                                                                                                                                            |
+| `src/helpers/deprecation.ts`                         | 1 ✅, 2 ✅    | NEW — neutral `makeOncePerClassWarner`, shared by runtime + codegen warners                                                                                                                                                              |
+| `src/codegen/routeTypes.ts`                          | 2 ✅, 4       | drive `loadControllerClasses` → `ghostController` → `registerControllerInstance`; (Phase 4) `skipFrameworkControllers`                                                                                                                   |
+| `src/codegen/ghostController.test.ts`                | 2 ✅          | ghost-safe (no ctor) + fallback-with-warn + registerControllerInstance + runtime paths                                                                                                                                                   |
+| `src/codegen/collectMetadata.ts`                     | 2 ✅          | unchanged — `extractControllerMeta` reads the ghost as-is (no static variant needed)                                                                                                                                                     |
+| `src/codegen/appTypes.ts`                            | 3             | drop per-model `import()`; regex parse for `BaseModel` detection                                                                                                                                                                         |
+| `src/modules/BaseModel.ts`                           | 3             | `static isBaseModel = true`                                                                                                                                                                                                              |
+| `cliCommand.ts`                                      | 5             | remove `process.exit(0)`                                                                                                                                                                                                                 |
+| `src/server.ts`                                      | 5             | clean up force-shutdown timer                                                                                                                                                                                                            |
+| `CHANGELOG.md`                                       | each          | per-phase entries                                                                                                                                                                                                                        |
 
 ## Out of scope
 
@@ -93,14 +93,14 @@ Residual (accepted for v5.x): try/catch catches *throws* — a `routes` getter r
 
 ## Done when
 
-| Phase | Verifiable in <5 min |
-|---|---|
-| 0 ✅ | `npx vitest run src/codegen/emit.test.ts` shows 3 passing |
-| 1 ✅ | `npm test` green; framework middlewares all use `static get`; `#wrapHandlerEntry` reads static-first with cached instance fallback |
-| 2 ✅ | `npx vitest run src/codegen/ghostController.test.ts` (4 passing): ghost read fires no ctor; constructor-dependent controller falls back to a real instance + emits `ASF_DEP_CTOR_ROUTES`; `registerControllerInstance` registers a ghost; runtime `registerController` still `new`s; `npm run gen --throw-deprecation` clean; output byte-identical |
-| 3 | `node --inspect-brk` on `npm run gen` shows zero `import()` calls under `models/` outside the regex parser path |
-| 4 | a fresh consumer project's `npm run gen` doesn't print framework-internal controllers in the "Found N controller(s)" log |
-| overall | consumer codebase (28 controllers, 137 routes): cold `<300 ms`, warm `<100 ms` for `node cli.ts generatetypes` wall-clock |
+| Phase   | Verifiable in <5 min                                                                                                                                                                                                                                                                                                                                |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 ✅    | `npx vitest run src/codegen/emit.test.ts` shows 3 passing                                                                                                                                                                                                                                                                                           |
+| 1 ✅    | `npm test` green; framework middlewares all use `static get`; `#wrapHandlerEntry` reads static-first with cached instance fallback                                                                                                                                                                                                                  |
+| 2 ✅    | `npx vitest run src/codegen/ghostController.test.ts` (4 passing): ghost read fires no ctor; constructor-dependent controller falls back to a real instance + emits `ASF_DEP_CTOR_ROUTES`; `registerControllerInstance` registers a ghost; runtime `registerController` still `new`s; `npm run gen --throw-deprecation` clean; output byte-identical |
+| 3       | `node --inspect-brk` on `npm run gen` shows zero `import()` calls under `models/` outside the regex parser path                                                                                                                                                                                                                                     |
+| 4       | a fresh consumer project's `npm run gen` doesn't print framework-internal controllers in the "Found N controller(s)" log                                                                                                                                                                                                                            |
+| overall | consumer codebase (28 controllers, 137 routes): cold `<300 ms`, warm `<100 ms` for `node cli.ts generatetypes` wall-clock                                                                                                                                                                                                                           |
 
 ## Trade-offs
 

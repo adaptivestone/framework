@@ -13,9 +13,9 @@ returned at runtime, with no cast.
 
 ## Why (origin)
 
-Requested 2026-06-15. Previously judged "not worth covering" as a *test* case
+Requested 2026-06-15. Previously judged "not worth covering" as a _test_ case
 (see the Remaining-cases audit — `.select()` listed under mongoose-territory
-skips), but the ask now is the *feature*: generation/typing of the projection,
+skips), but the ask now is the _feature_: generation/typing of the projection,
 not just a fixture. This doc revisits that call as a roadmap item.
 
 Refs are the biggest cast source; `.select()` is the second — every place a
@@ -55,7 +55,7 @@ mongoose-version bumps. Before building:
    add string-form parsing only if the object form proves insufficient.
 3. **Mandatory** per the typing PRINCIPLE: land a permanent tsc-gate fixture in
    `src/models/__fixtures__/` (include, exclude, `_id` default, mixed→full,
-   `.lean()` interaction) *before* touching the machinery — and re-run the whole
+   `.lean()` interaction) _before_ touching the machinery — and re-run the whole
    7-fixture gate + framework tsc + build/declaration-emit + smoke afterward.
 
 ## Out of scope

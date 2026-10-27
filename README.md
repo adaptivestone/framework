@@ -32,7 +32,7 @@ Node-only, as of Bun 1.4:
 - **`cluster.js` / `runCluster`** — the multi-process production entry point. It
   imports fine under Bun, but only the Node path is tested; run single-process
   under Bun (or put the process manager outside the app).
-- **Node's test-runner CLI.** Bun implements the `node:test` *API* but not
+- **Node's test-runner CLI.** Bun implements the `node:test` _API_ but not
   `node --test`, so a Bun project runs its suite with `bun test` and the
   framework preloads rather than the flags the Node docs show. Four framework
   test files need `mock.module()` (Node's `--experimental-test-module-mocks`),
@@ -69,6 +69,23 @@ To add the framework to an existing project instead:
 ```sh
 npm install @adaptivestone/framework
 ```
+
+## Upgrade notes (5.6.0)
+
+See the [5.6.0 release notes](CHANGELOG.md). Check these when you upgrade:
+
+- Register custom validator drivers (`ValidateService.register`) at module
+  scope, before `startServer()`. Routes now pick their driver once at boot, so
+  a driver registered inside the `bootHttp` hook no longer reaches them, and a
+  schema no driver matches fails `startServer()` instead of answering 500.
+- A static route answers only for the methods it defines. With
+  `GET /events/new` and `DELETE /events/:slug`, `DELETE /events/new` now reaches
+  the `:slug` route instead of answering 405.
+- A per-mount `RateLimiter` `consumeKeyComponents.request` list replaces the
+  configured list instead of adding to it. A mount that relied on both lists
+  must name every field.
+- Projects that run `npm run gen` must update the optional peer:
+  `npm i -D oxc-parser@^0.156.0`.
 
 ## Upgrade notes (5.5.1)
 

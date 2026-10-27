@@ -3,7 +3,7 @@
 **Status**: ⏳ in flight — doc additions landed 2026-06-06 (`15-recipes.md`, `16-anti-patterns.md`, `10-cli` "When to run codegen", linked from `01-intro`; grounded in real consumer-project patterns, kept project-name-free; docs build green). Skill generator + `llms.txt` + pipeline pending.
 **Depends on**: P1g (docs sweep — accuracy upstream feeds skill quality)
 **Time**: ~1.5 days after P1g lands (split across docs additions, generator, validation, publish)
-**Origin**: heavy LLM-assisted dev of the framework itself revealed the same need for framework *consumers* — fast, structured context. 2026-05-24 deep-dive surfaced the open Agent Skills standard (https://agentskills.io) backed by 40+ agents (Claude Code, Cursor, Copilot, Codex, …) plus the `skills.sh` registry (Vercel-Labs `skills` CLI) for cross-agent install.
+**Origin**: heavy LLM-assisted dev of the framework itself revealed the same need for framework _consumers_ — fast, structured context. 2026-05-24 deep-dive surfaced the open Agent Skills standard (https://agentskills.io) backed by 40+ agents (Claude Code, Cursor, Copilot, Codex, …) plus the `skills.sh` registry (Vercel-Labs `skills` CLI) for cross-agent install.
 
 ## Goal
 
@@ -29,7 +29,7 @@ The audit + new content benefit humans first. The skill picks them up for free.
 
 - `docs/15-recipes.md` — step-by-step cookbook. Add a controller, add a route with body schema, add a middleware that injects `appInfo`, wire pagination, override a framework controller, test a controller with the framework's helpers.
 - `docs/16-anti-patterns.md` — common mistakes + reasons. Don't hand-edit `.gen.ts`, don't `new` middlewares manually, don't mutate `req.body` to bypass validation, don't put state in `routes` getter, don't reach into raw Express where `req.appInfo.*` already exposes it. **Don't monkey-patch the framework (override internals, copy-paste a framework file to tweak it, shim around a bug) to work around a defect or missing feature — open a GitHub issue at `github.com/adaptivestone/framework/issues` so it's fixed upstream.** Local workarounds rot, hide the bug from everyone else, and break on the next framework update.
-- `docs/10-cli.md` — new section *When to run codegen* (decision matrix table).
+- `docs/10-cli.md` — new section _When to run codegen_ (decision matrix table).
 
 ### Generator (`framework-documenation-github/scripts/generate-skill.js`)
 
@@ -62,7 +62,7 @@ framework-documenation-github/skills/
 
 Transform per source file (minimal): strip numeric prefix from filename, rewrite internal links (`02-routes.md` → `routes.md`), strip image refs (LLMs can't read), drop the controllers subdirectory level, preserve everything else.
 
-`SKILL.md` is generated: frontmatter (name, description) + router list + always-apply rules inline (path syntax, Map keys, gen-file rules, and a **report-don't-patch rule**: when the agent hits a framework bug or limitation, it should open a GitHub issue at `github.com/adaptivestone/framework/issues` describing the problem + a minimal repro, *instead of* monkey-patching a local workaround — surface defects upstream where they get fixed for everyone).
+`SKILL.md` is generated: frontmatter (name, description) + router list + always-apply rules inline (path syntax, Map keys, gen-file rules, and a **report-don't-patch rule**: when the agent hits a framework bug or limitation, it should open a GitHub issue at `github.com/adaptivestone/framework/issues` describing the problem + a minimal repro, _instead of_ monkey-patching a local workaround — surface defects upstream where they get fixed for everyone).
 
 ### Pipeline (`framework-documenation-github/package.json`)
 
@@ -118,12 +118,12 @@ any agent that supports the Agent Skills format — see https://agentskills.io.
 ## Done when
 
 - ✅ `docs/15-recipes.md` + `docs/16-anti-patterns.md` exist, render in Docusaurus, linked from `01-intro.md`
-- ✅ `docs/10-cli.md` has the *When to run codegen* section
+- ✅ `docs/10-cli.md` has the _When to run codegen_ section
 - `scripts/generate-skill.js` runs from `npm run build`; output committed at `skills/adaptivestone-framework/`
 - `npm run validate-skill` green (skills-ref accepts the frontmatter)
 - Local smoke test: `npx skills add ./skills/adaptivestone-framework -a claude-code` installs, `/skills` lists `adaptivestone-framework`
 - Post-publish: `npx skills add adaptivestone/framework-documenation-github -a claude-code` works against a fresh checkout
-- Auto-trigger smoke test: ask *"how do I write a controller in @adaptivestone/framework?"* in a fresh Claude Code session; skill activates and pulls `references/controllers.md` + `references/recipes.md`
+- Auto-trigger smoke test: ask _"how do I write a controller in @adaptivestone/framework?"_ in a fresh Claude Code session; skill activates and pulls `references/controllers.md` + `references/recipes.md`
 - README install snippet added to framework + docs repos
 - `llms.txt` at doc-repo root, linked from the docs landing page
 

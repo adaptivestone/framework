@@ -6,7 +6,7 @@
 `ensureTestServerReady()` gate for application root hooks and expands the node:test suite to 7 tests.
 **Depends on**: nothing critical — can ship anytime
 **Time**: ~½ day
-**Origin**: framework currently ships test helpers (`getTestServerURL`, `serverInstance`, etc.) that lean on vitest's globals and lifecycle hooks. Consumers who'd rather use Node's built-in `node:test` (smaller dep tree, native TypeScript, runtime alignment) can't use them directly. Different scope from [vitest-to-node-test](vitest-to-node-test.md), which is about migrating the framework's *own* tests.
+**Origin**: framework currently ships test helpers (`getTestServerURL`, `serverInstance`, etc.) that lean on vitest's globals and lifecycle hooks. Consumers who'd rather use Node's built-in `node:test` (smaller dep tree, native TypeScript, runtime alignment) can't use them directly. Different scope from [vitest-to-node-test](vitest-to-node-test.md), which is about migrating the framework's _own_ tests.
 
 ## Goal
 
@@ -14,7 +14,7 @@ Make the framework's test surface usable from both `vitest` and `node:test`. The
 
 ## Files touched
 
-- `src/tests/setupVitest.ts` — split: the *vitest-specific* parts (`beforeAll`, `afterEach`) stay here; the *framework setup* (server bootstrap, mongo memory-server lifecycle) moves to a runner-agnostic module.
+- `src/tests/setupVitest.ts` — split: the _vitest-specific_ parts (`beforeAll`, `afterEach`) stay here; the _framework setup_ (server bootstrap, mongo memory-server lifecycle) moves to a runner-agnostic module.
 - New `src/tests/setupFramework.ts` (or similar) — exports `startTestServer()`, `stopTestServer()`, `resetDatabaseBetweenTests()` as plain async functions. No vitest imports.
 - New `src/tests/setupNodeTest.ts` — node:test glue that wraps the framework setup with `before`/`after` hooks from `node:test`. Mirrors what `setupVitest.ts` does.
 - `src/tests/testHelpers.ts` — already runner-agnostic (`getTestServerURL`, etc.); confirm no implicit vitest dependency.
@@ -38,7 +38,10 @@ import '@adaptivestone/framework/tests/setupVitest';
 import '@adaptivestone/framework/tests/setupNodeTest';
 
 // programmatic, runner-agnostic (new)
-import { startTestServer, stopTestServer } from '@adaptivestone/framework/tests/setupFramework';
+import {
+  startTestServer,
+  stopTestServer,
+} from '@adaptivestone/framework/tests/setupFramework';
 ```
 
 ## Isolated-test utilities — NOT built (future follow-up)

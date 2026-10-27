@@ -73,7 +73,7 @@ Module mocking:
 ```ts
 // Before
 import { vi } from 'vitest';
-vi.mock('yup', () => ({ ...realYup, /* spies */ }));
+vi.mock('yup', () => ({ ...realYup /* spies */ }));
 
 // After
 import { mock } from 'node:test';
