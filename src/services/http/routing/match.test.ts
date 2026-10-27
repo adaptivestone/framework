@@ -554,23 +554,105 @@ describe('match — backtracking past method-less static nodes (doc 05)', () => 
     assert.deepStrictEqual(m?.params, { id: 'me' });
     assert.ok(!m?.middlewares.map((e) => e.Class.name).includes('MeOnly'));
   });
+});
 
-  it('PINNED: a static node with a different method wins (405), not the param route', () => {
-    // Deliberate choice: the most-specific node reports 405 rather than
-    // backtracking to the param route. Change this only with intent.
-    const root = createNode('');
-    const u = createNode('u');
-    const me = createNode('me');
-    me.methods = { POST: { handler: noop } };
-    const idNode = createNode(':id');
-    idNode.methods = { GET: { handler: async () => 'param' } };
-    u.children.set('me', me);
-    u.paramChild = idNode;
-    root.children.set('u', u);
+describe('match — method-aware backtracking past static nodes', () => {
+  // GET /editor/event  +  DELETE /editor/:slug — a slug may equal "event".
+  const getEvent: HandlerEntry['handler'] = async () => 'getEvent';
+  const deleteBySlug: HandlerEntry['handler'] = async () => 'deleteBySlug';
+  const buildEditor = () => {
+    const registry = new RouteRegistry();
+    registry.registerRoute('GET', '/editor/event', { handler: getEvent });
+    registry.registerRoute('DELETE', '/editor/:slug', {
+      handler: deleteBySlug,
+    });
+    return registry;
+  };
 
-    const m = match(root, 'GET', '/u/me');
+  it('a static node without the method does not shadow a sibling param route', () => {
+    const registry = buildEditor();
+    const m = registry.match('DELETE', '/editor/event');
+    assert.strictEqual(m?.entry?.handler, deleteBySlug);
+    assert.deepStrictEqual(m?.params, { slug: 'event' });
+    // The static route still wins for its own method; case-insensitive too.
+    assert.strictEqual(
+      registry.match('GET', '/editor/event')?.entry?.handler,
+      getEvent,
+    );
+    assert.deepStrictEqual(registry.match('DELETE', '/editor/EVENT')?.params, {
+      slug: 'EVENT',
+    });
+  });
+
+  it('405 only when no matching route has the method; Allow lists them all', () => {
+    const m = buildEditor().match('POST', '/editor/event');
     assert.strictEqual(m?.entry, null);
-    assert.deepStrictEqual(m?.allowedMethods, ['POST']);
+    assert.deepStrictEqual(m?.allowedMethods, ['GET', 'HEAD', 'DELETE']);
+    // A path only the param route matches keeps its own Allow list.
+    const other = buildEditor().match('GET', '/editor/other');
+    assert.strictEqual(other?.entry, null);
+    assert.deepStrictEqual(other?.allowedMethods, ['DELETE']);
+  });
+
+  it('405 reports params and middlewares of the most specific path match', () => {
+    const registry = buildEditor();
+    registry.registerSubtree('/editor/event', {
+      ...createNode(''),
+      middlewares: [mw('EventOnly')],
+    });
+    const m = registry.match('POST', '/editor/event');
+    assert.strictEqual(m?.entry, null);
+    assert.deepStrictEqual(m?.params, {});
+    assert.deepStrictEqual(
+      m?.middlewares.map((e) => e.Class.name),
+      ['EventOnly'],
+    );
+  });
+
+  it('middleware on the skipped static node does not leak into the param match', () => {
+    const registry = buildEditor();
+    registry.registerSubtree('/editor/event', {
+      ...createNode(''),
+      middlewares: [mw('EventOnly')],
+    });
+    const m = registry.match('DELETE', '/editor/event');
+    assert.strictEqual(m?.entry?.handler, deleteBySlug);
+    assert.deepStrictEqual(m?.middlewares, []);
+  });
+
+  it('HEAD falls back to GET on the param route when the static node lacks both', () => {
+    const registry = new RouteRegistry();
+    registry.registerRoute('POST', '/u/me', { handler: noop });
+    registry.registerRoute('GET', '/u/:id', { handler: getEvent });
+    for (const method of ['GET', 'HEAD']) {
+      const m = registry.match(method, '/u/me');
+      assert.strictEqual(m?.entry?.handler, getEvent);
+      assert.deepStrictEqual(m?.params, { id: 'me' });
+    }
+  });
+
+  it('falls through to a splat sibling, including a zero-segment splat', () => {
+    const registry = new RouteRegistry();
+    registry.registerRoute('GET', '/files', { handler: noop });
+    registry.registerRoute('GET', '/files/readme', { handler: noop });
+    registry.registerRoute('PUT', '/files/*path', { handler: getEvent });
+    assert.deepStrictEqual(registry.match('PUT', '/files/readme')?.params, {
+      path: 'readme',
+    });
+    assert.deepStrictEqual(registry.match('PUT', '/files')?.params, {
+      path: '',
+    });
+    assert.strictEqual(registry.match('GET', '/files')?.entry?.handler, noop);
+  });
+
+  it('a deeper static branch without the method falls back to a param ancestor', () => {
+    // GET /a/b/c  +  POST /a/:x/c  →  POST /a/b/c reaches the param branch.
+    const registry = new RouteRegistry();
+    registry.registerRoute('GET', '/a/b/c', { handler: noop });
+    registry.registerRoute('POST', '/a/:x/c', { handler: getEvent });
+    const m = registry.match('POST', '/a/b/c');
+    assert.strictEqual(m?.entry?.handler, getEvent);
+    assert.deepStrictEqual(m?.params, { x: 'b' });
   });
 });
 
