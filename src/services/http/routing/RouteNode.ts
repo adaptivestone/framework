@@ -101,9 +101,10 @@ export interface RouteNode {
 /**
  * Match outcome:
  * - `entry !== null` → success; adapter runs middlewares then handler.
- * - `entry === null` → path matched a node but the method didn't (405);
- *   adapter sets `Allow: <allowedMethods>`. `middlewares` still holds the
- *   accumulated path chain — adapter chooses whether to run them.
+ * - `entry === null` → the path matched but no matching route has the method
+ *   (405); `allowedMethods` lists the methods of every route matching the
+ *   path, for the `Allow` header. `middlewares` and `params` come from the most
+ *   specific of them — adapter chooses whether to run the middlewares.
  *
  * `match()` returns `null` when nothing matches (404).
  */
