@@ -139,7 +139,10 @@ describe('createExpressAdapter — 405 with Allow', () => {
     assert.ok(allow);
     assertTextMatch(allow, /GET/);
     assertTextMatch(allow, /POST/);
-    assert.deepStrictEqual(res.body, { message: 'Method not allowed' });
+    assert.deepStrictEqual(res.body, {
+      error: 'METHOD_NOT_ALLOWED',
+      message: 'Method not allowed',
+    });
   });
 
   it('routes to a param sibling when the static route lacks the method', async () => {
@@ -191,7 +194,10 @@ describe('createExpressAdapter — 405 with Allow', () => {
       asExpressRes(methodRes),
       mock.fn(),
     );
-    assert.deepStrictEqual(methodRes.body, { message: 'Метод не разрешён' });
+    assert.deepStrictEqual(methodRes.body, {
+      error: 'METHOD_NOT_ALLOWED',
+      message: 'Метод не разрешён',
+    });
 
     const malformedRes = makeRes();
     await adapter(
@@ -200,7 +206,10 @@ describe('createExpressAdapter — 405 with Allow', () => {
       mock.fn(),
     );
     assert.strictEqual(malformedRes.statusCode, 400);
-    assert.deepStrictEqual(malformedRes.body, { message: 'Неверный URL' });
+    assert.deepStrictEqual(malformedRes.body, {
+      error: 'MALFORMED_URL',
+      message: 'Неверный URL',
+    });
   });
 });
 

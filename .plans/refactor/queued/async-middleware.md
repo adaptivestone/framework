@@ -56,7 +56,13 @@ async middleware(req, res, next): Promise<void | Response> {
 uses the returned-response path already exercised in v5.3. Reopen B only with a concrete
 wrap-around middleware use case.
 
-## D2 — what `ctx` is (open; needs the user's call, raised 2026-10-31)
+## D2 — what `ctx` is (direction C chosen 2026-10-31; final shape after market research)
+
+**User decision 2026-10-31:** option **c** is the priority, but the exact `RequestContext` must
+come from a survey of how the market does it (Hono, h3/Nitro, Elysia, Koa, Fastify, Express 5,
+NestJS, AdonisJS, Cloudflare Workers, SvelteKit, Astro, Next.js, React Router, Fresh, Encore, …):
+it should feel like a proper framework request/response context with the abilities those offer,
+not a minimal shim. Proposal goes back to the user before implementation.
 
 The plan says `middleware(ctx)` but never defines `ctx` for the v5 opt-in. It matters because the
 point of opting in during 5.x is that a v2 middleware survives v6 (and later the Node adapter)

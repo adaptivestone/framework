@@ -162,10 +162,10 @@ adapter-neutral and ships with the writer instead of being built twice.
   Phase 2 (framework responses traverse the writer); the hook must not be advertised before then,
   or it silently covers only descriptor-returning handlers.
 - **Bridge period (v5.x)**: legacy handlers that call `res.json` directly never reach the writer.
-  If the all-JSON guarantee is wanted before v6, the Express-era implementation is a `res.json`
-  wrap owned internally by `ExpressAdapter`, with `ExpressResponseWriter` sending through the same
-  point so the hook applies exactly once; consumers never see Express. In v6 the writer is the
-  only path and the implementation moves there — the consumer contract does not change.
+  **Settled 2026-10-31 (user): no `res.json` bridge.** The hook covers returned responses and every
+  framework-built response; a handler writing `res` itself is documented as not transformed (an
+  always-on wrap would double-envelope apps that already wrap their own bodies). In v6 the writer
+  is the only path, so the gap closes by itself.
 - **Failure**: a throwing transform logs at `error` and renders the original response — a broken
   envelope must not take the API down.
 - **OpenAPI caveat**: a transform makes generated body schemas wrong unless paired with a
@@ -327,13 +327,23 @@ As built:
 - **Built-ins.** `Home` and `Health` return descriptors, keeping an optional `res` parameter and
   `| Response` in their return types so overrides written against `res` still compile (pinned
   by compile-only subclasses in `Home.test.ts`/`Health.test.ts`).
-- **Held: `Auth`.** Migrating it would silently drop the response of an override that does
-  `await super.postLogin(req, res)` without returning — a runtime break for the most-subclassed
-  controller. Flagged to the user 2026-10-31 instead of shipping; candidate for the v6 bucket.
+- **`Auth` — decided 2026-10-31 (user): migrate everything if it can be done safely, else keep
+  it on `res` until v6.** The hazard: an override doing `await super.postLogin(req, res)` without
+  `return` would drop the returned response and hang. Safe route being tried: the built-in
+  handlers mark the response they produce on the request; when a handler finishes having sent
+  nothing and returned no response, the adapter sends the marked one and warns once
+  (`return super.…()`). Fallback if that is not small and clean: keep `Auth` on `res` (v6 list).
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
-  "not initialised" 500 (registry middleware — moves with P1m). The optional `res.json` bridge
-  that would extend the transform to legacy handlers before v6 was not built; open question.
+  "not initialised" 500 (registry middleware — moves with P1m).
+- **Legacy error results — decided 2026-10-31 (user): strict.** A `{ status, body }` result with a
+  status no JSON response may carry (206, outside 200–599) is a broken handler → logged, 500.
+  Before, `res.status(s).json()` sent 206 as given. One changelog line.
+- **Error codes on framework-built errors — decided 2026-10-31 (user, option C).** Every error
+  body the framework builds carries `error`: `VALIDATION_FAILED` (validation 400 and the
+  Mongoose safety nets), `MALFORMED_URL`, `MALFORMED_BODY`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`,
+  `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_CONTENT_TYPE`, `SERVER_ERROR`. Additive for clients;
+  whole-body test assertions in apps change (as with the 5.5 codes).
 
 ### Phase 3 — OpenAPI/type integration
 

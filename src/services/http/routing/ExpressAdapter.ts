@@ -11,6 +11,7 @@ import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
 import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import type { ResponseWriter } from '../ResponseWriter.ts';
 import { HttpResponse } from '../responses.ts';
@@ -42,6 +43,7 @@ export function createExpressAdapter(
     } catch (err) {
       if (err instanceof MalformedPathError) {
         const malformed = HttpResponse.json(400, {
+          error: FRAMEWORK_ERROR_CODES.malformedUrl,
           message: translateWithDefault(
             req as FrameworkRequest,
             'http.malformedUrl',
@@ -63,6 +65,7 @@ export function createExpressAdapter(
       const notAllowed = HttpResponse.json(
         405,
         {
+          error: FRAMEWORK_ERROR_CODES.methodNotAllowed,
           message: translateWithDefault(
             req as FrameworkRequest,
             'http.methodNotAllowed',

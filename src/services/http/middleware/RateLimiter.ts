@@ -15,7 +15,7 @@ import type rateLimiterConfig from '../../../config/rateLimiter.js';
 import { makeOncePerClassWarner } from '../../../helpers/deprecation.ts';
 import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
-import { HttpError } from '../httpErrors.ts';
+import { FRAMEWORK_ERROR_CODES, HttpError } from '../httpErrors.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
 
@@ -212,7 +212,10 @@ class RateLimiter extends AbstractMiddleware {
       this.logger?.info(
         `RateLimiter not inited correclty! Please check init logs `,
       );
-      return res.status(500).json({ message: 'RateLimiter error' });
+      return res.status(500).json({
+        error: FRAMEWORK_ERROR_CODES.serverError,
+        message: 'RateLimiter error',
+      });
     }
 
     // The redis `namespace` prefixes the consume key regardless of driver

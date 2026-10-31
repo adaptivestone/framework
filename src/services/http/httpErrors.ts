@@ -39,6 +39,29 @@ export interface HttpErrorBodyDetails {
 
 export type HttpErrorDetails = HttpErrorContractDetails | HttpErrorBodyDetails;
 
+/**
+ * The `error` code of every error response the framework builds itself, so a
+ * client can tell them apart without parsing the translated `message`.
+ */
+export const FRAMEWORK_ERROR_CODES = {
+  /** 400: a `params:`/`request:`/`query:` schema rejected the input (also the Mongoose safety nets). */
+  validationFailed: 'VALIDATION_FAILED',
+  /** 400: the URL path could not be decoded. */
+  malformedUrl: 'MALFORMED_URL',
+  /** 400: the request body could not be parsed. */
+  malformedBody: 'MALFORMED_BODY',
+  /** 404: no route matches the path. */
+  notFound: 'NOT_FOUND',
+  /** 405: a route matches the path, but not the method. */
+  methodNotAllowed: 'METHOD_NOT_ALLOWED',
+  /** 413: the request body exceeds the configured limits. */
+  payloadTooLarge: 'PAYLOAD_TOO_LARGE',
+  /** 415: the route accepts none of the request's content type. */
+  unsupportedContentType: 'UNSUPPORTED_CONTENT_TYPE',
+  /** 500: an error nothing in the error-handler registry resolved. */
+  serverError: 'SERVER_ERROR',
+} as const;
+
 const CONTRACT_FIELDS = ['code', 'i18nKey', 'errors'] as const;
 
 const warnBodyMixed = makeOncePerClassWarner(

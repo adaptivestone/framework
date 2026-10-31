@@ -13,6 +13,7 @@ import {
   validationFailedMessage,
 } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import { FRAMEWORK_ERROR_CODES } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import { HttpResponse } from '../services/http/responses.ts';
 import {
@@ -458,6 +459,7 @@ class ControllerManager extends Base {
               : undefined;
           if (!matched) {
             return HttpResponse.json(415, {
+              error: FRAMEWORK_ERROR_CODES.unsupportedContentType,
               message: translateWithDefault(
                 req,
                 'http.unsupportedContentType',
@@ -515,6 +517,7 @@ class ControllerManager extends Base {
           req,
           ValidationError.isValidationError(err)
             ? HttpResponse.json(400, {
+                error: FRAMEWORK_ERROR_CODES.validationFailed,
                 message: validationFailedMessage(req),
                 errors: err.message,
               })
