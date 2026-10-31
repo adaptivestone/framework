@@ -6,6 +6,7 @@ import { translateWithDefault } from '../helpers/translate.ts';
 import AbstractController, {
   type TMiddleware,
 } from '../modules/AbstractController.ts';
+import { builtInResponse } from '../services/http/builtInResponse.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { HttpResponse, type JsonResponse } from '../services/http/responses.ts';
 
@@ -68,7 +69,7 @@ class Health extends AbstractController {
     if (!this.isAuthorized(req)) {
       return this.unauthorized(req, res);
     }
-    return HttpResponse.json(200, { status: 'ok' });
+    return builtInResponse(req, HttpResponse.json(200, { status: 'ok' }));
   }
 
   async ready(
@@ -86,10 +87,13 @@ class Health extends AbstractController {
     if (mongo === 'error') {
       this.logger?.warn('Health check failed: MongoDB ping');
     }
-    return HttpResponse.json(mongo === 'ok' ? 200 : 503, {
-      status: mongo,
-      checks: { mongo },
-    });
+    return builtInResponse(
+      req,
+      HttpResponse.json(mongo === 'ok' ? 200 : 503, {
+        status: mongo,
+        checks: { mongo },
+      }),
+    );
   }
 
   /** With `health.token` set, the request must carry it (`X-Health-Token` or `?token=`). */
@@ -107,9 +111,16 @@ class Health extends AbstractController {
     req: FrameworkRequest,
     _res?: Response,
   ): Unauthorized | Response {
-    return HttpResponse.json(401, {
-      message: translateWithDefault(req, 'health.unauthorized', 'Unauthorized'),
-    });
+    return builtInResponse(
+      req,
+      HttpResponse.json(401, {
+        message: translateWithDefault(
+          req,
+          'health.unauthorized',
+          'Unauthorized',
+        ),
+      }),
+    );
   }
 }
 

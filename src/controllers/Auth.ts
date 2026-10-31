@@ -4,8 +4,10 @@ import { translateWithDefault } from '../helpers/translate.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken } from '../models/User.ts';
 import AbstractController from '../modules/AbstractController.ts';
+import { builtInResponse } from '../services/http/builtInResponse.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
 import RateLimiter from '../services/http/middleware/RateLimiter.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import { defineSchema } from '../services/validate/defineSchema.ts';
 import type { ValidationIssue } from '../services/validate/types.ts';
 import type {
@@ -19,6 +21,14 @@ import type {
 } from './Auth.routes.gen.ts';
 
 type UserInstance = InstanceType<TUser>;
+
+/**
+ * What the auth handlers answer. They return an `HttpResponse`; `Response`
+ * stays in the type (and `res` an optional parameter) so overrides written
+ * against `res` still fit. An override that calls a handler must return its
+ * result (`return super.postLogin(req, res)`).
+ */
+type AuthAnswer = HttpResponse | Response;
 
 // Zero-dependency validation for the built-in auth routes. Messages are i18n
 // keys; the framework auto-translates them via the request's `i18n.t` before
@@ -324,20 +334,23 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(req: PostLoginRequest, res: Response) {
+  async postLogin(req: PostLoginRequest, _res?: Response): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     const userResult = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
       req.appInfo.request.password, // we do a request casting
     );
     if (!userResult) {
-      return res.status(400).json({
-        message: translateWithDefault(
-          req,
-          'auth.errorUPValid',
-          EN['auth.errorUPValid'],
-        ),
-      });
+      return builtInResponse(
+        req,
+        HttpResponse.json(400, {
+          message: translateWithDefault(
+            req,
+            'auth.errorUPValid',
+            EN['auth.errorUPValid'],
+          ),
+        }),
+      );
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
     const user = userResult;
@@ -345,24 +358,33 @@ class Auth extends AbstractController {
       this.app.getConfig('auth'),
     );
     if (isAuthWithVerificationFlow && !user.isVerified) {
-      return res.status(400).json({
-        error: 'EMAIL_NOT_VERIFIED',
-        message: translateWithDefault(
-          req,
-          'email.notVerified',
-          EN['email.notVerified'],
-        ),
-        // @deprecated in favor of `error`; removed in v6.
-        notVerified: true,
-      });
+      return builtInResponse(
+        req,
+        HttpResponse.json(400, {
+          error: 'EMAIL_NOT_VERIFIED',
+          message: translateWithDefault(
+            req,
+            'email.notVerified',
+            EN['email.notVerified'],
+          ),
+          // @deprecated in favor of `error`; removed in v6.
+          notVerified: true,
+        }),
+      );
     }
     // A password changed meanwhile rejects with the wrong-password 400.
     const token = await user.generateToken();
 
-    return res.status(200).json({ data: { token, user: user.getPublic() } });
+    return builtInResponse(
+      req,
+      HttpResponse.json(200, { data: { token, user: user.getPublic() } }),
+    );
   }
 
-  async postRegister(req: PostRegisterRequest, res: Response) {
+  async postRegister(
+    req: PostRegisterRequest,
+    _res?: Response,
+  ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     // NOTE: registration intentionally reports when an email or nickname is
     // already taken (distinct 400s). This leaks account existence — a deliberate
@@ -373,26 +395,32 @@ class Auth extends AbstractController {
       req.appInfo.request.email,
     )) as InstanceType<TUser>;
     if (user) {
-      return res.status(400).json({
-        message: translateWithDefault(
-          req,
-          'email.registered',
-          EN['email.registered'],
-        ),
-      });
+      return builtInResponse(
+        req,
+        HttpResponse.json(400, {
+          message: translateWithDefault(
+            req,
+            'email.registered',
+            EN['email.registered'],
+          ),
+        }),
+      );
     }
     if (req.appInfo.request.nickName) {
       user = (await User.findOne({
         'name.nick': req.appInfo.request.nickName,
       })) as InstanceType<TUser>;
       if (user) {
-        return res.status(400).json({
-          message: translateWithDefault(
-            req,
-            'auth.nicknameExists',
-            EN['auth.nicknameExists'],
-          ),
-        });
+        return builtInResponse(
+          req,
+          HttpResponse.json(400, {
+            message: translateWithDefault(
+              req,
+              'auth.nicknameExists',
+              EN['auth.nicknameExists'],
+            ),
+          }),
+        );
       }
     }
 
@@ -414,22 +442,28 @@ class Auth extends AbstractController {
       // so the error-handler registry keeps returning its honest 500.
       const dupFields = duplicateKeyFields(err);
       if (dupFields?.includes('email')) {
-        return res.status(400).json({
-          message: translateWithDefault(
-            req,
-            'email.registered',
-            EN['email.registered'],
-          ),
-        });
+        return builtInResponse(
+          req,
+          HttpResponse.json(400, {
+            message: translateWithDefault(
+              req,
+              'email.registered',
+              EN['email.registered'],
+            ),
+          }),
+        );
       }
       if (dupFields?.includes('name.nick')) {
-        return res.status(400).json({
-          message: translateWithDefault(
-            req,
-            'auth.nicknameExists',
-            EN['auth.nicknameExists'],
-          ),
-        });
+        return builtInResponse(
+          req,
+          HttpResponse.json(400, {
+            message: translateWithDefault(
+              req,
+              'auth.nicknameExists',
+              EN['auth.nicknameExists'],
+            ),
+          }),
+        );
       }
       throw err;
     }
@@ -444,10 +478,13 @@ class Auth extends AbstractController {
           this.logger?.error(e);
         });
     }
-    return res.status(201).json();
+    return builtInResponse(req, HttpResponse.empty(201));
   }
 
-  async postLogout(req: PostLogoutRequest, res: Response) {
+  async postLogout(
+    req: PostLogoutRequest,
+    _res?: Response,
+  ): Promise<AuthAnswer> {
     const user = req.appInfo.user;
     if (user) {
       // Revoke the exact session the request authenticated with: resolve the
@@ -463,10 +500,13 @@ class Auth extends AbstractController {
         );
       }
     }
-    return res.status(200).json({ message: 'Ok' });
+    return builtInResponse(req, HttpResponse.json(200, { message: 'Ok' }));
   }
 
-  async verifyUser(req: VerifyUserRequest, res: Response) {
+  async verifyUser(
+    req: VerifyUserRequest,
+    _res?: Response,
+  ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user: UserInstance;
     try {
@@ -477,23 +517,29 @@ class Auth extends AbstractController {
         { save: false },
       )) as unknown as UserInstance;
     } catch {
-      return res.status(400).json({
-        message: translateWithDefault(
-          req,
-          'email.alreadyVerifiedOrWrongToken',
-          EN['email.alreadyVerifiedOrWrongToken'],
-        ),
-      });
+      return builtInResponse(
+        req,
+        HttpResponse.json(400, {
+          message: translateWithDefault(
+            req,
+            'email.alreadyVerifiedOrWrongToken',
+            EN['email.alreadyVerifiedOrWrongToken'],
+          ),
+        }),
+      );
     }
     this.logger?.debug(`Verify user ${user?.id}`);
     if (!user) {
-      return res.status(400).json({
-        message: translateWithDefault(
-          req,
-          'email.alreadyVerifiedOrWrongToken',
-          EN['email.alreadyVerifiedOrWrongToken'],
-        ),
-      });
+      return builtInResponse(
+        req,
+        HttpResponse.json(400, {
+          message: translateWithDefault(
+            req,
+            'email.alreadyVerifiedOrWrongToken',
+            EN['email.alreadyVerifiedOrWrongToken'],
+          ),
+        }),
+      );
     }
 
     user.isVerified = true;
@@ -505,23 +551,26 @@ class Auth extends AbstractController {
         err instanceof mongoose.Error.VersionError ||
         err instanceof mongoose.Error.DocumentNotFoundError
       ) {
-        return res.status(400).json({
-          message: translateWithDefault(
-            req,
-            'email.alreadyVerifiedOrWrongToken',
-            EN['email.alreadyVerifiedOrWrongToken'],
-          ),
-        });
+        return builtInResponse(
+          req,
+          HttpResponse.json(400, {
+            message: translateWithDefault(
+              req,
+              'email.alreadyVerifiedOrWrongToken',
+              EN['email.alreadyVerifiedOrWrongToken'],
+            ),
+          }),
+        );
       }
       throw err;
     }
-    return res.status(200).json();
+    return builtInResponse(req, HttpResponse.empty(200));
   }
 
   async sendPasswordRecoveryEmail(
     req: SendPasswordRecoveryEmailRequest,
-    res: Response,
-  ) {
+    _res?: Response,
+  ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     // Uniform response whether or not the account exists — the old 400-vs-200
     // split was an account-existence oracle. The dispatch is fire-and-forget so
@@ -537,16 +586,22 @@ class Auth extends AbstractController {
     } catch (e) {
       this.logger?.error(e);
     }
-    return res.status(200).json({
-      message: translateWithDefault(
-        req,
-        'auth.recoveryEmailSent',
-        EN['auth.recoveryEmailSent'],
-      ),
-    });
+    return builtInResponse(
+      req,
+      HttpResponse.json(200, {
+        message: translateWithDefault(
+          req,
+          'auth.recoveryEmailSent',
+          EN['auth.recoveryEmailSent'],
+        ),
+      }),
+    );
   }
 
-  async recoverPassword(req: RecoverPasswordRequest, res: Response) {
+  async recoverPassword(
+    req: RecoverPasswordRequest,
+    _res?: Response,
+  ): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     // Consume the token in the same write as the new password, so a failed
     // save leaves the link usable for a retry.
@@ -558,13 +613,16 @@ class Auth extends AbstractController {
     });
 
     if (!user) {
-      return res.status(400).json({
-        message: translateWithDefault(
-          req,
-          'password.wrongToken',
-          EN['password.wrongToken'],
-        ),
-      });
+      return builtInResponse(
+        req,
+        HttpResponse.json(400, {
+          message: translateWithDefault(
+            req,
+            'password.wrongToken',
+            EN['password.wrongToken'],
+          ),
+        }),
+      );
     }
 
     this.logger?.debug(`Password recovery user ${user.id}`);
@@ -583,20 +641,26 @@ class Auth extends AbstractController {
         err instanceof mongoose.Error.VersionError ||
         err instanceof mongoose.Error.DocumentNotFoundError
       ) {
-        return res.status(400).json({
-          message: translateWithDefault(
-            req,
-            'password.wrongToken',
-            EN['password.wrongToken'],
-          ),
-        });
+        return builtInResponse(
+          req,
+          HttpResponse.json(400, {
+            message: translateWithDefault(
+              req,
+              'password.wrongToken',
+              EN['password.wrongToken'],
+            ),
+          }),
+        );
       }
       throw err;
     }
-    return res.status(200).json();
+    return builtInResponse(req, HttpResponse.empty(200));
   }
 
-  async sendVerification(req: SendVerificationRequest, res: Response) {
+  async sendVerification(
+    req: SendVerificationRequest,
+    _res?: Response,
+  ): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     // Uniform response + fire-and-forget dispatch — no existence oracle and no
     // timing oracle (the known-email path doesn't block on token gen + SMTP).
@@ -610,13 +674,16 @@ class Auth extends AbstractController {
     } catch (e) {
       this.logger?.error(e);
     }
-    return res.status(200).json({
-      message: translateWithDefault(
-        req,
-        'auth.verificationEmailSent',
-        EN['auth.verificationEmailSent'],
-      ),
-    });
+    return builtInResponse(
+      req,
+      HttpResponse.json(200, {
+        message: translateWithDefault(
+          req,
+          'auth.verificationEmailSent',
+          EN['auth.verificationEmailSent'],
+        ),
+      }),
+    );
   }
 
   static get middleware() {

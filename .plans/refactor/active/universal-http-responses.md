@@ -333,6 +333,12 @@ As built:
   handlers mark the response they produce on the request; when a handler finishes having sent
   nothing and returned no response, the adapter sends the marked one and warns once
   (`return super.…()`). Fallback if that is not small and clean: keep `Auth` on `res` (v6 list).
+  **Done 2026-10-31:** `services/http/builtInResponse.ts` (`builtInResponse(req, response)` marks,
+  `producedBuiltInResponse(req)` reads); `Auth`, `Home` and `Health` mark every response; the
+  adapter sends a marked-but-dropped response and emits `ASF_DEP_DROPPED_RESPONSE` once per
+  handler. `Auth` handlers keep `_res?: Response` and `Promise<HttpResponse | Response>` so
+  overrides written against `res` compile (compile-only subclass in `Auth.test.ts`). v6: drop the
+  bridge — a response that was not returned is not sent.
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).

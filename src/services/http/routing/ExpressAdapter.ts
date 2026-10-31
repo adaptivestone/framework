@@ -9,6 +9,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
+import { producedBuiltInResponse } from '../builtInResponse.ts';
 import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
@@ -16,10 +17,30 @@ import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import type { ResponseWriter } from '../ResponseWriter.ts';
 import { HttpResponse } from '../responses.ts';
 import { getMatchedNode, MalformedPathError } from './match.ts';
-import type { MatchResult, MiddlewareEntry, RouteNode } from './RouteNode.ts';
+import type {
+  HandlerEntry,
+  MatchResult,
+  MiddlewareEntry,
+  RouteNode,
+} from './RouteNode.ts';
 import type { RouteRegistry } from './RouteRegistry.ts';
 
 const instanceCache = new WeakMap<MiddlewareEntry, AbstractMiddleware>();
+
+const warnedDroppedResponse = new Set<string>();
+
+/** Once per handler: it called a framework handler and dropped its response. */
+function warnDroppedResponse(entry: HandlerEntry): void {
+  const name = `${entry.meta?.controllerClass ?? 'Controller'}.${entry.meta?.methodName ?? 'handler'}`;
+  if (warnedDroppedResponse.has(name)) {
+    return;
+  }
+  warnedDroppedResponse.add(name);
+  process.emitWarning(
+    `${name} called a framework handler without returning its response; the response was sent anyway. Return it (\`return super.${entry.meta?.methodName ?? 'handler'}(req, res)\`): v6 will not send a response that was not returned.`,
+    { type: 'DeprecationWarning', code: 'ASF_DEP_DROPPED_RESPONSE' },
+  );
+}
 
 export type ExpressAdapter = (
   req: Request,
@@ -121,6 +142,14 @@ export function createExpressAdapter(
           );
         }
         await writer.write(returned, req, res);
+      } else if (!res.headersSent) {
+        // An override that awaited a framework handler without returning its
+        // response would answer nothing (5.x bridge, see `builtInResponse`).
+        const dropped = producedBuiltInResponse(req);
+        if (dropped) {
+          warnDroppedResponse(result.entry);
+          await writer.write(dropped, req, res);
+        }
       }
     } catch (err) {
       next(err);
