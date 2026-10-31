@@ -63,7 +63,8 @@ void [plain, fallback, interpolated, numeric, objectAsString, detailsAsString];
 
 // The validation error, the registry and the response factories are public:
 // their declarations must check under `skipLibCheck: false` too.
-const unregister = app.httpServer?.registerErrorHandler(ValidationError, (err) =>
-  HttpResponse.json(422, { errors: err.message }),
+const unregister = app.httpServer?.registerErrorHandler(
+  ValidationError,
+  (err) => HttpResponse.json(422, { errors: err.message }),
 );
 void unregister;

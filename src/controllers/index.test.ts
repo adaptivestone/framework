@@ -35,6 +35,7 @@ import type {
 } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
+import { ValidationError } from '../services/validate/ValidationError.ts';
 import { assertCalledTimes, assertThrowsLike } from '../tests/assertions.ts';
 import ErrorRegistryController, {
   FakeDriverError,
@@ -2070,5 +2071,105 @@ describe('ControllerManager — returned HttpResponse', () => {
       logged().map((r) => r.level),
       ['error'],
     );
+  });
+});
+
+// ─── request validation through the error-handler registry ───────────
+//
+// The validation catch asks the registry first, so a handler registered for
+// `ValidationError` (or a catch-all `Error`) can reshape the 400; with nothing
+// resolving it, the 400 is unchanged.
+
+class ValidationRegistryController extends AbstractController {
+  get routes() {
+    return {
+      post: {
+        '/check': { handler: this.check, request: requiredName },
+      },
+    };
+  }
+
+  async check(req: FrameworkRequest) {
+    return HttpResponse.json(200, { name: req.appInfo.request.name });
+  }
+
+  static get middleware() {
+    return new Map();
+  }
+}
+
+describe('Request validation through the error-handler registry', () => {
+  const check = (body: unknown) =>
+    fetch(getTestServerURL('/test/validationregistrycontroller/check'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const unregisters: Array<() => void> = [];
+
+  before(() => {
+    appInstance.controllerManager?.registerController(
+      ValidationRegistryController,
+      'test',
+    );
+  });
+
+  afterEach(() => {
+    for (const unregister of unregisters.splice(0)) {
+      unregister();
+    }
+  });
+
+  it('keeps the 400 when no handler resolves it', async () => {
+    const res = await check({});
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(await res.json(), {
+      message: 'Validation failed',
+      errors: { name: ['name is required'] },
+    });
+  });
+
+  it('lets a handler registered for ValidationError reshape it', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, (err) =>
+        HttpResponse.json(
+          422,
+          { problems: err.message },
+          { contentType: 'application/problem+json' },
+        ),
+      ),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 422);
+    assert.match(
+      res.headers.get('content-type') ?? '',
+      /^application\/problem\+json/,
+    );
+    assert.deepStrictEqual(await res.json(), {
+      problems: { name: ['name is required'] },
+    });
+  });
+
+  it('a catch-all Error handler sees it and keeps the 400 by returning null', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    const seen: string[] = [];
+    unregisters.push(
+      server.registerErrorHandler(Error, (err) => {
+        seen.push(err.name);
+        return null;
+      }),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(seen, ['ValidationError']);
+  });
+
+  it('valid input still reaches the handler', async () => {
+    const res = await check({ name: 'Ada' });
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { name: 'Ada' });
   });
 });

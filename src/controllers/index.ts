@@ -502,19 +502,24 @@ class ControllerManager extends Base {
         if (res.headersSent) {
           return next(err);
         }
-        // Only a framework `ValidationError` is a client 400 — its widened
-        // `.message` is the per-field payload. Anything else thrown while
-        // validating is a server-side defect (a validator that threw): route it
-        // through the error-handler registry, same as the handler catch below,
-        // so consumer handlers apply consistently; otherwise a generic 500 with
-        // the detail LOGGED, never echoed.
-        if (ValidationError.isValidationError(err)) {
-          return HttpResponse.json(400, {
-            message: validationFailedMessage(req),
-            errors: err.message,
-          });
-        }
-        return answerError(app, logger, err, req);
+        // Registry first, as in the handler catch below: a handler registered
+        // for `ValidationError` (or a catch-all `Error`) may reshape it. Left
+        // unresolved, a framework `ValidationError` is the client 400 — its
+        // widened `.message` is the per-field payload. Anything else thrown
+        // while validating is a server-side defect (a validator that threw): a
+        // generic 500 with the detail LOGGED, never echoed.
+        return answerError(
+          app,
+          logger,
+          err,
+          req,
+          ValidationError.isValidationError(err)
+            ? HttpResponse.json(400, {
+                message: validationFailedMessage(req),
+                errors: err.message,
+              })
+            : undefined,
+        );
       }
 
       try {
@@ -592,13 +597,15 @@ export function buildSubtreeFromSpec(
  * for consumer entries). A handled error's log line rides into log shippers
  * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
  * Anything unresolved is a server-side defect: logged in full, answered with a
- * generic 500.
+ * generic 500 — unless the caller passes the `unresolved` response (the
+ * validation 400), which is a client error and not logged.
  */
 async function answerError(
   app: IApp,
   logger: ControllerManager['logger'] | undefined,
   err: unknown,
   req: FrameworkRequest,
+  unresolved?: HttpResponse,
 ): Promise<HttpResponse> {
   const resolved = app.httpServer
     ? await app.httpServer.resolveError(err, req)
@@ -606,6 +613,9 @@ async function answerError(
   if (resolved) {
     logger?.[resolved.logLevel](toLoggableError(err));
     return resolved.response;
+  }
+  if (unresolved) {
+    return unresolved;
   }
   logger?.error(err);
   return serverErrorResponse(req);

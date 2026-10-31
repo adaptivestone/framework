@@ -1,6 +1,6 @@
 # Request-validation 400s through the error-handler registry
 
-**Status:** queued for 5.6, implemented and verified 2026-10-06, then held back from 5.5.1 (behavior change → minor). Split out of [consumer-review-fixes](../done/consumer-review-fixes.md).
+**Status:** ✅ implemented 2026-10-31 (unreleased; ships in the next minor with P1q). First implemented 2026-10-06 and held back from 5.5.1 (behavior change → minor); that patch was lost with its container, so it was redone from this description. Split out of [consumer-review-fixes](consumer-review-fixes.md).
 
 ## Problem
 
@@ -32,8 +32,17 @@ Found 2026-10-06; older than this plan, not fixed in 5.5.1. `ValidationError.ts`
 
 ## Relation to P1q
 
-Complementary to [universal-http-responses](../active/universal-http-responses.md): this lets a handler reshape one error class; P1q Phase 2 routes the validation 400 through the writer and `transformResponse`. Ship together in 5.6.
+Complementary to [universal-http-responses](../active/universal-http-responses.md): this lets a handler reshape one error class; P1q Phase 2 routes the validation 400 through the writer and `transformResponse`. Ship together in the next minor (5.6.0 shipped without both).
 
 ## Verification (2026-10-06, before the split)
 
 926/926 tests, Biome, both type checks and the packaging smoke test passed with the patch applied.
+
+## Done (2026-10-31)
+
+- `answerError` in `src/controllers/index.ts` takes an optional `unresolved` response: the validation catch passes the 400 (built only for a framework `ValidationError`), so the registry is asked first and the 400 is the fallback; other errors still end in the logged 500. The 400 is not logged.
+- `RegistrableError = Omit<Error, 'message'>` in `builtinErrorHandlers.ts`; `ErrorHandlerFn<E extends RegistrableError>`, `RegisteredErrorHandler` stores `ErrorHandlerFn<RegistrableError>`, `HttpServer.registerErrorHandler<E extends RegistrableError>`.
+- Declaration bug: `ValidationError` extends `Error` through `ErrorWithPayloadMessage` (`Error` cast to `new (message?) => Omit<Error, 'message'>`), no `@ts-expect-error`. Reproduced first in the packaging smoke test (TS2416 in the shipped `.d.ts`, TS2345 on `registerErrorHandler(ValidationError, …)`), which now imports `ValidationError` and `HttpResponse` and registers such a handler under `skipLibCheck: false`.
+- Tests (`controllers/index.test.ts`): unchanged 400 with no handler; a `ValidationError` handler answering 422 `application/problem+json`; a catch-all `Error` handler sees `ValidationError` and keeps the 400 by returning `null`; valid input reaches the handler.
+- Verification: Biome, both type checks, smoke; controller tests 91/92 locally with the HTTP server booted without MongoDB (the one failure needs a database lookup and fails on `main` the same way); full suite in CI.
+- Docs (docs repo, not reachable from this session): one line in `06-Controllers/04-error-handling.md` — still to do.

@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **Request-body errors go through the error-handler registry.** The 413 for an oversized body and the 400 for a body that cannot be parsed are passed on as `HttpError`s, so a handler you register for `HttpError` (or `Error`) now sees them and can reshape them. Status and body are unchanged.
 - **The built-in `Home` and `Health` handlers return their response** instead of writing to `res`. Responses are unchanged, and overrides that write to `res` keep working and keep compiling. An override that calls the built-in handler must return its result: `return super.live(req, res)`, not `await super.live(req, res)`.
+- **Request-validation 400s go through the error-handler registry.** A handler registered with `registerErrorHandler` for `ValidationError` (from `services/validate/ValidationError.js`) can now reshape the 400 answered when a route's `params:`, `request:` or `query:` schema rejects the input, for example `registerErrorHandler(ValidationError, (err) => HttpResponse.json(422, { errors: err.message }))`. With no such handler the response is unchanged. A handler registered for `Error` (a catch-all) now receives these validation errors too: return `null` for a `ValidationError` to keep the default 400.
 
 ### Fixed
 
