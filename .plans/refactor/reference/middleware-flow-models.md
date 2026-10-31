@@ -250,3 +250,37 @@ async function run(ctx, chain, i): Promise<HttpResponse | undefined> {
 - **Work around the handler**: `try/finally` (release a lock, commit or roll back a transaction,
   refresh a session cookie only when the handler succeeded).
 - Request-only middleware (auth, roles, rate limits, i18n, pagination) stay as simple as today.
+
+## Independent review (Fable, 2026-10-31)
+
+Asked by the owner for a review not anchored on earlier recommendations. Verdict: **C2** —
+request-only `middleware(ctx)` plus `ctx.onResponse(hook)` (before the write, newest first, every
+response including early stops and errors, may return a replacement) and `ctx.onFinish(hook)`
+(after the last byte or disconnect, read-only). B is judged over-engineered for this framework.
+
+Retained heap per _pending_ request (Node 26.12.1, `--expose-gc`, 10 000 requests suspended in the
+handler, 10 middleware of which 2 work before and after; reproduced independently):
+
+|          A |    C1 |      **C2** |       D |       B |
+| ---------: | ----: | ----------: | ------: | ------: |
+| ≈ 25–290 B | 952 B | **1 350 B** | 2 696 B | 3 400 B |
+
+With all 10 middleware wrapping: C2 ≈ 2.1 KB, B ≈ 10.8 KB. For scale, a pending request on plain
+Node http holds ≈ 4.7 KB heap (Express ≈ 6.3 KB); at 10 000 concurrent streams B ≈ 34 MB, C2 ≈
+13 MB, A ≈ 3 MB on top of ≈ 200 MB of sockets and parsers. B keeps a suspended async frame,
+a promise and a `next` closure per wrapping layer for the request's whole life (long streams
+included); C2 keeps one suspended runner frame plus one small closure per registered hook.
+
+B's only unique capability is running the rest of the request inside an AsyncLocalStorage scope
+(`als.run(store, next)`; verified: in a linear runner `enterWith` reaches the handler only before
+the middleware's first `await`). Tracing spans for handlers can be done by the framework itself
+(wrap the handler call in the runner), so it is not a reason to buy the onion.
+
+Guard rails for C2: only a branded `HttpResponse` stops or replaces; `onResponse` registered after
+the response is decided throws; a throwing hook is replaced by the registry response (with
+`ctx.error`) and the remaining hooks still run; hooks are skipped with a one-time warning for 5.x
+handlers that write `res` themselves (`onFinish` still runs); staging after headers are sent is a
+clear framework error; an aborted client stops the chain and `onFinish` gets `aborted: true`.
+Hooks receive `(response, ctx)` so a middleware without locals can register a shared method
+(no allocation). Naming: Fastify's `onResponse` runs _after_ sending — `beforeSend` would avoid
+that ambiguity.

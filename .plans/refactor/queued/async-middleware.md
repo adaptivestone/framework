@@ -148,6 +148,11 @@ change.
     methods (response hooks in reverse order, for every response including errors). No `next`
     to misuse, but no shared locals or `try/finally` around the handler.
   - **D — h3-style hybrid as is:** any non-`undefined` return stops; optional `next`.
+  - **Independent review (Fable, 2026-10-31):** C2 — B over-engineered (≈2.5× retained memory per
+    pending request with 2 wrapping layers, ≈5× with all wrapping; five extra runner rules; its
+    one unique capability, AsyncLocalStorage wrapping, can live in the framework). Details and
+    guard rails: [middleware-flow-models § Independent review](../reference/middleware-flow-models.md#independent-review-fable-2026-10-31).
+    Awaiting the owner's decision.
 - **D2.2 Request representation** — plain portable fields as above. Alternative: a Web `Request`
   underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
   as a lazy getter with the Node adapter.
