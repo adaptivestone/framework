@@ -111,7 +111,8 @@ export interface NativeResponse extends ResponseBase<'native', number> {
   readonly response: Response;
 }
 
-const NO_BODY_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
+/** Statuses that never carry a body, as a runtime set. */
+export const NO_BODY_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([
   301, 302, 303, 307, 308,
 ]);

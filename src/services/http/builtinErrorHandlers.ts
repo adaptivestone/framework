@@ -8,7 +8,7 @@ import {
 } from '../validate/ValidationError.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import { HttpError } from './httpErrors.ts';
-import { HttpResponse } from './responses.ts';
+import { HttpResponse, NO_BODY_STATUSES } from './responses.ts';
 
 /** The `message` of every framework 500 response. */
 export const serverErrorMessage = (req: FrameworkRequest) =>
@@ -60,8 +60,6 @@ export function sendErrorResult(
   return res.status(status).json(body);
 }
 
-const NO_BODY_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
-
 /**
  * A `{ status, body, headers }` result as the response `sendErrorResult` sent:
  * JSON, with a `Content-Type` header kept as the media type, and no body for
@@ -82,7 +80,8 @@ export function errorResultResponse({
     }
   }
   if (body === undefined || NO_BODY_STATUSES.has(status)) {
-    return HttpResponse.empty(status, { headers: rest });
+    // `empty` owns no media type, so the header rides along unchanged.
+    return HttpResponse.empty(status, { headers: headers ?? {} });
   }
   return HttpResponse.json(status, body, { headers: rest, contentType });
 }

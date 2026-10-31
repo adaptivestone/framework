@@ -89,7 +89,7 @@ export class ExpressResponseWriter
         return transformed;
       }
       const got =
-        transformed instanceof Promise
+        typeof (transformed as { then?: unknown } | null)?.then === 'function'
           ? 'a Promise (it must be synchronous)'
           : transformed === null
             ? 'null'
@@ -225,6 +225,8 @@ async function writeStream(
   try {
     const first = await source.next();
     if (res.destroyed) {
+      // 'close' may not have fired yet, and `finally` drops its listener.
+      stop();
       return;
     }
     commit();
