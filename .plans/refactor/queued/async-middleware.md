@@ -129,10 +129,25 @@ change.
 
 **Sub-decisions** (one by one with the user; recommendation first):
 
-- **D2.1 Flow** — keep the settled linear model (return nothing = continue, `HttpResponse` =
-  stop, throw = registry) **plus** response staging and `onFinish` (h3 v2's choice; covers
-  CORS, request id, cookies, timing/logging). Alternative: switch to onion (`await next()` returns
-  the response; the market majority) by reopening D1.
+- **D2.1 Flow** — reopened by the user 2026-10-31 ("request + response middleware is probably
+  better"); source study of 14 frameworks + benchmark in
+  [middleware-flow-models](../reference/middleware-flow-models.md). Correction: h3 v2 is **hybrid**,
+  not linear (its `next()` returns the downstream response). Options:
+  - **A — request-only** + response staging + `onFinish`. Simplest; cannot wrap the handler.
+  - **B — onion with safe defaults (recommended):** `async middleware(ctx, next)`.
+    Return nothing without calling `next` → the chain continues (request-only middleware stay
+    one-liners, React Router's auto-`next`); return an `HttpResponse` → stop and answer (only the
+    branded value stops, so an accidental return cannot end the request — h3's pitfall);
+    `const response = await next()` → the rest of the chain runs and its response comes back,
+    return it or a new one. `next()` never throws: errors come back as the error registry's
+    response with the original on `ctx.error`, so outer middleware still run for errors.
+    Calling `next` and forgetting to return bubbles its result; a second `next()` call throws at
+    call time; returning before an un-awaited `next()` settles warns. Plus `onFinish` for
+    after-send metrics.
+  - **C — separate hooks per middleware:** `onRequest(ctx)` and `onResponse(ctx, response)`
+    methods (response hooks in reverse order, for every response including errors). No `next`
+    to misuse, but no shared locals or `try/finally` around the handler.
+  - **D — h3-style hybrid as is:** any non-`undefined` return stops; optional `next`.
 - **D2.2 Request representation** — plain portable fields as above. Alternative: a Web `Request`
   underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
   as a lazy getter with the Node adapter.
