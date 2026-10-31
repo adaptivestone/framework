@@ -105,10 +105,10 @@ repository; Markdown remains the reviewed source of truth.
 
 ### active/
 
-| File                                                           | Ref | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| -------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [llm-skills](active/llm-skills.md)                             | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d.                                                                                                                                                       |
-| [universal-http-responses](active/universal-http-responses.md) | P1q | **Typed response bridge — next minor (5.7).** Phases 0–1 ✅ 2026-10-31 (unreleased): `HttpResponse` json/text/bytes/stream/redirect/empty/native descriptors returned by handlers, rendered by `ExpressResponseWriter` from the adapter; contract locked in tests; `transformResponse` settled as a `Server` option. Next: Phase 2 (framework responses + error registry through the writer, `transformResponse`), then Phase 3 OpenAPI, Phase 4 files. Legacy `res` coexists; removed in v6. |
+| File                                                           | Ref | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [llm-skills](active/llm-skills.md)                             | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d.                                                                                                               |
+| [universal-http-responses](active/universal-http-responses.md) | P1q | **Typed response bridge — next minor (5.7).** Phases 0–2 ✅ 2026-10-31 (unreleased): `HttpResponse` json/text/bytes/stream/redirect/empty/native descriptors returned by handlers; every framework response and error-registry result written by `ExpressResponseWriter`; `transformResponse` `Server` option; `Home`/`Health` migrated (`Auth` held — question to user). Next: Phase 3 OpenAPI, Phase 4 files. Legacy `res` coexists; removed in v6. |
 
 ### queued/
 
@@ -305,14 +305,16 @@ Moved out of 5.5 on 2026-10-03 so the finished 5.5 batch is not held back by the
 
 - [Async middleware v2 opt-in](queued/async-middleware.md) (P1m) — co-designed with P1q: `static contractVersion = 2`, returned `HttpResponse` through P1q's writer, throws through the error registry; v1 default untouched until v6.
 
-- [Universal typed HTTP responses](active/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists. Phases 0–1 ✅ 2026-10-31; Phase 2 next.
+- [Universal typed HTTP responses](active/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists. Phases 0–2 ✅ 2026-10-31 (`Auth` migration held); Phase 3 next.
 - **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
   ResponseWriter is the instrumentation seam, and adding it afterwards means reopening the hot path.
+  As of Phase 2 every framework-rendered response passes `ExpressResponseWriter.write()`.
 - Resolve `bodyParsing` — `'raw'`/`'none'` are accepted by the type and do nothing (the JSDoc says
   so, without a version promise since 2026-10-03). Implement (the request-side half of P1q's thesis) or
   remove them from the type.
-- `RequestParser` 413/400 → coded `HttpError`s through the registry (the optional follow-up of
-  [middleware-errors-registry](done/middleware-errors-registry.md)); deferred from 5.5 on 2026-10-03.
+- ✅ `RequestParser` 413/400 → `HttpError`s through the registry (the optional follow-up of
+  [middleware-errors-registry](done/middleware-errors-registry.md)), done with P1q Phase 2 on
+  2026-10-31; error codes not added yet (bodies unchanged).
 
 The former "small independent items" were already done when checked on 2026-10-03: Redis-dependent
 tests skip when Redis is unreachable (`src/tests/redisAvailability.ts`), `OpenApiGenerator.ts` has no

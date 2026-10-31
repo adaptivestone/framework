@@ -9,6 +9,7 @@ import formidable, {
 import type ThttpConfig from '../../../config/http.ts';
 import { normalizeContentType } from '../../validate/contentType.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpError } from '../httpErrors.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
 /**
@@ -16,7 +17,9 @@ import AbstractMiddleware from './AbstractMiddleware.ts';
  * `req.body`. Size and count limits come from `config.http.requestParser`
  * (explicit per-mount params override them). Spooled upload temp files are
  * unlinked once the response finishes — a handler that needs to keep an upload
- * MUST move or copy it (e.g. `fs.rename`) before responding.
+ * MUST move or copy it (e.g. `fs.rename`) before responding. An oversized body
+ * (413) or an unparsable one (400) is passed on as an `HttpError`, so the
+ * error-handler registry answers it.
  */
 class RequestParser extends AbstractMiddleware {
   static get description() {
@@ -64,13 +67,7 @@ class RequestParser extends AbstractMiddleware {
         );
         // Close after the 413 instead of draining the unread body.
         res.setHeader('Connection', 'close');
-        return res.status(413).json({
-          message: this.translate(
-            req,
-            'middleware.requestParser.entityTooLarge',
-            'Request entity too large. Your upload exceeds the allowed size or count limits.',
-          ),
-        });
+        return next(this.#entityTooLarge(req));
       }
     }
     // Also guard chunked bodies. Only a genuinely selected multipart parser
@@ -133,21 +130,17 @@ class RequestParser extends AbstractMiddleware {
           // The rest of the body stays unread; close rather than drain it.
           res.setHeader('Connection', 'close');
         }
-        return res.status(413).json({
+        return next(this.#entityTooLarge(req));
+      }
+      return next(
+        new HttpError(400, {
           message: this.translate(
             req,
-            'middleware.requestParser.entityTooLarge',
-            'Request entity too large. Your upload exceeds the allowed size or count limits.',
+            'middleware.requestParser.parseError',
+            `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
           ),
-        });
-      }
-      return res.status(400).json({
-        message: this.translate(
-          req,
-          'middleware.requestParser.parseError',
-          `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
-        ),
-      });
+        }),
+      );
     }
     this.logger?.verbose(
       `Parsing multipart/formdata request DONE ${Date.now() - time}ms`,
@@ -179,6 +172,16 @@ class RequestParser extends AbstractMiddleware {
       ...files,
     };
     return next();
+  }
+
+  #entityTooLarge(req: FrameworkRequest) {
+    return new HttpError(413, {
+      message: this.translate(
+        req,
+        'middleware.requestParser.entityTooLarge',
+        'Request entity too large. Your upload exceeds the allowed size or count limits.',
+      ),
+    });
   }
 }
 

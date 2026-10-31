@@ -6,6 +6,8 @@ import { stubI18n } from '../../tests/mocks.ts';
 import { testEach } from '../../tests/parameterized.ts';
 import {
   builtInErrorHandlers,
+  type ErrorHandlerResult,
+  errorResultResponse,
   matchedClientCastError,
   matchedClientValidationErrors,
   toLoggableError,
@@ -252,10 +254,11 @@ describe('builtInErrorHandlers', () => {
   });
 
   describe('coded HttpError', () => {
-    const map = (err: HttpError, i18n?: unknown) =>
-      builtInErrorHandlers()[0]?.handler(err, {
+    // The built-in mapper answers `{ status, body }`, never an `HttpResponse`.
+    const map = async (err: HttpError, i18n?: unknown) =>
+      (await builtInErrorHandlers()[0]?.handler(err, {
         appInfo: { i18n },
-      } as unknown as FrameworkRequest);
+      } as unknown as FrameworkRequest)) as ErrorHandlerResult | null;
     const details = {
       code: 'LOGIN_CODE_EXPIRED',
       i18nKey: 'accounts.errors.LOGIN_CODE_EXPIRED',
@@ -370,6 +373,52 @@ describe('builtInErrorHandlers', () => {
     assert.strictEqual(
       await mongooseHandler?.handler(error, request({})),
       null,
+    );
+  });
+});
+
+describe('errorResultResponse', () => {
+  it('answers a { status, body } result as JSON with its headers', () => {
+    const response = errorResultResponse({
+      status: 409,
+      body: { message: 'Taken' },
+      headers: { 'Retry-After': '3' },
+    });
+    assert.strictEqual(response.kind, 'json');
+    assert.strictEqual(response.status, 409);
+    assert.deepStrictEqual(response.kind === 'json' ? response.body : null, {
+      message: 'Taken',
+    });
+    assert.deepStrictEqual(response.headers, [['retry-after', '3']]);
+  });
+
+  it('keeps a Content-Type header as the media type', () => {
+    const response = errorResultResponse({
+      status: 400,
+      body: { title: 'Bad' },
+      headers: { 'Content-Type': 'application/problem+json' },
+    });
+    assert.strictEqual(
+      response.kind === 'json' ? response.contentType : null,
+      'application/problem+json',
+    );
+    assert.deepStrictEqual(response.headers, []);
+  });
+
+  it('answers no body for an undefined body or a no-body status', () => {
+    assert.strictEqual(
+      errorResultResponse({ status: 401, body: undefined }).kind,
+      'empty',
+    );
+    const notModified = errorResultResponse({ status: 304, body: { a: 1 } });
+    assert.strictEqual(notModified.kind, 'empty');
+    assert.strictEqual(notModified.status, 304);
+  });
+
+  it('throws on a status no response can carry', () => {
+    assert.throws(
+      () => errorResultResponse({ status: 99, body: {} }),
+      RangeError,
     );
   });
 });

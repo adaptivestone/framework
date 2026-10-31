@@ -8,13 +8,13 @@ import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import {
-  sendErrorResult,
-  serverErrorMessage,
+  serverErrorResponse,
   toLoggableError,
   validationFailedMessage,
 } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import {
   type MiddlewareSpec,
   normalizeMiddlewares,
@@ -457,7 +457,7 @@ class ControllerManager extends Base {
               ? entryRequestMapLookup[contentType]
               : undefined;
           if (!matched) {
-            return res.status(415).json({
+            return HttpResponse.json(415, {
               message: translateWithDefault(
                 req,
                 'http.unsupportedContentType',
@@ -509,12 +509,12 @@ class ControllerManager extends Base {
         // so consumer handlers apply consistently; otherwise a generic 500 with
         // the detail LOGGED, never echoed.
         if (ValidationError.isValidationError(err)) {
-          return res.status(400).json({
+          return HttpResponse.json(400, {
             message: validationFailedMessage(req),
             errors: err.message,
           });
         }
-        return answerError(app, logger, err, req, res);
+        return answerError(app, logger, err, req);
       }
 
       try {
@@ -527,7 +527,7 @@ class ControllerManager extends Base {
           return next(err);
         }
         // Same registry walk as the validation catch above (see `answerError`).
-        return answerError(app, logger, err, req, res);
+        return answerError(app, logger, err, req);
       }
     };
 
@@ -583,34 +583,32 @@ export function buildSubtreeFromSpec(
 }
 
 /**
- * Answer an error thrown while validating or handling a request. Error-handler
- * registry first: consumer-registered handlers, then the built-ins (`HttpError`
- * mapper, mongoose safety nets) — the first `instanceof` match returning
- * non-null wins, logged at the entry's own level (`verbose` for deliberate
- * HttpError control flow, `warn` for the safety nets' schema-gap signal, `warn`
- * default for consumer entries). A handled error's log line rides into log
- * shippers (Sentry, retention), so it is rebuilt value-free by `toLoggableError`
- * first. Anything unresolved is a server-side defect: logged in full, answered
- * with a generic 500.
+ * The response for an error thrown while validating or handling a request
+ * (returned, so the adapter writes it). Error-handler registry first:
+ * consumer-registered handlers, then the built-ins (`HttpError` mapper,
+ * mongoose safety nets) — the first `instanceof` match returning non-null
+ * wins, logged at the entry's own level (`verbose` for deliberate HttpError
+ * control flow, `warn` for the safety nets' schema-gap signal, `warn` default
+ * for consumer entries). A handled error's log line rides into log shippers
+ * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
+ * Anything unresolved is a server-side defect: logged in full, answered with a
+ * generic 500.
  */
 async function answerError(
   app: IApp,
   logger: ControllerManager['logger'] | undefined,
   err: unknown,
   req: FrameworkRequest,
-  res: Response,
-) {
+): Promise<HttpResponse> {
   const resolved = app.httpServer
     ? await app.httpServer.resolveError(err, req)
     : null;
   if (resolved) {
     logger?.[resolved.logLevel](toLoggableError(err));
-    return sendErrorResult(res, resolved);
+    return resolved.response;
   }
   logger?.error(err);
-  return res.status(500).json({
-    message: serverErrorMessage(req),
-  });
+  return serverErrorResponse(req);
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────

@@ -7,8 +7,11 @@ import AbstractController, {
   type TMiddleware,
 } from '../modules/AbstractController.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import { HttpResponse, type JsonResponse } from '../services/http/responses.ts';
 
 const MONGO_PING_TIMEOUT_MS = 1000;
+
+type Unauthorized = JsonResponse<401, { message: string }>;
 
 /** Ping MongoDB; false when disconnected, failing, or slower than the timeout. */
 async function pingMongo(): Promise<boolean> {
@@ -40,6 +43,8 @@ async function pingMongo(): Promise<boolean> {
  * `GET /health/live` never touches a dependency (a failing liveness probe
  * restarts the process); `GET /health/ready` also pings MongoDB. Override this
  * controller in your app to add checks, middleware or another mount path.
+ * Handlers return their response; `res` stays an optional parameter (and
+ * `Response` a possible return) so overrides written against `res` still fit.
  */
 class Health extends AbstractController {
   get routes() {
@@ -56,14 +61,24 @@ class Health extends AbstractController {
     return new Map();
   }
 
-  async live(req: FrameworkRequest, res: Response) {
+  async live(
+    req: FrameworkRequest,
+    res?: Response,
+  ): Promise<JsonResponse<200, { status: string }> | Unauthorized | Response> {
     if (!this.isAuthorized(req)) {
       return this.unauthorized(req, res);
     }
-    return res.json({ status: 'ok' });
+    return HttpResponse.json(200, { status: 'ok' });
   }
 
-  async ready(req: FrameworkRequest, res: Response) {
+  async ready(
+    req: FrameworkRequest,
+    res?: Response,
+  ): Promise<
+    | JsonResponse<200 | 503, { status: string; checks: { mongo: string } }>
+    | Unauthorized
+    | Response
+  > {
     if (!this.isAuthorized(req)) {
       return this.unauthorized(req, res);
     }
@@ -71,9 +86,10 @@ class Health extends AbstractController {
     if (mongo === 'error') {
       this.logger?.warn('Health check failed: MongoDB ping');
     }
-    return res
-      .status(mongo === 'ok' ? 200 : 503)
-      .json({ status: mongo, checks: { mongo } });
+    return HttpResponse.json(mongo === 'ok' ? 200 : 503, {
+      status: mongo,
+      checks: { mongo },
+    });
   }
 
   /** With `health.token` set, the request must carry it (`X-Health-Token` or `?token=`). */
@@ -87,8 +103,11 @@ class Health extends AbstractController {
     return typeof sent === 'string' && timingSafeEqualStrings(sent, token);
   }
 
-  unauthorized(req: FrameworkRequest, res: Response) {
-    return res.status(401).json({
+  unauthorized(
+    req: FrameworkRequest,
+    _res?: Response,
+  ): Unauthorized | Response {
+    return HttpResponse.json(401, {
       message: translateWithDefault(req, 'health.unauthorized', 'Unauthorized'),
     });
   }

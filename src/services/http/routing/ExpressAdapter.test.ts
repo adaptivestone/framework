@@ -37,6 +37,9 @@ interface MockRes extends EventEmitter {
   status(code: number): MockRes;
   setHeader(k: string, v: string): MockRes;
   getHeader(k: string): string | undefined;
+  getHeaders(): Record<string, string>;
+  getHeaderNames(): string[];
+  removeHeader(k: string): void;
   json(obj: unknown): MockRes;
   end(): MockRes;
 }
@@ -57,6 +60,15 @@ const makeRes = (): MockRes => {
   };
   res.getHeader = function (k) {
     return this.headers[k.toLowerCase()];
+  };
+  res.getHeaders = function () {
+    return { ...this.headers };
+  };
+  res.getHeaderNames = function () {
+    return Object.keys(this.headers);
+  };
+  res.removeHeader = function (k) {
+    delete this.headers[k.toLowerCase()];
   };
   res.json = function (obj) {
     this.body = obj;

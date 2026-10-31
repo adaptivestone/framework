@@ -16,6 +16,8 @@ import type BaseCli from './modules/BaseCli.ts';
 import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
 import Cache from './services/cache/Cache.ts';
 import type HttpServer from './services/http/HttpServer.ts';
+import type { FrameworkRequest } from './services/http/HttpServer.ts';
+import type { HttpResponse } from './services/http/responses.ts';
 import type { I18n } from './services/i18n/I18n.ts';
 import { createRedactFormat } from './services/logging/redaction.ts';
 
@@ -111,12 +113,31 @@ export interface IApp {
  */
 export type BootHttpHook = (app: IApp) => void | Promise<void>;
 
+/**
+ * Project response transform. Passed to the {@link Server} constructor as the
+ * `transformResponse` option; called synchronously with every response the
+ * framework renders (the `HttpResponse` a handler returns, validation and other
+ * error responses, the 404 and 405 pages) just before it is written, and
+ * returns the response to send: reshape the kinds you care about (typically
+ * `json`) and return the others unchanged. A handler that writes to `res`
+ * itself bypasses it. If the transform throws or returns anything but an
+ * `HttpResponse`, the error is logged and the original response is sent.
+ */
+export type TransformResponseHook = (
+  response: HttpResponse,
+  context: { req: FrameworkRequest },
+) => HttpResponse;
+
 /** Options accepted by the {@link Server} constructor. */
 export interface ServerOptions extends TFolderConfig {
   /**
    * Project HTTP boot hook — see {@link BootHttpHook}.
    */
   bootHttp?: BootHttpHook;
+  /**
+   * Reshapes every framework-rendered response — see {@link TransformResponseHook}.
+   */
+  transformResponse?: TransformResponseHook;
 }
 
 try {
@@ -179,6 +200,9 @@ class Server {
   /** Project HTTP boot hook from the constructor options (run in `startServer`). */
   #bootHttp?: BootHttpHook;
 
+  /** Project response transform from the constructor options (given to `HttpServer`). */
+  #transformResponse?: TransformResponseHook;
+
   app: IApp;
 
   /**
@@ -196,6 +220,7 @@ class Server {
   constructor(config: ServerOptions) {
     this.config = config;
     this.#bootHttp = config.bootHttp;
+    this.#transformResponse = config.transformResponse;
     const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),
@@ -248,7 +273,9 @@ class Server {
     this.#assertBootConfig();
 
     // TODO config
-    this.app.httpServer = new HttpServer(this.app);
+    this.app.httpServer = new HttpServer(this.app, {
+      transformResponse: this.#transformResponse,
+    });
 
     this.app.controllerManager = new ControllerManager(this.app);
 

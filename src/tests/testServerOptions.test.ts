@@ -54,6 +54,20 @@ describe('configureTestServer — consumer Server options in the test bootstrap'
     assert.strictEqual(code, 0);
   });
 
+  it('applies the configured transformResponse to framework-rendered responses', {
+    timeout: 40000,
+  }, async () => {
+    const { code, out } = await runChild([fixture]);
+
+    // A returned response and the 404 page go through the transform…
+    assertTextMatch(out, /RETURNED_BODY:\{"data":\{"returned":true\}\}/);
+    assertTextMatch(out, /NOT_FOUND_STATUS:404/);
+    assertTextMatch(out, /NOT_FOUND_BODY:\{"data":\{"message":"Not found"\}\}/);
+    // …a handler writing to `res` itself does not.
+    assertTextMatch(out, /ROUTE_BODY:\{"bootHttp":"ran"\}/);
+    assert.strictEqual(code, 0);
+  });
+
   it('works in the documented arrangement: glue imported above the call', {
     timeout: 40000,
   }, async () => {

@@ -14,6 +14,7 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpError } from '../httpErrors.ts';
 
 import RequestParser from './RequestParser.ts';
 
@@ -82,7 +83,14 @@ const postToParser = ({
       await new RequestParser(appInstance, params).middleware(
         frReq,
         resShim as unknown as Response,
-        (() => {
+        ((err?: unknown) => {
+          // Rejections arrive as an `HttpError` for the error sink.
+          if (err) {
+            status = (err as HttpError).status;
+            res.writeHead(status);
+            res.end('{}');
+            return;
+          }
           result = { status: 200, body: frReq.body };
           res.writeHead(200);
           res.end('ok');
@@ -357,7 +365,12 @@ const runParser = async (
   await new RequestParser(appInstance, params).middleware(
     req,
     res as unknown as Response,
-    (() => {}) as NextFunction,
+    ((err?: unknown) => {
+      if (err instanceof HttpError) {
+        status = err.status;
+        payload = { message: err.message };
+      }
+    }) as NextFunction,
   );
   return { status, payload };
 };

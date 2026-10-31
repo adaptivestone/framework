@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import express, { type Request, type Response } from 'express';
+import type { TransformResponseHook } from '../../server.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import { HttpResponse } from './responses.ts';
 
@@ -420,5 +421,82 @@ describe('ExpressResponseWriter — native Web Response', () => {
     const response = await fetch(origin);
     assert.strictEqual(response.status, 204);
     assert.strictEqual(await response.text(), '');
+  });
+});
+
+describe('ExpressResponseWriter — transform', () => {
+  const envelope: TransformResponseHook = (response) =>
+    response.kind === 'json'
+      ? HttpResponse.json(
+          response.status,
+          { data: response.body },
+          { headers: response.headers, contentType: response.contentType },
+        )
+      : response;
+
+  /** Serve one descriptor through a writer built with `transform`. */
+  const serveWith = (
+    transform: TransformResponseHook,
+    make: () => HttpResponse,
+  ) => {
+    const reported: string[] = [];
+    const transforming = new ExpressResponseWriter({
+      transform,
+      onTransformError: (message) => reported.push(message),
+    });
+    route = (req, res) => transforming.write(make(), req, res);
+    return reported;
+  };
+
+  it('sends what the transform returns', async () => {
+    const reported = serveWith(envelope, () =>
+      HttpResponse.json(201, { id: 'x' }, { headers: { 'x-id': 'x' } }),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(response.status, 201);
+    assert.strictEqual(response.headers.get('x-id'), 'x');
+    assert.deepStrictEqual(await response.json(), { data: { id: 'x' } });
+    assert.deepStrictEqual(reported, []);
+  });
+
+  it('passes the request and leaves other kinds to the transform', async () => {
+    let seenPath = '';
+    serveWith(
+      (response, { req }) => {
+        seenPath = req.path;
+        return envelope(response, { req });
+      },
+      () => HttpResponse.text(200, 'plain'),
+    );
+    const response = await fetch(`${origin}/seen`);
+    assert.strictEqual(await response.text(), 'plain');
+    assert.strictEqual(seenPath, '/seen');
+  });
+
+  it('sends the original and reports a transform that throws', async () => {
+    const reported = serveWith(
+      () => {
+        throw new Error('envelope broke');
+      },
+      () => HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    assert.strictEqual(reported.length, 1);
+    assert.match(reported[0] ?? '', /transformResponse threw.*envelope broke/s);
+  });
+
+  it('sends the original and reports a transform that returns no response', async () => {
+    const asyncTransform = (async (response: HttpResponse) =>
+      response) as unknown as TransformResponseHook;
+    const reported = serveWith(asyncTransform, () =>
+      HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    assert.match(
+      reported[0] ?? '',
+      /returned a Promise \(it must be synchronous\)/,
+    );
   });
 });

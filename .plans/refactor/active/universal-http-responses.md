@@ -297,13 +297,43 @@ pass on Node and Bun locally; Biome, both type checks and the packaging smoke te
 suite needs MongoDB, which this session's network policy blocked (`fastdl.mongodb.org`), so it
 runs in CI. Docs (docs repo) are not written yet; they follow Phase 2.
 
-### Phase 2 — framework and error migration
+### Phase 2 — framework and error migration (implemented 2026-10-31, except `Auth`)
 
 - Route framework-generated responses and error-registry results through the writer.
 - Migrate `Home`/`Auth` framework controllers to returned descriptors as fixtures for consumers.
 - Keep legacy `{ status, body }` error-handler results accepted.
 - Expose and document `transformResponse` here — the all-responses guarantee only holds once
   framework responses traverse the writer.
+
+As built:
+
+- **Writer is the single seam.** The controller validation wrapper _returns_ its 415, 400 and
+  error responses (the adapter writes them); the adapter writes its malformed-URL 400 and 405;
+  `add404Page` and the final sink write through `HttpServer.responseWriter`. This is also the P1s
+  metrics hook point: one `write()` sees every framework-rendered response.
+- **Error registry.** `ErrorHandlerFn` may return an `HttpResponse`. A `{ status, body, headers }`
+  result becomes `errorResultResponse()`: JSON, a `Content-Type` header kept as the media type,
+  `empty` for an undefined body or 204/205/304. `resolveError` returns `ResolvedError` = the
+  legacy fields plus `response` (additive). A result that is not a valid response (e.g. status 99)
+  counts as a broken handler → logged, 500. If the error response itself cannot be written (a
+  circular body), the sink falls back to the plain 500 without writer or transform.
+- **`transformResponse`**: `Server` option → `HttpServer` constructor option → the writer. It
+  covers returned responses, validation/415/405/404/malformed-URL, registry results and the
+  500; a handler writing `res` itself bypasses it. Throwing, returning a non-response or a
+  Promise → logged at `error` through `HttpServer`'s logger, original sent.
+- **RequestParser** 413/400 → `next(new HttpError(...))` with the same translated message, so
+  they reach the registry and the transform; `Connection: close` stays on `res`. No error codes
+  were added (bodies unchanged).
+- **Built-ins.** `Home` and `Health` return descriptors, keeping an optional `res` parameter and
+  `| Response` in their return types so overrides written against `res` still compile (pinned
+  by compile-only subclasses in `Home.test.ts`/`Health.test.ts`).
+- **Held: `Auth`.** Migrating it would silently drop the response of an override that does
+  `await super.postLogin(req, res)` without returning — a runtime break for the most-subclassed
+  controller. Flagged to the user 2026-10-31 instead of shipping; candidate for the v6 bucket.
+- **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
+  itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
+  "not initialised" 500 (registry middleware — moves with P1m). The optional `res.json` bridge
+  that would extend the transform to legacy handlers before v6 was not built; open question.
 
 ### Phase 3 — OpenAPI/type integration
 

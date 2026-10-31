@@ -1080,7 +1080,16 @@ describe('ControllerManager — validated output runtime parity', () => {
       params: {},
       appInfo: { request: {}, query: {}, params: {} },
     } as unknown as FrameworkRequest;
-    await hit.entry.handler(req, response as unknown as Response, () => {});
+    const returned = await hit.entry.handler(
+      req,
+      response as unknown as Response,
+      () => {},
+    );
+    // Error responses come back as values for the adapter to write.
+    if (HttpResponse.is(returned) && returned.kind === 'json') {
+      response.statusCode = returned.status;
+      response.body = returned.body;
+    }
     return response;
   };
 

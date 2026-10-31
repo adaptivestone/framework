@@ -41,14 +41,14 @@ export function createExpressAdapter(
       result = registry.match(req.method, req.path);
     } catch (err) {
       if (err instanceof MalformedPathError) {
-        res.status(400).json({
+        const malformed = HttpResponse.json(400, {
           message: translateWithDefault(
             req as FrameworkRequest,
             'http.malformedUrl',
             'Malformed URL',
           ),
         });
-        return;
+        return writer.write(malformed, req, res).catch(next);
       }
       return next(err);
     }
@@ -60,15 +60,18 @@ export function createExpressAdapter(
 
     if (result.entry === null) {
       // 405 — path matched, method didn't.
-      res.setHeader('Allow', result.allowedMethods.join(', '));
-      res.status(405).json({
-        message: translateWithDefault(
-          req as FrameworkRequest,
-          'http.methodNotAllowed',
-          'Method not allowed',
-        ),
-      });
-      return;
+      const notAllowed = HttpResponse.json(
+        405,
+        {
+          message: translateWithDefault(
+            req as FrameworkRequest,
+            'http.methodNotAllowed',
+            'Method not allowed',
+          ),
+        },
+        { headers: { Allow: result.allowedMethods.join(', ') } },
+      );
+      return writer.write(notAllowed, req, res).catch(next);
     }
 
     // Populate request with match metadata before middleware runs.
