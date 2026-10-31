@@ -295,7 +295,9 @@ headers and returns a descriptor raises an error to `next(err)` (the final sink 
 failures go to `next(err)` and resolve through the error registry. Verification: the new tests
 pass on Node and Bun locally; Biome, both type checks and the packaging smoke test pass. The full
 suite needs MongoDB, which this session's network policy blocked (`fastdl.mongodb.org`), so it
-runs in CI. Docs (docs repo) are not written yet; they follow Phase 2.
+runs in CI. Docs: written 2026-10-31 on branch `docs/http-responses` of the documentation repo (new
+`06-Controllers/05-responses.md`; error handling, routes and testing pages updated; site build
+passes), not merged.
 
 ### Phase 2 — framework and error migration (implemented 2026-10-31, except `Auth`)
 
