@@ -20,6 +20,7 @@ import {
   type ErrorLogLevel,
   errorResultResponse,
   type RegisteredErrorHandler,
+  type RegistrableError,
   type ResolvedError,
   serverErrorMessage,
   serverErrorResponse,
@@ -180,7 +181,7 @@ class HttpServer extends Base {
    * validation and middleware (the final sink, `addErrorHandler`, resolves
    * through the same registry).
    */
-  registerErrorHandler<E extends Error>(
+  registerErrorHandler<E extends RegistrableError>(
     errorClass: abstract new (...args: never[]) => E,
     handler: ErrorHandlerFn<E>,
     opts?: { logLevel?: ErrorLogLevel },
@@ -189,7 +190,7 @@ class HttpServer extends Base {
       errorClass,
       // Stored type-erased; `resolveError` guarantees `instanceof errorClass`
       // before the call, so the narrower parameter type is safe.
-      handler: handler as ErrorHandlerFn,
+      handler: handler as ErrorHandlerFn<RegistrableError>,
       logLevel: opts?.logLevel ?? 'warn',
     };
     this.#errorHandlers.push(entry);

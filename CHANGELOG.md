@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Request-body errors go through the error-handler registry.** The 413 for an oversized body and the 400 for a body that cannot be parsed are passed on as `HttpError`s, so a handler you register for `HttpError` (or `Error`) now sees them and can reshape them. Status and body are unchanged.
 - **The built-in `Home` and `Health` handlers return their response** instead of writing to `res`. Responses are unchanged, and overrides that write to `res` keep working and keep compiling. An override that calls the built-in handler must return its result: `return super.live(req, res)`, not `await super.live(req, res)`.
 
+### Fixed
+
+- **`ValidationError` compiles under `skipLibCheck: false`.** Importing `ValidationError` (from `services/validate/ValidationError.js`) in an app with `skipLibCheck: false` failed with TS2416 inside the framework's own declaration, because its widened `message` was hidden behind a `@ts-expect-error` that does not reach the `.d.ts`. The class still is an `Error` at runtime. `registerErrorHandler` and `ErrorHandlerFn` now also accept it as an error class.
+
 ## [5.6.0] - 2026-10-27
 
 ### Changed

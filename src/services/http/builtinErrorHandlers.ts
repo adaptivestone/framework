@@ -92,11 +92,18 @@ export const serverErrorResponse = (req: FrameworkRequest) =>
   HttpResponse.json(500, { message: serverErrorMessage(req) });
 
 /**
+ * What `registerErrorHandler` accepts: any `Error` subclass, including one that
+ * widens `message` (the framework's `ValidationError` carries its field
+ * payload there). Structural, so the core declarations need not import it.
+ */
+export type RegistrableError = Omit<Error, 'message'>;
+
+/**
  * Maps an error to a response: a `{ status, body, headers? }` result, an
  * `HttpResponse` (for other content or full control), or `null`/`undefined`
  * to pass to the next entry.
  */
-export type ErrorHandlerFn<E extends Error = Error> = (
+export type ErrorHandlerFn<E extends RegistrableError = Error> = (
   err: E,
   req: FrameworkRequest,
 ) =>
@@ -108,8 +115,8 @@ export type ErrorHandlerFn<E extends Error = Error> = (
 
 /** A registered (class, handler, level) triple as stored by the registry. */
 export interface RegisteredErrorHandler {
-  errorClass: abstract new (...args: never[]) => Error;
-  handler: ErrorHandlerFn;
+  errorClass: abstract new (...args: never[]) => RegistrableError;
+  handler: ErrorHandlerFn<RegistrableError>;
   logLevel: ErrorLogLevel;
 }
 
