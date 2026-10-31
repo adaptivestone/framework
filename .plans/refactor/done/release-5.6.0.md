@@ -43,3 +43,5 @@ Preparation does not publish a package, tag or GitHub release.
 ## Completion
 
 Preparation complete. At the user's request on 2026-10-27, Claude commits the release, merges the release and docs PRs, dismisses CodeQL #3, and creates the `5.6.0` tag and GitHub release. The user publishes 5.6.0 to npm. The example project then moves to framework ^5.6.0 and `oxc-parser` ^0.156.0.
+
+**Published 2026-10-27**: release PR #80 merged, GitHub release `5.6.0` (21:16 UTC) and npm `5.6.0` (21:21 UTC), checked 2026-10-31.
