@@ -1,7 +1,7 @@
 # P1m — Async/await middleware contract (breaking)
 
 **Status**: ⏸ queued — RE-SCOPED 2026-08-31 (user-approved): **v5.6 opt-in bridge via `static contractVersion = 2`, v6 flips the default and drops v1.** (Retargeted 5.5 → 5.6 on 2026-10-03 together with P1q.) Linear direction (Option A) settled by
-[P1q universal HTTP responses](./universal-http-responses.md); co-designed and landed WITH P1q in v5.6.
+[P1q universal HTTP responses](../active/universal-http-responses.md); co-designed and landed WITH P1q in v5.6.
 **Depends on**: P1b ✅ (tree router / `ExpressAdapter`) and P1q (v5.6) response bridge — the v2 contract's
 returned `HttpResponse` rides P1q's writer, so the two ship in the same minor. The v6 half (default flip,
 v1 removal, built-in migration) still lands alongside [static-middleware-cutover](../later/static-middleware-cutover.md) —

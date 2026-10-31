@@ -3,7 +3,7 @@
 **Status**: ✅ direction settled 2026-07-18 · implementation not started
 **Target**: unscheduled after v5.2.0; coordinate with the broader observability plan before implementation
 **Depends on**: app lifecycle/config; automatic response metrics use
-[P1q ResponseWriter](./universal-http-responses.md)
+[P1q ResponseWriter](../active/universal-http-responses.md)
 **Feeds**: [observability phases 2+](../later/observability.md), jobs/queues,
 rate-limiter and cache degradation signals
 **Origin**: best-effort operations currently emit logs only. Logs explain individual failures but

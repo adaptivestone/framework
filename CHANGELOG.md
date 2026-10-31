@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **Route handlers can return their response instead of writing to `res`.** `HttpResponse` from `services/http/responses.js` builds typed response values: `json`, `text`, `bytes`, `stream`, `redirect`, `empty`, and `native` for a Web `Response`. A handler returns one (`return HttpResponse.json(201, user)`) and the framework sends it. The status comes first and keeps its literal type, so `Promise<JsonResponse<201, UserDto>>` describes the handler. A status a kind cannot use fails to compile and throws a `RangeError` at runtime: informational statuses, 204/205/304 anywhere but `empty`, and 206. Set the media type with `contentType` (`HttpResponse.json(422, problem, { contentType: 'application/problem+json' })`) and other headers with `headers`. JSON, text and bytes are sent like `res.json` / `res.send`, with the same `ETag` and charset. Headers already on the response (security headers, CORS) stay: a returned header replaces one of the same name, `set-cookie` is appended and `vary` merged. A stream sends its status and headers with its first chunk, so an error before that chunk is answered like a thrown error. A client that disconnects stops the stream's source. Errors are still thrown (`throw new NotFoundError(…)`), and handlers that write to `res` keep working. A handler that writes to `res` and also returns a response gets an error logged, and the returned response is not sent.
+
 ## [5.6.0] - 2026-10-27
 
 ### Changed

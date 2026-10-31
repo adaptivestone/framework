@@ -23,6 +23,7 @@ import {
   serverErrorMessage,
   toLoggableError,
 } from './builtinErrorHandlers.ts';
+import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import Cors from './middleware/Cors.ts';
 import I18nMiddleware from './middleware/I18n.ts';
 import IpDetector from './middleware/IpDetector.ts';
@@ -52,6 +53,9 @@ class HttpServer extends Base {
   httpServer: Server;
 
   routeRegistry: RouteRegistry;
+
+  /** Renders the `HttpResponse` values route handlers return. */
+  readonly responseWriter = new ExpressResponseWriter();
 
   /** Consumer-registered error handlers — checked before the built-ins. */
   #errorHandlers: RegisteredErrorHandler[] = [];
@@ -149,7 +153,9 @@ class HttpServer extends Base {
 
   /** Mount the route adapter — single entry to the registry. */
   mountAdapter() {
-    this.express.use(createExpressAdapter(this.routeRegistry, this.app));
+    this.express.use(
+      createExpressAdapter(this.routeRegistry, this.app, this.responseWriter),
+    );
   }
 
   /**

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, it, mock } from 'node:test';
-import type { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { IApp } from '../../../server.ts';
 import {
@@ -16,6 +18,7 @@ import {
 import { stubI18n } from '../../../tests/mocks.ts';
 import { HttpError } from '../httpErrors.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
+import { HttpResponse } from '../responses.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
 
@@ -365,6 +368,126 @@ describe('createExpressAdapter — error propagation', () => {
       next.mock.calls[0]?.arguments[0]?.message,
       'mw exploded',
     );
+  });
+});
+
+describe('createExpressAdapter — returned HttpResponse', () => {
+  const stubWriter = () => {
+    const write = mock.fn(
+      async (_response: HttpResponse, _req: Request, _res: Response) => {},
+    );
+    return { writer: { write }, write };
+  };
+
+  it('writes a returned HttpResponse through the writer', async () => {
+    const response = HttpResponse.json(201, { id: 'x' });
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/users', { handler: async () => response });
+    const { writer, write } = stubWriter();
+    const req = makeReq('POST', '/users');
+    const res = asExpressRes(makeRes());
+    const next = mock.fn();
+
+    await createExpressAdapter(r, fakeApp, writer)(req, res, next);
+
+    assertCalledTimes(write, 1);
+    assert.deepStrictEqual(write.mock.calls[0]?.arguments, [
+      response,
+      req,
+      res,
+    ]);
+    assertNotCalled(next);
+  });
+
+  it('leaves legacy return values to the handler', async () => {
+    const legacyReturns = [
+      (_req: Request, res: Response) => res.json({ ok: true }),
+      () => ({ kind: 'json', status: 201, headers: [], body: {} }),
+      () => undefined,
+    ];
+    for (const handler of legacyReturns) {
+      const r = new RouteRegistry();
+      r.registerRoute('GET', '/legacy', { handler });
+      const { writer, write } = stubWriter();
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('GET', '/legacy'),
+        asExpressRes(makeRes()),
+        mock.fn(),
+      );
+      assertNotCalled(write);
+    }
+  });
+
+  it('fails loudly when the handler also wrote to res', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.json(200, { second: true });
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    const next = mock.fn();
+
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(res),
+      next,
+    );
+
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { first: true });
+    assertCalledWith(next, pattern.any(Error));
+    assertTextMatch(
+      next.mock.calls[0]?.arguments[0]?.message,
+      /GET \/mixed: the handler both wrote to res and returned an HttpResponse/,
+    );
+  });
+
+  it('passes a writer failure to next(err)', async () => {
+    const failure = new Error('write failed');
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', { handler: () => HttpResponse.empty(204) });
+    const writer = { write: async () => Promise.reject(failure) };
+    const next = mock.fn();
+
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('GET', '/x'),
+      asExpressRes(makeRes()),
+      next,
+    );
+
+    assertCalledWith(next, failure);
+  });
+
+  it('renders through the Express writer by default', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/users/:id', {
+      handler: (req: Request) =>
+        HttpResponse.json(
+          200,
+          { id: req.params.id },
+          {
+            headers: { 'cache-control': 'no-store' },
+          },
+        ),
+    });
+    const app = express();
+    app.use(createExpressAdapter(r, fakeApp));
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/users/42`);
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(response.headers.get('cache-control'), 'no-store');
+      assert.deepStrictEqual(await response.json(), { id: '42' });
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });
 

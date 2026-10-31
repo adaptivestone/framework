@@ -26,6 +26,7 @@ import type { IApp } from '../server.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import type { MiddlewareSpec } from '../services/http/routing/middlewareNormalization.ts';
 import type {
   HttpMethod,
@@ -1889,5 +1890,159 @@ describe('ControllerManager — route `params:` schema', () => {
 
     assert.strictEqual(res.status, 400);
     assert.deepStrictEqual(Object.keys(body.errors), ['group']);
+  });
+});
+
+// ─── returned HttpResponse (P1q) — over HTTP ─────────────────────────
+//
+// A handler may return an `HttpResponse` instead of writing to `res`. The
+// validation wrapper passes the return value through, and the adapter renders
+// it; thrown errors and validation 400s keep their existing paths.
+
+const requiredName: StandardSchemaV1 = {
+  '~standard': {
+    version: 1,
+    vendor: 'runtime-test',
+    validate: (value) => {
+      const name = (value as { name?: unknown } | null)?.name;
+      return typeof name === 'string'
+        ? { value: { name } }
+        : { issues: [{ message: 'name is required', path: ['name'] }] };
+    },
+  },
+};
+
+class ReturnedResponseController extends AbstractController {
+  get routes() {
+    return {
+      post: {
+        '/create': { handler: this.create, request: requiredName },
+      },
+      get: {
+        '/moved': this.moved,
+        '/missing': this.missing,
+        '/mixed': this.mixed,
+      },
+    };
+  }
+
+  async create(req: FrameworkRequest) {
+    return HttpResponse.json(
+      201,
+      { name: req.appInfo.request.name },
+      { headers: { location: '/test/returnedresponsecontroller/1' } },
+    );
+  }
+
+  async moved() {
+    return HttpResponse.redirect(
+      308,
+      '/test/returnedresponsecontroller/create',
+    );
+  }
+
+  async missing(): Promise<HttpResponse> {
+    throw new NotFoundError('Nothing to return');
+  }
+
+  async mixed(_req: FrameworkRequest, res: Response) {
+    res.status(200).json({ first: true });
+    await new Promise((resolve) => setImmediate(resolve));
+    return HttpResponse.json(200, { second: true });
+  }
+
+  static get middleware() {
+    return new Map();
+  }
+}
+
+describe('ControllerManager — returned HttpResponse', () => {
+  const base = '/test/returnedresponsecontroller';
+  const post = (path: string, body: unknown) =>
+    fetch(getTestServerURL(`${base}${path}`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const get = (path: string) =>
+    fetch(getTestServerURL(`${base}${path}`), { redirect: 'manual' });
+
+  let capture: CaptureTransport;
+  let silenced: Transport[] = [];
+
+  before(() => {
+    appInstance.controllerManager?.registerController(
+      ReturnedResponseController,
+      'test',
+    );
+    capture = new CaptureTransport();
+    appInstance.logger.add(capture);
+    silenced = appInstance.logger.transports.filter((t) => t !== capture);
+    for (const t of silenced) {
+      t.silent = true;
+    }
+  });
+
+  after(() => {
+    for (const t of silenced) {
+      t.silent = false;
+    }
+    appInstance.logger.remove(capture);
+  });
+
+  beforeEach(() => {
+    capture.records.length = 0;
+  });
+
+  it('renders the returned response with the validated input', async () => {
+    const res = await post('/create', { name: 'Ada', extra: 'dropped' });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(
+      res.headers.get('location'),
+      '/test/returnedresponsecontroller/1',
+    );
+    assert.deepStrictEqual(await res.json(), { name: 'Ada' });
+  });
+
+  it('keeps the validation 400 for rejected input', async () => {
+    const res = await post('/create', {});
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(await res.json(), {
+      message: 'Validation failed',
+      errors: { name: ['name is required'] },
+    });
+  });
+
+  it('renders a redirect', async () => {
+    const res = await get('/moved');
+    assert.strictEqual(res.status, 308);
+    assert.strictEqual(
+      res.headers.get('location'),
+      '/test/returnedresponsecontroller/create',
+    );
+  });
+
+  it('keeps thrown errors on the error-handler registry', async () => {
+    const res = await get('/missing');
+    assert.strictEqual(res.status, 404);
+    assert.deepStrictEqual(await res.json(), { message: 'Nothing to return' });
+  });
+
+  it('logs an error when the handler also wrote to res', async () => {
+    const res = await get('/mixed');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { first: true });
+    const logged = () =>
+      capture.records.filter((r) =>
+        /both wrote to res and returned an HttpResponse/.test(r.message),
+      );
+    // The error is raised after the response went out; give it a moment.
+    for (let i = 0; i < 50 && logged().length === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepStrictEqual(
+      logged().map((r) => r.level),
+      ['error'],
+    );
   });
 });
