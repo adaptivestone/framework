@@ -77,6 +77,80 @@ unchanged. With P1q Phases 0–2 done, this is the only thing blocking implement
 Recommendation: **c** — no new runtime object, no per-request cost, and the type is the
 portability contract. The exact field list of `RequestContext` is part of the decision.
 
+### Proposal after the market survey (2026-10-31, awaiting the user)
+
+Survey of 23 frameworks: [request-context-survey](../reference/request-context-survey.md). The
+proposal keeps what is already ours (per-route typed `appInfo`, the error registry, returned
+`HttpResponse`) and adds what nearly every mature context offers.
+
+```ts
+interface RequestContext<AppInfo = BaseAppInfo> {
+  // Request: read-only, portable
+  readonly method: string;
+  readonly path: string; //                    decoded path, no query
+  readonly url: URL; //                        lazy; host/protocol per trusted-proxy config
+  readonly route: string | undefined; //       matched template, e.g. '/users/:id'
+  header(name: string): string | undefined;
+  readonly headers: Readonly<Record<string, string | string[] | undefined>>;
+  readonly params: Readonly<Record<string, string>>; // raw; validated → appInfo.params
+  readonly query: Readonly<Record<string, unknown>>; //  raw; validated → appInfo.query
+  readonly body: unknown; //                   parsed body (files included); validated → appInfo.request
+  readonly ip: string | undefined; //          IpDetector, trusted-proxy aware
+  readonly cookies: { get(name: string): string | undefined }; // D2.5
+  // Identity and lifecycle (all lazy: no cost unless used)
+  readonly id: string; //                      X-Request-Id or generated
+  readonly logger: Logger; //                  child logger tagged with `id`
+  readonly signal: AbortSignal; //             aborts when the client disconnects
+  onFinish(
+    cb: (outcome: {
+      status: number;
+      aborted: boolean;
+      durationMs: number;
+    }) => void,
+  ): void;
+  // Per-request state: unchanged, typed per route by codegen + static `provides`
+  appInfo: AppInfo;
+  // Response staging: applied to whatever response is sent
+  readonly response: {
+    setHeader(name: string, value: string): void;
+    appendHeader(name: string, value: string): void;
+    setCookie(name: string, value: string, options?: CookieOptions): void; // D2.5
+    deleteCookie(name: string, options?: CookieOptions): void;
+  };
+}
+```
+
+**Runtime in 5.x (option c):** the Express `req` handlers already get. The new members are defined
+once on Express's request prototype (`app.request`) as lazy getters and methods, so no
+per-request allocation; `response.*` writes straight to the Express `res`, which the writer keeps
+(headers set earlier survive into the returned or error response). With the Node adapter (P3) a
+framework class implements the same interface; code written against `RequestContext` does not
+change.
+
+**Sub-decisions** (one by one with the user; recommendation first):
+
+- **D2.1 Flow** — keep the settled linear model (return nothing = continue, `HttpResponse` =
+  stop, throw = registry) **plus** response staging and `onFinish` (h3 v2's choice; covers
+  CORS, request id, cookies, timing/logging). Alternative: switch to onion (`await next()` returns
+  the response; the market majority) by reopening D1.
+- **D2.2 Request representation** — plain portable fields as above. Alternative: a Web `Request`
+  underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
+  as a lazy getter with the Node adapter.
+- **D2.3 State** — keep `appInfo`, typed per route by codegen from each middleware's `provides`
+  (the market's weak spot is global augmentation that lies on routes without the middleware).
+  Alternative: typed keys (`createContext<T>()`, React Router) for reusable middleware packages.
+- **D2.4 Staged headers on error responses** — apply to every response, errors included (what
+  Express apps rely on today, e.g. CORS). Alternative: h3's rule — drop them on ≥400 except an
+  explicit error-headers set.
+- **D2.5 Cookies** — the framework parses no cookies today. Add `ctx.cookies.get` (lazy parse) and
+  `ctx.response.setCookie/deleteCookie` with secure defaults (`HttpOnly`, `Secure`,
+  `SameSite=Lax`); nearly every surveyed framework has this. Alternative: leave cookies to apps.
+- **D2.6 Identity and lifecycle** — `id`, `logger`, `signal`, `onFinish`, all lazy. Not now:
+  `waitUntil` (no platform lifetime on Node; `onFinish` covers after-response work) and ambient
+  access through AsyncLocalStorage (`getRequestContext()`), possible later as a complement.
+- **D2.7 v6 handlers** — receive the same `ctx` (one object for middleware and handlers, the
+  market norm); in 5.x handlers keep `req`, which is the same runtime object.
+
 ## API change (Option A)
 
 ```ts
