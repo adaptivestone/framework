@@ -56,6 +56,21 @@ async middleware(req, res, next): Promise<void | Response> {
 uses the returned-response path already exercised in v5.3. Reopen B only with a concrete
 wrap-around middleware use case.
 
+## D2 — what `ctx` is (open; needs the user's call, raised 2026-10-31)
+
+The plan says `middleware(ctx)` but never defines `ctx` for the v5 opt-in. It matters because the
+point of opting in during 5.x is that a v2 middleware survives v6 (and later the Node adapter)
+unchanged. With P1q Phases 0–2 done, this is the only thing blocking implementation.
+
+| Option              | `ctx` at runtime                                                                                                   | `ctx` type                                                                          | Survives v6 / Node adapter?                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a                   | the request handlers get (`FrameworkRequest`, Express `Request` underneath)                                        | `FrameworkRequest`                                                                  | v6 yes; Node adapter no — any Express request API used (`ctx.get()`, `ctx.cookies`, …) breaks there                                                   |
+| b                   | a new framework object (`method`, `path`, `headers`, `params`, `query`, `body`, `appInfo`, `ip`) built per request | new `RequestContext`                                                                | yes, but adds an allocation per request and a second object beside the `req` handlers still get in v5                                                 |
+| **c (recommended)** | the same request object as (a)                                                                                     | a framework-owned `RequestContext` interface listing only the portable fields above | yes: code that compiles against the interface keeps working when the runtime object changes; `appInfo` written by middleware is the one handlers read |
+
+Recommendation: **c** — no new runtime object, no per-request cost, and the type is the
+portability contract. The exact field list of `RequestContext` is part of the decision.
+
 ## API change (Option A)
 
 ```ts
