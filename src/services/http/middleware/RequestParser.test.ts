@@ -222,7 +222,10 @@ d\r
         await middleware.middleware(
           frReq,
           resp as unknown as Response,
-          (() => {}) as NextFunction,
+          ((err?: unknown) => {
+            // The rejection is passed on for the error sink to answer.
+            status = err instanceof HttpError ? err.status : status;
+          }) as NextFunction,
         );
 
         assert.strictEqual(status, 400);
@@ -537,6 +540,13 @@ describe('request parser media-type isolation', () => {
     app.use((_req, res) => {
       res.json({ ok: true });
     });
+    // Answer at once like the framework's final sink: Express's default
+    // handler would first drain the unread (endless) body.
+    app.use(
+      (err: HttpError, _req: unknown, res: Response, _next: NextFunction) => {
+        res.status(err.status).json({ message: err.message });
+      },
+    );
     const server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const { port } = server.address() as AddressInfo;
