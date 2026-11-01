@@ -16,6 +16,8 @@ import {
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
+import type { RequestContext } from '../services/http/RequestContext.ts';
+import { requestContext } from '../services/http/requestScope.ts';
 import { HttpResponse } from '../services/http/responses.ts';
 import {
   type MiddlewareSpec,
@@ -440,6 +442,7 @@ class ControllerManager extends Base {
       req: FrameworkRequest,
       res: Response,
       next: NextFunction,
+      ctx?: RequestContext,
     ): Promise<unknown> => {
       try {
         // Params first: a malformed `:id` means the request targets nothing
@@ -507,6 +510,11 @@ class ControllerManager extends Base {
       } catch (err) {
         markValidationStage(err);
         throw err;
+      }
+      if (entry.contract === 2) {
+        // A v2 handler gets the request's context (validated `appInfo` is the
+        // same object) and must return an `HttpResponse`.
+        return original(ctx ?? requestContext());
       }
       return original(req, res, next);
     };
@@ -656,6 +664,29 @@ export function convertPathSyntax(p: string): string {
   return p.replace(/\{\*([a-zA-Z_][a-zA-Z0-9_]*)\}/g, '*$1');
 }
 
+/**
+ * The contract of a handler: the `contractVersion` of the class that declares
+ * the method (so an inherited 5.x method keeps `(req, res)` when a subclass
+ * opts in), or the controller's own for an inline function.
+ */
+// biome-ignore lint/complexity/noBannedTypes: handlers are user-provided callables
+function handlerContract(fn: Function, controller: object): 1 | 2 {
+  const versionOf = (owner: unknown): 1 | 2 =>
+    (owner as { contractVersion?: unknown } | undefined)?.contractVersion === 2
+      ? 2
+      : 1;
+  let proto: object | null = Object.getPrototypeOf(controller);
+  while (proto && proto !== Object.prototype) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (Object.getOwnPropertyDescriptor(proto, key)?.value === fn) {
+        return versionOf((proto as { constructor?: unknown }).constructor);
+      }
+    }
+    proto = Object.getPrototypeOf(proto);
+  }
+  return versionOf((controller as { constructor?: unknown }).constructor);
+}
+
 function buildHandlerEntry(
   spec: unknown,
   controller: object,
@@ -663,6 +694,7 @@ function buildHandlerEntry(
   if (typeof spec === 'function') {
     return {
       handler: spec.bind(controller),
+      contract: handlerContract(spec, controller),
       meta: { methodName: spec.name || undefined },
     };
   }
@@ -688,6 +720,8 @@ function buildHandlerEntry(
   const entry: HandlerEntry = {
     // biome-ignore lint/complexity/noBannedTypes: handler is a user-provided callable
     handler: (obj.handler as Function).bind(controller),
+    // biome-ignore lint/complexity/noBannedTypes: handler is a user-provided callable
+    contract: handlerContract(obj.handler as Function, controller),
     meta: {
       methodName: handlerName || undefined,
       ...(typeof obj.description === 'string'

@@ -82,6 +82,11 @@ export interface HandlerEntry {
    */
   // biome-ignore lint/complexity/noBannedTypes: handlers are user-provided callables of varying shape
   rawHandler?: Function;
+  /**
+   * @internal Handler contract: `2` takes the `RequestContext` and returns an
+   * `HttpResponse` (the declaring controller's `contractVersion`); default `1`.
+   */
+  contract?: 1 | 2;
   request?: StandardSchemaV1 | RequestContentTypeMap;
   query?: StandardSchemaV1;
   params?: StandardSchemaV1;

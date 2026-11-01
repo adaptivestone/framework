@@ -9,6 +9,7 @@ import type { IApp } from '../../server.ts';
 import type { TI18n } from '../i18n/types.ts';
 import type { StandardSchemaV1 } from '../validate/types.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
+import type { RequestContext } from './RequestContext.ts';
 
 /**
  * Module-augmentation point for app-wide `appInfo` extensions. Users add:
@@ -249,3 +250,12 @@ export type ValidatedRequest<
     query: ValidatedSlot<MWs, Outputs, 'query', ProvidedAppInfo<MWs>['query']>;
   } & Pick<Outputs, Exclude<keyof Outputs, 'request' | 'query'>>;
 };
+
+/**
+ * The `ctx` a v2 handler (`static contractVersion = 2`) receives for a route:
+ * the same validated, middleware-provided `appInfo` as the route's request
+ * type, and the route's path params by name. Codegen emits one per handler as
+ * `<MethodName>Context`.
+ */
+export type ValidatedContext<R extends { appInfo: object; params: object }> =
+  RequestContext<R['appInfo']> & { readonly params: Readonly<R['params']> };

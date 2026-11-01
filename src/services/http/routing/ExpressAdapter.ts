@@ -124,8 +124,11 @@ export function createExpressAdapter(
       ...(result.entry.meta ?? {}),
     };
 
-    if (result.middlewares.some(isV2Middleware)) {
-      // A v2 `Middleware` on the route: run it as a strict-onion chain.
+    if (
+      result.entry.contract === 2 ||
+      result.middlewares.some(isV2Middleware)
+    ) {
+      // A v2 handler or `Middleware` on the route: run it as a strict-onion chain.
       try {
         await dispatchV2(
           app,

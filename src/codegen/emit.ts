@@ -127,7 +127,9 @@ export function renderGenFile(input: RenderInput): string {
 
   const importLines: string[] = [];
   importLines.push(...middlewareImports);
-  importLines.push(`import type { ValidatedRequest } from '${typesPath}';`);
+  importLines.push(
+    `import type { ValidatedContext, ValidatedRequest } from '${typesPath}';`,
+  );
   if (navigateSchema) {
     importLines.push(
       `import type { StandardSchemaV1 } from '${validateTypesPath}';`,
@@ -193,13 +195,15 @@ function renderHandlerGroup(
   );
   const shapes = Array.from(new Set(allShapes));
 
+  const contextAlias = `\n\n/** Context type for ${docComment} (v2 handler: \`${handlerName}(ctx)\`). */
+export type ${pascalCase(handlerName)}Context = ValidatedContext<${typeName}>;`;
   if (shapes.length === 1) {
     return `/** Request type for ${docComment} (handler: \`${handlerName}\`). */
-export type ${typeName} = ${shapes[0]};`;
+export type ${typeName} = ${shapes[0]};${contextAlias}`;
   }
   return `/** Request type for ${docComment} (handler: \`${handlerName}\`). */
 export type ${typeName} =
-  | ${shapes.join('\n  | ')};`;
+  | ${shapes.join('\n  | ')};${contextAlias}`;
 }
 
 /** Render a handler context using the same ordered validation outputs as runtime. */

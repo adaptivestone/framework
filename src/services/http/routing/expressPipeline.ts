@@ -356,9 +356,18 @@ function handlerCall(
   onDroppedResponse: (entry: HandlerEntry) => void,
 ) {
   const run = entry.rawHandler ?? entry.handler;
+  const name = `${entry.meta?.controllerClass ?? 'Controller'}.${entry.meta?.methodName ?? 'handler'}`;
   return async (ctx: Ctx): Promise<HttpResponse> => {
     const { req, res, next, transport } = bindings.get(ctx) as Binding;
-    const returned = await run(req, res, next);
+    const returned = await run(req, res, next, ctx);
+    if (entry.contract === 2) {
+      if (!HttpResponse.is(returned)) {
+        throw new TypeError(
+          `${name} must return an HttpResponse (it takes ctx and has no res)`,
+        );
+      }
+      return returned;
+    }
     if (HttpResponse.is(returned)) {
       if (res.headersSent) {
         throw new Error(

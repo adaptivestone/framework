@@ -16,6 +16,8 @@
  *     `query:` schema flows to a typed `req.appInfo.request` / `.query`, and a
  *     `:id` segment to `req.params.id` — asserted via typed-local assignments
  *     (a fallback to `Record<string, unknown>` or a missing param fails tsc).
+ *   - v2 handlers (`ContextHandlers` fixture): the `<MethodName>Context` alias
+ *     carries the same validated `appInfo` and path params as the request type.
  *   - generated model-name lookup (`appModelLookup.ts`): known literals and
  *     unions resolve precisely, replacements win framework fallbacks, unknown
  *     names fail, and the explicit runtime-name API has no `false` branch.
@@ -121,6 +123,20 @@ describe('codegen golden fixtures (real pipeline + tsc gate)', () => {
         "import type { RoleGuard as Guard } from '../middleware/Guards.ts';",
       ),
     );
+
+    // v2 handlers: each handler also gets a `<MethodName>Context` over its
+    // request type; `ContextHandlers` reads validated input through it below.
+    const contextGen = await readFile(
+      path.join(controllersDir, 'ContextHandlers.routes.gen.ts'),
+      'utf8',
+    );
+    for (const name of ['Create', 'Show']) {
+      assert.ok(
+        contextGen.includes(
+          `export type ${name}Context = ValidatedContext<${name}Request>;`,
+        ),
+      );
+    }
 
     // The real gate: the handlers read `req.appInfo.user` with no guard, so a
     // regression in any of the bugs above makes this `tsc` run fail.

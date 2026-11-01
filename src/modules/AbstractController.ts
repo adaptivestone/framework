@@ -191,6 +191,17 @@ class AbstractController extends Base {
     return defaultControllerHttpPath(this.prefix, this.constructor.name);
   }
 
+  /**
+   * Which handler contract this controller's own methods use. `1` (default,
+   * 5.x): `handler(req, res)`. `2`: `handler(ctx)` with the request's
+   * `RequestContext`, returning an `HttpResponse`. Set it on a controller to
+   * opt in during 5.x; in v6 every handler uses `2`. A method inherited from
+   * a parent class keeps the parent's contract.
+   */
+  static get contractVersion(): 1 | 2 {
+    return 1;
+  }
+
   static get loggerGroup() {
     return 'controller';
   }
