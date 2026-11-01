@@ -462,9 +462,9 @@ adapter (P3) the same class reads from Node directly.
   it), `testServerOptions.test.ts` (+1: the real `Server` option in a booted test server, route and
   404). The packed type fixture accepts `Class` / `[Class, params]` and rejects a 5.x middleware.
 
-**Phase 2b-1 — route built-ins converted in place (in progress 2026-11-01; owner decision A):**
+**Phase 2b-1 — route built-ins converted in place (done 2026-11-01; owner decision A):**
 
-- `Auth`, `GetUserByToken`, `Role`, `Pagination` extend `Middleware` (`middleware(ctx, next)`).
+- `Auth`, `GetUserByToken`, `Role`, `Pagination`, `RateLimiter` extend `Middleware` (`middleware(ctx, next)`).
   `GetUserByToken` exports `UserContext` and `TokenSource`; `resolveToken()` takes a request or a
   context (the Auth controller's logout still passes `req`). The deprecated static
   `usedAuthParameters` alias stays on `GetUserByToken` until v6.
@@ -476,11 +476,15 @@ adapter (P3) the same class reads from Node directly.
 - Tests: the four built-ins' unit tests use `createTestContext()`; `AbstractMiddleware.test.ts`
   pins that a `(ctx, next)` subclass may answer with a response and an old-shape override is
   refused; the packaging smoke calls `Auth` with a context from the dist.
-- **Open: `RateLimiter`.** Its docs invite subclassing (`extend RateLimiter and override
-  generateConsumeKey`), and `generateConsumeKey(req)` reads `req.route.path`, `req.appInfo`,
-  `req.body`. Converting it changes that override's argument to `ctx` — owner question.
+- `RateLimiter` converted too (owner decision A, 2026-11-01): `generateConsumeKey(ctx)` (and the
+  misspelled alias) receive the context; overrides map `req.route.path` → `ctx.route`,
+  `req.get()` → `ctx.header()`. The HEAD rule is unchanged — a HEAD the GET handler answers shares
+  GET's budget, an explicit HEAD handler keeps its own — through the internal
+  `RequestContext.routeMethods(ctx)` (the adapter's `routeMethods` source field), not a public
+  member. The 500 for a limiter that failed to start is returned, not written to `res`. The adapter's
+  route-budget tests moved to a real HTTP server (their `res` stubs never emit `finish`).
 
-**Still open for P1m:** Phase 2b-1 `RateLimiter` (owner question), Phase 2b-2 (global built-ins),
+**Still open for P1m:** Phase 2b-2 (global built-ins),
 the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
 re-measure.
 
