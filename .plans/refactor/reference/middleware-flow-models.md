@@ -271,6 +271,11 @@ Node http holds ≈ 4.7 KB heap (Express ≈ 6.3 KB); at 10 000 concurrent strea
 a promise and a `next` closure per wrapping layer for the request's whole life (long streams
 included); C2 keeps one suspended runner frame plus one small closure per registered hook.
 
+_Correction (Astra, 2026-11-01): "long streams included" does not hold for this framework. The
+harness suspends requests inside the handler; a handler that returns a stream descriptor lets the
+chain unwind before writing starts, so no model keeps middleware frames during a stream. The
+numbers apply to requests pending in the handler._
+
 B's only unique capability is running the rest of the request inside an AsyncLocalStorage scope
 (`als.run(store, next)`; verified: in a linear runner `enterWith` reaches the handler only before
 the middleware's first `await`). Tracing spans for handlers can be done by the framework itself

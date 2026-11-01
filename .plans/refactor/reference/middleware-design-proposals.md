@@ -111,6 +111,10 @@ response before it is written), `ctx.onFinish(cb)` (after send). Names are not f
   | 10 of 10, own async store | —            | —       | 2 449 B | 4 228 B       | —       | 8 963 B   |
 
   For scale: a pending request on plain Node `http` holds ≈ 4.7 KB, with Express ≈ 6.3 KB.
+  **Limit (Astra, 2026-11-01):** the harness suspends requests _inside the handler_ (slow DB,
+  long poll). It does not measure an active streaming response: the handler returns a stream
+  descriptor, the middleware chain unwinds, and only then does writing start — so no model keeps
+  middleware frames during a long stream. Streaming is still to be measured separately.
 - **Tracing**: OpenTelemetry's request span stays active through any runner; database and HTTP
   client spans nest under it with no middleware code. Only "my span contains the handler's work"
   needs WRAP — or framework-published `node:diagnostics_channel` tracing channels around each
@@ -193,8 +197,8 @@ class Transaction {
 }
 ```
 
-Meets 1–8. Costs the most memory: every layer keeps a waiting async frame, a promise and a `next`
-closure for the whole request, also for a long stream. Needs rules: forgot `await`/`return` on
+Meets 1–8. Costs the most memory while the handler is pending: every layer keeps a waiting async
+frame, a promise and a `next` closure (not during streaming — see the limit in §5). Needs rules: forgot `await`/`return` on
 `next()`, `next()` called twice, does `next()` throw or return the error response.
 
 ### C1 — Two methods per middleware: `onRequest` / `onResponse`
@@ -272,7 +276,7 @@ Meets 1, 2, 3, 7, 8; 5 with tracing channels. Misses 4 (own store) and 6. Low me
 
 ### C2W — C2 plus `ctx.runInside(wrap)`
 
-C2, and a middleware may ask the runner to run the rest of the request inside a wrapper.
+C2, and a middleware may ask the runner to run later code inside a wrapper.
 
 ```
 request ─▶ M1 ─▶ M3 (registers wrapper) ─▶ [ wrapper( handler ─▶ callbacks ) ] ─▶ write
@@ -293,7 +297,12 @@ class Transaction {
 // Role, Timing: as in C2.
 ```
 
-Meets 1–8. Low memory; only requests whose middleware call `runInside` pay. Wrapping through a
+**As measured, the wrapper starts at the handler** (Astra, 2026-11-01): with
+`Tenant → Auth → handler`, Auth runs before the wrapper and cannot see the tenant store. Wrapping
+the later middleware too needs continuation machinery much like H's, with the scope entry less
+visible at the call site.
+
+Meets 1–3, 5–8; 4 and 6 for the handler only. Low memory; only requests whose middleware call `runInside` pay. Wrapping through a
 registered callback is unusual (no surveyed framework does exactly this) and `try/finally` is
 written inside the callback. Rule: errors must pass through wrappers (so a transaction rolls back)
 before the registry turns them into a response.
@@ -373,7 +382,7 @@ middleware to document; `next` rules apply to `around` only. Precedent: NestJS g
 | B      | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 3.2–3.4 KB              |
 | C1     | ✅              | ✅      | ✅           | ❌                | channels               | partly        | ≈ 1 KB                  |
 | C2     | ✅              | ✅      | ✅           | ❌                | channels               | ❌            | 1.3 KB                  |
-| C2W    | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 1.4–1.8 KB              |
+| C2W    | ✅              | ✅      | ✅           | handler only      | handler only           | handler only  | 1.4–1.8 KB              |
 | D      | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 2.6–2.7 KB              |
 | H      | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 1.2–1.9 KB              |
 
@@ -386,6 +395,22 @@ middleware to document; `next` rules apply to `around` only. Precedent: NestJS g
 - Framework store: opt-in or always on?
 - Streaming responses: should AFTER code run when the stream starts or when it ends?
 - 5.x bridge: how old `middleware(req, res, next)` classes run inside the new runner.
+- Error boundary (Astra): today the controller wrapper catches handler errors itself
+  (`src/controllers/index.ts`, `answerError`). For `try { await next(); commit() } catch {
+  rollback() }` to roll back, errors must travel up through `around`, and only uncaught errors
+  reach the registry. Order to settle: handler → `around` unwinds → registry → `beforeSend` hooks →
+  `transformResponse` (P1q Server option) → write → `onFinish`.
+- `next` misuse (Astra, reproduced against the onion sketch): `next(); return HttpResponse.empty(202)`
+  answers while the handler is still running; throwing after an un-awaited `next()` has the same
+  problem; a saved `next` called later can run the handler a second time. Require explicit `next`
+  in `around`, reject duplicate and late calls, and keep started downstream work accounted for.
+- Resource lifetime (Astra): an `around` transaction ends when the handler returns its response
+  descriptor, but a lazy stream may read a DB cursor later. Define that boundary, cleanup when a
+  hook replaces a stream, and abort handling.
+- `onFinish` means the server finished (Node's `finish`: the last bytes were handed to the OS), not
+  that the client received them; also define the async context its callbacks run in.
+- D1 in [async-middleware](../queued/async-middleware.md) settled the linear contract "until a
+  concrete wrap-around use case". Requirements 4–6 are such cases; D1 must be reopened explicitly.
 
 ## 9. Ideas from the independent review (Fable)
 
@@ -394,3 +419,43 @@ Pending — being added.
 ## 10. Reviewer notes
 
 Add your name, the option you would pick (or a new one), and why.
+
+### Astra (2026-11-01)
+
+**Pick: H** — simple request middleware, explicit `around`, plus response and completion hooks.
+Keeps auth/roles/rate limits simple and gives transactions and custom AsyncLocalStorage scopes a
+clear place. Keep the existing method name:
+
+| API                    | Purpose                                                   |
+| ---------------------- | --------------------------------------------------------- |
+| `middleware(ctx)`      | Return nothing to continue; return `HttpResponse` to stop |
+| `around(ctx, next)`    | Wrap later middleware and the handler                     |
+| `ctx.beforeSend(hook)` | Inspect or replace the response before it is written      |
+| `ctx.onFinish(hook)`   | Observe completion, failure or disconnect                 |
+
+Fix before settling the contract (details in §8):
+
+1. "`next()` never throws" breaks ordinary transaction rollback; let errors propagate through
+   `around`, then resolve uncaught ones through the registry, then run `beforeSend` hooks. This
+   moves the error boundary out of the controller wrapper.
+2. C2W as measured wraps only the handler, not later middleware (`Tenant → Auth`); making it wrap
+   "the rest" rebuilds most of H — a reason to prefer H.
+3. The safe-defaults onion runner has real races (`next(); return …`, throw after un-awaited
+   `next`, a saved `next` called later). In `around`, require explicit continuation and guard
+   duplicate/late calls.
+4. The memory numbers cover requests pending in the handler, not active streams; measure both and
+   keep the harness with the proposal (done: [middleware-experiments](middleware-experiments/README.md)).
+5. Resource lifetime: transaction vs lazy stream, stream replacement cleanup, abort, the context of
+   finish hooks; `onFinish` = server-side completion, not client receipt.
+
+Agrees: ordinary timing/header work belongs in hooks so wrapping stays rare; diagnostics channels
+for instrumentation, not as the app-facing mechanism for transaction or tenant scope. Reconcile
+with D1 (linear settled) and with P1q's `transformResponse` ordering.
+
+_Note:_ Astra read a local checkout where P1q is still `queued/` and the response writer is only
+planned. On this branch P1q is `active/` and the writer, returned responses and
+`transformResponse` are built (`src/services/http/ExpressResponseWriter.ts`).
+
+### Sol
+
+Pending.
