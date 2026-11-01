@@ -5,7 +5,8 @@
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
 decision record: D1 and D2 below.
-**Target**: the next minor (5.7) as an opt-in via `static contractVersion = 2`, landing with
+**Target**: the next minor (5.7) as an opt-in — middleware extend the new `Middleware` base,
+controllers set `static contractVersion = 2` — landing with
 [P1q universal HTTP responses](../active/universal-http-responses.md) (its writer renders the
 returned responses). v6 flips the default, drops v1, migrates built-ins, together with
 [static-middleware-cutover](../later/static-middleware-cutover.md).
@@ -14,18 +15,19 @@ descriptors, `transformResponse`).
 
 ## Settled contract (2026-11-01)
 
-| Decision                 | Outcome                                                                                                                                                                                                                                                                                                                          |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D2.1 flow                | Strict onion. `return next()` continues, a returned `HttpResponse` stops, a throw travels up unchanged; the registry resolves it once at the top.                                                                                                                                                                                |
-| Guards                   | Production: `next()` always returns a Promise, works once, expires when its own middleware call settles, is refused once the response is chosen; every started suffix is awaited; no misuse becomes an `unhandledRejection`; final value must be a response. Development: name the culprit. (Revised after the contract review.) |
-| v5 bridge                | A v1 handler/middleware that wrote `res` itself yields a `sent` response kind, visible in the v5 response union and removed in v6; `Next` stays `Promise<HttpResponse>`. Full outcome rules below.                                                                                                                               |
-| D2.2 context             | A separate `RequestContext` object per v2 request in 5.x (80 B measured); `ctx.appInfo` is the same object as `req.appInfo`. Names: `route` (template), `url` (`URL`), `path` (decoded), `ip` (IpDetector), `cookies`.                                                                                                           |
-| D2.3 state               | Keep `ctx.appInfo`, typed per route by codegen from `provides`; packages namespace their data.                                                                                                                                                                                                                                   |
-| D2.4 staged headers      | `ctx.response.setHeader/appendHeader` apply to every response, errors included.                                                                                                                                                                                                                                                  |
-| D2.5 cookies             | `ctx.cookies.get`, `ctx.response.setCookie/deleteCookie`, secure defaults; `cookie` becomes a direct dependency.                                                                                                                                                                                                                 |
-| D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                                                                                                                                |
-| D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                                                                                                                                     |
-| Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                         |
+| Decision                 | Outcome                                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| D2.1 flow                | Strict onion. `return next()` continues, a returned `HttpResponse` stops, a throw travels up unchanged; the registry resolves it once at the top.                                                                                                                                                                                    |
+| Guards                   | Production: `next()` always returns a Promise, works once, expires when its own middleware call settles, is refused once the response is chosen; every started suffix is awaited; no misuse becomes an `unhandledRejection`; final value must be a response. Development: name the culprit. (Revised after the contract review.)     |
+| v2 base class            | **Decided 2026-11-01:** a new `Middleware` base (`src/services/http/middleware/Middleware.ts`) for v2 middleware, typed `middleware(ctx, next): HttpResponse \| Promise<HttpResponse>`; `AbstractMiddleware` stays the v1 base and is removed in v6. The class says which contract it uses, so middleware need no `contractVersion`. |
+| v5 bridge                | A v1 handler/middleware that wrote `res` itself yields a `sent` response kind, visible in the v5 response union and removed in v6; `Next` stays `Promise<HttpResponse>`. Full outcome rules below.                                                                                                                                   |
+| D2.2 context             | A separate `RequestContext` object per v2 request in 5.x (80 B measured); `ctx.appInfo` is the same object as `req.appInfo`. Names: `route` (template), `url` (`URL`), `path` (decoded), `ip` (IpDetector), `cookies`.                                                                                                               |
+| D2.3 state               | Keep `ctx.appInfo`, typed per route by codegen from `provides`; packages namespace their data.                                                                                                                                                                                                                                       |
+| D2.4 staged headers      | `ctx.response.setHeader/appendHeader` apply to every response, errors included.                                                                                                                                                                                                                                                      |
+| D2.5 cookies             | `ctx.cookies.get`, `ctx.response.setCookie/deleteCookie`, secure defaults; `cookie` becomes a direct dependency.                                                                                                                                                                                                                     |
+| D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                                                                                                                                    |
+| D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                                                                                                                                         |
+| Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
 once → global `transformResponse` → writer merges staged headers/cookies → `onFinish` exactly once
@@ -33,9 +35,11 @@ once → global `transformResponse` → writer merges staged headers/cookies →
 
 ## v5 opt-in bridge (approved 2026-08-31; contract revised 2026-11-01)
 
-- `AbstractMiddleware` (and, per D2.7, controllers) get `static get contractVersion(): 1 | 2`
-  defaulting to `1` — the house static-getter pattern, readable by adapter and codegen with zero
-  instantiation.
+- **Middleware:** v2 classes extend the new `Middleware` base; v1 classes keep extending
+  `AbstractMiddleware`. The adapter and codegen tell them apart by base class at registration.
+- **Controllers** (D2.7) get `static get contractVersion(): 1 | 2` defaulting to `1` — the house
+  static-getter pattern, readable with zero instantiation (handlers do not override a base method,
+  so a flag works there).
 - The adapter composes each route's chain once. **v2** entries run as strict-onion layers with a
   `RequestContext`; **v1** entries run through today's Promise bridge inside the chain, as a layer
   that continues when the old middleware calls `next()` and yields the "already sent" kind when it
@@ -43,15 +47,16 @@ once → global `transformResponse` → writer merges staged headers/cookies →
 - **Framework built-ins stay v1 through all of v5.** Flipping a built-in's signature would break
   every consumer subclass overriding it. Built-ins migrate in v6 with the flip.
 - v5 docs mark v1 deprecated with a mechanical migration table; consumers migrate class by class.
-- v6: default flips to 2, v1 dispatch and the Promise bridge are deleted, built-ins migrate,
-  `contractVersion` becomes vestigial (kept one major as a no-op or dropped — decide at cutover).
-- **v2 base class (open, owner to choose the name):** TypeScript rejects a v2 subclass overriding
-  `middleware(ctx, next)` on the v1 base `middleware(req, res, next)` (TS2416), and the
-  forgotten-`return` check needs the strict base type. Recommended (contract review): a separately
-  typed v2 base that stays the import in v6, sharing metadata/implementation with the v1 base; not
-  a base widened to `any`/`void`. Affects `typeof AbstractMiddleware` constraints in
-  `src/modules/AbstractController.ts`, `routing/RouteNode.ts` (`MiddlewareEntry`) and
-  `routing/middlewareNormalization.ts`.
+- v6: `AbstractMiddleware`, v1 dispatch and the Promise bridge are deleted, built-ins move to
+  `Middleware`, controllers default to v2 and their `contractVersion` becomes vestigial (kept one
+  major as a no-op or dropped — decide at cutover).
+- **v2 base class — decided 2026-11-01 (option A):** a separately typed `Middleware` base, the v2
+  import in 5.x and v6, sharing static metadata and helpers with `AbstractMiddleware` (not a base
+  widened to `any`/`void`). Why: TypeScript rejects a v2 override of `middleware(ctx, next)` on the
+  v1 base `middleware(req, res, next)` (TS2416), and the forgotten-`return` check needs the strict
+  base type. Affects `typeof AbstractMiddleware` constraints in `src/modules/AbstractController.ts`,
+  `routing/RouteNode.ts` (`MiddlewareEntry`) and `routing/middlewareNormalization.ts`, which must
+  accept both bases.
 - **v1 code inside a v2 chain (contract review, proposed resolution):** a v1 controller handler or
   validator running inside the portable chain keeps its `(req, res, next)` call, but its errors
   escape to the outer v2 wrappers before the registry (so a v2 transaction rolls back); the old
@@ -313,21 +318,15 @@ class GetUserByToken extends AbstractMiddleware {
   }
 }
 
-// AFTER (v2 opt-in in 5.7, default in v6)
-class GetUserByToken extends AbstractMiddleware {
-  static get contractVersion() {
-    return 2 as const;
-  }
+// AFTER (v2 opt-in in 5.7, the only form in v6)
+class GetUserByToken extends Middleware {
   async middleware(ctx, next) {
     ctx.appInfo.user = await resolveUser(ctx);
     return next();
   }
 }
 
-class RateLimiter extends AbstractMiddleware {
-  static get contractVersion() {
-    return 2 as const;
-  }
+class RateLimiter extends Middleware {
   async middleware(ctx, next) {
     if (await this.exceeded(ctx))
       return HttpResponse.json(429, { message: 'Too many requests' });
@@ -346,7 +345,8 @@ class Users extends AbstractController {
 }
 ```
 
-Migration for pass-through middleware: replace `(req, res, next)` with `(ctx, next)`, keep
+Migration for pass-through middleware: extend `Middleware` instead of `AbstractMiddleware`,
+replace `(req, res, next)` with `(ctx, next)`, keep
 `return next()`, replace `next(err)` with `throw err`, replace `res.status(...).json(...)` with a
 returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 
@@ -359,8 +359,8 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 - `src/services/http/RequestContext.ts` (new) — the per-request class: lazy `method`, `path`, `url`,
   `route`, `headers`/`header()`, `params`, `query`, `body`, `ip`, `cookies`, `id`, `logger`,
   `signal`, `onFinish`, `appInfo`, `response` (staged headers and cookies).
-- `src/services/http/middleware/AbstractMiddleware.ts` — `contractVersion`; v2 signature and its
-  base type (see the open implementation question).
+- `src/services/http/middleware/AbstractMiddleware.ts` — shared static metadata moves to a place
+  both bases use; v1 signature unchanged.
 - `src/services/http/routing/ExpressAdapter.ts` — builds the context, enters the framework store,
   runs the pipeline; v1 entries through the existing bridge inside the chain.
 - `src/controllers/index.ts` — v2 controllers: handlers get `ctx`; errors are not caught inside the
@@ -373,7 +373,7 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 - `src/services/http/requestContext.ts` (new) — the `requestContext()` accessor, side-effect free,
   imported as `@adaptivestone/framework/services/http/requestContext.js` (the `./services/*`
   export); `src/index.ts` boots a server and is not a package export. Packaging smoke imports it.
-- The chosen v2 base module, `src/modules/AbstractController.ts`, `routing/RouteNode.ts`,
+- `src/services/http/middleware/Middleware.ts` (new v2 base), `src/modules/AbstractController.ts`, `routing/RouteNode.ts`,
   `routing/middlewareNormalization.ts` and their tests — mixed v1/v2 middleware lists and tuples.
 - Controller version recorded when methods become bound `HandlerEntry` functions; defaults for
   ad-hoc handlers and inheritance (a subclass changing its version must not call an inherited v1

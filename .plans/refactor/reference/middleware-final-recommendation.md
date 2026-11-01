@@ -32,7 +32,7 @@ priority set, H stays the measured alternative, not the recommendation.
 ## 2. The contract
 
 ```ts
-class Auth extends AbstractMiddleware {
+class Auth extends Middleware {
   //               check, then pass on
   middleware(ctx: RequestContext, next: Next) {
     if (!ctx.appInfo.user)
@@ -41,7 +41,7 @@ class Auth extends AbstractMiddleware {
   }
 }
 
-class Role extends AbstractMiddleware {
+class Role extends Middleware {
   //               stop early with a response
   middleware(ctx: RequestContext, next: Next) {
     if (!hasRole(ctx)) return HttpResponse.json(403, { error: 'NO_ACCESS' });
@@ -49,14 +49,14 @@ class Role extends AbstractMiddleware {
   }
 }
 
-class UserScope extends AbstractMiddleware {
+class UserScope extends Middleware {
   //          own AsyncLocalStorage store for the rest
   middleware(ctx: AuthenticatedContext, next: Next) {
     return currentUser.run(ctx.appInfo.user, next);
   }
 }
 
-class RequestLogger extends AbstractMiddleware {
+class RequestLogger extends Middleware {
   //      after the response is sent
   middleware(ctx: RequestContext, next: Next) {
     ctx.onFinish(({ outcome, status, durationMs }) =>
@@ -71,7 +71,7 @@ class RequestLogger extends AbstractMiddleware {
   }
 }
 
-class Transaction extends AbstractMiddleware {
+class Transaction extends Middleware {
   //        try/catch/finally around the rest
   async middleware(ctx: RequestContext, next: Next) {
     const session = await db.startSession();
@@ -108,7 +108,8 @@ Rules:
 4. **Development diagnostics** (the `dev` runner): additionally checks each middleware's result and
    names the one that broke the rule ("`Forgot` must return a response — missing `return next()`?").
    koa-compose 4.2 splits production and development checks the same way.
-5. `static contractVersion = 2` marks a v2 class; v1 `(req, res, next)` classes keep the bridge.
+5. A v2 middleware extends the new `Middleware` base (decided 2026-11-01); v1 `(req, res, next)`
+   classes keep `AbstractMiddleware` and the bridge. Controllers opt in with `contractVersion = 2`.
    Built-ins stay v1 through v5, as the plan already says.
 
 ## 3. Checked against every requirement
@@ -259,6 +260,8 @@ From the Astro Proposal and the earlier version of this file:
 6. **D2.3 state:** keep `ctx.appInfo`, typed per route by codegen.
 7. **D2.5 cookies:** helpers on `ctx` with secure defaults.
 8. **D2.7 handlers:** v6 handlers get the same `ctx`; 5.x controllers opt in with `contractVersion = 2`.
+9. **v2 base class:** a new `Middleware` base for v2 middleware; `AbstractMiddleware` stays v1 and
+   is removed in v6 (contract review finding 1).
 
 All D2 decisions are settled; the plan is [async-middleware](../queued/async-middleware.md).
 
@@ -277,7 +280,7 @@ code before acting.
 
 | Finding                                                         | Checked                                                                                                                     | Action                                                                                                                                                                                                               |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. v2 base class (TS2416)                                       | true (same conflict P1m flagged)                                                                                            | Recommend a separate typed v2 base, usable in v6; owner to choose the name. Added to P1m with the affected files.                                                                                                    |
+| 1. v2 base class (TS2416)                                       | true (same conflict P1m flagged)                                                                                            | Decided (owner, option A): a new `Middleware` base for v2, kept in v6; `AbstractMiddleware` stays v1. Recorded in P1m with the affected files.                                                                       |
 | 2. v1 handler inside a v2 chain commits on error                | true (`controllers/index.ts` catches and returns 400/500)                                                                   | P1m: when a v1 handler runs inside the portable chain, its errors escape to the outer wrappers first; the standalone v1 path is unchanged. Bridge `next(err)`/sync throw/rejection keep raw identity.                |
 | 3. Legacy terminal outcome                                      | true (`ExpressAdapter` treats `close` as success; staged headers would miss legacy writes)                                  | Astra's outcome table adopted into P1m: flush staged headers/cookies at the legacy write boundary, reject later staging, `aborted` on premature close, `sent` kind visible in the v5 response union (removed in v6). |
 | 4. Guards: started cleanup, per-invocation expiry               | true (reproduced: answered before cleanup; handler ran though 403 was chosen)                                               | Fixed in the kernels; conformance cases added; re-measured (§4).                                                                                                                                                     |
