@@ -7,7 +7,7 @@ for years, and a later need (new middleware ability, new adapter, new response k
 itself (owner) — 5.x makes Express optional with a Node.js adapter, v6 removes the Express adapter.
 **Kind**: cross-cutting checklist. Each item names the plan that implements it; this card tracks
 that, when v6 ships, Express is gone and every public API can grow in minors.
-**Depends on**: [P1m async middleware](async-middleware.md), [P1q universal responses](../active/universal-http-responses.md),
+**Depends on**: [P1m async middleware](../active/async-middleware.md), [P1q universal responses](../active/universal-http-responses.md),
 [static-middleware-cutover](../later/static-middleware-cutover.md), [node-adapter](../later/node-adapter.md),
 [default-node-adapter](../later/default-node-adapter.md), [drop-express](../later/drop-express.md),
 [P1z logging](logging-facade-and-pino.md), [observability](../later/observability.md).
@@ -39,7 +39,7 @@ v6   the Express adapter and the `express` dependency are removed (P5's Express 
    `ServerResponse` outside an explicit raw-transport route (item 4), so Bun/Deno/Fetch adapters
    can be added in 6.x minors.
 5. **Reserved lifecycle positions are written down now.** The order of one request is fixed in
-   [P1m](async-middleware.md), with the slot for a future per-request `beforeSend` (between error
+   [P1m](../active/async-middleware.md), with the slot for a future per-request `beforeSend` (between error
    resolution and `transformResponse`) reserved, so adding the hook later reorders nothing.
 6. **One extension point per concern.** Request flow: strict-onion `Middleware`. Per-request data:
    `appInfo` + `provides`. Errors: the error registry. Global response shape: `transformResponse`.

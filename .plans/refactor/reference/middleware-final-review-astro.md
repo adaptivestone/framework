@@ -2,7 +2,7 @@
 
 **Date:** 2026-11-01.
 **Reviewed:** `ccr-80ccfb40-0qs0lo` at `2b0777c8f4245d7003187a7446c055789bd772ae`.
-**Scope:** [async-middleware](../queued/async-middleware.md),
+**Scope:** [async-middleware](../active/async-middleware.md),
 [v6-api-stability](../queued/v6-api-stability.md), their contract checks and the accompanying
 response-writer fix. Source line references below refer to this reviewed commit.
 **Responses (2026-11-01):** every finding checked and acted on —

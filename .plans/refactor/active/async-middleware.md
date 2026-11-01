@@ -1,17 +1,19 @@
 # P1m — Async/await middleware contract (breaking)
 
-**Status**: ⏸ queued — **contract settled 2026-11-01** (owner), implementation not started.
+**Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
+Progress (slices in [Implementation progress](#implementation-progress)): slice 1, the portable
+core, done; slice 2, wiring into the Express adapter, next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
 decision record: D1 and D2 below.
 **Target**: the next minor (5.7) as an opt-in — middleware extend the new `Middleware` base,
 controllers set `static contractVersion = 2` — landing with
-[P1q universal HTTP responses](../active/universal-http-responses.md) (its writer renders the
+[P1q universal HTTP responses](universal-http-responses.md) (its writer renders the
 returned responses). v6 flips the default, drops v1, migrates built-ins, together with
 [static-middleware-cutover](../later/static-middleware-cutover.md).
 **v6 stability**: this contract is part of the v6 public API that must last for years; it follows
-the rules in [v6-api-stability](v6-api-stability.md) (options objects, framework-created `ctx`,
+the rules in [v6-api-stability](../queued/v6-api-stability.md) (options objects, framework-created `ctx`,
 reserved `beforeSend` slot, no Express types).
 **Depends on**: P1b ✅ (tree router / `ExpressAdapter`), P1q Phases 1–2 ✅ (writer, error
 descriptors, `transformResponse`).
@@ -315,6 +317,40 @@ adapter (P3) the same class reads from Node directly.
   handlers next to today's request types. Original text: receive the same `ctx` (one object for
   middleware and handlers, the market norm); in 5.x handlers keep `req`.
 
+## Implementation progress
+
+**Slice 1 — portable core (done 2026-11-01, not wired to any adapter yet):**
+
+- `src/services/http/middleware/BaseMiddleware.ts` — static metadata and construction shared by
+  both contracts; `AbstractMiddleware` now extends it (its public surface is unchanged:
+  deprecated aliases, `translate(req)`, `middleware(req, res, next)`, `getMiddleware()`).
+- `src/services/http/middleware/Middleware.ts` — the v2 base: abstract
+  `middleware(ctx, next): HttpResponse | Promise<HttpResponse>`, `translate(ctx, …)`.
+- `src/services/http/RequestContext.ts` — the context class over an adapter's `RequestSource`
+  (lazy `method`, `path`, `url`, `route`, `headers`/`header()`, `params`, `query`, `body`, `ip`,
+  `id`, `signal`, `appInfo`, `error`/`failed`), `ResponseStaging` (`setHeader`, `appendHeader`,
+  sealed when the response starts), `onFinish` (exactly once, newest first, contained,
+  in the request scope), and the `Next` / `FinishResult` types. `logger` waits for the P1z logger
+  contract; `cookies` comes with slice 4.
+- `src/services/http/requestScope.ts` — `requestContext()` and the internal `runInRequestScope`.
+- `src/services/http/pipeline.ts` — `composeChain` (strict onion with the production guards and
+  optional diagnostics), `middlewareLayer`, `handleRequest` (request scope + registry once).
+- `src/tests/createTestContext.ts` — `createTestContext()` / `finishTestContext()` for tests.
+- `src/helpers/translate.ts` — accepts anything carrying `appInfo.i18n` (a request or a context).
+- Tests: `pipeline.test.ts` (every requirement and guard case from `contract-check.mjs`, with and
+  without diagnostics), `RequestContext.test.ts`, `middleware/Middleware.test.ts` (including the
+  compile-time forgotten-`return` check against the real base). 47 tests on Node 24, Node 26 and
+  Bun; full suite 1 075/1 075 on Node 24 and 26.
+
+**Slice 2 — Express adapter (next):** route chains accept both bases (`RouteNode`,
+`AbstractController`, `middlewareNormalization`); the v1 bridge inside the chain with raw error
+identity; v1 controller errors escape inside a v2 chain; writer merges staged headers and seals
+them; legacy commit flush; `onFinish` from the transport (`finished`/`aborted`/`failed`); `sent`
+kind; abort signal from the response; diagnostics on outside production.
+
+**Slice 3:** v2 controllers and per-route context types. **Slice 4:** cookies, docs, CHANGELOG.
+**Phase 2:** app-wide middleware API and portable built-ins.
+
 ## API change
 
 ```ts
@@ -383,11 +419,13 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
   hand-build contexts and `RequestContext` can grow in minors.
 - Public response type: a forward-compatible representation so supported narrowing and
   pass-through code keeps compiling when a kind is added in a minor
-  ([v6-api-stability](v6-api-stability.md) decision 2), plus a consumer type fixture that adds a
+  ([v6-api-stability](../queued/v6-api-stability.md) decision 2), plus a consumer type fixture that adds a
   simulated kind.
 - Phase 2: the app-wide middleware API and the portable built-ins (see the bridge section).
-- `src/services/http/requestContext.ts` (new) — the `requestContext()` accessor, side-effect free,
-  imported as `@adaptivestone/framework/services/http/requestContext.js` (the `./services/*`
+- `src/services/http/requestScope.ts` (new) — the `requestContext()` accessor, side-effect free,
+  imported as `@adaptivestone/framework/services/http/requestScope.js` (the `./services/*`;
+  not `requestContext.ts`, which would collide with `RequestContext.ts` on case-insensitive file
+  systems)
   export); `src/index.ts` boots a server and is not a package export. Packaging smoke imports it.
 - `src/services/http/middleware/Middleware.ts` (new v2 base), `src/modules/AbstractController.ts`, `routing/RouteNode.ts`,
   `routing/middlewareNormalization.ts` and their tests — mixed v1/v2 middleware lists and tuples.

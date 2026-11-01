@@ -1,6 +1,6 @@
 # Request-context survey (2026-10-31)
 
-Input for [async-middleware D2](../queued/async-middleware.md): what the per-request context of
+Input for [async-middleware D2](../active/async-middleware.md): what the per-request context of
 established frameworks contains, so the v2 middleware `ctx` behaves like a proper framework
 context. Four research passes over current official docs (read from the projects' doc sources on
 GitHub and their published types where doc hosts were blocked). `[u]` = not confirmed on a current
