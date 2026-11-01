@@ -421,3 +421,45 @@ case needs a runner hook (B) or a channel (C). The common case — user, request
 every surveyed framework offers in some form.
 
 Experiment sources: session scratchpad `als/` (outside the repository).
+
+## Is onion the only model that covers everything? (2026-11-01)
+
+Requirements gathered with the owner: (1) request-only middleware such as `RoleMiddleware` stay
+unchanged; (2) work after the handler (headers, replace the response, timing); (3) work after the
+response is sent; (4) a middleware gives the rest of the request its own AsyncLocalStorage store
+(user, tenant, transaction); (5) a middleware's tracing span parents the handler's work;
+(6) `try/catch/finally` around the rest (commit or roll back a transaction); (7) low memory and few
+rules.
+
+Only (4), (5) and (6) need _wrapping_ the rest of the request, and only a few middleware need it.
+So the real choice is who pays for wrapping: every middleware (onion) or only the ones that ask.
+
+| Model                                                                      | 1   | 2   | 3   | 4                    | 5             | 6                   | 7                  |
+| -------------------------------------------------------------------------- | --- | --- | --- | -------------------- | ------------- | ------------------- | ------------------ |
+| A request-only + `onFinish`                                                | ✅  | ❌  | ✅  | framework store only | channels only | ❌                  | best               |
+| C2 stages (`ctx.onResponse`, `ctx.onFinish`)                               | ✅  | ✅  | ✅  | framework store only | channels      | error seen, no wrap | good               |
+| **C2W** = C2 + `ctx.runInside(wrap)` (wrapping registered per request)     | ✅  | ✅  | ✅  | ✅                   | ✅            | ✅                  | good               |
+| **H** hybrid by declaration: `run(ctx)` _or_ `around(ctx, next)` per class | ✅  | ✅  | ✅  | ✅                   | ✅            | ✅                  | good               |
+| B onion with safe defaults (every middleware gets `next`)                  | ✅  | ✅  | ✅  | ✅                   | ✅            | ✅                  | most memory, rules |
+
+H composes the chain once at startup: consecutive `run` middleware execute in a flat loop; each
+`around` middleware nests the rest (`return store.run(value, next)`, `try { return await next() }
+finally { … }`). `next` misuse rules apply to `around` only. Market precedent for this split:
+NestJS guards (`canActivate`) vs interceptors (`intercept(context, next)`); Spring
+`HandlerInterceptor` (`preHandle`/`postHandle`/`afterCompletion`) vs servlet filters
+(`chain.doFilter`); ASP.NET Core `IActionFilter` vs `IAsyncActionFilter` (`next()`). (NestJS read
+in the clone; Spring and ASP.NET Core from their public APIs, not cloned.)
+
+Retained heap per pending request (Node 26.12.1, same harness as the review above, 10 middleware,
+10 000 requests, median of 5; `retained3.mjs` in the session scratchpad):
+
+| Wrapping middleware (of 10)     | C2      | C2W     | H             | D       | B        |
+| ------------------------------- | ------- | ------- | ------------- | ------- | -------- |
+| 2, timing                       | 1 343 B | 1 423 B | 1 864 B       | 2 696 B | 3 403 B  |
+| 2, own AsyncLocalStorage store  | —       | 1 792 B | 1 224–1 559 B | 2 592 B | 3 184 B  |
+| 10, timing                      | 2 129 B | 2 207 B | 6 880 B       | —       | 10 720 B |
+| 10, own AsyncLocalStorage store | —       | 2 449 B | 4 228 B       | —       | 8 963 B  |
+
+Typical apps (a couple of wrapping middleware): C2W and H cost about half of B. H's `around` is an
+async frame while it waits, so it grows like onion when many middleware wrap; timing belongs in
+`onFinish`/`onResponse`, which keeps `around` rare.
