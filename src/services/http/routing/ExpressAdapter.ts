@@ -10,6 +10,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
 import { producedBuiltInResponse } from '../builtInResponse.ts';
+import { notFoundResponse } from '../builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
@@ -51,54 +52,125 @@ export type ExpressAdapter = (
   next: NextFunction,
 ) => Promise<void>;
 
+export interface ExpressAdapterOptions {
+  /**
+   * App-wide `Middleware` (the `Server` option `middleware`). When present,
+   * every request the adapter sees runs as one chain: these, then the route's
+   * middleware and handler — or the framework's 400, 404 or 405.
+   */
+  appMiddleware?: readonly MiddlewareEntry[];
+}
+
+/** A chain end that answers with a framework response. */
+const answering = (
+  methodName: string,
+  respond: (req: FrameworkRequest) => HttpResponse,
+): HandlerEntry => ({
+  handler: (req: FrameworkRequest) => respond(req),
+  meta: { controllerClass: 'Framework', methodName },
+});
+
+const malformedUrlResponse = (req: FrameworkRequest) =>
+  HttpResponse.json(400, {
+    error: FRAMEWORK_ERROR_CODES.malformedUrl,
+    message: translateWithDefault(req, 'http.malformedUrl', 'Malformed URL'),
+  });
+
+const methodNotAllowedResponse = (
+  req: FrameworkRequest,
+  allowedMethods: readonly string[],
+) =>
+  HttpResponse.json(
+    405,
+    {
+      error: FRAMEWORK_ERROR_CODES.methodNotAllowed,
+      message: translateWithDefault(
+        req,
+        'http.methodNotAllowed',
+        'Method not allowed',
+      ),
+    },
+    { headers: { Allow: allowedMethods.join(', ') } },
+  );
+
+const malformedUrlEntry = answering('malformedUrl', malformedUrlResponse);
+const notFoundEntry = answering('notFound', notFoundResponse);
+
 export function createExpressAdapter(
   registry: RouteRegistry,
   app: IApp,
   writer: ResponseWriter<Request, Response> = new ExpressResponseWriter(),
+  options: ExpressAdapterOptions = {},
 ): ExpressAdapter {
+  const appMiddleware = options.appMiddleware ?? [];
   const routeTemplates = new WeakMap<RouteNode, string>();
   const indexTemplates = () =>
     registry.walk((node, path) => routeTemplates.set(node, path));
   indexTemplates();
+  /** Run `entry` behind `middlewares` as a strict-onion chain. */
+  const runChain = async (
+    entry: HandlerEntry,
+    middlewares: readonly MiddlewareEntry[],
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => {
+    try {
+      await dispatchV2(
+        app,
+        writer,
+        entry,
+        middlewares,
+        req,
+        res,
+        next,
+        warnDroppedResponse,
+      );
+    } catch (err) {
+      next(err);
+    }
+  };
   return async function dispatch(req, res, next) {
     let result: MatchResult | null;
     try {
       result = registry.match(req.method, req.path);
     } catch (err) {
       if (err instanceof MalformedPathError) {
-        const malformed = HttpResponse.json(400, {
-          error: FRAMEWORK_ERROR_CODES.malformedUrl,
-          message: translateWithDefault(
-            req as FrameworkRequest,
-            'http.malformedUrl',
-            'Malformed URL',
-          ),
-        });
-        return writer.write(malformed, req, res).catch(next);
+        if (appMiddleware.length > 0) {
+          return runChain(malformedUrlEntry, appMiddleware, req, res, next);
+        }
+        return writer
+          .write(malformedUrlResponse(req as FrameworkRequest), req, res)
+          .catch(next);
       }
       return next(err);
     }
 
     if (!result) {
+      if (appMiddleware.length > 0) {
+        // App-wide middleware wrap the 404 too.
+        return runChain(notFoundEntry, appMiddleware, req, res, next);
+      }
       // 404 — let downstream Express middleware (notFoundHandler) decide.
       return next();
     }
 
     if (result.entry === null) {
       // 405 — path matched, method didn't.
-      const notAllowed = HttpResponse.json(
-        405,
-        {
-          error: FRAMEWORK_ERROR_CODES.methodNotAllowed,
-          message: translateWithDefault(
-            req as FrameworkRequest,
-            'http.methodNotAllowed',
-            'Method not allowed',
-          ),
-        },
-        { headers: { Allow: result.allowedMethods.join(', ') } },
-      );
-      return writer.write(notAllowed, req, res).catch(next);
+      const { allowedMethods } = result;
+      if (appMiddleware.length > 0) {
+        const notAllowedEntry = answering('methodNotAllowed', (r) =>
+          methodNotAllowedResponse(r, allowedMethods),
+        );
+        return runChain(notAllowedEntry, appMiddleware, req, res, next);
+      }
+      return writer
+        .write(
+          methodNotAllowedResponse(req as FrameworkRequest, allowedMethods),
+          req,
+          res,
+        )
+        .catch(next);
     }
 
     // Populate request with match metadata before middleware runs.
@@ -124,26 +196,22 @@ export function createExpressAdapter(
       ...(result.entry.meta ?? {}),
     };
 
+    if (appMiddleware.length > 0) {
+      // App-wide middleware: one chain around the route's own.
+      return runChain(
+        result.entry,
+        [...appMiddleware, ...result.middlewares],
+        req,
+        res,
+        next,
+      );
+    }
     if (
       result.entry.contract === 2 ||
       result.middlewares.some(isV2Middleware)
     ) {
       // A v2 handler or `Middleware` on the route: run it as a strict-onion chain.
-      try {
-        await dispatchV2(
-          app,
-          writer,
-          result.entry,
-          result.middlewares,
-          req,
-          res,
-          next,
-          warnDroppedResponse,
-        );
-      } catch (err) {
-        next(err);
-      }
-      return;
+      return runChain(result.entry, result.middlewares, req, res, next);
     }
 
     try {

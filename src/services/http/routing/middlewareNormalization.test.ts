@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { assertThrowsLike } from '../../../tests/assertions.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
+import AbstractMiddlewareClass from '../middleware/AbstractMiddleware.ts';
+import Middleware from '../middleware/Middleware.ts';
 import {
+  type AppMiddlewareSpec,
   type MiddlewareSpec,
+  normalizeAppMiddlewares,
   normalizeMiddleware,
   normalizeMiddlewares,
 } from './middlewareNormalization.ts';
@@ -104,5 +108,40 @@ describe('normalizeMiddlewares', () => {
 
   it('empty input → empty output', () => {
     assert.deepStrictEqual(normalizeMiddlewares([]), []);
+  });
+});
+
+describe('normalizeAppMiddlewares (the Server `middleware` option)', () => {
+  class Stamp extends Middleware {
+    middleware(_ctx: unknown, next: () => Promise<never>) {
+      return next();
+    }
+  }
+  class Legacy extends AbstractMiddlewareClass {}
+
+  it('accepts Middleware classes and [Class, params] tuples, in order', () => {
+    const params = { header: 'x-tenant' };
+    assert.deepStrictEqual(normalizeAppMiddlewares([Stamp, [Stamp, params]]), [
+      { Class: Stamp },
+      { Class: Stamp, params },
+    ]);
+  });
+
+  it('rejects a 5.x AbstractMiddleware, naming it and its position', () => {
+    assertThrowsLike(
+      () =>
+        normalizeAppMiddlewares([
+          Stamp,
+          Legacy as unknown as AppMiddlewareSpec,
+        ]),
+      /`middleware`\[1\]: Legacy is not a Middleware \(ctx, next\) class/,
+    );
+  });
+
+  it('rejects a list that is not an array', () => {
+    assertThrowsLike(
+      () => normalizeAppMiddlewares(Stamp as unknown as AppMiddlewareSpec[]),
+      /must be an array/,
+    );
   });
 });

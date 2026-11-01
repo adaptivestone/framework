@@ -19,6 +19,7 @@ import type HttpServer from './services/http/HttpServer.ts';
 import type { FrameworkRequest } from './services/http/HttpServer.ts';
 import type { RequestContext } from './services/http/RequestContext.ts';
 import type { HttpResponse } from './services/http/responses.ts';
+import type { AppMiddlewareSpec } from './services/http/routing/middlewareNormalization.ts';
 import type { I18n } from './services/i18n/I18n.ts';
 import { createRedactFormat } from './services/logging/redaction.ts';
 
@@ -144,6 +145,14 @@ export interface ServerOptions extends TFolderConfig {
    * Reshapes every framework-rendered response — see {@link TransformResponseHook}.
    */
   transformResponse?: TransformResponseHook;
+  /**
+   * Middleware for every request: `Middleware` (`ctx, next`) classes, or
+   * `[Class, params]`, run in order after the framework's own (security
+   * headers, logging, IP, i18n, CORS, body parsing) and around routing — a
+   * route's middleware and handler, the 404 and the 405. `await next()` gives
+   * them the response, and errors from the route reach them first.
+   */
+  middleware?: ReadonlyArray<AppMiddlewareSpec>;
 }
 
 try {
@@ -209,6 +218,9 @@ class Server {
   /** Project response transform from the constructor options (given to `HttpServer`). */
   #transformResponse?: TransformResponseHook;
 
+  /** App-wide middleware from the constructor options (given to `HttpServer`). */
+  #middleware: ReadonlyArray<AppMiddlewareSpec>;
+
   app: IApp;
 
   /**
@@ -227,6 +239,8 @@ class Server {
     this.config = config;
     this.#bootHttp = config.bootHttp;
     this.#transformResponse = config.transformResponse;
+    // Checked when the HTTP server boots (`HttpServer` loads lazily).
+    this.#middleware = config.middleware ?? [];
     const that = this;
     this.app = {
       getConfig: this.getConfig.bind(this),
@@ -281,6 +295,7 @@ class Server {
     // TODO config
     this.app.httpServer = new HttpServer(this.app, {
       transformResponse: this.#transformResponse,
+      middleware: this.#middleware,
     });
 
     this.app.controllerManager = new ControllerManager(this.app);

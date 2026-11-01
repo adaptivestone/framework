@@ -71,6 +71,18 @@ describe('configureTestServer — consumer Server options in the test bootstrap'
     assert.strictEqual(code, 0);
   });
 
+  it('runs the configured app-wide middleware around routes and the 404', {
+    timeout: 40000,
+  }, async () => {
+    const { code, out } = await runChild([fixture]);
+
+    assertTextMatch(out, /APP_MW_ROUTE:ran/);
+    assertTextMatch(out, /APP_MW_404:ran/);
+    // The 404 is still the framework's (and still transformed).
+    assertTextMatch(out, /NOT_FOUND_STATUS:404/);
+    assert.strictEqual(code, 0);
+  });
+
   it('works in the documented arrangement: glue imported above the call', {
     timeout: 40000,
   }, async () => {

@@ -1,5 +1,8 @@
 import AbstractController from '@adaptivestone/framework/modules/AbstractController.js';
-import type { TransformResponseHook } from '@adaptivestone/framework/server.js';
+import type {
+  ServerOptions,
+  TransformResponseHook,
+} from '@adaptivestone/framework/server.js';
 import type HttpServer from '@adaptivestone/framework/services/http/HttpServer.js';
 import AbstractMiddleware from '@adaptivestone/framework/services/http/middleware/AbstractMiddleware.js';
 import Middleware from '@adaptivestone/framework/services/http/middleware/Middleware.js';
@@ -102,3 +105,9 @@ httpServer.registerErrorHandler(
   { contractVersion: 2 },
 );
 void transform;
+
+// App-wide middleware: `Middleware` classes or `[Class, params]`; 5.x ones are refused.
+const appWide: ServerOptions['middleware'] = [Session, [Deny, { reason: 'x' }]];
+// @ts-expect-error — a 5.x AbstractMiddleware cannot be app-wide middleware
+const legacyAppWide: ServerOptions['middleware'] = [Legacy];
+void [appWide, legacyAppWide];

@@ -14,7 +14,11 @@ import type { FinishResult, Next, RequestContext } from '../RequestContext.ts';
 import { requestContext } from '../requestScope.ts';
 import { HttpResponse } from '../responses.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
-import type { HandlerEntry, MiddlewareClass } from './RouteNode.ts';
+import type {
+  HandlerEntry,
+  MiddlewareClass,
+  MiddlewareEntry,
+} from './RouteNode.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
 
 // ─── a small app: a fake error registry that maps HttpError and strings ───
@@ -56,6 +60,8 @@ let origin: string;
 let registry: RouteRegistry;
 /** A writer for the next request (`undefined`: the adapter's default). */
 let writer: ExpressResponseWriter | undefined;
+/** App-wide middleware for the next request (the `Server` option). */
+let appMiddleware: MiddlewareEntry[] = [];
 
 before(async () => {
   const app = express();
@@ -64,7 +70,11 @@ before(async () => {
     next();
   });
   app.use((req, res, next) =>
-    createExpressAdapter(registry, fakeApp, writer)(req, res, next),
+    createExpressAdapter(registry, fakeApp, writer, { appMiddleware })(
+      req,
+      res,
+      next,
+    ),
   );
   app.use((err: unknown, _req: Request, res: Response, _next: () => void) => {
     if (!res.headersSent) {
@@ -84,6 +94,7 @@ after(async () => {
 beforeEach(() => {
   registry = new RouteRegistry();
   writer = undefined;
+  appMiddleware = [];
   logged.length = 0;
 });
 
@@ -452,6 +463,110 @@ describe('transformResponse gets the request context', () => {
     assert.strictEqual(finishes.length, 1);
     assert.strictEqual(finishes[0]?.outcome, 'finished');
     assert.strictEqual(finishes[0]?.status, 201);
+  });
+});
+
+describe('app-wide middleware (the Server `middleware` option)', () => {
+  class Outer extends Middleware {
+    async middleware(ctx: RequestContext, next: Next) {
+      events.push('outer in');
+      ctx.response.setHeader('x-outer', 'yes');
+      try {
+        const response = await next();
+        events.push(`outer out ${response.kind} ${response.status}`);
+        return response;
+      } catch (err) {
+        events.push('outer caught');
+        throw err;
+      }
+    }
+  }
+  class Gate extends Middleware {
+    middleware(ctx: RequestContext, next: Next) {
+      return ctx.header('authorization')
+        ? next()
+        : HttpResponse.json(401, { error: 'NO_TOKEN' });
+    }
+  }
+
+  it('wraps a route with only 5.x code: runs first, sees the response, adds its header', async () => {
+    appMiddleware = [{ Class: Outer }];
+    route([LegacyPass], (_req: Request, res: Response) => {
+      events.push('handler');
+      res.status(200).json({ legacy: true });
+    });
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers.get('x-outer'), 'yes');
+    await sleep(10);
+    assert.deepStrictEqual(events, [
+      'outer in',
+      'legacy',
+      'legacy after next',
+      'handler',
+      'outer out sent 200',
+    ]);
+  });
+
+  it('wraps the 404, the 405 and the malformed-URL 400', async () => {
+    appMiddleware = [{ Class: Outer }];
+    route([], () => HttpResponse.empty(204));
+    const missing = await fetch(`${origin}/nope`);
+    assert.strictEqual(missing.status, 404);
+    assert.deepStrictEqual(await missing.json(), {
+      error: 'NOT_FOUND',
+      message: 'Not found',
+    });
+    assert.strictEqual(missing.headers.get('x-outer'), 'yes');
+
+    const notAllowed = await fetch(`${origin}/r`, { method: 'DELETE' });
+    assert.strictEqual(notAllowed.status, 405);
+    assert.strictEqual(notAllowed.headers.get('allow'), 'GET, HEAD');
+    assert.strictEqual(notAllowed.headers.get('x-outer'), 'yes');
+
+    const malformed = await fetch(`${origin}/r/%E0%A4%A`);
+    assert.strictEqual(malformed.status, 400);
+    assert.strictEqual(malformed.headers.get('x-outer'), 'yes');
+    assert.deepStrictEqual(events, [
+      'outer in',
+      'outer out json 404',
+      'outer in',
+      'outer out json 405',
+      'outer in',
+      'outer out json 400',
+    ]);
+  });
+
+  it('runs in order and can answer before routing', async () => {
+    appMiddleware = [{ Class: Outer }, { Class: Gate }];
+    let ran = false;
+    route([Stage], () => {
+      ran = true;
+      return HttpResponse.empty(204);
+    });
+    const denied = await fetch(`${origin}/r`);
+    assert.strictEqual(denied.status, 401);
+    assert.strictEqual(denied.headers.get('x-outer'), 'yes');
+    assert.strictEqual(ran, false);
+
+    const allowed = await fetch(`${origin}/r`, {
+      headers: { authorization: 'Bearer x' },
+    });
+    assert.strictEqual(allowed.status, 204);
+    assert.strictEqual(allowed.headers.get('x-staged'), 'yes');
+    assert.strictEqual(ran, true);
+  });
+
+  it('a route error reaches it before the error handlers answer', async () => {
+    appMiddleware = [{ Class: Outer }];
+    route([], async () => {
+      throw new HttpError(409, 'conflict');
+    });
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 409);
+    assert.deepStrictEqual(await response.json(), { error: 'HTTP' });
+    assert.strictEqual(response.headers.get('x-outer'), 'yes');
+    assert.deepStrictEqual(events, ['outer in', 'outer caught']);
   });
 });
 

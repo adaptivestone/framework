@@ -9,7 +9,6 @@ import type {
 } from 'express';
 import express from 'express';
 import type ThttpConfig from '../../config/http.ts';
-import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp, TransformResponseHook } from '../../server.ts';
 import type { TI18n } from '../i18n/types.ts';
@@ -20,6 +19,7 @@ import {
   type ErrorHandlerResult,
   type ErrorLogLevel,
   errorResultResponse,
+  notFoundResponse,
   type RegisteredErrorHandler,
   type RegistrableError,
   type ResolvedError,
@@ -38,6 +38,11 @@ import RequestParserMiddleware from './middleware/RequestParser.ts';
 import { HttpResponse } from './responses.ts';
 import { createExpressAdapter } from './routing/ExpressAdapter.ts';
 import { expressContext } from './routing/expressPipeline.ts';
+import {
+  type AppMiddlewareSpec,
+  normalizeAppMiddlewares,
+} from './routing/middlewareNormalization.ts';
+import type { MiddlewareEntry } from './routing/RouteNode.ts';
 import { RouteRegistry } from './routing/RouteRegistry.ts';
 
 export interface FrameworkRequest extends Request {
@@ -69,11 +74,18 @@ class HttpServer extends Base {
 
   #builtInHandlers: RegisteredErrorHandler[] = builtInErrorHandlers();
 
+  /** App-wide middleware (`Server` option `middleware`), normalized. */
+  readonly #appMiddleware: MiddlewareEntry[];
+
   constructor(
     app: IApp,
-    options: { transformResponse?: TransformResponseHook } = {},
+    options: {
+      transformResponse?: TransformResponseHook;
+      middleware?: ReadonlyArray<AppMiddlewareSpec>;
+    } = {},
   ) {
     super(app);
+    this.#appMiddleware = normalizeAppMiddlewares(options.middleware ?? []);
     this.responseWriter = new ExpressResponseWriter({
       transform: options.transformResponse,
       onTransformError: (message) => this.logger?.error(message),
@@ -169,7 +181,9 @@ class HttpServer extends Base {
   /** Mount the route adapter — single entry to the registry. */
   mountAdapter() {
     this.express.use(
-      createExpressAdapter(this.routeRegistry, this.app, this.responseWriter),
+      createExpressAdapter(this.routeRegistry, this.app, this.responseWriter, {
+        appMiddleware: this.#appMiddleware,
+      }),
     );
   }
 
@@ -289,17 +303,11 @@ class HttpServer extends Base {
    * Add handle for 404 error
    */
   add404Page() {
-    this.express.use((req, res, next) => {
-      const notFound = HttpResponse.json(404, {
-        error: FRAMEWORK_ERROR_CODES.notFound,
-        message: translateWithDefault(
-          req as FrameworkRequest,
-          'http.notFound',
-          'Not found',
-        ),
-      });
-      return this.responseWriter.write(notFound, req, res).catch(next);
-    });
+    this.express.use((req, res, next) =>
+      this.responseWriter
+        .write(notFoundResponse(req as FrameworkRequest), req, res)
+        .catch(next),
+    );
   }
 
   /**

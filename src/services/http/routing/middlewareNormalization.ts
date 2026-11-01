@@ -4,7 +4,12 @@
  * shorthand exists at the user-authoring boundary.
  */
 
-import type { MiddlewareClass, MiddlewareEntry } from './RouteNode.ts';
+import Middleware from '../middleware/Middleware.ts';
+import type {
+  MiddlewareClass,
+  MiddlewareEntry,
+  V2MiddlewareClass,
+} from './RouteNode.ts';
 
 export type MiddlewareSpec =
   | MiddlewareClass
@@ -51,4 +56,33 @@ export function normalizeMiddlewares(
   specs: ReadonlyArray<MiddlewareSpec>,
 ): MiddlewareEntry[] {
   return specs.map((spec) => normalizeMiddleware(spec));
+}
+
+/** An app-wide middleware: a `Middleware` class, or `[Class, params]`. */
+export type AppMiddlewareSpec =
+  | V2MiddlewareClass
+  | readonly [V2MiddlewareClass, Record<string, unknown>];
+
+/**
+ * Normalize the `Server` `middleware` option. Only `Middleware` (`ctx, next`)
+ * classes are accepted: the list must run without Express. Throws `TypeError`
+ * naming the offending entry.
+ */
+export function normalizeAppMiddlewares(
+  specs: ReadonlyArray<AppMiddlewareSpec>,
+): MiddlewareEntry[] {
+  if (!Array.isArray(specs)) {
+    throw new TypeError(
+      'Server option `middleware` must be an array of Middleware classes or [Class, params] tuples',
+    );
+  }
+  return specs.map((spec, i) => {
+    const entry = normalizeMiddleware(spec as MiddlewareSpec);
+    if (!(entry.Class.prototype instanceof Middleware)) {
+      throw new TypeError(
+        `Server option \`middleware\`[${i}]: ${entry.Class.name || 'the class'} is not a Middleware (ctx, next) class. Extend Middleware from services/http/middleware/Middleware.js; a 5.x AbstractMiddleware can be mounted with app.httpServer.express.use() in bootHttp.`,
+      );
+    }
+    return entry;
+  });
 }

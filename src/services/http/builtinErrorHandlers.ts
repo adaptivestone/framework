@@ -94,6 +94,13 @@ export const serverErrorResponse = (req: FrameworkRequest) =>
     message: serverErrorMessage(req),
   });
 
+/** The framework's 404 for a request no route matches. */
+export const notFoundResponse = (req: FrameworkRequest) =>
+  HttpResponse.json(404, {
+    error: FRAMEWORK_ERROR_CODES.notFound,
+    message: translateWithDefault(req, 'http.notFound', 'Not found'),
+  });
+
 /**
  * What `registerErrorHandler` accepts: any `Error` subclass, including one that
  * widens `message` (the framework's `ValidationError` carries its field
