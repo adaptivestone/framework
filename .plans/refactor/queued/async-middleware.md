@@ -73,6 +73,11 @@ wrap-around middleware use case.
 > [Astro scope review](../reference/astro-proposal.md#smallest-useful-deliverable-now) identifies the
 > shared pipeline boundary, remaining listener/global/type coupling and the adapter cutover.
 
+> **Review handoff (2026-11-01):** the owner requested recording the
+> [Auth/ALS/completion examples](../reference/astro-proposal.md#api-comparison-for-review-auth-als-and-completion-logging)
+> for Opus review. Strict onion is the author's recommendation; H remains the documented alternative.
+> D2.1 is pending review and the owner's final decision; no runtime implementation is authorized.
+
 ## D2 — what `ctx` is (direction C chosen 2026-10-31; final shape after market research)
 
 **User decision 2026-10-31:** option **c** is the priority, but the exact `RequestContext` must
