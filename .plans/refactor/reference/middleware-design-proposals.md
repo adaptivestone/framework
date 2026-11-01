@@ -1,0 +1,396 @@
+# Middleware flow — design proposals (for review)
+
+**Status**: open — decision D2.1 in [async-middleware](../queued/async-middleware.md). Written
+2026-11-01 to be read on its own by reviewers who have not seen the other plans. Measurements and
+source evidence behind every number here: [middleware-flow-models](middleware-flow-models.md).
+
+**What we ask a reviewer:** which option would you pick, is there a better one, what did we miss?
+Add your notes at the end (section 10).
+
+## 1. Context
+
+- `@adaptivestone/framework`: a TypeScript backend framework for Node.js (≥ 24) and Bun (≥ 1.4).
+  Express 5 runs underneath today; a framework-owned Node HTTP adapter is planned.
+- A controller declares routes. Each route has a list of middleware classes and a handler. The
+  handler may return an immutable response (`return HttpResponse.json(201, body)`). A thrown error
+  goes to an error-handler registry that turns it into a response.
+- Per-request data lives in `req.appInfo`, typed per route by code generation.
+- A middleware today (5.x):
+
+  ```ts
+  class RoleMiddleware extends AbstractMiddleware {
+    async middleware(req, res, next) {
+      if (!hasRole(req.appInfo.user, this.params.roles)) throw new ForbiddenError(/* … */);
+      return next();
+    }
+  }
+  ```
+
+- The framework runs a route's middleware one after another, then the handler. It waits for
+  `next()`, then starts the next middleware. **A middleware can only act before the handler.**
+
+## 2. The problem in one picture
+
+```
+today:  request ─▶ mw1 ─▶ mw2 ─▶ mw3 ─▶ handler ─▶ response
+                   (each one runs, finishes, then the next starts)
+```
+
+Middleware have four kinds of jobs:
+
+```
+BEFORE       check something, maybe stop          Role, Auth, RateLimit
+AFTER        look at / change the response        Server-Timing header, cache headers
+AFTER SEND   when the last byte has left          metrics, access log
+WRAP         the handler must run INSIDE my code  own AsyncLocalStorage store, DB transaction,
+                                                  tracing span that contains the handler's work
+```
+
+WRAP is the hard one. The middleware's code must still be running while the handler runs:
+
+```ts
+userStore.run(user, () => handler()); //          handler and deep code see `user`
+connection.transaction(() => handler()); //       rolled back if the handler throws
+```
+
+A middleware that has already returned cannot wrap anything. Today even the usual Express recipe
+`als.run(store, () => next())` silently does nothing inside framework middleware (measured, §5).
+
+Only a few middleware need WRAP. Most need only BEFORE. The design question is **who pays for
+wrapping**: every middleware (onion) or only the ones that ask.
+
+## 3. Requirements
+
+1. BEFORE-only middleware (like `Role`) stay as simple as today: no `next`, no after-logic.
+2. AFTER: add or replace headers, replace the response, measure request → response time.
+3. AFTER SEND: run code when the response is fully sent (or the client went away).
+4. WRAP with AsyncLocalStorage: deep code that never receives `req`/`ctx` can read the current
+   user, the request, a tenant or a transaction session — from a framework store **and** from a
+   middleware's own store.
+5. Tracing (OpenTelemetry): a middleware's span can be the parent of the handler's work.
+6. `try/catch/finally` around the rest: commit a transaction on success, roll back when the
+   handler throws.
+7. Low memory per in-flight request (long streams, many concurrent requests); few runner rules; no
+   over-engineering.
+8. Errors still go through the error-handler registry; handlers keep returning `HttpResponse`.
+
+Compatibility: 5.x middleware classes keep working through a bridge; the new contract is opt-in in
+5.x (`static contractVersion = 2`) and the default in v6.
+
+## 4. The four test middleware
+
+Every option below is shown with the same four middleware:
+
+- **M1 Role** — stop with 403 unless the user has a role.
+- **M2 Timing** — add `Server-Timing: app;dur=…` to the response and log the duration after send.
+- **M3 Current user** — load the user once; deep code reads it from AsyncLocalStorage.
+- **M4 Transaction** — run the handler in a DB transaction; commit on success, roll back on throw.
+
+Helpers used in the sketches: `isAllowed(ctx)`, `User.findByToken(token)`,
+`userStore = new AsyncLocalStorage()`, `connection.transaction(fn)` (commits when `fn` resolves,
+aborts when it throws — Mongoose's API), `ctx.response.setHeader(…)` (headers staged on the
+response before it is written), `ctx.onFinish(cb)` (after send). Names are not final.
+
+## 5. Measured facts (Node 26.12.1; Bun 1.4.4 where stated)
+
+- **AsyncLocalStorage today**, real framework code, identical on Node and Bun:
+  `als.run(store, () => next())` inside a framework middleware → handler sees nothing;
+  `als.enterWith` → works only before the middleware's first `await`; an Express middleware mounted
+  before the framework router → works.
+- **A framework-owned store** (the runner runs every request inside one `store.run(ctx)`; middleware
+  write into `ctx`; deep code calls `requestContext()`) works everywhere — handler, services, after
+  hooks, after send — under 40 concurrent requests, Node and Bun. Cost: +0.15–0.4 µs and
+  +70–180 B per in-flight request.
+- **Retained heap per in-flight request**, 10 middleware of which 2 (or 10) wrap/act after:
+
+  | wrapping middleware       | request-only | C2      | C2W     | H             | D       | Onion (B) |
+  | ------------------------- | ------------ | ------- | ------- | ------------- | ------- | --------- |
+  | 2 of 10, timing           | ≈ 0–290 B    | 1 343 B | 1 423 B | 1 864 B       | 2 696 B | 3 403 B   |
+  | 2 of 10, own async store  | —            | —       | 1 792 B | 1 224–1 559 B | 2 592 B | 3 184 B   |
+  | 10 of 10, timing          | —            | 2 129 B | 2 207 B | 6 880 B       | —       | 10 720 B  |
+  | 10 of 10, own async store | —            | —       | 2 449 B | 4 228 B       | —       | 8 963 B   |
+
+  For scale: a pending request on plain Node `http` holds ≈ 4.7 KB, with Express ≈ 6.3 KB.
+- **Tracing**: OpenTelemetry's request span stays active through any runner; database and HTTP
+  client spans nest under it with no middleware code. Only "my span contains the handler's work"
+  needs WRAP — or framework-published `node:diagnostics_channel` tracing channels around each
+  middleware and the handler (+17 ns per call when nobody listens), which let an OTel subscriber
+  make its span active for the handler.
+
+## 6. Options
+
+### A — Request-only (+ `onFinish`)
+
+Middleware run before the handler and return. Nothing after, except after-send callbacks.
+
+```
+request ─▶ M1 ─▶ M2 ─▶ M3 ─▶ handler ─▶ write ─▶ (after send: onFinish callbacks)
+```
+
+```ts
+class Role {
+  async run(ctx) {
+    if (!isAllowed(ctx)) return HttpResponse.json(403, { error: 'FORBIDDEN' });
+  }
+}
+class Timing {
+  async run(ctx) {
+    const t0 = performance.now();
+    ctx.onFinish(() => log(performance.now() - t0));
+  }
+}
+// Server-Timing header: impossible — the duration is not known before the handler.
+class CurrentUser {
+  async run(ctx) {
+    ctx.state.user = await User.findByToken(token(ctx));
+  }
+}
+// deep code: requestContext().state.user — framework store only, no own store.
+// Transaction: impossible.
+```
+
+Meets 1, 3, 7, 8. Misses 2, 4 (own store), 5 (without channels), 6. Smallest and simplest.
+
+### B — Onion (Koa, Hono, Express 5 `router`)
+
+Every middleware gets `next`. `await next()` runs the rest of the chain and the handler and gives
+back the response. Code after `await next()` is the AFTER part. A middleware that returns without
+calling `next` continues automatically ("safe defaults"), so `Role` stays a one-liner.
+
+```
+request ─▶ M2 before ─▶ M3 before ─▶ M4 before ─▶ handler
+                                                  │
+response ◀─ M2 after ◀── M3 after ◀── M4 after ◀──┘   (each layer waits for the inner ones)
+```
+
+```ts
+class Role {
+  async run(ctx) {
+    if (!isAllowed(ctx)) return HttpResponse.json(403, { error: 'FORBIDDEN' });
+  }
+}
+class Timing {
+  async run(ctx, next) {
+    const t0 = performance.now();
+    const res = await next();
+    ctx.response.setHeader(
+      'server-timing',
+      `app;dur=${performance.now() - t0}`,
+    );
+    ctx.onFinish(() => log(performance.now() - t0));
+    return res;
+  }
+}
+class CurrentUser {
+  async run(ctx, next) {
+    return userStore.run(await User.findByToken(token(ctx)), next);
+  }
+}
+class Transaction {
+  async run(ctx, next) {
+    return connection.transaction(() => next());
+  }
+}
+```
+
+Meets 1–8. Costs the most memory: every layer keeps a waiting async frame, a promise and a `next`
+closure for the whole request, also for a long stream. Needs rules: forgot `await`/`return` on
+`next()`, `next()` called twice, does `next()` throw or return the error response.
+
+### C1 — Two methods per middleware: `onRequest` / `onResponse`
+
+```
+request ─▶ M1.onRequest ─▶ M2.onRequest ─▶ handler ─▶ M2.onResponse ─▶ M1.onResponse ─▶ write
+```
+
+```ts
+class Role {
+  async onRequest(ctx) {
+    if (!isAllowed(ctx)) return HttpResponse.json(403, { error: 'FORBIDDEN' });
+  }
+}
+class Timing {
+  async onRequest(ctx) {
+    ctx.state.t0 = performance.now();
+  } // per-request data must live on ctx
+  async onResponse(ctx, res) {
+    ctx.response.setHeader(
+      'server-timing',
+      `app;dur=${performance.now() - ctx.state.t0}`,
+    );
+    return res;
+  }
+}
+class CurrentUser {
+  async onRequest(ctx) {
+    ctx.state.user = await User.findByToken(token(ctx));
+  }
+} // framework store only
+// Transaction: start in onRequest, commit/abort in onResponse by status — but the handler's DB
+// calls do not join the session automatically (no wrap); the session must be passed by hand.
+```
+
+Meets 1, 2, 3, 7, 8. Misses 4 (own store), 5, 6 (partly). Per-request data goes through `ctx`.
+
+### C2 — Stages with callbacks (`ctx.onResponse`, `ctx.onFinish`)
+
+Like A, but a middleware can register "call me with the response" callbacks while it runs. They
+run newest first, before the write, for every response including errors and early stops.
+
+```
+request ─▶ M1 ─▶ M2 (registers onResponse) ─▶ handler ─▶ M2's callback ─▶ write ─▶ onFinish
+```
+
+```ts
+class Role {
+  async run(ctx) {
+    if (!isAllowed(ctx)) return HttpResponse.json(403, { error: 'FORBIDDEN' });
+  }
+}
+class Timing {
+  async run(ctx) {
+    const t0 = performance.now();
+    ctx.onResponse((res) => {
+      ctx.response.setHeader(
+        'server-timing',
+        `app;dur=${performance.now() - t0}`,
+      );
+      return res;
+    });
+    ctx.onFinish(() => log(performance.now() - t0));
+  }
+}
+class CurrentUser {
+  async run(ctx) {
+    ctx.state.user = await User.findByToken(token(ctx));
+  }
+} // framework store only
+// Transaction: same limit as C1.
+```
+
+Meets 1, 2, 3, 7, 8; 5 with tracing channels. Misses 4 (own store) and 6. Low memory.
+
+### C2W — C2 plus `ctx.runInside(wrap)`
+
+C2, and a middleware may ask the runner to run the rest of the request inside a wrapper.
+
+```
+request ─▶ M1 ─▶ M3 (registers wrapper) ─▶ [ wrapper( handler ─▶ callbacks ) ] ─▶ write
+```
+
+```ts
+class CurrentUser {
+  async run(ctx) {
+    const user = await User.findByToken(token(ctx));
+    ctx.runInside((next) => userStore.run(user, next));
+  }
+}
+class Transaction {
+  async run(ctx) {
+    ctx.runInside((next) => connection.transaction(() => next()));
+  }
+}
+// Role, Timing: as in C2.
+```
+
+Meets 1–8. Low memory; only requests whose middleware call `runInside` pay. Wrapping through a
+registered callback is unusual (no surveyed framework does exactly this) and `try/finally` is
+written inside the callback. Rule: errors must pass through wrappers (so a transaction rolls back)
+before the registry turns them into a response.
+
+### D — h3 v2 hybrid, as is
+
+Like onion, but `next` is optional, and **any** non-`undefined` return value stops the chain and
+becomes the response.
+
+Meets 1–8. Same code as B. Pitfall: a middleware that accidentally returns a value (e.g. the result
+of a helper) ends the request. Memory between C2 and B.
+
+### H — Hybrid by declaration: `run(ctx)` **or** `around(ctx, next)`
+
+Each middleware class says what it is. `run` = BEFORE-only (A/C2 style). `around` = wraps the rest
+(onion style). The chain is built once at startup: `run` middleware go through a plain loop; only
+`around` middleware pay the onion cost.
+
+```
+request ─▶ M1 run ─▶ M3 around ┐
+                     ┌─────────┘
+                     └▶ M4 around ┐
+                        ┌─────────┘
+                        └▶ handler ─▶ back through M4, M3 ─▶ write ─▶ onFinish
+```
+
+```ts
+class Role {
+  async run(ctx) {
+    if (!isAllowed(ctx)) return HttpResponse.json(403, { error: 'FORBIDDEN' });
+  }
+}
+class Timing {
+  async around(ctx, next) {
+    const t0 = performance.now();
+    const res = await next();
+    ctx.response.setHeader(
+      'server-timing',
+      `app;dur=${performance.now() - t0}`,
+    );
+    ctx.onFinish(() => log(performance.now() - t0));
+    return res;
+  }
+}
+class CurrentUser {
+  async around(ctx, next) {
+    return userStore.run(await User.findByToken(token(ctx)), next);
+  }
+}
+class Transaction {
+  async around(ctx, next) {
+    return connection.transaction(() => next());
+  }
+}
+```
+
+Meets 1–8. Memory close to C2 when few middleware wrap; grows like onion when many do. Two kinds of
+middleware to document; `next` rules apply to `around` only. Precedent: NestJS guards
+(`canActivate`) vs interceptors (`intercept(context, next)`); Spring `HandlerInterceptor`
+(`preHandle`/`postHandle`/`afterCompletion`) vs servlet filters (`chain.doFilter`); ASP.NET Core
+`IActionFilter` vs `IAsyncActionFilter`.
+
+### Add-ons that combine with any option
+
+- **Framework-owned request store** (`requestContext()`), opt-in like Koa (`asyncLocalStorage:
+  true`) and AdonisJS (`useAsyncLocalStorage`), or always on like SvelteKit (`getRequestEvent()`).
+  Covers "current user / request in async storage" without WRAP.
+- **Tracing channels** (`node:diagnostics_channel`) around the request, each middleware, the
+  handler, error resolution and the response write — as AdonisJS does. Covers requirement 5
+  without WRAP.
+
+## 7. Comparison
+
+| Option | 1 BEFORE simple | 2 AFTER | 3 AFTER SEND | 4 own async store | 5 span parents handler | 6 try/finally | 7 memory (2 of 10 wrap) |
+| ------ | --------------- | ------- | ------------ | ----------------- | ---------------------- | ------------- | ----------------------- |
+| A      | ✅              | ❌      | ✅           | ❌                | channels               | ❌            | ≈ 0–290 B               |
+| B      | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 3.2–3.4 KB              |
+| C1     | ✅              | ✅      | ✅           | ❌                | channels               | partly        | ≈ 1 KB                  |
+| C2     | ✅              | ✅      | ✅           | ❌                | channels               | ❌            | 1.3 KB                  |
+| C2W    | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 1.4–1.8 KB              |
+| D      | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 2.6–2.7 KB              |
+| H      | ✅              | ✅      | ✅           | ✅                | ✅                     | ✅            | 1.2–1.9 KB              |
+
+## 8. Open questions
+
+- In a wrapping design, does `next()` throw the handler's error (needed for a transaction to roll
+  back) or return the error response (outer middleware always get a response)?
+- Keep `ctx.onResponse` callbacks next to `around`, or one way per job (`around` for AFTER,
+  `onFinish` for AFTER SEND)?
+- Framework store: opt-in or always on?
+- Streaming responses: should AFTER code run when the stream starts or when it ends?
+- 5.x bridge: how old `middleware(req, res, next)` classes run inside the new runner.
+
+## 9. Ideas from the independent review (Fable)
+
+Pending — being added.
+
+## 10. Reviewer notes
+
+Add your name, the option you would pick (or a new one), and why.

@@ -361,6 +361,7 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 - [Open questions](./reference/open-questions.md) — unresolved trade-offs
 - [Request-context survey](./reference/request-context-survey.md) — how 23 frameworks shape the per-request context (2026-10-31)
 - [Middleware flow models](./reference/middleware-flow-models.md) — request-only vs onion vs request/response stages, from the source of 14 frameworks + benchmark (2026-10-31)
+- [Middleware design proposals](./reference/middleware-design-proposals.md) — self-contained D2.1 options with the same four middleware in each, for outside reviewers (2026-11-01)
 - [Glossary](./reference/glossary.md) — `RouteNode`, `HandlerEntry`, `MiddlewareEntry`, `RouteRegistry`, etc.
 
 ## Archive
