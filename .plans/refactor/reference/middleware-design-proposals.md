@@ -1,6 +1,7 @@
 # Middleware flow — design proposals (for review)
 
-**Status**: open — decision D2.1 in [async-middleware](../queued/async-middleware.md). Written
+**Status**: **decided 2026-11-01 — strict onion** (D2.1 in [async-middleware](../queued/async-middleware.md);
+see [middleware-final-recommendation](middleware-final-recommendation.md)). Written
 2026-11-01 to be read on its own by reviewers who have not seen the other plans. Measurements and
 source evidence behind every number here: [middleware-flow-models](middleware-flow-models.md).
 
