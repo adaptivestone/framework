@@ -17,6 +17,7 @@ import type { BaseModel, TBaseModel } from './modules/BaseModel.ts';
 import Cache from './services/cache/Cache.ts';
 import type HttpServer from './services/http/HttpServer.ts';
 import type { FrameworkRequest } from './services/http/HttpServer.ts';
+import type { RequestContext } from './services/http/RequestContext.ts';
 import type { HttpResponse } from './services/http/responses.ts';
 import type { I18n } from './services/i18n/I18n.ts';
 import { createRedactFormat } from './services/logging/redaction.ts';
@@ -122,10 +123,15 @@ export type BootHttpHook = (app: IApp) => void | Promise<void>;
  * `json`) and return the others unchanged. A handler that writes to `res`
  * itself bypasses it. If the transform throws or returns anything but an
  * `HttpResponse`, the error is logged and the original response is sent.
+ *
+ * `ctx` is the request's `RequestContext` (the one middleware saw); its
+ * staged headers and cookies are already applied, so `ctx.response` is closed
+ * here — change the returned response instead. `req` is the 5.x request; v6
+ * removes it, so new code should read `ctx`.
  */
 export type TransformResponseHook = (
   response: HttpResponse,
-  context: { req: FrameworkRequest },
+  context: { req: FrameworkRequest; ctx: RequestContext },
 ) => HttpResponse;
 
 /** Options accepted by the {@link Server} constructor. */

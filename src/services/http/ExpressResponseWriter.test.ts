@@ -606,15 +606,51 @@ describe('ExpressResponseWriter — transform', () => {
   it('passes the request and leaves other kinds to the transform', async () => {
     let seenPath = '';
     serveWith(
-      (response, { req }) => {
-        seenPath = req.path;
-        return envelope(response, { req });
+      (response, info) => {
+        seenPath = info.req.path;
+        return envelope(response, info);
       },
       () => HttpResponse.text(200, 'plain'),
     );
     const response = await fetch(`${origin}/seen`);
     assert.strictEqual(await response.text(), 'plain');
     assert.strictEqual(seenPath, '/seen');
+  });
+
+  it('gives the transform the request context, read lazily, with staging closed', async () => {
+    let seen: { path: string; header?: string; refused?: string } | undefined;
+    serveWith(
+      (response, { ctx }) => {
+        seen = { path: ctx.path, header: ctx.header('x-test') };
+        try {
+          ctx.response.setHeader('x-late', '1');
+        } catch (err) {
+          seen.refused = (err as Error).message;
+        }
+        return response;
+      },
+      () => HttpResponse.json(200, { ok: true }),
+    );
+    const response = await fetch(`${origin}/my%20file`, {
+      headers: { 'x-test': 'v' },
+    });
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers.get('x-late'), null);
+    assert.strictEqual(seen?.path, '/my file');
+    assert.strictEqual(seen?.header, 'v');
+    assert.match(seen?.refused ?? '', /already started/);
+
+    let built = 0;
+    const lazy = new ExpressResponseWriter({
+      transform: (r) => r,
+      context: () => {
+        built += 1;
+        throw new Error('not read');
+      },
+    });
+    route = (req, res) => lazy.write(HttpResponse.empty(204), req, res);
+    assert.strictEqual((await fetch(origin)).status, 204);
+    assert.strictEqual(built, 0);
   });
 
   it('cancels a stream the transform replaced, keeps one it re-wrapped', async () => {

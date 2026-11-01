@@ -15,6 +15,7 @@ import type { IApp, TransformResponseHook } from '../../server.ts';
 import type { TI18n } from '../i18n/types.ts';
 import {
   builtInErrorHandlers,
+  type ContextErrorHandlerFn,
   type ErrorHandlerFn,
   type ErrorHandlerResult,
   type ErrorLogLevel,
@@ -36,6 +37,7 @@ import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import RequestParserMiddleware from './middleware/RequestParser.ts';
 import { HttpResponse } from './responses.ts';
 import { createExpressAdapter } from './routing/ExpressAdapter.ts';
+import { expressContext } from './routing/expressPipeline.ts';
 import { RouteRegistry } from './routing/RouteRegistry.ts';
 
 export interface FrameworkRequest extends Request {
@@ -75,6 +77,7 @@ class HttpServer extends Base {
     this.responseWriter = new ExpressResponseWriter({
       transform: options.transformResponse,
       onTransformError: (message) => this.logger?.error(message),
+      context: (req) => expressContext(this.app, req),
     });
     this.express = express();
     this.express.disable('x-powered-by');
@@ -185,15 +188,40 @@ class HttpServer extends Base {
   registerErrorHandler<E extends RegistrableError>(
     errorClass: abstract new (...args: never[]) => E,
     handler: ErrorHandlerFn<E>,
-    opts?: { logLevel?: ErrorLogLevel },
+    opts?: { logLevel?: ErrorLogLevel; contractVersion?: 1 },
+  ): () => void;
+  /**
+   * With `{ contractVersion: 2 }` the handler gets the request's
+   * `RequestContext` instead of `req` — the only form in v6. Headers and
+   * cookies it stages on `ctx.response` reach the error response.
+   */
+  registerErrorHandler<E extends RegistrableError>(
+    errorClass: abstract new (...args: never[]) => E,
+    handler: ContextErrorHandlerFn<E>,
+    opts: { logLevel?: ErrorLogLevel; contractVersion: 2 },
+  ): () => void;
+  registerErrorHandler<E extends RegistrableError>(
+    errorClass: abstract new (...args: never[]) => E,
+    handler: ErrorHandlerFn<E> | ContextErrorHandlerFn<E>,
+    opts?: { logLevel?: ErrorLogLevel; contractVersion?: 1 | 2 },
   ): () => void {
-    const entry: RegisteredErrorHandler = {
-      errorClass,
-      // Stored type-erased; `resolveError` guarantees `instanceof errorClass`
-      // before the call, so the narrower parameter type is safe.
-      handler: handler as ErrorHandlerFn<RegistrableError>,
-      logLevel: opts?.logLevel ?? 'warn',
-    };
+    const logLevel = opts?.logLevel ?? 'warn';
+    // Stored type-erased; `resolveError` guarantees `instanceof errorClass`
+    // before the call, so the narrower parameter type is safe.
+    const entry: RegisteredErrorHandler =
+      opts?.contractVersion === 2
+        ? {
+            errorClass,
+            contract: 2,
+            handler: handler as ContextErrorHandlerFn<RegistrableError>,
+            logLevel,
+          }
+        : {
+            errorClass,
+            contract: 1,
+            handler: handler as ErrorHandlerFn<RegistrableError>,
+            logLevel,
+          };
     this.#errorHandlers.push(entry);
     return () => {
       const i = this.#errorHandlers.indexOf(entry);
@@ -223,7 +251,9 @@ class HttpServer extends Base {
         let result: ErrorHandlerResult | HttpResponse | null | undefined;
         let response: HttpResponse | null = null;
         try {
-          result = await entry.handler(err, req);
+          result = await (entry.contract === 2
+            ? entry.handler(err, expressContext(this.app, req))
+            : entry.handler(err, req));
           if (result != null) {
             response = HttpResponse.is(result)
               ? result

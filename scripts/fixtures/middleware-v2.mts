@@ -1,4 +1,6 @@
 import AbstractController from '@adaptivestone/framework/modules/AbstractController.js';
+import type { TransformResponseHook } from '@adaptivestone/framework/server.js';
+import type HttpServer from '@adaptivestone/framework/services/http/HttpServer.js';
 import AbstractMiddleware from '@adaptivestone/framework/services/http/middleware/AbstractMiddleware.js';
 import Middleware from '@adaptivestone/framework/services/http/middleware/Middleware.js';
 import type {
@@ -84,3 +86,19 @@ const response: HttpResponse = await new Session(null as never).middleware(
 );
 finishTestContext(ctx, { outcome: 'finished', status: response.status });
 void [ForgotReturn, Users];
+
+// The hooks hand portable code the context.
+const transform: TransformResponseHook = (response, { ctx }) => {
+  void ctx.route;
+  return response;
+};
+declare const httpServer: HttpServer;
+httpServer.registerErrorHandler(
+  Error,
+  (err, ctx) => {
+    ctx.response.setHeader('x-failed', '1');
+    return HttpResponse.json(500, { message: err.message, path: ctx.path });
+  },
+  { contractVersion: 2 },
+);
+void transform;

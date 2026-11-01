@@ -53,6 +53,52 @@ interface Binding {
 /** The Express objects behind a context, for the 5.x layers of its chain. */
 const bindings = new WeakMap<Ctx, Binding>();
 
+/** One context per Express request, whichever code asks for it first. */
+const contexts = new WeakMap<Request, Ctx>();
+
+const noopNext: NextFunction = () => {};
+
+/**
+ * The request's `RequestContext`, created on first use. A route with a v2
+ * middleware or handler creates it when it is dispatched; on a route with only
+ * 5.x code it exists only once a hook (`transformResponse`, a `contractVersion:
+ * 2` error handler) asks for it. Either way it is the same object for the
+ * whole request, and its staged headers and cookies reach the response.
+ */
+export function expressContext(
+  app: IApp | undefined,
+  req: Request,
+  res: Response | undefined = req.res,
+): Ctx {
+  const existing = contexts.get(req);
+  if (existing) {
+    return existing;
+  }
+  const transport = res ? new ExpressTransport(res) : undefined;
+  const ctx = new RequestContext(
+    expressSource(req, transport),
+    // Seeded by `PrepareAppInfo`; absent only for an error raised before it ran.
+    ((req as Partial<FrameworkRequest>).appInfo ?? {}) as Ctx['appInfo'],
+    {
+      runInScope: runInRequestScope,
+      reportError: (message, error) => {
+        const line = `${message}: ${error instanceof Error ? (error.stack ?? error.message) : error}`;
+        if (app?.logger) {
+          app.logger.error(line);
+        } else {
+          console.error(line);
+        }
+      },
+    },
+  );
+  contexts.set(req, ctx);
+  if (res && transport) {
+    bindings.set(ctx, { req, res, next: noopNext, transport });
+    transport.attach(ctx);
+  }
+  return ctx;
+}
+
 const instanceCache = new WeakMap<
   MiddlewareEntry,
   AbstractMiddleware | Middleware
@@ -167,6 +213,21 @@ class ExpressTransport {
 
   attach(ctx: Ctx): void {
     this.#ctx = ctx;
+    const res = this.#res;
+    if (res.headersSent) {
+      // Created after the response started: nothing staged can reach it.
+      this.#staged = true;
+      ctx.response.seal();
+    }
+    if (res.writableFinished) {
+      RequestContext.finish(ctx, {
+        outcome: 'finished',
+        status: res.statusCode,
+      });
+    } else if (res.destroyed) {
+      this.#closedEarly = true;
+      RequestContext.finish(ctx, { outcome: 'aborted' });
+    }
   }
 
   get signal(): AbortSignal {
@@ -229,8 +290,9 @@ class ExpressTransport {
 /** `RequestSource` over an Express request, read lazily. */
 function expressSource(
   req: Request,
-  transport: ExpressTransport,
+  transport: ExpressTransport | undefined,
 ): RequestSource {
+  let signal: AbortSignal | undefined;
   let path: string | undefined;
   return {
     get method() {
@@ -269,7 +331,9 @@ function expressSource(
       return req.body;
     },
     get signal() {
-      return transport.signal;
+      // Without a response to watch (a request built by hand) it never aborts.
+      signal ??= transport?.signal ?? new AbortController().signal;
+      return signal;
     },
   };
 }
@@ -435,20 +499,10 @@ export async function dispatchV2(
   onDroppedResponse: (entry: HandlerEntry) => void,
 ): Promise<void> {
   const frameworkReq = req as FrameworkRequest;
-  const transport = new ExpressTransport(res);
-  const ctx = new RequestContext(
-    expressSource(req, transport),
-    frameworkReq.appInfo as Ctx['appInfo'],
-    {
-      runInScope: runInRequestScope,
-      reportError: (message, error) =>
-        app.logger?.error(
-          `${message}: ${error instanceof Error ? (error.stack ?? error.message) : error}`,
-        ),
-    },
-  );
-  transport.attach(ctx);
-  bindings.set(ctx, { req, res, next, transport });
+  const ctx = expressContext(app, req, res);
+  const binding = bindings.get(ctx) as Binding;
+  binding.next = next;
+  const { transport } = binding;
   const chain = chainFor(app, entry, middlewares, onDroppedResponse);
   const response = await handleRequest(ctx, chain, async (error) => {
     if (transport.closedEarly) {

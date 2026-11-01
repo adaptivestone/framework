@@ -8,6 +8,7 @@ import {
 } from '../validate/ValidationError.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES, HttpError } from './httpErrors.ts';
+import type { RequestContext } from './RequestContext.ts';
 import { HttpResponse, NO_BODY_STATUSES } from './responses.ts';
 
 /** The `message` of every framework 500 response. */
@@ -108,7 +109,20 @@ export type RegistrableError = Omit<Error, 'message'>;
 export type ErrorHandlerFn<E extends RegistrableError = Error> = (
   err: E,
   req: FrameworkRequest,
-) =>
+) => ErrorHandlerReturn;
+
+/**
+ * An error handler registered with `{ contractVersion: 2 }`: it gets the
+ * request's `RequestContext` instead of `req` (the only form in v6). Headers
+ * and cookies it stages on `ctx.response` reach the error response.
+ */
+export type ContextErrorHandlerFn<E extends RegistrableError = Error> = (
+  err: E,
+  ctx: RequestContext,
+) => ErrorHandlerReturn;
+
+/** What an error handler returns. */
+export type ErrorHandlerReturn =
   | ErrorHandlerResult
   | HttpResponse
   | null
@@ -116,11 +130,13 @@ export type ErrorHandlerFn<E extends RegistrableError = Error> = (
   | Promise<ErrorHandlerResult | HttpResponse | null | undefined>;
 
 /** A registered (class, handler, level) triple as stored by the registry. */
-export interface RegisteredErrorHandler {
+export type RegisteredErrorHandler = {
   errorClass: abstract new (...args: never[]) => RegistrableError;
-  handler: ErrorHandlerFn<RegistrableError>;
   logLevel: ErrorLogLevel;
-}
+} & (
+  | { contract: 1; handler: ErrorHandlerFn<RegistrableError> }
+  | { contract: 2; handler: ContextErrorHandlerFn<RegistrableError> }
+);
 
 type MongooseFieldError =
   | mongoose.Error.ValidatorError
@@ -391,10 +407,13 @@ export function matchedClientCastError(
  *      a route `params:` schema turns the same failure into a 400 earlier, with
  *      a message you control.
  */
-export function builtInErrorHandlers(): RegisteredErrorHandler[] {
+export function builtInErrorHandlers(): Array<
+  Extract<RegisteredErrorHandler, { contract: 1 }>
+> {
   return [
     {
       errorClass: HttpError,
+      contract: 1,
       // Entries are stored type-erased (`ErrorHandlerFn`); `resolveError`
       // guarantees `instanceof errorClass` before the call.
       handler: (err, req) => {
@@ -433,6 +452,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
     },
     {
       errorClass: mongoose.Error.ValidationError,
+      contract: 1,
       handler: (err, req) => {
         const clientErrors = matchedClientValidationErrors(
           err as mongoose.Error.ValidationError,
@@ -453,6 +473,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
     },
     {
       errorClass: mongoose.Error.CastError,
+      contract: 1,
       handler: (err, req) => {
         const clientErrors = matchedClientCastError(
           err as mongoose.Error.CastError,

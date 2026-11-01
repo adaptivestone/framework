@@ -1,18 +1,22 @@
 import type { Request, Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
+import type { RequestContext } from './RequestContext.ts';
 import type { ResponseWriter } from './ResponseWriter.ts';
 import {
   type ByteStream,
   HttpResponse,
   type ResponseHeaders,
 } from './responses.ts';
+import { expressContext } from './routing/expressPipeline.ts';
 
 export interface ExpressResponseWriterOptions {
   /** Applied to every response before it is written (`transformResponse`). */
   transform?: TransformResponseHook;
   /** Told when `transform` throws or returns no response; the original is sent. */
   onTransformError?: (message: string) => void;
+  /** The request's context for `transform` (default: one per request, without an app logger). */
+  context?: (req: Request) => RequestContext;
 }
 
 /** Framing headers Node sets itself; a native response's copies are dropped. */
@@ -43,9 +47,13 @@ export class ExpressResponseWriter
 
   readonly #onTransformError: (message: string) => void;
 
+  readonly #context: (req: Request) => RequestContext;
+
   constructor(options: ExpressResponseWriterOptions = {}) {
     this.#transform = options.transform;
     this.#onTransformError = options.onTransformError ?? (() => {});
+    this.#context =
+      options.context ?? ((req) => expressContext(undefined, req));
   }
 
   async write(
@@ -88,9 +96,17 @@ export class ExpressResponseWriter
       return response;
     }
     try {
+      const context = this.#context;
       // Typed as a response, but it is project code: check what came back.
       const transformed: unknown = this.#transform(response, {
         req: req as FrameworkRequest,
+        // Read lazily: a transform that never looks at `ctx` costs nothing.
+        get ctx() {
+          const ctx = context(req);
+          // The response is being written: change the returned one instead.
+          ctx.response.seal();
+          return ctx;
+        },
       });
       if (HttpResponse.is(transformed)) {
         return transformed;

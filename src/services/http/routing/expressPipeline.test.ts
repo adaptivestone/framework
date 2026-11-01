@@ -6,6 +6,7 @@ import express, { type Request, type Response } from 'express';
 import type { IApp } from '../../../server.ts';
 import { ValidationError } from '../../validate/ValidationError.ts';
 import { markValidationStage } from '../answerError.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import { HttpError } from '../httpErrors.ts';
 import AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import Middleware from '../middleware/Middleware.ts';
@@ -53,6 +54,8 @@ const fakeApp = {
 let server: Server;
 let origin: string;
 let registry: RouteRegistry;
+/** A writer for the next request (`undefined`: the adapter's default). */
+let writer: ExpressResponseWriter | undefined;
 
 before(async () => {
   const app = express();
@@ -61,7 +64,7 @@ before(async () => {
     next();
   });
   app.use((req, res, next) =>
-    createExpressAdapter(registry, fakeApp)(req, res, next),
+    createExpressAdapter(registry, fakeApp, writer)(req, res, next),
   );
   app.use((err: unknown, _req: Request, res: Response, _next: () => void) => {
     if (!res.headersSent) {
@@ -80,6 +83,7 @@ after(async () => {
 
 beforeEach(() => {
   registry = new RouteRegistry();
+  writer = undefined;
   logged.length = 0;
 });
 
@@ -404,6 +408,50 @@ describe('v2 chain on Express — cookies', () => {
     assert.deepStrictEqual(response.headers.getSetCookie(), [
       'sid=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax',
     ]);
+  });
+});
+
+describe('transformResponse gets the request context', () => {
+  it('on a v2 route: the context the middleware saw, staging closed', async () => {
+    let seen: unknown;
+    let refused = false;
+    writer = new ExpressResponseWriter({
+      transform: (response, { ctx }) => {
+        seen = ctx;
+        try {
+          ctx.response.setHeader('x-in-transform', '1');
+        } catch {
+          refused = true;
+        }
+        return response;
+      },
+    });
+    route([Stage], () => HttpResponse.json(200, { ok: true }));
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers.get('x-staged'), 'yes');
+    assert.strictEqual(response.headers.get('x-in-transform'), null);
+    assert.strictEqual(seen, lastCtx);
+    assert.strictEqual(refused, true);
+  });
+
+  it('on a 5.x route: a context made on first read, with onFinish', async () => {
+    let seenRoute: string | undefined;
+    writer = new ExpressResponseWriter({
+      transform: (response, { ctx }) => {
+        seenRoute = ctx.route;
+        ctx.onFinish((r) => finishes.push(r));
+        return response;
+      },
+    });
+    route([], () => HttpResponse.json(201, { ok: true }));
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 201);
+    await sleep(10);
+    assert.strictEqual(seenRoute, '/r');
+    assert.strictEqual(finishes.length, 1);
+    assert.strictEqual(finishes[0]?.outcome, 'finished');
+    assert.strictEqual(finishes[0]?.status, 201);
   });
 });
 
