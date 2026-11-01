@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter) and 3 (v2 controllers) done; slice 4 (cookies) next.
+2 (Express adapter), 3 (v2 controllers) and 4 (cookies) done; hook types, docs and Phase 2 next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -296,8 +296,8 @@ adapter (P3) the same class reads from Node directly.
 - **D2.5 Cookies** — **decided 2026-11-01: A, on `ctx`.** `ctx.cookies.get(name)` (lazy parse) and
   `ctx.response.setCookie(name, value, options)` / `deleteCookie(name, options)`, staged like other
   response headers; defaults `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` except on plain
-  `http://localhost`; the `cookie` package becomes a direct dependency (today it only arrives
-  through Express). Not now: signed/encrypted cookies, sessions. Original text: the framework
+  `http://localhost` (outside production only — see slice 4); the `cookie` package becomes a
+  direct dependency (today it only arrives through Express). Not now: signed/encrypted cookies, sessions. Original text: the framework
   parses no cookies today. Add `ctx.cookies.get` (lazy parse) and
   `ctx.response.setCookie/deleteCookie` with secure defaults (`HttpOnly`, `Secure`,
   `SameSite=Lax`); nearly every surveyed framework has this. Alternative: leave cookies to apps.
@@ -392,7 +392,34 @@ adapter (P3) the same class reads from Node directly.
 - Not in this slice: portable types for `transformResponse` and error handlers (they still receive
   `req`). Their shape is an open owner question; it is still required before P1m is done.
 
-**Slice 4:** cookies, docs, CHANGELOG. **Phase 2:** app-wide middleware API and portable built-ins.
+**Slice 4 — cookies (done 2026-11-01):**
+
+- `ctx.cookies.get(name)` (`RequestCookies`, parsed from the `Cookie` header on first read,
+  URL-decoded, own keys only; several `cookie` headers join with `; `).
+- `ctx.response.setCookie(name, value, options)` / `deleteCookie(name, options)` stage `Set-Cookie`
+  values keyed by name + domain + path (the same identity replaces); staged cookies come after
+  staged headers, so they reach returned, early-stop, error and 5.x-written responses through the
+  existing staging path. A descriptor's own `Set-Cookie` is appended after them.
+- Defaults `Path=/`, `HttpOnly`, `SameSite=Lax`, `Secure`. The `http://localhost` exception
+  (loopback and `*.localhost` too) applies **outside production only**: nginx's default
+  `proxy_pass http://localhost:…` forwards `Host: localhost`, so without `trust proxy` a production
+  app would otherwise drop `Secure`. `maxAge` is in seconds (the attribute's unit; Express's
+  `res.cookie` uses milliseconds — called out in the CHANGELOG). Invalid names, values, domains or
+  paths throw (the `cookie` package validates).
+- `cookie@^2.0.1` is a direct dependency (ESM, no dependencies, Node ≥ 22); Express keeps its own
+  0.7 copy until v6.
+- Packaging smoke: `scripts/fixtures/middleware-v2.mts` type-checks against the packed package (v2
+  middleware, forgotten `return next()` rejected, both middleware versions in real registration
+  forms, a `contractVersion = 2` controller, `createTestContext`); the runtime check runs a v2
+  middleware with cookies and `requestContext()` from the installed dist.
+- Tests: `RequestContext.test.ts` (+9 cookie cases: parsing, defaults, localhost and production,
+  overrides, replace, delete, order, invalid input, late staging); `expressPipeline.test.ts` (+4
+  over HTTP: returned response with its own `Set-Cookie`, error response, 5.x-written response,
+  delete).
+
+**Still open for P1m:** portable types for `transformResponse` and error handlers (owner question),
+the response-type consumer fixture with a simulated added kind (with P1q), docs, the real-runner
+re-measure, and Phase 2 (app-wide middleware API and portable built-ins).
 
 ## API change
 
