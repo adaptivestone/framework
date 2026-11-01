@@ -1,10 +1,9 @@
-import type { NextFunction, Response } from 'express';
 import type i18nConfig from '../../../config/i18n.ts';
 import type { IApp } from '../../../server.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
-import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+import type { Next } from '../RequestContext.ts';
+import type { UserContext } from './GetUserByToken.ts';
+import Middleware from './Middleware.ts';
 
 export type { TI18n };
 
@@ -14,7 +13,7 @@ export interface I18nMiddlewareAppInfo {
   };
 }
 
-class I18n extends AbstractMiddleware {
+class I18n extends Middleware {
   enabled = true;
 
   lookupQuerystring = '';
@@ -30,50 +29,33 @@ class I18n extends AbstractMiddleware {
     return 'Provide language detection and translation';
   }
 
-  async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
+  async middleware(ctx: UserContext, next: Next) {
     let lang = '';
 
     if (this.enabled) {
-      lang = await this.detectLang(req);
+      lang = await this.detectLang(ctx);
     }
     const i18nService = await this.app.getI18nService();
 
-    req.appInfo.i18n = await i18nService.getI18nForLang(lang);
-    //@ts-expect-error we known thats a new one
-    req.i18n = new Proxy(req.appInfo.i18n, {
-      get: (target, prop) => {
-        this.logger?.warn('Please not use "req.i18n" Use "req.appInfo.i18n"');
-        //@ts-expect-error there are should be an erroe
-        return target[prop];
-      },
-    });
-
+    ctx.appInfo.i18n = await i18nService.getI18nForLang(lang);
     return next();
   }
 
-  detectors: Record<
-    string,
-    (
-      req: FrameworkRequest & GetUserByTokenAppInfo,
-    ) => string | undefined | false
-  > = {
-    XLang: (req: FrameworkRequest) => req.get('X-Lang'), // grab from header
-    query: (req: FrameworkRequest) =>
-      req.query ? (req.query[this.lookupQuerystring] as string) : false, // grab from query
-    user: (req: FrameworkRequest & GetUserByTokenAppInfo) =>
-      req.appInfo?.user?.locale, // what if we have a user and user have a defined locale?
-  };
+  /** Language sources, tried in `detectorOrder`; each reads the request context. */
+  detectors: Record<string, (ctx: UserContext) => string | undefined | false> =
+    {
+      XLang: (ctx) => ctx.header('x-lang'), // grab from header
+      query: (ctx) => ctx.query[this.lookupQuerystring] as string, // grab from query
+      user: (ctx) => ctx.appInfo.user?.locale, // what if we have a user and user have a defined locale?
+    };
 
   detectorOrder = ['XLang', 'query', 'user'];
 
-  async detectLang(
-    req: FrameworkRequest,
-    isUseShortCode = true,
-  ): Promise<string> {
+  async detectLang(ctx: UserContext, isUseShortCode = true): Promise<string> {
     const { supportedLngs } = this.app.getConfig('i18n') as typeof i18nConfig;
     let lang = '';
     for (const detectorName of this.detectorOrder) {
-      const lng = this.detectors[detectorName](req);
+      const lng = this.detectors[detectorName](ctx);
       // A repeated query parameter arrives as an array — not a language code.
       if (!lng || typeof lng !== 'string') {
         continue;

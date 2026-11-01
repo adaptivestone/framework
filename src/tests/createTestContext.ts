@@ -21,6 +21,8 @@ export interface TestContextInit<AppInfo extends object> {
   appInfo?: NoInfer<Partial<AppInfo>> & Record<string, unknown>;
   /** Abort it to simulate a client that went away. */
   signal?: AbortSignal;
+  /** Address the connection came from (a proxy, or the client). Default `127.0.0.1`. */
+  peerAddress?: string;
 }
 
 /**
@@ -59,6 +61,7 @@ export function createTestContext<
       Object.fromEntries(new URL(url, 'http://localhost').searchParams),
     body: init.body,
     signal: init.signal ?? new AbortController().signal,
+    peerAddress: init.peerAddress ?? '127.0.0.1',
   };
   return new RequestContext<AppInfo>(source, (init.appInfo ?? {}) as AppInfo, {
     runInScope: runInRequestScope,

@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict';
-import { EventEmitter } from 'node:events';
 import { describe, it } from 'node:test';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import {
+  createTestContext,
+  finishTestContext,
+} from '../../../tests/createTestContext.ts';
+import { HttpResponse } from '../responses.ts';
 import RequestLogger from './RequestLogger.ts';
 
-const run = async (path: string, statusCode: number) => {
+const run = async (
+  path: string,
+  status: number,
+  outcome: 'finished' | 'aborted' = 'finished',
+) => {
   const lines: [level: string, message: string][] = [];
   const middleware = new RequestLogger(appInstance);
   const log = (level: string) => (message: string) => {
@@ -13,13 +21,9 @@ const run = async (path: string, statusCode: number) => {
   Object.defineProperty(middleware, 'logger', {
     value: { info: log('info'), warn: log('warn') },
   });
-  const res = Object.assign(new EventEmitter(), { statusCode });
-  await middleware.middleware(
-    { method: 'GET', path } as never,
-    res as never,
-    () => {},
-  );
-  res.emit('finish');
+  const ctx = createTestContext({ url: `${path}?token=secret` });
+  await middleware.middleware(ctx, async () => HttpResponse.empty(204));
+  finishTestContext(ctx, { outcome, status });
   return lines;
 };
 
@@ -30,6 +34,20 @@ describe('RequestLogger', () => {
       lines.map(([level]) => level),
       ['info', 'info'],
     );
+    assert.match(
+      lines[1]?.[1] ?? '',
+      /Finished Request is {2}\[GET\] \/users\. Status: 200\./,
+    );
+  });
+
+  it('never logs the query string', async () => {
+    const lines = await run('/users', 200);
+    assert.ok(lines.every(([, message]) => !message.includes('secret')));
+  });
+
+  it('logs no finish line for a request the client abandoned', async () => {
+    const lines = await run('/users', 200, 'aborted');
+    assert.strictEqual(lines.length, 1);
   });
 
   it('skips successful health probes', async () => {

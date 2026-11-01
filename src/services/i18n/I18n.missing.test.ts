@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import { before, describe, it, mock } from 'node:test';
-import type { NextFunction, Response } from 'express';
 import { appInstance } from '../../helpers/appInstance.ts';
 import {
   assertCalledTimes,
   assertRejectsLike,
 } from '../../tests/assertions.ts';
-import type { FrameworkRequest } from '../http/HttpServer.ts';
+import { createTestContext } from '../../tests/createTestContext.ts';
 import I18nMiddleware from '../http/middleware/I18n.ts';
-import type { I18n } from './I18n.ts';
+import { HttpResponse } from '../http/responses.ts';
+import type { I18n, TI18n } from './I18n.ts';
 
 /**
  * `i18next` and `i18next-fs-backend` are OPTIONAL peer dependencies. A consumer
@@ -77,25 +77,20 @@ describe('i18n service without the optional i18next packages', () => {
 
   it('lets the i18n middleware run with a language hint', async () => {
     const middleware = new I18nMiddleware(appInstance);
-    const req = {
-      appInfo: {},
-      get: (header: string) => (header === 'X-Lang' ? 'ru' : undefined),
-      query: {},
-    } as unknown as FrameworkRequest;
+    const ctx = createTestContext<{ i18n?: TI18n }>({
+      headers: { 'x-lang': 'ru' },
+    });
     let nexted = false;
 
-    await middleware.middleware(
-      req,
-      {} as Response,
-      (() => {
-        nexted = true;
-      }) as NextFunction,
-    );
+    await middleware.middleware(ctx as never, async () => {
+      nexted = true;
+      return HttpResponse.empty(204);
+    });
 
     assert.ok(nexted);
-    assert.ok(req.appInfo.i18n);
+    assert.ok(ctx.appInfo.i18n);
     assert.strictEqual(
-      req.appInfo.i18n.t('middleware.role.noAccess', {
+      ctx.appInfo.i18n.t('middleware.role.noAccess', {
         defaultValue: 'You do not have access',
       }),
       'You do not have access',

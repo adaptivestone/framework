@@ -1,9 +1,9 @@
-import type { NextFunction, Response } from 'express';
 import type { IApp } from '../../../server.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
+import type { Next, RequestContext } from '../RequestContext.ts';
+import { HttpResponse } from '../responses.ts';
+import Middleware from './Middleware.ts';
 
-class Cors extends AbstractMiddleware {
+class Cors extends Middleware {
   constructor(
     app: IApp,
     params: {
@@ -36,35 +36,40 @@ class Cors extends AbstractMiddleware {
     return 'Add CORS headers to request';
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(ctx: RequestContext<object>, next: Next) {
     const origins = this.params?.origins;
     if (!Array.isArray(origins)) {
       return next();
     }
     // Whether the allow-origin header is sent depends on Origin, so every
-    // response varies by it. `vary` appends instead of replacing other values.
-    res.vary('Origin');
+    // response varies by it. `vary` adds to other values, never replaces.
+    ctx.response.appendHeader('vary', 'Origin');
+    const origin = ctx.header('origin');
     for (const host of origins as (string | RegExp)[]) {
       if (
-        (typeof host === 'string' && req.headers.origin === host) ||
-        (host instanceof RegExp && host.test(req.headers.origin ?? ''))
+        origin !== undefined &&
+        ((typeof host === 'string' && origin === host) ||
+          (host instanceof RegExp && host.test(origin)))
       ) {
-        res.set('Access-Control-Allow-Origin', req.headers.origin);
+        ctx.response.setHeader('access-control-allow-origin', origin);
 
-        if (req.method === 'OPTIONS') {
-          res.set(
-            'Access-Control-Allow-Methods',
+        if (ctx.method === 'OPTIONS') {
+          ctx.response.setHeader(
+            'access-control-allow-methods',
             'GET,HEAD,PUT,PATCH,POST,DELETE',
           );
-          res.vary('Access-Control-Request-Headers');
+          ctx.response.appendHeader('vary', 'Access-Control-Request-Headers');
 
-          const allowedHeaders = req.headers['access-control-request-headers'];
+          const allowedHeaders = ctx.header('access-control-request-headers');
           if (allowedHeaders) {
-            res.set('Access-Control-Allow-Headers', allowedHeaders);
+            ctx.response.setHeader(
+              'access-control-allow-headers',
+              allowedHeaders,
+            );
           }
-          res.set('Content-Length', '0');
-          res.status(204);
-          return res.end();
+          return HttpResponse.empty(204, {
+            headers: { 'content-length': '0' },
+          });
         }
 
         // Only the actual response needs it; a preflight ignores it.
@@ -72,7 +77,10 @@ class Cors extends AbstractMiddleware {
           | string[]
           | undefined;
         if (exposedHeaders?.length) {
-          res.set('Access-Control-Expose-Headers', exposedHeaders.join(', '));
+          ctx.response.setHeader(
+            'access-control-expose-headers',
+            exposedHeaders.join(', '),
+          );
         }
       }
     }

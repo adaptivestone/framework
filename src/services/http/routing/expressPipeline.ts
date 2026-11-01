@@ -76,10 +76,14 @@ export function expressContext(
     return existing;
   }
   const transport = res ? new ExpressTransport(res) : undefined;
+  // One `appInfo` for the context and 5.x code: create it here when the
+  // context comes first (`PrepareAppInfo` then fills in its fields).
+  const frameworkReq = req as Partial<FrameworkRequest>;
+  frameworkReq.appInfo ??= {} as FrameworkRequest['appInfo'];
+  installLegacyI18nAlias(req);
   const ctx = new RequestContext(
     expressSource(req, transport),
-    // Seeded by `PrepareAppInfo`; absent only for an error raised before it ran.
-    ((req as Partial<FrameworkRequest>).appInfo ?? {}) as Ctx['appInfo'],
+    frameworkReq.appInfo as Ctx['appInfo'],
     {
       runInScope: runInRequestScope,
       reportError: (message, error) => {
@@ -153,6 +157,105 @@ function applyStaged(
       res.setHeader(name, values.length === 1 ? (values[0] as string) : values);
     }
   }
+}
+
+let warnedI18nAlias = false;
+
+/**
+ * `req.i18n` — the deprecated alias of `req.appInfo.i18n` that the 5.x `I18n`
+ * middleware set. Kept for 5.x code on Express; v6 removes it with Express.
+ */
+function installLegacyI18nAlias(req: Request): void {
+  if (Object.hasOwn(req, 'i18n')) {
+    return;
+  }
+  Object.defineProperty(req, 'i18n', {
+    configurable: true,
+    enumerable: false,
+    get() {
+      if (!warnedI18nAlias) {
+        warnedI18nAlias = true;
+        process.emitWarning(
+          'req.i18n is deprecated; use req.appInfo.i18n (or ctx.appInfo.i18n). It is removed in v6.',
+          { type: 'DeprecationWarning', code: 'ASF_DEP_REQ_I18N' },
+        );
+      }
+      return (req as Partial<FrameworkRequest>).appInfo?.i18n;
+    },
+  });
+}
+
+/**
+ * A `Middleware` mounted as an Express middleware — how the framework runs its
+ * global built-ins on Express, in the same place as before. `next()` hands the
+ * request to the next Express middleware (inside the request scope, so
+ * `requestContext()` works downstream) and resolves when the response ends; a
+ * returned response is written (with the staged headers); a throw goes to the
+ * error handlers.
+ */
+export function expressMiddleware(
+  app: IApp,
+  writer: ResponseWriter<Request, Response>,
+  instance: Middleware,
+): (req: Request, res: Response, next: NextFunction) => void {
+  const name = instance.constructor.name;
+  return (req, res, next) => {
+    const ctx = expressContext(app, req, res);
+    const { transport } = bindings.get(ctx) as Binding;
+    let continued = false;
+    const forward: Next = () => {
+      if (continued) {
+        return Promise.reject(new Error(`${name}: next() called twice`));
+      }
+      continued = true;
+      next();
+      return transport.legacyOutcome();
+    };
+    let result: Promise<HttpResponse>;
+    try {
+      result = Promise.resolve(
+        runInRequestScope(ctx, () => instance.middleware(ctx, forward)),
+      );
+    } catch (err) {
+      result = Promise.reject(err);
+    }
+    result
+      .then(
+        async (response) => {
+          if (continued) {
+            return; // the rest of the app answered
+          }
+          if (!HttpResponse.is(response)) {
+            throw new TypeError(
+              `${name} must return next() or an HttpResponse`,
+            );
+          }
+          if (res.headersSent || res.destroyed) {
+            return;
+          }
+          transport.flushStaged(false);
+          await writer.write(response, req, res);
+        },
+        (err: unknown) => {
+          if (continued) {
+            // After next(): the request already went on (or the client left).
+            return;
+          }
+          throw err;
+        },
+      )
+      .catch((err: unknown) => {
+        if (!res.headersSent) {
+          next(err);
+        } else {
+          app.logger?.error(
+            `${name} failed after the response started: ${
+              err instanceof Error ? (err.stack ?? err.message) : err
+            }`,
+          );
+        }
+      });
+  };
 }
 
 /** The client went away before the response finished. */
@@ -323,6 +426,9 @@ function expressSource(
     get route() {
       const template = (req.route as { path?: string } | undefined)?.path;
       return template && template !== 'unmatched' ? template : undefined;
+    },
+    get peerAddress() {
+      return req.socket?.remoteAddress;
     },
     get routeMethods() {
       const methods = (

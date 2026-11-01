@@ -41,6 +41,8 @@ export interface RequestSource {
   readonly route: string | undefined;
   /** @internal Methods the matched route has handlers for (upper case). */
   readonly routeMethods?: readonly string[] | undefined;
+  /** @internal Address of the connection's peer (a proxy, or the client). */
+  readonly peerAddress?: string | undefined;
   readonly params: Readonly<Record<string, string>>;
   readonly query: Readonly<Record<string, unknown>>;
   readonly body: unknown;
@@ -359,6 +361,14 @@ export class RequestContext<
     ctx: RequestContext<object>,
   ): readonly string[] | undefined {
     return ctx.#source.routeMethods;
+  }
+
+  /**
+   * @internal Address of the connection's peer — the client, or the proxy in
+   * front of it. Framework IP detection reads it; applications read `ip`.
+   */
+  static peerAddress(ctx: RequestContext<object>): string | undefined {
+    return ctx.#source.peerAddress;
   }
 
   /** @internal Record the error the registry turned into the response. */

@@ -1,12 +1,11 @@
 import type { IncomingMessage } from 'node:http';
 import { BlockList, isIP } from 'node:net';
-import type { NextFunction, Response } from 'express';
 import type ipDetectorConfig from '../../../config/ipDetector.ts';
 import type { IApp } from '../../../server.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
+import { type Next, RequestContext } from '../RequestContext.ts';
+import Middleware from './Middleware.ts';
 
-class IpDetector extends AbstractMiddleware {
+class IpDetector extends Middleware {
   static get description() {
     return 'Detect real user IP address. Support proxy and load balancer';
   }
@@ -42,11 +41,23 @@ class IpDetector extends AbstractMiddleware {
     }
   }
 
+  /** The client address of a Node request (e.g. a WebSocket upgrade). */
   getIpAdressFromIncomingMessage(req: IncomingMessage) {
+    return this.clientAddress(req.socket.remoteAddress, req.headers);
+  }
+
+  /**
+   * The client address, from the connection's peer address and the
+   * configured forwarding headers (honoured only from a trusted proxy).
+   */
+  clientAddress(
+    peerAddress: string | undefined,
+    requestHeaders: Readonly<Record<string, string | string[] | undefined>>,
+  ) {
     const { headers } = this.app.getConfig(
       'ipDetector',
     ) as typeof ipDetectorConfig;
-    const initialIp = req.socket.remoteAddress;
+    const initialIp = peerAddress;
     let ip = initialIp;
     const initialType = initialIp?.includes(':') ? 'ipv6' : 'ipv4';
 
@@ -55,7 +66,7 @@ class IpDetector extends AbstractMiddleware {
     if (this.blockList.check(initialIp ?? '', initialType)) {
       for (const header of headers) {
         // first present header wins
-        const ipHeader = req.headers[header.toLowerCase()] as string;
+        const ipHeader = requestHeaders[header.toLowerCase()] as string;
         if (!ipHeader) {
           continue;
         }
@@ -90,9 +101,12 @@ class IpDetector extends AbstractMiddleware {
     return ip;
   }
 
-  async middleware(req: FrameworkRequest, _res: Response, next: NextFunction) {
-    req.appInfo.ip = this.getIpAdressFromIncomingMessage(req);
-    next();
+  async middleware(ctx: RequestContext<{ ip?: string }>, next: Next) {
+    ctx.appInfo.ip = this.clientAddress(
+      RequestContext.peerAddress(ctx),
+      ctx.headers,
+    );
+    return next();
   }
 }
 

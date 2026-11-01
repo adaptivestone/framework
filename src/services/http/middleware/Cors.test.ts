@@ -2,14 +2,24 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, it } from 'node:test';
-import type { Handler, Response } from 'express';
 import express from 'express';
 import Transport from 'winston-transport';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { assertThrowsLike } from '../../../tests/assertions.ts';
+import {
+  createTestContext,
+  type TestContextInit,
+} from '../../../tests/createTestContext.ts';
 import { getTestServerURL } from '../../../tests/testHelpers.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
+import { HttpResponse } from '../responses.ts';
+import { expressMiddleware } from '../routing/expressPipeline.ts';
 import Cors from './Cors.ts';
+import type Middleware from './Middleware.ts';
+
+/** Mount a `Middleware` on a plain Express app, as the framework does. */
+const mount = (instance: Middleware) =>
+  expressMiddleware(appInstance, new ExpressResponseWriter(), instance);
 
 // Captures app log entries so a test can assert the boot-time CORS warning.
 class CaptureTransport extends Transport {
@@ -23,6 +33,30 @@ class CaptureTransport extends Transport {
     callback();
   }
 }
+
+/** Run Cors on a test context; staged headers are read back by name. */
+const runCors = async (
+  params: ConstructorParameters<typeof Cors>[1],
+  init: TestContextInit<object>,
+) => {
+  const ctx = createTestContext(init);
+  let continued = false;
+  const response = await new Cors(appInstance, params).middleware(
+    ctx,
+    async () => {
+      continued = true;
+      return HttpResponse.empty(204);
+    },
+  );
+  const header = (name: string) => {
+    const values = ctx.response
+      .entries()
+      .filter(([n]) => n === name)
+      .map(([, v]) => v);
+    return values.length ? values.join(', ') : undefined;
+  };
+  return { continued, response, header };
+};
 
 describe('cors middleware methods', () => {
   it('have description fields', async () => {
@@ -51,215 +85,87 @@ describe('cors middleware methods', () => {
   });
 
   it('non options should be different', async () => {
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const map = new Map();
-    const req = {
-      method: 'GET',
-
-      headers: { origin: 'https://localhost' },
-    };
-    const res = {
-      set: (key: string, val?: string | string[]) => {
-        map.set(key, val);
-      },
-      vary: (field: string) => {
-        const current = map.get('Vary');
-        map.set('Vary', current ? `${current}, ${field}` : field);
-      },
-    };
-    const middleware = new Cors(appInstance, {
-      origins: ['https://localhost'],
-    });
-
-    await middleware.middleware(
-      req as FrameworkRequest,
-      res as Response,
-      nextFunction,
+    const { continued, header } = await runCors(
+      { origins: ['https://localhost'] },
+      { method: 'GET', headers: { origin: 'https://localhost' } },
     );
-
-    assert.ok(isCalled);
-    assert.strictEqual(map.get('Vary'), 'Origin');
+    assert.ok(continued);
+    assert.strictEqual(header('vary'), 'Origin');
   });
 
   it('host the not match origin', async () => {
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const map = new Map();
-    const req = {
-      method: 'OPTIONS',
-      headers: { origin: 'http://anotherDomain.com' },
-    };
-    const res = {
-      set: (key: string, val?: string | string[]) => {
-        map.set(key, val);
-      },
-      vary: (field: string) => {
-        map.set('Vary', field);
-      },
-    };
-    const middleware = new Cors(appInstance, {
-      origins: ['https://localhost'],
-    });
-
-    await middleware.middleware(
-      req as FrameworkRequest,
-      res as unknown as Response,
-      nextFunction,
+    const { continued, header } = await runCors(
+      { origins: ['https://localhost'] },
+      { method: 'OPTIONS', headers: { origin: 'http://anotherDomain.com' } },
     );
-
-    assert.ok(isCalled);
+    assert.ok(continued);
     // No allow-origin, but caches must still key the response on Origin.
-    assert.strictEqual(map.get('Access-Control-Allow-Origin'), undefined);
-    assert.strictEqual(map.get('Vary'), 'Origin');
+    assert.strictEqual(header('access-control-allow-origin'), undefined);
+    assert.strictEqual(header('vary'), 'Origin');
   });
 
   it('continues safely if origins are unavailable at request time', async () => {
     const middleware = new Cors(appInstance, {
       origins: ['https://localhost'],
     });
-    middleware.params = undefined;
+    middleware.params = undefined as never;
     let isCalled = false;
 
     await middleware.middleware(
-      {
-        method: 'GET',
-        headers: { origin: 'https://localhost' },
-      } as FrameworkRequest,
-      {} as Response,
-      () => {
+      createTestContext({ headers: { origin: 'https://localhost' } }),
+      async () => {
         isCalled = true;
+        return HttpResponse.empty(204);
       },
     );
 
     assert.strictEqual(isCalled, true);
   });
 
-  it('string domain match', async () => {
-    let isEndCalled = false;
-    const map = new Map();
-    const req = {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'https://localhost',
-        'access-control-request-headers': 'someAccessControlRequestHeaders',
-      },
-    };
-    const res = {
-      set: (key: string, val?: string | string[]) => {
-        map.set(key, val);
-      },
-      vary: (field: string) => {
-        const current = map.get('Vary');
-        map.set('Vary', current ? `${current}, ${field}` : field);
-      },
-      status: () => {},
-      end: () => {
-        isEndCalled = true;
-      },
-    };
-    const middleware = new Cors(appInstance, {
-      origins: ['https://localhost'],
+  for (const [name, origins] of [
+    ['string domain match', ['https://localhost']],
+    ['regexp domain match', [/./]],
+  ] as const) {
+    it(name, async () => {
+      const { continued, response, header } = await runCors(
+        { origins: [...origins] },
+        {
+          method: 'OPTIONS',
+          headers: {
+            origin: 'https://localhost',
+            'access-control-request-headers': 'someAccessControlRequestHeaders',
+          },
+        },
+      );
+
+      // The preflight is answered here, with an empty 204.
+      assert.ok(!continued);
+      assert.strictEqual(response.kind, 'empty');
+      assert.strictEqual(response.status, 204);
+      assert.strictEqual(
+        header('vary'),
+        'Origin, Access-Control-Request-Headers',
+      );
+      assert.strictEqual(
+        header('access-control-allow-headers'),
+        'someAccessControlRequestHeaders',
+      );
+      assert.strictEqual(
+        header('access-control-allow-origin'),
+        'https://localhost',
+      );
+      assert.strictEqual(
+        header('access-control-allow-methods'),
+        'GET,HEAD,PUT,PATCH,POST,DELETE',
+      );
     });
-
-    await middleware.middleware(
-      req as FrameworkRequest,
-      res as unknown as Response,
-      () => {},
-    );
-
-    assert.ok(isEndCalled);
-    assert.strictEqual(
-      map.get('Vary'),
-      'Origin, Access-Control-Request-Headers',
-    );
-    assert.strictEqual(
-      map.get('Access-Control-Allow-Headers'),
-      'someAccessControlRequestHeaders',
-    );
-    assert.strictEqual(
-      map.get('Access-Control-Allow-Origin'),
-      'https://localhost',
-    );
-    assert.strictEqual(
-      map.get('Access-Control-Allow-Methods'),
-      'GET,HEAD,PUT,PATCH,POST,DELETE',
-    );
-  });
-
-  it('regexp domain match', async () => {
-    let isEndCalled = false;
-    const map = new Map();
-    const req = {
-      method: 'OPTIONS',
-      headers: {
-        origin: 'https://localhost',
-        'access-control-request-headers': 'someAccessControlRequestHeaders',
-      },
-      appInfo: {
-        app: {},
-      },
-    };
-    const res = {
-      set: (key: string, val?: string | string[]) => {
-        map.set(key, val);
-      },
-      vary: (field: string) => {
-        const current = map.get('Vary');
-        map.set('Vary', current ? `${current}, ${field}` : field);
-      },
-      status: () => {},
-
-      end: () => {
-        isEndCalled = true;
-      },
-    };
-    const middleware = new Cors(appInstance, {
-      origins: [/./],
-    });
-
-    await middleware.middleware(
-      req as FrameworkRequest,
-      res as unknown as Response,
-      () => {},
-    );
-
-    assert.ok(isEndCalled);
-    assert.strictEqual(
-      map.get('Vary'),
-      'Origin, Access-Control-Request-Headers',
-    );
-    assert.strictEqual(
-      map.get('Access-Control-Allow-Headers'),
-      'someAccessControlRequestHeaders',
-    );
-    assert.strictEqual(
-      map.get('Access-Control-Allow-Origin'),
-      'https://localhost',
-    );
-    assert.strictEqual(
-      map.get('Access-Control-Allow-Methods'),
-      'GET,HEAD,PUT,PATCH,POST,DELETE',
-    );
-  });
+  }
 
   it('an unanchored regex matches unintended origins; an anchored one does not (doc 21)', async () => {
-    const reflect = async (origins: (string | RegExp)[], origin: string) => {
-      const map = new Map();
-      await new Cors(appInstance, { origins }).middleware(
-        { method: 'GET', headers: { origin } } as FrameworkRequest,
-        {
-          set: (k: string, v: string) => map.set(k, v),
-          vary: () => {},
-        } as unknown as Response,
-        () => {},
+    const reflect = async (origins: (string | RegExp)[], origin: string) =>
+      (await runCors({ origins }, { headers: { origin } })).header(
+        'access-control-allow-origin',
       );
-      return map.get('Access-Control-Allow-Origin');
-    };
 
     // Footgun: `/example\.com/` (unanchored) reflects an attacker origin.
     assert.strictEqual(
@@ -303,9 +209,11 @@ describe('cors middleware over HTTP', () => {
       next();
     });
     app.use(
-      new Cors(appInstance, {
-        origins: ['https://localhost'],
-      }).getMiddleware() as Handler,
+      mount(
+        new Cors(appInstance, {
+          origins: ['https://localhost'],
+        }),
+      ),
     );
     app.use((_req, res) => {
       res.json({ ok: true });
@@ -338,7 +246,7 @@ describe('cors middleware over HTTP', () => {
       init: { origin: string; method?: string },
     ) => {
       const app = express();
-      app.use(new Cors(appInstance, params).getMiddleware() as Handler);
+      app.use(mount(new Cors(appInstance, params)));
       app.use((_req, res) => {
         res.set('Retry-After', '40').json({ ok: true });
       });

@@ -14,6 +14,7 @@ import type { FinishResult, Next, RequestContext } from '../RequestContext.ts';
 import { requestContext } from '../requestScope.ts';
 import { HttpResponse } from '../responses.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
+import { expressMiddleware } from './expressPipeline.ts';
 import type {
   HandlerEntry,
   MiddlewareClass,
@@ -567,6 +568,102 @@ describe('app-wide middleware (the Server `middleware` option)', () => {
     assert.deepStrictEqual(await response.json(), { error: 'HTTP' });
     assert.strictEqual(response.headers.get('x-outer'), 'yes');
     assert.deepStrictEqual(events, ['outer in', 'outer caught']);
+  });
+});
+
+describe('a Middleware mounted on Express (the global built-ins)', () => {
+  /** A plain Express app: the bridged middleware, then 5.x code. */
+  const serve = async (
+    instance: Middleware,
+    after: (req: Request, res: Response) => void,
+  ) => {
+    const app = express();
+    app.use(expressMiddleware(fakeApp, new ExpressResponseWriter(), instance));
+    app.use(after);
+    app.use((err: unknown, _req: Request, res: Response, _next: () => void) => {
+      res.status(599).json({ sink: String(err) });
+    });
+    const bridged = http.createServer(app);
+    await new Promise<void>((resolve) => bridged.listen(0, resolve));
+    const url = `http://127.0.0.1:${(bridged.address() as AddressInfo).port}/`;
+    const close = () => {
+      bridged.closeAllConnections();
+      return new Promise((resolve) => bridged.close(resolve));
+    };
+    return { url, close };
+  };
+
+  it('next() continues to 5.x code, in the request scope, with one appInfo', async () => {
+    let inside: { same?: boolean; shared?: unknown } = {};
+    let finished: FinishResult | undefined;
+    class Mark extends Middleware {
+      middleware(ctx: RequestContext, next: Next) {
+        lastCtx = ctx;
+        (ctx.appInfo as { mark?: string }).mark = 'set by ctx';
+        ctx.response.setHeader('x-mark', '1');
+        ctx.onFinish((r) => {
+          finished = r;
+        });
+        return next();
+      }
+    }
+    const { url, close } = await serve(new Mark(fakeApp), (req, res) => {
+      inside = {
+        same: requestContext() === lastCtx,
+        shared: (req as unknown as { appInfo: { mark?: string } }).appInfo.mark,
+      };
+      res.status(200).json({ ok: true });
+    });
+    try {
+      const response = await fetch(url);
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(response.headers.get('x-mark'), '1');
+      await sleep(10);
+      assert.deepStrictEqual(inside, { same: true, shared: 'set by ctx' });
+      assert.strictEqual(finished?.outcome, 'finished');
+    } finally {
+      await close();
+    }
+  });
+
+  it('a returned response is written with the staged headers; later code does not run', async () => {
+    let ran = false;
+    class Answer extends Middleware {
+      middleware(ctx: RequestContext) {
+        ctx.response.setHeader('x-mark', '1');
+        return HttpResponse.json(418, { teapot: true });
+      }
+    }
+    const { url, close } = await serve(new Answer(fakeApp), () => {
+      ran = true;
+    });
+    try {
+      const response = await fetch(url);
+      assert.strictEqual(response.status, 418);
+      assert.strictEqual(response.headers.get('x-mark'), '1');
+      assert.deepStrictEqual(await response.json(), { teapot: true });
+      assert.strictEqual(ran, false);
+    } finally {
+      await close();
+    }
+  });
+
+  it('a throw goes to the Express error handler', async () => {
+    class Fail extends Middleware {
+      middleware(): never {
+        throw new Error('bridge failure');
+      }
+    }
+    const { url, close } = await serve(new Fail(fakeApp), () => {});
+    try {
+      const response = await fetch(url);
+      assert.strictEqual(response.status, 599);
+      assert.deepStrictEqual(await response.json(), {
+        sink: 'Error: bridge failure',
+      });
+    } finally {
+      await close();
+    }
   });
 });
 

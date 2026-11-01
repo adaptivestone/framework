@@ -1,15 +1,23 @@
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { createTestContext } from '../../../tests/createTestContext.ts';
 import { getTestServerURL } from '../../../tests/testHelpers.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpResponse } from '../responses.ts';
+import type { UserContext } from './GetUserByToken.ts';
 import I18n from './I18n.ts';
 
-// Minimal request/response stubs: the middleware touches only `get`, `query`
-// and `appInfo`, so the widening cast lives here instead of at every call site.
-const asRequest = (stub: object) => stub as unknown as FrameworkRequest;
-const asResponse = (stub: object) => stub as unknown as Response;
+/** A context with the detector inputs: `X-Lang`, the language query, the user's locale. */
+const ctxFor = (
+  xLang: string | undefined,
+  query: Record<string, unknown> = {},
+  user?: { locale?: string },
+) =>
+  createTestContext<UserContext['appInfo']>({
+    headers: xLang === undefined ? {} : { 'x-lang': xLang },
+    query,
+    appInfo: user ? { user: user as never } : {},
+  });
 
 describe('i18n middleware methods', () => {
   let middleware: I18n;
@@ -26,153 +34,72 @@ describe('i18n middleware methods', () => {
   });
 
   it('detectors should works correctly', async () => {
-    const request: {
-      get: () => string;
-      query?: {
-        [key: string]: string | string[];
-      };
-      appInfo: {
-        user?: {
-          locale?: string;
-        };
-      };
-    } = {
-      get: () => 'en',
-      query: {
-        [middleware.lookupQuerystring]: 'ru',
-      },
-      appInfo: {},
-    };
-    let lang = await middleware.detectLang(asRequest(request));
+    const q = (value: unknown) => ({ [middleware.lookupQuerystring]: value });
+    const detect = (ctx: UserContext, isUseShortCode?: boolean) =>
+      middleware.detectLang(ctx, isUseShortCode);
 
-    assert.strictEqual(lang, 'en');
-
-    request.appInfo = {
-      user: {
-        locale: 'ru',
-      },
-    };
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, 'en');
-
-    request.get = () => null as unknown as string;
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, 'ru');
-
-    request.query = undefined;
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, 'ru');
-
+    assert.strictEqual(await detect(ctxFor('en', q('ru'))), 'en');
+    assert.strictEqual(
+      await detect(ctxFor('en', q('ru'), { locale: 'ru' })),
+      'en',
+    );
+    assert.strictEqual(
+      await detect(ctxFor(undefined, q('ru'), { locale: 'ru' })),
+      'ru',
+    );
+    assert.strictEqual(
+      await detect(ctxFor(undefined, {}, { locale: 'ru' })),
+      'ru',
+    );
     // An unsupported value falls through to the next detector.
-    request.get = () => 'de';
-    request.query = { [middleware.lookupQuerystring]: 'es' };
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, 'ru');
-
-    request.appInfo = {};
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, '');
-
+    assert.strictEqual(
+      await detect(ctxFor('de', q('es'), { locale: 'ru' })),
+      'ru',
+    );
+    assert.strictEqual(await detect(ctxFor('de', q('es'))), '');
     // A repeated query parameter is an array: ignored, never thrown on.
-    request.query = { [middleware.lookupQuerystring]: ['a', '_'] };
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, '');
-
-    request.query = {
-      [middleware.lookupQuerystring]: 'en-GB',
-    };
-    lang = await middleware.detectLang(asRequest(request));
-
-    assert.strictEqual(lang, 'en');
-
-    lang = await middleware.detectLang(asRequest(request), false);
-
-    assert.strictEqual(lang, 'en-GB');
+    assert.strictEqual(await detect(ctxFor('de', q(['a', '_']))), '');
+    assert.strictEqual(await detect(ctxFor('de', q('en-GB'))), 'en');
+    assert.strictEqual(await detect(ctxFor('de', q('en-GB')), false), 'en-GB');
   });
 
   it('middleware that works', async () => {
     let isCalled = false;
-    const nextFunction = () => {
+    const next = async () => {
       isCalled = true;
+      return HttpResponse.empty(204);
     };
-    const req: {
-      get: () => string;
-      appInfo: {
-        i18n?: {
-          language: string;
-          t: (value: string) => string;
-        };
-      };
-      i18n?: {
-        t: (value: string) => string;
-      };
-    } = {
-      get: () => 'en',
-      appInfo: {},
-    };
-    await middleware.middleware(asRequest(req), asResponse({}), nextFunction);
+    const ctx = ctxFor('en');
+    await middleware.middleware(ctx, next);
 
     assert.ok(isCalled);
-    assert.notStrictEqual(req.appInfo.i18n, undefined);
-    assert.strictEqual(req.appInfo.i18n?.language, 'en');
-    assert.strictEqual(req.appInfo.i18n?.t('aaaaa'), 'aaaaa');
-    assert.strictEqual(req.i18n?.t('aaaaa'), 'aaaaa'); // proxy test
+    assert.notStrictEqual(ctx.appInfo.i18n, undefined);
+    assert.strictEqual(ctx.appInfo.i18n?.language, 'en');
+    assert.strictEqual(ctx.appInfo.i18n?.t('aaaaa'), 'aaaaa');
 
-    const req2: {
-      get: () => string;
-      appInfo: {
-        i18n?: {
-          language: string;
-        };
-      };
-    } = {
-      get: () => 'fakeLang',
-      appInfo: {},
-    };
+    const unsupported = ctxFor('fakeLang');
+    await middleware.middleware(unsupported, next);
 
-    await middleware.middleware(asRequest(req2), asResponse({}), nextFunction);
-
-    assert.strictEqual(req2.appInfo.i18n?.language, 'en');
+    assert.strictEqual(unsupported.appInfo.i18n?.language, 'en');
   });
 
   it('middleware disabled', async () => {
     appInstance.updateConfig('i18n', { enabled: false });
-    middleware = new I18n(appInstance);
+    try {
+      const disabled = new I18n(appInstance);
+      let isCalled = false;
+      const ctx = ctxFor('en');
+      await disabled.middleware(ctx, async () => {
+        isCalled = true;
+        return HttpResponse.empty(204);
+      });
 
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req: {
-      get: () => string;
-      appInfo: {
-        i18n?: {
-          language: string;
-          t: (value: string) => string;
-        };
-      };
-      i18n?: {
-        language: string;
-        t: (value: string) => string;
-      };
-    } = {
-      get: () => 'en',
-      appInfo: {},
-    };
-    await middleware.middleware(asRequest(req), asResponse({}), nextFunction);
-
-    assert.ok(isCalled);
-    assert.notStrictEqual(req.appInfo.i18n, undefined);
-    assert.strictEqual(req.appInfo.i18n?.t('aaaaa'), 'aaaaa');
-    assert.strictEqual(req.i18n?.t('aaaaa'), 'aaaaa'); // proxy test
-
-    appInstance.updateConfig('i18n', { enabled: true });
+      assert.ok(isCalled);
+      assert.notStrictEqual(ctx.appInfo.i18n, undefined);
+      assert.strictEqual(ctx.appInfo.i18n?.t('aaaaa'), 'aaaaa');
+    } finally {
+      appInstance.updateConfig('i18n', { enabled: true });
+    }
   });
 });
 
@@ -193,5 +120,38 @@ describe('i18n middleware over HTTP', () => {
 
     assert.strictEqual(response.status, 400);
     assert.deepStrictEqual(body.errors.email, ['Нужно указать Email']);
+  });
+
+  it('keeps the deprecated req.i18n alias for 5.x code on Express', async () => {
+    const { default: express } = await import('express');
+    const { createServer } = await import('node:http');
+    const { expressMiddleware } = await import('../routing/expressPipeline.ts');
+    const { ExpressResponseWriter } = await import(
+      '../ExpressResponseWriter.ts'
+    );
+    const app = express();
+    app.use(
+      expressMiddleware(
+        appInstance,
+        new ExpressResponseWriter(),
+        new I18n(appInstance),
+      ),
+    );
+    app.use((req, res) => {
+      const alias = (req as unknown as { i18n?: { language?: string } }).i18n;
+      res.json({ language: alias?.language });
+    });
+    const server = createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const { port } = server.address() as { port: number };
+    try {
+      const response = await fetch(`http://localhost:${port}/`, {
+        headers: { 'X-Lang': 'ru' },
+      });
+      assert.deepStrictEqual(await response.json(), { language: 'ru' });
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });

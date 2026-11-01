@@ -1,63 +1,47 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import { createTestContext } from '../../../tests/createTestContext.ts';
+import { HttpResponse } from '../responses.ts';
+import type { BaseAppInfo } from '../types.ts';
 import PrepareAppInfo from './PrepareAppInfo.ts';
+
+const next = async () => HttpResponse.empty(204);
 
 describe('prepareAppInfo methods', () => {
   it('have description fields', async () => {
-    // const middleware = new PrepareAppInfo(appInstance);
-
     assert.notStrictEqual(PrepareAppInfo.description, undefined);
   });
 
-  it('middleware that works', async () => {
+  it('fills appInfo and keeps what is already there', async () => {
     const middleware = new PrepareAppInfo(appInstance);
     let isCalled = false;
-    const nextFunction = () => {
+    const ctx = createTestContext<Partial<BaseAppInfo> & { test?: number }>();
+    await middleware.middleware(ctx, async () => {
       isCalled = true;
-    };
-    const req: {
-      appInfo?: {
-        test: number;
-      };
-    } = {};
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
+      return HttpResponse.empty(204);
+    });
 
     assert.ok(isCalled);
-    assert.notStrictEqual(req.appInfo, undefined);
+    assert.strictEqual(ctx.appInfo.app, appInstance);
 
-    if (req.appInfo) {
-      req.appInfo.test = 5;
-    }
+    ctx.appInfo.test = 5;
+    const request = ctx.appInfo.request;
+    await middleware.middleware(ctx, next);
 
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.strictEqual(req.appInfo?.test, 5);
+    assert.strictEqual(ctx.appInfo.test, 5);
+    assert.strictEqual(ctx.appInfo.request, request);
   });
 
-  it('initializes request and query to {} so schema-less routes can read them', async () => {
+  it('initializes request, query and params to {} so schema-less routes can read them', async () => {
     // The declared `appInfo.request`/`.query` types are non-optional, but a
     // route without schemas never has them assigned by the validation wrapper.
-    // `PrepareAppInfo` must seed both so a handler reading them can't crash.
-    const middleware = new PrepareAppInfo(appInstance);
-    const req: { appInfo?: FrameworkRequest['appInfo'] } = {};
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      () => {},
-    );
+    // `PrepareAppInfo` must seed them so a handler reading them can't crash.
+    const ctx = createTestContext<Partial<BaseAppInfo>>();
+    await new PrepareAppInfo(appInstance).middleware(ctx, next);
 
-    assert.deepStrictEqual(req.appInfo?.request, {});
-    assert.deepStrictEqual(req.appInfo?.query, {});
+    assert.deepStrictEqual(ctx.appInfo.request, {});
+    assert.deepStrictEqual(ctx.appInfo.query, {});
+    assert.deepStrictEqual(ctx.appInfo.params, {});
   });
 });

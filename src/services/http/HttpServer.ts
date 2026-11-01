@@ -37,7 +37,10 @@ import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import RequestParserMiddleware from './middleware/RequestParser.ts';
 import { HttpResponse } from './responses.ts';
 import { createExpressAdapter } from './routing/ExpressAdapter.ts';
-import { expressContext } from './routing/expressPipeline.ts';
+import {
+  expressContext,
+  expressMiddleware,
+} from './routing/expressPipeline.ts';
 import {
   type AppMiddlewareSpec,
   normalizeAppMiddlewares,
@@ -116,21 +119,23 @@ class HttpServer extends Base {
       next();
     });
 
-    this.express.use(
-      new RequestLoggerMiddleware(this.app).getMiddleware() as Handler,
-    );
-    this.express.use(
-      new PrepareAppInfoMiddleware(this.app).getMiddleware() as Handler,
-    );
-    this.express.use(new IpDetector(this.app).getMiddleware() as Handler);
-    this.express.use(new I18nMiddleware(this.app).getMiddleware() as Handler);
-
-    this.express.use(
+    // The framework's own middleware, in order, before anything `bootHttp`
+    // adds — `Middleware` classes mounted on Express (`requestContext()`
+    // works from here on).
+    for (const instance of [
+      new RequestLoggerMiddleware(this.app),
+      new PrepareAppInfoMiddleware(this.app),
+      new IpDetector(this.app),
+      new I18nMiddleware(this.app),
       new Cors(this.app, {
         origins: httpConfig.corsDomains,
         exposedHeaders: httpConfig.corsExposedHeaders,
-      }).getMiddleware() as Handler,
-    );
+      }),
+    ]) {
+      this.express.use(
+        expressMiddleware(this.app, this.responseWriter, instance),
+      );
+    }
 
     this.express.use(
       new RequestParserMiddleware(this.app).getMiddleware() as Handler,

@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import type { IncomingMessage } from 'node:http';
 import { describe, it } from 'node:test';
-import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import { createTestContext } from '../../../tests/createTestContext.ts';
+import { HttpResponse } from '../responses.ts';
 import IpDetector from './IpDetector.ts';
 
 const testVectors = [
@@ -124,32 +124,25 @@ describe('ipDetector methods', () => {
   });
 
   it('middleware that works', async () => {
-    const nextFunction = () => {};
+    const next = async () => HttpResponse.empty(204);
     for (const vector of testVectors) {
       appInstance.updateConfig('ipDetector', {
         trustedProxy: [vector.cidr],
       });
       const middleware = new IpDetector(appInstance);
       for (const test of vector.tests) {
-        const req = {
-          appInfo: {
-            ip: undefined,
-          },
-          // A valid but untrusted client IP. When the socket peer is trusted
-          // the walk returns this header value; otherwise the header is
-          // ignored and the socket address wins. (The old test used a non-IP
-          // sentinel, which the right-to-left walk now correctly rejects.)
+        // A valid but untrusted client IP. When the socket peer is trusted
+        // the walk returns this header value; otherwise the header is
+        // ignored and the socket address wins. (The old test used a non-IP
+        // sentinel, which the right-to-left walk now correctly rejects.)
+        const ctx = createTestContext<{ ip?: string }>({
           headers: { 'x-forwarded-for': '203.0.113.7' },
-          socket: { remoteAddress: test.ip },
-        };
-        await middleware.middleware(
-          req as unknown as FrameworkRequest,
-          {} as Response,
-          nextFunction,
-        );
+          peerAddress: test.ip,
+        });
+        await middleware.middleware(ctx, next);
 
         assert.strictEqual(
-          req.appInfo.ip,
+          ctx.appInfo.ip,
           test.matches ? '203.0.113.7' : test.ip,
         );
       }
