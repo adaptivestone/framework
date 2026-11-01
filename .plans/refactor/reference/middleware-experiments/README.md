@@ -60,3 +60,18 @@ waiting for a started downstream) and measures retained heap per pending request
 node --expose-gc .plans/refactor/reference/middleware-experiments/guarded-runners.mjs onion-guarded-fast async
 node --expose-gc .plans/refactor/reference/middleware-experiments/guarded-runners.mjs h-guarded-fast async
 ```
+
+## Requirements and costs: strict onion vs H (production and development guards)
+
+`contract-check.mjs` checks every requirement and misuse case for both models in three runner
+modes (`raw`, `safe` = production guards, `dev` = diagnostics) and measures memory and CPU on five
+route mixes built from our middleware. `contract-types.ts` shows which forgotten `return next()`
+cases TypeScript rejects. Results for Node 24.22.2, Node 26.12.1 and Bun 1.4.4 are in
+`contract-check-node24.json`, `contract-check-node26.json` and `contract-check-bun.json`;
+conclusions in [middleware-final-recommendation](../middleware-final-recommendation.md).
+
+```sh
+node contract-check.mjs conformance
+node --expose-gc contract-check.mjs memory
+node contract-check.mjs cpu
+```

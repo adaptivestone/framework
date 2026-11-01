@@ -367,7 +367,7 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 - [Middleware flow models](./reference/middleware-flow-models.md) — request-only vs onion vs request/response stages, from the source of 14 frameworks + benchmark (2026-10-31)
 - [Middleware design proposals](./reference/middleware-design-proposals.md) — self-contained D2.1 options with the same four middleware in each, for outside reviewers (2026-11-01)
 - [Middleware review — Fable](./reference/middleware-review-fable.md) — independent review of every flow idea with measurements and the rules for the recommended hybrid (2026-11-01)
-- [Middleware final recommendation](./reference/middleware-final-recommendation.md) — review of the Astro Proposal: H as one contract with stage shorthand, guarded-runner measurements, the final contract and the owner's decisions (2026-11-01)
+- [Middleware final recommendation](./reference/middleware-final-recommendation.md) — strict onion per the owner's priority, every requirement checked on Node 24/26 and Bun, memory/CPU vs H, the final contract and the owner's decisions (2026-11-01)
 - [Glossary](./reference/glossary.md) — `RouteNode`, `HandlerEntry`, `MiddlewareEntry`, `RouteRegistry`, etc.
 
 ## Archive

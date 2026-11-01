@@ -1,0 +1,219 @@
+{
+  "conformance": {
+    "runtime": "node v26.12.1",
+    "conformance": [
+      {
+        "case": "R1 early response stops the chain (Role \u2192 403)",
+        "onion/raw": true,
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": true,
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "R2 after-part sees and replaces the response",
+        "onion/raw": true,
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": true,
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "R4 own store reaches later middleware, handler, deep code (40 concurrent)",
+        "onion/raw": true,
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": true,
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "R6 handler throws \u2192 transaction rolls back, original error reaches the top",
+        "onion/raw": true,
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": true,
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "R6 success \u2192 commit; non-Error throw passes through unchanged",
+        "onion/raw": true,
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": true,
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "R5 tracing span of a middleware parents the handler span (real OTel)",
+        "onion/raw": true,
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": true,
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Misuse: next() called twice \u2192 error, handler runs once",
+        "onion/raw": "handler ran 2\u00d7",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "handler ran 2\u00d7",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Misuse: next() not awaited, other response returned, handler throws later",
+        "onion/raw": "answered before handler finished: true; unhandled rejection: true",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "answered before handler finished: true; unhandled rejection: true",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Misuse: stored next() called after the response was chosen",
+        "onion/raw": "handler ran 1\u00d7 after the answer",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "handler ran 1\u00d7 after the answer",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Misuse: forgotten return (await next() without return)",
+        "onion/raw": "result: undefined (no response)",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "result: undefined (no response)",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Misuse: throw after an un-awaited next()",
+        "onion/raw": "answered before handler finished: true",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "answered before handler finished: true",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "R8 lazy stream body is read after the transaction closed (documented rule)",
+        "onion/raw": "tx open while streaming: false",
+        "onion/safe": "tx open while streaming: false",
+        "onion/dev": "tx open while streaming: false",
+        "hybrid/raw": "tx open while streaming: false",
+        "hybrid/safe": "tx open while streaming: false",
+        "hybrid/dev": "tx open while streaming: false"
+      }
+    ]
+  },
+  "memory": {
+    "runtime": "node v26.12.1",
+    "kind": "memory",
+    "unit": "bytes retained per pending request (median of 5, 10 000 pending)",
+    "rows": [
+      {
+        "scenario": "minimal",
+        "onion/raw": 31,
+        "onion/safe": 297,
+        "onion/dev": 675,
+        "hybrid/raw": 127,
+        "hybrid/safe": 415,
+        "hybrid/dev": 414
+      },
+      {
+        "scenario": "typical",
+        "onion/raw": 425,
+        "onion/safe": 1280,
+        "onion/dev": 2431,
+        "hybrid/raw": 73,
+        "hybrid/safe": 417,
+        "hybrid/dev": 198
+      },
+      {
+        "scenario": "typical+scope",
+        "onion/raw": 783,
+        "onion/safe": 1743,
+        "onion/dev": 3087,
+        "hybrid/raw": 535,
+        "hybrid/safe": 977,
+        "hybrid/dev": 980
+      },
+      {
+        "scenario": "typical+scope+tx",
+        "onion/raw": 1351,
+        "onion/safe": 2530,
+        "onion/dev": 4077,
+        "hybrid/raw": 1153,
+        "hybrid/safe": 1760,
+        "hybrid/dev": 2137
+      },
+      {
+        "scenario": "heavy",
+        "onion/raw": 985,
+        "onion/safe": 2415,
+        "onion/dev": 4153,
+        "hybrid/raw": 410,
+        "hybrid/safe": 1074,
+        "hybrid/dev": 1266
+      }
+    ]
+  },
+  "cpu": {
+    "runtime": "node v26.12.1",
+    "kind": "cpu",
+    "unit": "ns per request, dispatch only (median of 5 \u00d7 100 000)",
+    "rows": [
+      {
+        "scenario": "minimal",
+        "onion/raw": 150,
+        "onion/safe": 451,
+        "onion/dev": 596,
+        "hybrid/raw": 225,
+        "hybrid/safe": 376,
+        "hybrid/dev": 353
+      },
+      {
+        "scenario": "typical",
+        "onion/raw": 683,
+        "onion/safe": 1205,
+        "onion/dev": 1608,
+        "hybrid/raw": 710,
+        "hybrid/safe": 872,
+        "hybrid/dev": 886
+      },
+      {
+        "scenario": "typical+scope",
+        "onion/raw": 896,
+        "onion/safe": 1429,
+        "onion/dev": 1711,
+        "hybrid/raw": 958,
+        "hybrid/safe": 1286,
+        "hybrid/dev": 1323
+      },
+      {
+        "scenario": "typical+scope+tx",
+        "onion/raw": 1040,
+        "onion/safe": 1895,
+        "onion/dev": 2236,
+        "hybrid/raw": 1120,
+        "hybrid/safe": 1334,
+        "hybrid/dev": 1429
+      },
+      {
+        "scenario": "heavy",
+        "onion/raw": 1694,
+        "onion/safe": 2731,
+        "onion/dev": 2950,
+        "hybrid/raw": 1517,
+        "hybrid/safe": 1959,
+        "hybrid/dev": 2083
+      }
+    ]
+  }
+}
