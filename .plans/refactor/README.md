@@ -359,7 +359,10 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 - [Astro Proposal](reference/astro-proposal.md) — strict onion vs H, independent Sol review,
   equivalent-scope experiments, and portable response/middleware contracts for Express removal.
   Includes Auth/ALS/completion code examples prepared for Opus review. Rust remains a future option.
-  Proposed 2026-11-01; D2.1 is open.
+  Historical proposal; strict onion is now settled in P1m.
+- [Settled middleware contract — Astro review](reference/middleware-contract-review-astro.md) —
+  v2 base typing, mixed v1/v2 errors and terminal responses, reproduced guard gaps, and files/tests
+  needed before implementation. Reviews `dd6a39a`; the settled onion decision is unchanged.
 - [Prior art](./reference/prior-art.md) — Hono internals, TanStack Router codegen, Standard Schema, Encore.ts, OTel HTTP semconv
 - [Decisions](./reference/decisions.md) — settled architectural choices
 - [Open questions](./reference/open-questions.md) — unresolved trade-offs

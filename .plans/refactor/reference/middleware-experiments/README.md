@@ -80,3 +80,15 @@ node contract-check.mjs conformance
 node --expose-gc contract-check.mjs memory
 node contract-check.mjs cpu
 ```
+
+## Settled-contract review regressions
+
+`contract-review-probes.mjs` loads the unchanged kernel functions from `contract-check.mjs` and
+checks pending downstream cleanup, per-layer continuation expiry and the Promise return contract.
+At the reviewed `dd6a39a`, five of six checks fail; the script intentionally exits 1 when an
+invariant fails. These are findings for implementation, not a production runner or benchmark.
+See [the review](../middleware-contract-review-astro.md).
+
+```sh
+node .plans/refactor/reference/middleware-experiments/contract-review-probes.mjs
+```
