@@ -1,8 +1,8 @@
 # P1m — Async/await middleware contract (breaking)
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
-Progress (slices in [Implementation progress](#implementation-progress)): slice 1, the portable
-core, done; slice 2, wiring into the Express adapter, next.
+Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core)
+and 2 (Express adapter) done; slice 3 (v2 controllers) next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -342,11 +342,33 @@ adapter (P3) the same class reads from Node directly.
   compile-time forgotten-`return` check against the real base). 47 tests on Node 24, Node 26 and
   Bun; full suite 1 075/1 075 on Node 24 and 26.
 
-**Slice 2 — Express adapter (next):** route chains accept both bases (`RouteNode`,
-`AbstractController`, `middlewareNormalization`); the v1 bridge inside the chain with raw error
-identity; v1 controller errors escape inside a v2 chain; writer merges staged headers and seals
-them; legacy commit flush; `onFinish` from the transport (`finished`/`aborted`/`failed`); `sent`
-kind; abort signal from the response; diagnostics on outside production.
+**Slice 2 — Express adapter (done 2026-11-01):**
+
+- A route whose middleware include a v2 `Middleware` runs as a strict-onion chain
+  (`routing/expressPipeline.ts`); routes with only 5.x middleware keep the 5.x dispatch unchanged.
+- Route types accept both bases: `MiddlewareClass` / `V2MiddlewareClass` in `RouteNode`,
+  `AbstractController`'s `TMiddleware`, `middlewareNormalization`.
+- 5.x middleware inside the chain keep `(req, res, next)`: `next()` continues after their own
+  synchronous code and outside an AsyncLocalStorage scope they opened (`AsyncLocalStorage.snapshot`);
+  `next(err)`, a throw or a rejection fail the chain with the original value; ending the response
+  yields `sent`.
+- The controller wrapper is split: `entry.rawHandler` (validation + handler, errors escape) runs in
+  the chain; `entry.handler` (the 5.x wrapper) is unchanged. Error resolution moved to
+  `services/http/answerError.ts` (`answerError`, `validationFallback`, validation-stage marking), so
+  a v2 chain answers exactly what the 5.x controller would: registry, validation 400 fallback for
+  validation-stage errors only, otherwise a logged 500.
+- `HttpResponse` union gains `sent` (v5 only; internal `legacySentResponse`); the writer and
+  `transformResponse` skip it.
+- Transport: staged headers applied before the writer (descriptor headers win) or flushed when
+  5.x code commits headers (`writeHead`; 5.x headers win), then sealed; `onFinish` from
+  `finish`/`close` (`finished` / `aborted` / `failed`); `ctx.signal` lazy and aborted for a client
+  that already left; a response 5.x code already sent is never written twice (a replacement is
+  logged).
+- Diagnostics are on whenever `NODE_ENV` is not `production`.
+- Tests: `routing/expressPipeline.test.ts` (12, real HTTP): early stop, staged headers on returned,
+  error and 5.x responses, `onFinish`, `requestContext()` in a 5.x handler, rollback on a handler
+  error, validation 400, logged 500, 5.x middleware continue / `next(err)` identity / answering,
+  5.x handler writing `res`, refused late staging, replaced `sent` response, client abort.
 
 **Slice 3:** v2 controllers and per-route context types. **Slice 4:** cookies, docs, CHANGELOG.
 **Phase 2:** app-wide middleware API and portable built-ins.
