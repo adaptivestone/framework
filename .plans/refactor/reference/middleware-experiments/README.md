@@ -22,3 +22,24 @@ OTel scripts: install in a scratch folder `@opentelemetry/api@1.9`,
 Known limit (reviewer note, 2026-11-01): `retained-memory.mjs` suspends requests **inside the
 handler**. It does not measure an active streaming response, where the middleware chain has already
 returned the stream descriptor.
+
+## Astro strict onion/H comparison
+
+`strict-comparison.mjs` is a separate experiment for [Astro Proposal](../astro-proposal.md).
+Unlike the original B memory model, its onion requires explicit continuation. It compares
+equivalent suffix ALS scopes and gives both models the same response-hook facility. The harness
+and JSON output document what is included, the baseline, and the limitations. A synthetic pending
+writer is not a real socket or stream benchmark. These are research kernels, not production
+middleware runners or evidence of a Rust speedup.
+
+Run from the repository root:
+
+```sh
+node .plans/refactor/reference/middleware-experiments/strict-comparison.mjs --conformance-only
+node .plans/refactor/reference/middleware-experiments/strict-comparison.mjs --output=.plans/refactor/reference/middleware-experiments/strict-comparison-results.json
+```
+
+The default measurement uses 10,000 pending requests and five fresh processes per cell. Optional
+`--requests`, `--processes` and `--hooks=0|1|2` arguments change that configuration. The checked-in
+[results](strict-comparison-results.json) contain all samples and method limitations; the
+[proposal](../astro-proposal.md#measurements-and-decision-gate) explains the conclusions.

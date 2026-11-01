@@ -42,6 +42,15 @@ All rungs serve identical routes with identical responses:
 
 ## Standard Schema vs native validation
 
+**Research correction (2026-11-01):** the ecosystem now has a separate
+[Standard JSON Schema](https://standardschema.dev/json-schema) specification for input/output
+schema conversion. The older absence-of-export claim below is superseded by that fact. Export
+support still does not prove runtime equivalence. This repository's `toJsonSchema` seam targets
+OpenAPI and can deliberately lose unsupported checks; it must not authorize native replacement.
+[Astro Proposal](../reference/astro-proposal.md#standard-schema-is-a-validation-contract-not-a-native-program)
+describes a separate capability/equivalence gate and the ordering constraints. This correction
+does not change the spike's go/no-go thresholds or add native middleware to its scope.
+
 Route validators are **Standard Schema** (`ValidateService` → `StandardSchemaDriver`): arbitrary JS functions, not inherently serializable. Per-library JSON Schema export is widely available (TypeBox _is_ JSON Schema; zod 4 `z.toJSONSchema()`; Valibot `@valibot/to-json-schema`; ArkType native) — and the framework already has the vendor-neutral `toJsonSchema` driver seam from P2a (openapi-generator). Hard caveats: the Standard Schema spec defines no export interface (per-library dispatch — the P2a seam), and `.refine()`/`.transform()`/coercions can't convert. A real native engine therefore needs **per-route fallback: non-convertible schema → validate in JS**; realistic coverage for declarative CRUD schemas is high. W-val below uses a JSON-Schema-expressible schema deliberately.
 
 ## Workloads & measurement

@@ -356,6 +356,9 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 
 ## Reference
 
+- [Astro Proposal](reference/astro-proposal.md) — strict onion vs H, independent Sol review,
+  equivalent-scope experiments, and stable context/response boundaries for optional native
+  transport and validation. Proposed 2026-11-01; D2.1 remains open.
 - [Prior art](./reference/prior-art.md) — Hono internals, TanStack Router codegen, Standard Schema, Encore.ts, OTel HTTP semconv
 - [Decisions](./reference/decisions.md) — settled architectural choices
 - [Open questions](./reference/open-questions.md) — unresolved trade-offs

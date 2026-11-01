@@ -458,4 +458,28 @@ planned. On this branch P1q is `active/` and the writer, returned responses and
 
 ### Sol
 
-Pending.
+Independent GPT-6.1 Sol review (2026-11-01): prefers **H**, with explicit stages and explicit
+single-use wrappers, plus separate response preparation and transport completion. Its main
+argument is releasing ordinary request-stage frames before a pending handler. Strict explicit-next
+onion remains a defensible simpler API if representative measurements show little advantage for H.
+
+Additional finding: `connection.transaction(() => next())` is not a generally safe recipe.
+Transaction helpers may retry their callback, which conflicts with single-use continuation and
+can replay nontransactional side effects. Keep automatic retries inside a deliberately replayable
+operation; do not replay arbitrary downstream middleware. Native implementations must preserve
+operation ordering, transformed validation values, errors, hooks and tracing, with JS fallback.
+See [Astro Proposal](astro-proposal.md) for the full shared analysis and the remaining disagreement.
+
+### Astro (2026-11-01)
+
+**Revised pick: strict explicit-next onion**, subject to the actual guarded-runner comparison with
+H. The owner now accepts `return next()` in simple middleware, so requirement 1's prohibition of
+`next` is relaxed for this proposal. This is a new candidate, not the B implementation above:
+no auto-continuation, implicit bubbling or patch/sentinel return protocol. Errors unwind wrappers
+before registry resolution; response preparation and transport completion remain separate.
+
+[Astro Proposal](astro-proposal.md) connects the middleware decision to the existing response
+writer, context/telemetry contracts and optional native capabilities. It includes the independent
+Sol dissent, the native-validation equivalence constraint, a phased delivery path and the
+[strict onion/H experiment](middleware-experiments/strict-comparison.mjs). No runtime decision is
+approved by adding this review, and no production middleware code changes here.

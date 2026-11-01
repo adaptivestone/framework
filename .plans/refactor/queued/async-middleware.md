@@ -61,6 +61,12 @@ wrap-around middleware use case.
 > handler's work. D1 is reopened together with D2.1; see
 > [middleware-design-proposals](../reference/middleware-design-proposals.md). Not decided yet.
 
+> **Further review (2026-11-01):** the owner now permits explicit `return next()` in simple
+> middleware. [Astro Proposal](../reference/astro-proposal.md) compares a strict explicit-next
+> onion candidate with H, includes the independent Sol review, and connects the decision to future
+> native capabilities. The earlier no-`next` constraint is relaxed for that proposal; D2.1 is still
+> open. Publication of research is not approval to change the runtime contract.
+
 ## D2 — what `ctx` is (direction C chosen 2026-10-31; final shape after market research)
 
 **User decision 2026-10-31:** option **c** is the priority, but the exact `RequestContext` must
