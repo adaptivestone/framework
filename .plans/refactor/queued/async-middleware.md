@@ -1,33 +1,54 @@
 # P1m — Async/await middleware contract (breaking)
 
-**Status**: ⏸ queued — RE-SCOPED 2026-08-31 (user-approved): **v5.6 opt-in bridge via `static contractVersion = 2`, v6 flips the default and drops v1.** (Retargeted 5.5 → 5.6 on 2026-10-03 together with P1q.) Linear direction (Option A) settled by
-[P1q universal HTTP responses](../active/universal-http-responses.md); co-designed and landed WITH P1q in v5.6.
-**Depends on**: P1b ✅ (tree router / `ExpressAdapter`) and P1q (v5.6) response bridge — the v2 contract's
-returned `HttpResponse` rides P1q's writer, so the two ship in the same minor. The v6 half (default flip,
-v1 removal, built-in migration) still lands alongside [static-middleware-cutover](../later/static-middleware-cutover.md) —
-both touch `AbstractMiddleware` + the adapter, so one breaking-doc migration note for users.
+**Status**: ⏸ queued — **contract settled 2026-11-01** (owner), implementation not started.
+**Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
+`HttpResponse`, throws travel up through every middleware and the registry resolves them once.
+Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
+decision record: D1 and D2 below.
+**Target**: the next minor (5.7) as an opt-in via `static contractVersion = 2`, landing with
+[P1q universal HTTP responses](../active/universal-http-responses.md) (its writer renders the
+returned responses). v6 flips the default, drops v1, migrates built-ins, together with
+[static-middleware-cutover](../later/static-middleware-cutover.md).
+**Depends on**: P1b ✅ (tree router / `ExpressAdapter`), P1q Phases 1–2 ✅ (writer, error
+descriptors, `transformResponse`).
 
-## v5.6 opt-in bridge (approved 2026-08-31 for v5.5; retargeted 2026-10-03)
+## Settled contract (2026-11-01)
 
-- `AbstractMiddleware` gets `static get contractVersion(): 1 | 2` defaulting to `1` — the house
-  static-getter pattern (`usedAuthParameters`), readable by adapter and codegen with zero instantiation.
-- `ExpressAdapter.runMiddleware` dispatches per class contract: **v2** → `await instance.middleware(ctx)`;
-  `void` return → continue, returned `HttpResponse` → P1q writer + stop, `throw` → error-handler registry
-  (upgrading middleware errors, which today bypass the registry into the 500 sink); response already sent
-  (`headersSent`) → stop. **v1** → the existing Promise bridge, untouched.
-- **Framework built-ins stay v1 through all of v5.** Flipping a built-in's `middleware(req, res, next)`
-  signature would break every consumer subclass overriding it (contractVersion is inherited statically while
-  the override keeps the old arity → `next` is undefined at runtime). Built-ins migrate in v6 with the flip.
-  Dogfood candidates before that, if desired: app-level internals nobody subclasses (`PrepareAppInfo`, `IpDetector`).
-- v5.6 docs mark v1 deprecated with the mechanical migration table below; consumers migrate class-by-class
-  at their own pace across v5.6 → v6 instead of a big-bang rewrite.
-- v6: default flips to 2, v1 dispatch + the Promise bridge are deleted, built-ins migrate, `contractVersion`
-  itself becomes vestigial (kept one major as a no-op or dropped — decide at cutover).
-  **Time**: ~1 day (signature + adapter simplification + response returns) + framework middleware
-  migration + docs.
-  **Origin**: the middleware contract still threads Express's `res` and `next`. P1q makes returned
-  responses real before v6; the breaking cutover can then remove both Express-specific arguments
-  instead of preserving `res` while only deleting `next`.
+| Decision                 | Outcome                                                                                                                                                                                                                |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D2.1 flow                | Strict onion. `return next()` continues, a returned `HttpResponse` stops, a throw travels up unchanged; the registry resolves it once at the top.                                                                      |
+| Guards                   | Production: `next()` once, refused after the response is chosen, started downstream marked handled, started handler awaited, final value must be a response. Development: name the culprit.                            |
+| v5 bridge                | A v1 handler/middleware that wrote `res` itself yields an internal "already sent" response kind; `Next` stays `Promise<HttpResponse>` in v5 and v6.                                                                    |
+| D2.2 context             | A separate `RequestContext` object per v2 request in 5.x (80 B measured); `ctx.appInfo` is the same object as `req.appInfo`. Names: `route` (template), `url` (`URL`), `path` (decoded), `ip` (IpDetector), `cookies`. |
+| D2.3 state               | Keep `ctx.appInfo`, typed per route by codegen from `provides`; packages namespace their data.                                                                                                                         |
+| D2.4 staged headers      | `ctx.response.setHeader/appendHeader` apply to every response, errors included.                                                                                                                                        |
+| D2.5 cookies             | `ctx.cookies.get`, `ctx.response.setCookie/deleteCookie`, secure defaults; `cookie` becomes a direct dependency.                                                                                                       |
+| D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                      |
+| D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                           |
+| Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                               |
+
+Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
+once → global `transformResponse` → writer merges staged headers/cookies → `onFinish` exactly once
+(`finished | aborted | failed`). All behaviour is identical on Node 24, Node 26 and Bun (checked).
+
+## v5 opt-in bridge (approved 2026-08-31; contract revised 2026-11-01)
+
+- `AbstractMiddleware` (and, per D2.7, controllers) get `static get contractVersion(): 1 | 2`
+  defaulting to `1` — the house static-getter pattern, readable by adapter and codegen with zero
+  instantiation.
+- The adapter composes each route's chain once. **v2** entries run as strict-onion layers with a
+  `RequestContext`; **v1** entries run through today's Promise bridge inside the chain, as a layer
+  that continues when the old middleware calls `next()` and yields the "already sent" kind when it
+  ended `res`.
+- **Framework built-ins stay v1 through all of v5.** Flipping a built-in's signature would break
+  every consumer subclass overriding it. Built-ins migrate in v6 with the flip.
+- v5 docs mark v1 deprecated with a mechanical migration table; consumers migrate class by class.
+- v6: default flips to 2, v1 dispatch and the Promise bridge are deleted, built-ins migrate,
+  `contractVersion` becomes vestigial (kept one major as a no-op or dropped — decide at cutover).
+- **Open implementation question:** TypeScript will not accept a v2 subclass overriding
+  `middleware(ctx, next)` on a base that declares the v1 `middleware(req, res, next)` (TS2416), and
+  the forgotten-`return` check needs the strict base type. Options: a separate v2 base class (the
+  flag becomes implicit), or a base typed by `contractVersion`. Decide when implementation starts.
 
 ## Current contract (what we have)
 
@@ -251,13 +272,16 @@ adapter (P3) the same class reads from Node directly.
     what Koa, AdonisJS, SvelteKit, Hono and Fastify offer; B, `ctx.runInside(wrap)` for a
     middleware's own store; C, tracing-channel `bindStore` for libraries. See
     [middleware-flow-models § AsyncLocalStorage](../reference/middleware-flow-models.md#asynclocalstorage-from-middleware-experiment-2026-11-01).
-- **D2.7 v6 handlers** — receive the same `ctx` (one object for middleware and handlers, the
-  market norm); in 5.x handlers keep `req`, which is the same runtime object.
+- **D2.7 v6 handlers** — **decided 2026-11-01: B.** v6 handlers receive the same `ctx` as
+  middleware and must return an `HttpResponse` (`HttpResponse.empty(204)` for no content); a 5.x
+  controller opts in with `static contractVersion = 2`; codegen emits a per-route context type for
+  handlers next to today's request types. Original text: receive the same `ctx` (one object for
+  middleware and handlers, the market norm); in 5.x handlers keep `req`.
 
-## API change (Option A)
+## API change
 
 ```ts
-// BEFORE (v5.x)
+// BEFORE (v5.x, v1)
 class GetUserByToken extends AbstractMiddleware {
   async middleware(req, res, next) {
     req.appInfo.user = await resolveUser(req);
@@ -265,72 +289,109 @@ class GetUserByToken extends AbstractMiddleware {
   }
 }
 
-// AFTER (v6)
+// AFTER (v2 opt-in in 5.7, default in v6)
 class GetUserByToken extends AbstractMiddleware {
-  async middleware(ctx) {
+  static get contractVersion() {
+    return 2 as const;
+  }
+  async middleware(ctx, next) {
     ctx.appInfo.user = await resolveUser(ctx);
-    // return to continue
+    return next();
   }
 }
 
 class RateLimiter extends AbstractMiddleware {
-  async middleware(ctx) {
-    if (await this.exceeded(ctx)) {
+  static get contractVersion() {
+    return 2 as const;
+  }
+  async middleware(ctx, next) {
+    if (await this.exceeded(ctx))
       return HttpResponse.json(429, { message: 'Too many requests' });
-    }
+    return next();
+  }
+}
+
+class Users extends AbstractController {
+  // D2.7
+  static get contractVersion() {
+    return 2 as const;
+  }
+  async getUser(ctx: GetUserContext) {
+    return HttpResponse.json(200, { user: ctx.appInfo.user });
   }
 }
 ```
 
-Migration is mechanical for pass-through middleware: drop `res`/`next`, replace
-`return next()` / `next()` with `return` (or nothing), and replace `next(err)` with `throw err`.
-Middleware that sends a response replaces `res.status(...).json(...)` with an `HttpResponse`
-factory return.
+Migration for pass-through middleware: replace `(req, res, next)` with `(ctx, next)`, keep
+`return next()`, replace `next(err)` with `throw err`, replace `res.status(...).json(...)` with a
+returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 
 ## Files touched
 
-- `src/services/http/middleware/AbstractMiddleware.ts` — `middleware(ctx)` signature; return type
-  `Promise<void | HttpResponse>`; default implementation returns void.
-- `src/services/http/routing/ExpressAdapter.ts` — `runMiddleware` becomes
-  `await instance.middleware(ctx)`; returned descriptors go through P1q's writer; no `new Promise`,
-  `settle`, or `finish`/`close` listener bridge.
-- Framework's own middlewares — migrate each (`GetUserByToken`, `Cors`, `RequestLogger`,
-  `Pagination`, `RateLimiter`, etc.) from `res`/`next` to context + return/throw.
-- `src/services/http/HttpServer.ts` and `src/services/http/types.ts` — portable context and
-  middleware-signature types.
-- Handler contract: P1q's v6 cutover removes ordinary controller `res` in the same release; this
-  card owns only registry-middleware mechanics.
-- Tests: `AbstractMiddleware.test.ts`, `ExpressAdapter.test.ts`, and each migrated middleware's test. Add a case proving `throw` → error path and "response sent → chain stops".
-- Docs: `06-Controllers/03-middleware.md` (rewrite the contract section + a BEFORE/AFTER migration block), `16-anti-patterns.md` (drop any "always call next()" guidance), CHANGELOG `[BREAKING]`.
+- `src/services/http/pipeline.ts` (new) — the portable pipeline `(ctx) => Promise<HttpResponse>`:
+  per-route composition at registration, strict-onion runner with production guards and development
+  diagnostics, validation stage, raw-error unwind, registry resolution after unwind. No Express
+  import; proven by a conformance suite without Express.
+- `src/services/http/RequestContext.ts` (new) — the per-request class: lazy `method`, `path`, `url`,
+  `route`, `headers`/`header()`, `params`, `query`, `body`, `ip`, `cookies`, `id`, `logger`,
+  `signal`, `onFinish`, `appInfo`, `response` (staged headers and cookies).
+- `src/services/http/middleware/AbstractMiddleware.ts` — `contractVersion`; v2 signature and its
+  base type (see the open implementation question).
+- `src/services/http/routing/ExpressAdapter.ts` — builds the context, enters the framework store,
+  runs the pipeline; v1 entries through the existing bridge inside the chain.
+- `src/controllers/index.ts` — v2 controllers: handlers get `ctx`; errors are not caught inside the
+  wrapper (they travel up); v1 unchanged.
+- `src/services/http/ExpressResponseWriter.ts`, `responses.ts` — staged headers and cookies merged
+  into every response; internal "already sent" kind skipped; one completion seam for `onFinish`
+  (`finished | aborted | failed`); cancel a replaced stream source.
+- `src/services/http/HttpServer.ts`, `src/services/http/types.ts`, `src/index.ts` — `RequestContext`
+  and `Next` types, `requestContext()` export, registry entry for the pipeline.
+- `src/codegen/*` — per-route context types for v2 handlers; `appInfo` typing for `ctx`.
+- `package.json` — `cookie` as a direct dependency.
+- Tests: conformance suite ported from
+  [contract-check.mjs](../reference/middleware-experiments/contract-check.mjs) (requirements and
+  misuse cases) for the pipeline without Express; adapter, controller, writer and codegen tests;
+  CI on Node 24, Node 26 and Bun.
+- Docs (framework-documentation): middleware page rewrite with the migration table, controllers
+  (v2 handlers), request context, cookies, AsyncLocalStorage; CHANGELOG `Unreleased`.
 
-## What this removes / simplifies
+## What this removes / simplifies (v6)
 
-| Today                                                                               | After (A)                                                    |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `runMiddleware` `new Promise` + `settle` + `res.once('finish'/'close')` bookkeeping | gone — `await instance.middleware(ctx)`                      |
-| `next()` / `next(err)` / mutate `res`                                               | `void` / `throw` / return `HttpResponse`                     |
-| Express `res` and `next` threaded through every registry middleware                 | absent                                                       |
-| Transport completion detected indirectly from Express events                        | explicit returned response; writer owns transport completion |
+| Today                                                                               | After                                                         |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `runMiddleware` `new Promise` + `settle` + `res.once('finish'/'close')` bookkeeping | one composed chain per route                                  |
+| `next()` only resolves a promise; code after it runs before the handler             | `await next()` returns the response; code after it runs after |
+| `next(err)` / mutate `res`                                                          | `throw` / return `HttpResponse`                               |
+| `als.run(store, next)` silently does nothing                                        | wraps everything after the middleware                         |
+| Express `req`/`res`/`next` threaded through middleware and handlers                 | one framework `ctx`                                           |
+| Dispatch ≈ 4.7 µs for 10 middleware (v1 bridge)                                     | ≈ 1.2–2.7 µs on Node (measured kernels)                       |
 
 ## Out of scope
 
 - Exact v6 raw-route API — P1q reserves an explicit adapter-specific escape hatch.
-- Global Express middleware mounted directly via `app.express.use` (Cors-as-global, security headers, `RequestParser`) — those run on the raw Express stack, not the adapter loop; they keep Express's native `(req,res,next)`. This card is only the **registry-dispatched** middleware contract. (Confirm the framework-middleware list against this split when building.)
-- Static metadata getters — that's [static-middleware-cutover](../later/static-middleware-cutover.md); land together but they're orthogonal changes.
-- `WeakMap` instance cache keyed by `(Class, params)` — orthogonal request-time dedup, tracked elsewhere.
+- Global Express middleware mounted via `app.express.use` (security headers, `RequestParser`,
+  global `Cors`) stay Express middleware in v5; their move belongs to the Node adapter / Express
+  removal plans.
+- Static metadata getters — [static-middleware-cutover](../later/static-middleware-cutover.md).
+- Native (Rust) validation or paired middleware — later, with their own gates
+  ([astro-proposal](../reference/astro-proposal.md)).
+- Per-request `beforeSend`, signed/encrypted cookies, sessions.
 
 ## Done when
 
-- `AbstractMiddleware.middleware` signature is `(ctx) => Promise<void | HttpResponse>`; neither
-  Express `res` nor `next` is exposed.
-- `ExpressAdapter.runMiddleware` Promise bridge and middleware-owned response-event listeners are
-  removed; returned responses use `ResponseWriter`, and thrown errors use the registry.
-- All framework-own registry middlewares migrated; full suite + `gen --check` green.
-- `03-middleware.md` rewritten with a one-keyword-per-middleware migration block; CHANGELOG `[BREAKING]`.
+- A v2 middleware `(ctx, next)` and a v2 controller handler `(ctx)` work in 5.7 next to v1 code on
+  the same route, sharing `appInfo`.
+- The pipeline runs without Express in tests and passes the conformance suite (requirements and
+  misuse cases) on Node 24, Node 26 and Bun.
+- Errors thrown in a v2 chain unwind wrappers before the registry; staged headers and cookies apply
+  to error responses; `onFinish` fires exactly once.
+- TypeScript rejects a forgotten `return next()` in a v2 middleware.
+- The real runner is re-measured (heap, RSS, CPU, p95/p99) on Node 24, Node 26 and Bun.
+- Docs and CHANGELOG updated; full suite, `check`, `check:types`, `check:types:tests`, `smoke` green.
 
 ## Trade-offs
 
-- Breaking for every consumer registry middleware — but v5.3 provides a full release line to
-  migrate response-producing code before v6 removes `res`.
-- **A** forecloses onion wrap-around (post-handler code) — acceptable since today's model already can't do it; a consumer needing it is the trigger to revisit **B**.
-- **B** keeps `next` and adds continuation machinery for a capability nobody currently uses — heavier, speculative. Default to A.
+- Every middleware writes `return next()`; in exchange there is one contract for every middleware.
+- Production guards cost ≈ 0.6–0.8 KB per pending request and ≈ 0.3–1.8 µs per request more than
+  the H alternative (measured; accepted by the owner for the simpler contract).
+- 5.x pays one small `ctx` object per v2 request (80 B); v6 pays nothing extra.

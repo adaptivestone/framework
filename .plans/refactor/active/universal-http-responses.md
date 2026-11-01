@@ -184,8 +184,10 @@ existing third-party Express integrations and gives consumers one release line t
 
 ### v6
 
-Ordinary controllers and registry middleware receive framework context only and return
-`HttpResponse | void`. There is no optional `res` parameter. Two explicit escape levels remain:
+Ordinary controllers receive the framework context only and return an `HttpResponse`
+(`HttpResponse.empty(204)` for no content); registry middleware follow P1m's strict onion
+(`return next()` or a response) — updated 2026-11-01 from `HttpResponse | void` to match the
+settled middleware contract. There is no optional `res` parameter. Two explicit escape levels remain:
 
 1. `HttpResponse.native(webResponse)` for portable fetch/proxy pass-through.
 2. A separately declared raw-transport route/controller for WebSocket upgrade, `CONNECT`, direct
