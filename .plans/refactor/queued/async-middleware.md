@@ -233,7 +233,12 @@ adapter (P3) the same class reads from Node directly.
 - **D2.4 Staged headers on error responses** — **decided 2026-11-01: yes,** apply to every response, errors included (what
   Express apps rely on today, e.g. CORS). Alternative: h3's rule — drop them on ≥400 except an
   explicit error-headers set.
-- **D2.5 Cookies** — the framework parses no cookies today. Add `ctx.cookies.get` (lazy parse) and
+- **D2.5 Cookies** — **decided 2026-11-01: A, on `ctx`.** `ctx.cookies.get(name)` (lazy parse) and
+  `ctx.response.setCookie(name, value, options)` / `deleteCookie(name, options)`, staged like other
+  response headers; defaults `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` except on plain
+  `http://localhost`; the `cookie` package becomes a direct dependency (today it only arrives
+  through Express). Not now: signed/encrypted cookies, sessions. Original text: the framework
+  parses no cookies today. Add `ctx.cookies.get` (lazy parse) and
   `ctx.response.setCookie/deleteCookie` with secure defaults (`HttpOnly`, `Secure`,
   `SameSite=Lax`); nearly every surveyed framework has this. Alternative: leave cookies to apps.
 - **D2.6 Identity and lifecycle** — `id`, `logger`, `signal`, `onFinish`, all lazy. Not now:
