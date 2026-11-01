@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`) and Phase 2a (app-wide middleware) done; Phase 2b (portable built-ins) next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`) and Phase 2a (app-wide middleware) done; Phase 2b (built-ins converted in place) in progress.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -34,6 +34,7 @@ descriptors, `transformResponse`).
 | D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                                                                                                                                         |
 | Hooks                    | **Decided 2026-11-01 (B):** `transformResponse(response, { req, ctx })` (v6 drops `req`); error handlers opt in per registration with `{ contractVersion: 2 }` and get `(err, ctx)` — the same rule as controllers; one context per request, made on first use on 5.x-only routes.                                                   |
 | App-wide middleware      | **Decided 2026-11-01 (A):** a `Server` option, `middleware: [Class, [Class, params], …]` — v2 `Middleware` classes only, after the built-ins and around routing (routes, 404, 405). Supersedes the older `app.useGlobal()` / `registerGlobalMiddleware()` sketches (never built); a registration call can still be added in a minor. |
+| Built-ins                | **Decided 2026-11-01 (A):** converted in place in 5.x — one version, same names and paths; old-shape subclass overrides are refused at registration; direct `(req, res, next)` callers get a CHANGELOG note.                                                                                                                         |
 | Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
@@ -51,13 +52,16 @@ once → global `transformResponse` → writer merges staged headers/cookies →
   `RequestContext`; **v1** entries run through today's Promise bridge inside the chain, as a layer
   that continues when the old middleware calls `next()` and yields the "already sent" kind when it
   ended `res`.
-- **Built-ins: unchanged v1 classes plus portable versions in 5.x (final review, 2026-11-01).**
-  The existing v1 classes and their subclass signatures stay unchanged through v5 (flipping them
-  would break every consumer subclass). **Phase 2 of this card** adds the app-wide middleware API
-  and portable `Middleware` implementations of the built-ins (security headers, `RequestParser`,
-  `Cors`, `IpDetector`, `I18n`, `RequestLogger`, and the route built-ins) next to them; the Node.js
-  adapter runs the portable ones, the Express adapter keeps the v1 path. Their names/paths are
-  chosen when Phase 2 starts. In v6 the v1 classes are removed and the portable ones remain.
+- **Built-ins: one version, converted in place in 5.x (owner decision A, 2026-11-01).** Same
+  names and paths; each built-in extends `Middleware`. Supersedes "unchanged v1 classes plus
+  portable versions" (the final review's safe route, adopted without an owner decision). What keeps
+  working: route and controller lists, params, statics, responses, error codes, `appInfo` fields,
+  OpenAPI and codegen types. What breaks, in a minor, documented: a subclass overriding
+  `middleware(req, res, next)` (refused at registration by `assertMiddlewareShape`, naming the class)
+  and direct calls with `(req, res, next)` / `getMiddleware()`. Precedent: 5.5 changed `Auth`,
+  `Role` and `RateLimiter` in a minor. Phase 2b converts them: route built-ins first (2b-1), then
+  the global ones on an Express bridge that keeps their position before `bootHttp` Express
+  middleware (2b-2). In v6 nothing more happens to them.
 - v5 docs mark v1 deprecated with a mechanical migration table; consumers migrate class by class.
 - v6: `AbstractMiddleware`, v1 dispatch and the Promise bridge are deleted, built-ins move to
   `Middleware`, controllers default to v2 and their `contractVersion` becomes vestigial (kept one
@@ -458,8 +462,26 @@ adapter (P3) the same class reads from Node directly.
   it), `testServerOptions.test.ts` (+1: the real `Server` option in a booted test server, route and
   404). The packed type fixture accepts `Class` / `[Class, params]` and rejects a 5.x middleware.
 
-**Still open for P1m:** Phase 2b (portable built-ins; owner question on names/paths), the
-response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
+**Phase 2b-1 — route built-ins converted in place (in progress 2026-11-01; owner decision A):**
+
+- `Auth`, `GetUserByToken`, `Role`, `Pagination` extend `Middleware` (`middleware(ctx, next)`).
+  `GetUserByToken` exports `UserContext` and `TokenSource`; `resolveToken()` takes a request or a
+  context (the Auth controller's logout still passes `req`). The deprecated static
+  `usedAuthParameters` alias stays on `GetUserByToken` until v6.
+- `assertMiddlewareShape` (`routing/middlewareNormalization.ts`): a `Middleware` subclass whose
+  `middleware` declares three parameters is refused by `normalizeMiddleware` (route and controller
+  lists, the `Server` option) and by `middlewareInstance` (routes registered with entries).
+- Every controller route (default `[GetUserByToken, Auth]`) now runs as a strict-onion chain; the
+  full suite passes unchanged through it.
+- Tests: the four built-ins' unit tests use `createTestContext()`; `AbstractMiddleware.test.ts`
+  pins that a `(ctx, next)` subclass may answer with a response and an old-shape override is
+  refused; the packaging smoke calls `Auth` with a context from the dist.
+- **Open: `RateLimiter`.** Its docs invite subclassing (`extend RateLimiter and override
+  generateConsumeKey`), and `generateConsumeKey(req)` reads `req.route.path`, `req.appInfo`,
+  `req.body`. Converting it changes that override's argument to `ctx` — owner question.
+
+**Still open for P1m:** Phase 2b-1 `RateLimiter` (owner question), Phase 2b-2 (global built-ins),
+the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
 re-measure.
 
 ## API change
