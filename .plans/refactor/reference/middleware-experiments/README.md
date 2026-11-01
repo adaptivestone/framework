@@ -48,3 +48,15 @@ Re-run 2026-11-01 on Linux x64 (Node 26.12.1, Bun 1.4.4): conformance 32/32 on b
 identical to the macOS results; Bun shows the same pattern at smaller sizes. Raw output:
 [Node](strict-comparison-results-linux-node.json), [Bun](strict-comparison-results-linux-bun.json).
 Scripts from the Fable review: [fable/](fable/) (see [middleware-review-fable](../middleware-review-fable.md), Appendix A).
+
+## Guarded strict onion vs H
+
+`guarded-runners.mjs` adds the `next` guards both designs need (single use, expiry, result check,
+waiting for a started downstream) and measures retained heap per pending request, 8 ordinary steps
+- 2 AsyncLocalStorage wrappers, synchronous or `async` steps. Results and conclusions:
+  [middleware-final-recommendation](../middleware-final-recommendation.md#2-why-h-not-strict-onion-astras-question-1).
+
+```sh
+node --expose-gc .plans/refactor/reference/middleware-experiments/guarded-runners.mjs onion-guarded-fast async
+node --expose-gc .plans/refactor/reference/middleware-experiments/guarded-runners.mjs h-guarded-fast async
+```
