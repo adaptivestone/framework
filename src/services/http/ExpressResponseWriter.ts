@@ -274,13 +274,31 @@ async function writeStream(
     }
     return;
   }
-  let disconnected: () => void = () => {};
-  const closed = new Promise<typeof DISCONNECTED>((resolve) => {
-    disconnected = () => resolve(DISCONNECTED);
-  });
+  // One short-lived waiter per wait (read or drain), released when that wait ends. A single
+  // shared "closed" promise would keep one reaction per chunk alive until the client leaves,
+  // so a long stream would grow without bound.
+  let gone = false;
+  let wake: ((value: typeof DISCONNECTED) => void) | undefined;
+  const untilClosed = () =>
+    gone
+      ? Promise.resolve(DISCONNECTED)
+      : new Promise<typeof DISCONNECTED>((resolve) => {
+          wake = resolve;
+        });
+  /** Wait for `work` or the disconnect, whichever comes first. */
+  const orClosed = async <T>(
+    work: Promise<T>,
+  ): Promise<T | typeof DISCONNECTED> => {
+    try {
+      return await Promise.race([work, untilClosed()]);
+    } finally {
+      wake = undefined;
+    }
+  };
   const onClose = () => {
+    gone = true;
     stop();
-    disconnected();
+    wake?.(DISCONNECTED);
   };
   // A transport error is followed by 'close', which ends the write.
   const onError = () => {};
@@ -289,7 +307,7 @@ async function writeStream(
   /** The next chunk, or `undefined` once the client has gone. */
   const read = async (): Promise<IteratorResult<Uint8Array> | undefined> => {
     const pending = source.next();
-    const step = await Promise.race([pending, closed]);
+    const step = await orClosed(Promise.resolve(pending));
     if (step === DISCONNECTED || res.destroyed) {
       // The chunk may still arrive (or fail) later; nobody reads it.
       Promise.resolve(pending).catch(() => {});
@@ -306,7 +324,7 @@ async function writeStream(
     commit();
     while (!step.done) {
       if (!res.write(step.value)) {
-        const drained = await Promise.race([once(res, 'drain'), closed]);
+        const drained = await orClosed(once(res, 'drain'));
         if (drained === DISCONNECTED) {
           return;
         }
@@ -329,7 +347,7 @@ async function writeStream(
   }
 }
 
-/** Resolves on the first `event`; `closed` covers the transport going away. */
+/** Resolves on the first `event`; the caller races it against the disconnect. */
 function once(res: Response, event: 'drain'): Promise<void> {
   return new Promise((resolve) => {
     res.once(event, () => resolve());
