@@ -219,8 +219,10 @@ From the Astro Proposal and the earlier version of this file:
 - **Framework AsyncLocalStorage:** one instance, one store per request, active through dispatch,
   errors, writer and completion; completion callbacks restore the framework request context.
 - **No per-request `beforeSend`** in the first version; add it only for a concrete need.
-- **Context names:** `routeTemplate` instead of `route` (the adapter sets `req.route` to an object);
-  decide what `url` means (Node's `req.url` is a string) — D2.2.
+- **Context (decided 2026-11-01):** a separate `RequestContext` object for v2 code in 5.x (80 B per
+  request, measured), so the planned names stay clean: `ctx.route` = template string, `ctx.url` =
+  `URL`, `ctx.path` decoded, `ctx.ip` from IpDetector. v1 code keeps Express `req`; `appInfo` is
+  shared. In v6 this object is the request context.
 - **Scope:** finish the portable contract so Express becomes an adapter; native validation and
   paired Rust middleware are later options with their own gates. First deliverable: a pipeline
   `(ctx) => Promise<HttpResponse>` proven by a conformance fixture without Express.
@@ -242,8 +244,8 @@ From the Astro Proposal and the earlier version of this file:
    response kind (§6): it keeps the v2 `Next` type `Promise<HttpResponse>` the same in v6.
 3. **Framework request store on by default.** Decided: yes.
 4. **D2.4 staged headers on error responses too.** Decided: yes.
-5. **D2.2 names** (`route`, `url`, `path`, `ip`, `cookies` clash with the Express request object):
-   open — explained to the owner, awaiting the answer.
+5. **D2.2 names:** decided — option C: a separate `RequestContext` object in 5.x (80 B per request)
+   with the clean names (`route`, `url`, `path`, `ip`, `cookies`).
 
 ## 10. After the decision
 

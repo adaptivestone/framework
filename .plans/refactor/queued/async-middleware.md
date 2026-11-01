@@ -148,12 +148,18 @@ interface RequestContext<AppInfo = BaseAppInfo> {
 }
 ```
 
-**Runtime in 5.x (option c):** the Express `req` handlers already get. The new members are defined
-once on Express's request prototype (`app.request`) as lazy getters and methods, so no
-per-request allocation; `response.*` writes straight to the Express `res`, which the writer keeps
-(headers set earlier survive into the returned or error response). With the Node adapter (P3) a
-framework class implements the same interface; code written against `RequestContext` does not
-change.
+**Runtime in 5.x — decided 2026-11-01: a separate framework object (option b).** The earlier
+choice (c, reuse the Express `req`) fails because five planned names already mean something else on
+`req`: `route` (an object `{ path, methods }` set by the adapter), `url` (Node's path + query string),
+`path` (Express's raw, not decoded, path), `ip` (Express's guess, which ignores our proxy settings)
+and `cookies` (`cookie-parser`'s plain object). A small `RequestContext` class per v2 request reads
+from the Node request with lazy getters; `ctx.appInfo` is the same object as `req.appInfo`, so v1 and
+v2 middleware share data; `ctx.response.*` writes to the staged headers the writer applies. v1 code
+keeps `req` unchanged. Measured cost: **80 B per request** on Node 24, Node 26 and Bun; lazy features
+only when used (`url` ≈ 270 B, `onFinish` ≈ 240 B, `signal` ≈ 90 B on Node;
+[context-object-cost.mjs](../reference/middleware-experiments/context-object-cost.mjs)). In v6 there is
+no Express `req` to reuse, so this object is the request context at no extra cost; with the Node
+adapter (P3) the same class reads from Node directly.
 
 **Sub-decisions** (one by one with the user; recommendation first):
 
@@ -209,9 +215,11 @@ change.
     the measured memory/CPU difference to H is accepted. v5 bridge: the owner accepts any form
     because v6 removes it; use an explicit "already sent" response kind for legacy direct writes,
     which keeps the v2 `Next` type `Promise<HttpResponse>` unchanged in v6.
-- **D2.2 Request representation** — **open (2026-11-01):** five planned names clash with the
-  Express request object the v5 runtime reuses (`route`, `url`, `path`, `ip`, `cookies`); explained
-  to the owner with options, awaiting the answer. Original text: plain portable fields as above. Alternative: a Web `Request`
+- **D2.2 Request representation** — **decided 2026-11-01:** plain portable fields on a separate
+  framework object (see "Runtime in 5.x" above), with the names as proposed: `route` = matched
+  template string (`undefined` when unmatched), `url` = lazy `URL` (host/protocol per trusted-proxy
+  config), `path` = decoded path without query, `ip` = IpDetector's trusted-proxy-aware address,
+  `cookies` reserved for D2.5. Original text: plain portable fields as above. Alternative: a Web `Request`
   underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
   as a lazy getter with the Node adapter.
 - **D2.3 State** — keep `appInfo`, typed per route by codegen from each middleware's `provides`

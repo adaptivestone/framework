@@ -61,6 +61,11 @@ node --expose-gc .plans/refactor/reference/middleware-experiments/guarded-runner
 node --expose-gc .plans/refactor/reference/middleware-experiments/guarded-runners.mjs h-guarded-fast async
 ```
 
+## Cost of a separate `ctx` object
+
+`context-object-cost.mjs` measures the per-request `RequestContext` object chosen for 5.x (D2,
+2026-11-01): 80 B on Node 24, Node 26 and Bun, plus lazy features only when used.
+
 ## Requirements and costs: strict onion vs H (production and development guards)
 
 `contract-check.mjs` checks every requirement and misuse case for both models in three runner
