@@ -371,3 +371,53 @@ publish its own tracing channels (request, each middleware, handler, error resol
 write), the way AdonisJS does. That closes the stages gap above without `ctx.scope`, costs ~17 ns
 per traced call when nobody listens, and gives OTel, APM agents and tests one hook. Belongs to the
 `diagnostics_channel` namespace in [observability](../later/observability.md).
+
+## AsyncLocalStorage from middleware (experiment, 2026-11-01)
+
+Question: a middleware finds the user (or anything per request) and later code that never receives
+`req`/`ctx` — services, models, loggers — reads it from `AsyncLocalStorage`. Does it work?
+
+**Today's framework (real `ExpressAdapter`, Node 26.12.1 and Bun 1.4.4, identical results):**
+
+| Inside a framework middleware                                           | Handler sees the user? |
+| ----------------------------------------------------------------------- | ---------------------- |
+| `als.run(store, () => next())` (the usual Express recipe)               | no                     |
+| `als.enterWith(store)` before the first `await`, then `next()`          | yes                    |
+| `als.enterWith(store)` after an `await`, then `next()`                  | no                     |
+| Express middleware mounted before the framework, `als.run(store, next)` | yes                    |
+
+The adapter awaits a promise that `next()` resolves, so the rest of the chain continues in the
+adapter's context, not inside the middleware's `run`. The usual recipe silently does nothing.
+
+**Stages runner (C2), 40 concurrent requests per scenario, both runtimes identical** (count = the
+request saw its own user, never another request's):
+
+| Option                                                                                                                                         | handler | services | onResponse | onFinish |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- | ---------- | -------- |
+| A. framework store: runner runs each request in `store.run(ctx)`; middleware sets `ctx.state.user`; anyone reads `requestContext().state.user` | 40      | 40       | 40         | 40       |
+| B. `ctx.runInside((next) => myStore.run(value, next))`; runner wraps the handler                                                               | 40      | 40       | 0          | 0        |
+| C. library binds its own store to the framework's handler tracing channel (`start.bindStore`, set up once)                                     | 40      | 40       | 0          | 0        |
+| D. `enterWith` before the first `await` (value must be known synchronously)                                                                    | 40      | 40       | 40         | 40       |
+| D. `enterWith` after an `await` (the usual case: user comes from the DB)                                                                       | 0       | 0        | 0          | 0        |
+| E. `als.run(value, …)` inside a stages middleware (nothing to wrap)                                                                            | 0       | 0        | 0          | 0        |
+
+B and C cover the handler only; the runner could also wrap `onResponse`/`onFinish` if needed.
+
+**Cost of A** (one `run` per request; noisy, two Node runs + one Bun run): +140 to +380 ns per
+request; +70 to +180 B retained per in-flight request (the `ctx` itself is held anyway).
+
+**What the market does** (sources read):
+
+- One framework-owned store holding the request context, filled by middleware, read anywhere:
+  Koa (`new Koa({ asyncLocalStorage: true })` → `app.currentContext`, off by default), AdonisJS
+  (`useAsyncLocalStorage`, default `false` → `HttpContext.getOrFail()`), SvelteKit
+  (`getRequestEvent()`, always on), Hono (`contextStorage()` middleware → `getContext()`), Fastify
+  (`@fastify/request-context` 7.0.5: `als.run` once in `onRequest`, re-entered at `preValidation`;
+  later hooks `set`/`get` values in it).
+- Middleware-owned stores by wrapping `next`: Koa, Hono, Express (synchronous `next`).
+
+Conclusion: a stages middleware cannot wrap the rest of the request, so the "provide my own store"
+case needs a runner hook (B) or a channel (C). The common case — user, request, ids — is A, which
+every surveyed framework offers in some form.
+
+Experiment sources: session scratchpad `als/` (outside the repository).
