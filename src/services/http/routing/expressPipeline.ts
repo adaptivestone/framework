@@ -324,6 +324,16 @@ function expressSource(
       const template = (req.route as { path?: string } | undefined)?.path;
       return template && template !== 'unmatched' ? template : undefined;
     },
+    get routeMethods() {
+      const methods = (
+        req.route as { methods?: Record<string, boolean> } | undefined
+      )?.methods;
+      return methods
+        ? Object.keys(methods)
+            .filter((name) => methods[name])
+            .map((name) => name.toUpperCase())
+        : undefined;
+    },
     get params() {
       return req.params as Record<string, string>;
     },

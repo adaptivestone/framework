@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import merge from 'deepmerge';
-import type { NextFunction, Response } from 'express';
 import mongoose from 'mongoose';
 import type {
   RateLimiterAbstract,
@@ -14,10 +13,11 @@ import {
 import type rateLimiterConfig from '../../../config/rateLimiter.js';
 import { makeOncePerClassWarner } from '../../../helpers/deprecation.ts';
 import type { IApp } from '../../../server.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES, HttpError } from '../httpErrors.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
-import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+import { type Next, RequestContext } from '../RequestContext.ts';
+import { HttpResponse } from '../responses.ts';
+import type { UserContext } from './GetUserByToken.ts';
+import Middleware from './Middleware.ts';
 
 const warnMisspelledKeyOverride = makeOncePerClassWarner(
   'ASF_DEP_RATE_LIMITER_KEY_METHOD',
@@ -25,7 +25,7 @@ const warnMisspelledKeyOverride = makeOncePerClassWarner(
     `Middleware "${name}" overrides RateLimiter.gerenateConsumeKey, which is renamed to generateConsumeKey. Rename the override — the old name will be removed in v6.`,
 );
 
-class RateLimiter extends AbstractMiddleware {
+class RateLimiter extends Middleware {
   static get description() {
     return 'Rate limiter middleware. Limit amount of request. Please refer to documentation';
   }
@@ -115,33 +115,42 @@ class RateLimiter extends AbstractMiddleware {
     }
   }
 
-  generateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
+  /**
+   * The rate-limit key for a request, from the configured
+   * `consumeKeyComponents`. Override it in a subclass to build the key from
+   * your own canonical form; it receives the request context (`ctx.appInfo`,
+   * `ctx.body`, `ctx.route`, `ctx.method`, `ctx.header()`).
+   */
+  generateConsumeKey(ctx: UserContext) {
     const { ip, route, user, request } = this.finalOptions.consumeKeyComponents;
 
     const key = [];
     if (ip) {
-      if (!req.appInfo.ip) {
+      if (!ctx.appInfo.ip) {
         this.logger?.error(
           `RateLimiter: Can't get remote address from request. Please check that you used IpDetecor middleware before RateLimiter`,
         );
       } else {
-        key.push(req.appInfo.ip);
+        key.push(ctx.appInfo.ip);
       }
     }
     if (route) {
       // Concrete URLs are attacker-controlled: aliases and different IDs
       // must consume the registered route's budget. A global/unmatched limiter
       // uses one fixed bucket until routing has established a template.
+      // A HEAD the GET handler answers (no HEAD handler of its own) shares
+      // GET's budget; an explicit HEAD handler keeps its own.
+      const methods = RequestContext.routeMethods(ctx);
       const method =
-        req.method === 'HEAD' &&
-        req.route?.methods?.get &&
-        !req.route?.methods?.head
+        ctx.method === 'HEAD' &&
+        methods?.includes('GET') &&
+        !methods.includes('HEAD')
           ? 'GET'
-          : (req.method ?? 'ALL');
-      key.push(`${method}:${req.route?.path ?? 'unmatched'}`);
+          : (ctx.method ?? 'ALL');
+      key.push(`${method}:${ctx.route ?? 'unmatched'}`);
     }
-    if (user && req.appInfo?.user) {
-      key.push(req.appInfo?.user.id);
+    if (user && ctx.appInfo.user) {
+      key.push(ctx.appInfo.user.id);
     }
 
     if (request?.length) {
@@ -150,7 +159,9 @@ class RateLimiter extends AbstractMiddleware {
       // or each variant gets a fresh budget.
       const fields: [string, string][] = [];
       for (const field of request) {
-        const value = req.body?.[field];
+        const value = (ctx.body as Record<string, unknown> | undefined)?.[
+          field
+        ];
         if (typeof value !== 'string' && typeof value !== 'number') {
           continue;
         }
@@ -172,8 +183,8 @@ class RateLimiter extends AbstractMiddleware {
   }
 
   /** @deprecated Misspelled; use {@link generateConsumeKey}. Removed in v6. */
-  gerenateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
-    return this.generateConsumeKey(req);
+  gerenateConsumeKey(ctx: UserContext) {
+    return this.generateConsumeKey(ctx);
   }
 
   async consumeResult(consumeKey: string, consumePoints = 0) {
@@ -204,7 +215,7 @@ class RateLimiter extends AbstractMiddleware {
     }
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(ctx: UserContext, next: Next) {
     // No-op for memory/mongo (already resolved); awaits the lazy redis build on
     // the first request only.
     await this.whenReady;
@@ -212,7 +223,7 @@ class RateLimiter extends AbstractMiddleware {
       this.logger?.info(
         `RateLimiter not inited correclty! Please check init logs `,
       );
-      return res.status(500).json({
+      return HttpResponse.json(500, {
         error: FRAMEWORK_ERROR_CODES.serverError,
         message: 'RateLimiter error',
       });
@@ -227,9 +238,9 @@ class RateLimiter extends AbstractMiddleware {
     let key: string;
     if (this.gerenateConsumeKey !== RateLimiter.prototype.gerenateConsumeKey) {
       warnMisspelledKeyOverride(this.constructor);
-      key = this.gerenateConsumeKey(req);
+      key = this.gerenateConsumeKey(ctx);
     } else {
-      key = this.generateConsumeKey(req);
+      key = this.generateConsumeKey(ctx);
     }
     const consumeKey = `${namespace}-${key}`;
 

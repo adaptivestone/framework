@@ -39,6 +39,8 @@ export interface RequestSource {
   readonly headers: Readonly<Record<string, string | string[] | undefined>>;
   /** Matched route template, e.g. `/users/:id`; `undefined` when unmatched. */
   readonly route: string | undefined;
+  /** @internal Methods the matched route has handlers for (upper case). */
+  readonly routeMethods?: readonly string[] | undefined;
   readonly params: Readonly<Record<string, string>>;
   readonly query: Readonly<Record<string, unknown>>;
   readonly body: unknown;
@@ -346,6 +348,17 @@ export class RequestContext<
     } catch {
       return false;
     }
+  }
+
+  /**
+   * @internal Methods the matched route has handlers for, when the adapter
+   * knows them — framework code that must tell an implicit HEAD (served by
+   * the GET handler) from an explicit one.
+   */
+  static routeMethods(
+    ctx: RequestContext<object>,
+  ): readonly string[] | undefined {
+    return ctx.#source.routeMethods;
   }
 
   /** @internal Record the error the registry turned into the response. */

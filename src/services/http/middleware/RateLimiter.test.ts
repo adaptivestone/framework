@@ -2,13 +2,23 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { after, before, describe, it, mock } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
-import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import {
+  createTestContext,
+  type TestContextInit,
+} from '../../../tests/createTestContext.ts';
 import { mockRejectedValue, stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { HttpError } from '../httpErrors.ts';
+import { HttpResponse } from '../responses.ts';
+import type { UserContext } from './GetUserByToken.ts';
 import RateLimiter from './RateLimiter.ts';
+
+type Info = UserContext['appInfo'];
+const ctxOf = (init: TestContextInit<Info> = {}) =>
+  createTestContext<Info>(init);
+const pass = async () => HttpResponse.empty(204);
 
 let mongoRateLimiter: RateLimiter;
 
@@ -60,24 +70,24 @@ describe('rate limiter methods', () => {
       driver: 'redis',
     });
 
-    const res = await redisRateLimiter.generateConsumeKey({
-      appInfo: {
-        ip: '192.168.0.0',
-        user: {
-          id: 'someId',
+    const res = await redisRateLimiter.generateConsumeKey(
+      ctxOf({
+        appInfo: {
+          ip: '192.168.0.0',
+          user: { id: 'someId' } as unknown as Info['user'],
         },
-      },
-    } as unknown as FrameworkRequest);
+      }),
+    );
 
-    assert.strictEqual(res, '192.168.0.0_ALL:unmatched_someId');
+    assert.strictEqual(res, '192.168.0.0_GET:unmatched_someId');
   });
 
   it('keeps the misspelled method as an alias', () => {
     const limiter = new RateLimiter(appInstance, { driver: 'memory' });
-    const req = { appInfo: { ip: '10.0.0.1' } } as unknown as FrameworkRequest;
+    const ctx = ctxOf({ appInfo: { ip: '10.0.0.1' } });
     assert.strictEqual(
-      limiter.gerenateConsumeKey(req),
-      limiter.generateConsumeKey(req),
+      limiter.gerenateConsumeKey(ctx),
+      limiter.generateConsumeKey(ctx),
     );
   });
 
@@ -86,10 +96,7 @@ describe('rate limiter methods', () => {
       new RateLimiter(appInstance, {
         driver: 'memory',
         consumeKeyComponents: { request },
-      }).generateConsumeKey({
-        appInfo: { ip: '192.168.0.0' },
-        body,
-      } as unknown as FrameworkRequest);
+      }).generateConsumeKey(ctxOf({ appInfo: { ip: '192.168.0.0' }, body }));
 
     it('hashes the field names and values into the key', () => {
       const expected = crypto
@@ -98,7 +105,7 @@ describe('rate limiter methods', () => {
         .digest('hex');
       assert.strictEqual(
         keyFor({ email: 'foo@example.com' }),
-        `192.168.0.0_ALL:unmatched_${expected}`,
+        `192.168.0.0_GET:unmatched_${expected}`,
       );
     });
 
@@ -129,7 +136,7 @@ describe('rate limiter methods', () => {
     });
 
     it('treats blank and non-scalar values as absent', () => {
-      const noRequestPart = '192.168.0.0_ALL:unmatched';
+      const noRequestPart = '192.168.0.0_GET:unmatched';
       for (const email of ['', '   ', { a: 1 }, ['foo@example.com'], null]) {
         assert.strictEqual(keyFor({ email }), noRequestPart);
       }
@@ -149,10 +156,8 @@ describe('rate limiter methods', () => {
       }
       const limiter = new LegacyLimiter(appInstance, { driver: 'memory' });
       const consume = mock.method(limiter.limiter, 'consume');
-      const req = { appInfo: {} } as unknown as FrameworkRequest;
-      const res = {} as Response;
-      await limiter.middleware(req, res, () => {});
-      await limiter.middleware(req, res, () => {});
+      await limiter.middleware(ctxOf(), pass);
+      await limiter.middleware(ctxOf(), pass);
       await setTimeout(0); // warnings are emitted on the next tick
 
       assert.match(String(consume.mock.calls[0].arguments[0]), /-legacy-key$/);
@@ -169,30 +174,18 @@ describe('rate limiter methods', () => {
     const rateLimiter = new RateLimiter(appInstance, {
       driver: 'unknown',
     });
-    const req = {
-      appInfo: {},
-    };
-    let status = 0;
-    let isSend = false;
-    await rateLimiter.middleware(
-      req as FrameworkRequest,
-      {
-        status(statusCode) {
-          status = statusCode;
-          return this;
-        },
-        json() {
-          isSend = true;
-        },
-        setHeader(_name, _value) {
-          return this;
-        },
-      } as Response,
-      () => {},
-    );
+    let continued = false;
+    const response = await rateLimiter.middleware(ctxOf(), async () => {
+      continued = true;
+      return HttpResponse.empty(204);
+    });
 
-    assert.strictEqual(status, 500);
-    assert.ok(isSend);
+    assert.strictEqual(response.status, 500);
+    assert.deepStrictEqual(response.kind === 'json' && response.body, {
+      error: 'SERVER_ERROR',
+      message: 'RateLimiter error',
+    });
+    assert.ok(!continued);
   });
 
   const makeOneRequest = async ({
@@ -210,20 +203,15 @@ describe('rate limiter methods', () => {
         driver,
       });
     }
-    const req = {
-      appInfo: {},
-      ...request,
-    };
+    // `request.ip` is the socket address; the key reads `appInfo.ip`.
+    const ctx = ctxOf({ appInfo: { ...(request.appInfo ?? {}) } });
     let status = 0;
     let isNextCalled = false;
     try {
-      await realRateLimiter.middleware(
-        req as FrameworkRequest,
-        {} as Response,
-        () => {
-          isNextCalled = true;
-        },
-      );
+      await realRateLimiter.middleware(ctx, async () => {
+        isNextCalled = true;
+        return HttpResponse.empty(204);
+      });
     } catch (err) {
       if (!(err instanceof HttpError)) {
         throw err;
@@ -319,17 +307,15 @@ describe('rate limiter methods', () => {
         msBeforeNext: 5000,
       } as never);
 
-      const req = {
-        appInfo: {},
-        ip: '10.10.0.3',
-      } as unknown as FrameworkRequest;
-      const thrown = await rateLimiter
-        .middleware(req, {} as Response, () => {})
-        .then(
-          () => null,
-          (err: unknown) => err,
-        );
-      const answer = await appInstance.httpServer?.resolveError(thrown, req);
+      const ctx = ctxOf();
+      const thrown = await rateLimiter.middleware(ctx, pass).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      const answer = await appInstance.httpServer?.resolveError(
+        thrown,
+        ctx as unknown as FrameworkRequest,
+      );
 
       assert.strictEqual(answer?.status, 429);
       assert.deepStrictEqual(answer?.headers, { 'Retry-After': '5' });
@@ -383,18 +369,16 @@ describe('rate limiter message translation', () => {
       msBeforeNext: 5000,
     } as never);
 
-    const req = {
-      appInfo: { i18n },
-      ip: '10.10.0.4',
-    } as unknown as FrameworkRequest;
-    const thrown = await rateLimiter
-      .middleware(req, {} as Response, () => {})
-      .then(
-        () => null,
-        (err: unknown) => err,
-      );
+    const ctx = ctxOf({ appInfo: { i18n } });
+    const thrown = await rateLimiter.middleware(ctx, pass).then(
+      () => null,
+      (err: unknown) => err,
+    );
     // Answered the way the HTTP layer answers a middleware error.
-    const answer = await appInstance.httpServer?.resolveError(thrown, req);
+    const answer = await appInstance.httpServer?.resolveError(
+      thrown,
+      ctx as unknown as FrameworkRequest,
+    );
     return { status: answer?.status, payload: answer?.body };
   };
 

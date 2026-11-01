@@ -156,27 +156,8 @@ describe('AbstractMiddleware translate()', () => {
   });
 });
 
-// A 5.x built-in that only throws must keep the base return type, or a
-// subclass answering with `res.json(...)` stops compiling (`check:types:tests`).
+// The built-ins only throw or continue; a subclass may still answer itself.
 describe('built-in middleware subclasses', () => {
-  it('a 5.x built-in subclass may answer with a response instead of calling next()', async () => {
-    const answered = { answered: true } as unknown as Response;
-    class MyRateLimiter extends RateLimiter {
-      async middleware(_req: FrameworkRequest, res: Response) {
-        return res.status(401).json({});
-      }
-    }
-    const res = {
-      status: () => res,
-      json: () => answered,
-    } as unknown as Response;
-    const result = await new MyRateLimiter(appInstance).middleware(
-      {} as FrameworkRequest,
-      res,
-    );
-    assert.strictEqual(result, answered);
-  });
-
   it('a (ctx, next) built-in subclass may answer with a response instead of next()', async () => {
     class MyAuth extends Auth {
       async middleware() {
@@ -188,7 +169,12 @@ describe('built-in middleware subclasses', () => {
         return HttpResponse.json(401, { mine: true });
       }
     }
-    for (const Mw of [MyAuth, MyRole]) {
+    class MyRateLimiter extends RateLimiter {
+      async middleware() {
+        return HttpResponse.json(401, { mine: true });
+      }
+    }
+    for (const Mw of [MyAuth, MyRole, MyRateLimiter]) {
       const response = await new Mw(appInstance).middleware();
       assert.strictEqual(response.status, 401);
     }
