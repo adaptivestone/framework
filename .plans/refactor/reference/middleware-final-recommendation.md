@@ -262,6 +262,9 @@ From the Astro Proposal and the earlier version of this file:
 8. **D2.7 handlers:** v6 handlers get the same `ctx`; 5.x controllers opt in with `contractVersion = 2`.
 9. **v2 base class:** a new `Middleware` base for v2 middleware; `AbstractMiddleware` stays v1 and
    is removed in v6 (contract review finding 1).
+10. **v1 code inside a v2 chain:** its errors reach the v2 wrappers first (option A), so a v2
+    transaction around an old controller rolls back. v6 must stay final for years:
+    [v6-api-stability](../queued/v6-api-stability.md).
 
 All D2 decisions are settled; the plan is [async-middleware](../queued/async-middleware.md).
 

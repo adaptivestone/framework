@@ -10,6 +10,9 @@ controllers set `static contractVersion = 2` — landing with
 [P1q universal HTTP responses](../active/universal-http-responses.md) (its writer renders the
 returned responses). v6 flips the default, drops v1, migrates built-ins, together with
 [static-middleware-cutover](../later/static-middleware-cutover.md).
+**v6 stability**: this contract is part of the v6 public API that must last for years; it follows
+the rules in [v6-api-stability](v6-api-stability.md) (options objects, framework-created `ctx`,
+reserved `beforeSend` slot, no Express types).
 **Depends on**: P1b ✅ (tree router / `ExpressAdapter`), P1q Phases 1–2 ✅ (writer, error
 descriptors, `transformResponse`).
 
@@ -57,7 +60,7 @@ once → global `transformResponse` → writer merges staged headers/cookies →
   base type. Affects `typeof AbstractMiddleware` constraints in `src/modules/AbstractController.ts`,
   `routing/RouteNode.ts` (`MiddlewareEntry`) and `routing/middlewareNormalization.ts`, which must
   accept both bases.
-- **v1 code inside a v2 chain (contract review, proposed resolution):** a v1 controller handler or
+- **v1 code inside a v2 chain — decided 2026-11-01 (option A):** a v1 controller handler or
   validator running inside the portable chain keeps its `(req, res, next)` call, but its errors
   escape to the outer v2 wrappers before the registry (so a v2 transaction rolls back); the old
   standalone v1 dispatch keeps normalising inside the controller wrapper. A v1 middleware's
