@@ -1,8 +1,8 @@
 # P1m — Async/await middleware contract (breaking)
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
-Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core)
-and 2 (Express adapter) done; slice 3 (v2 controllers) next.
+Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
+2 (Express adapter) and 3 (v2 controllers) done; slice 4 (cookies) next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -370,8 +370,29 @@ adapter (P3) the same class reads from Node directly.
   error, validation 400, logged 500, 5.x middleware continue / `next(err)` identity / answering,
   5.x handler writing `res`, refused late staging, replaced `sent` response, client abort.
 
-**Slice 3:** v2 controllers and per-route context types. **Slice 4:** cookies, docs, CHANGELOG.
-**Phase 2:** app-wide middleware API and portable built-ins.
+**Slice 3 — v2 controllers (done 2026-11-01):**
+
+- `AbstractController.contractVersion` (static, default `1`). A controller returning `2` gets
+  `handler(ctx)`; the handler must return an `HttpResponse` (anything else is a `TypeError`,
+  answered as a logged 500). The contract is taken from the class that declares the method, so a
+  method inherited from a 5.x parent keeps `(req, res)`; an inline function takes the controller's.
+- `HandlerEntry.contract`; a route with a v2 handler always runs as a strict-onion chain (even with
+  only 5.x middleware), and the chain passes `ctx` to the route's validation + handler
+  (`rawHandler`). Validation, the 415 for an unknown content type, the registry and the validation
+  400 fallback are unchanged; `ctx.appInfo` is the same object validation fills.
+- Codegen emits `<MethodName>Context = ValidatedContext<<MethodName>Request>` next to every
+  request type (`ValidatedContext` in `services/http/types.ts`): same validated `appInfo` and path
+  params by name. Unknown param names still type as `string`, as on 5.x `req.params` (the Express
+  index signature) — narrowing that is a v6 typing change.
+- Tests: `controllers/contractVersion.test.ts` (7, real HTTP: context with validated input and
+  `requestContext()`, validation 400, params and route template, registry 404, missing
+  `HttpResponse` → logged 500, inherited 5.x method, v2 middleware + v2 handler sharing `appInfo`
+  and staged headers); golden codegen fixture `ContextHandlers.ts` (tsc reads validated input,
+  path params and the inherited `Auth` user through the generated context types).
+- Not in this slice: portable types for `transformResponse` and error handlers (they still receive
+  `req`). Their shape is an open owner question; it is still required before P1m is done.
+
+**Slice 4:** cookies, docs, CHANGELOG. **Phase 2:** app-wide middleware API and portable built-ins.
 
 ## API change
 
