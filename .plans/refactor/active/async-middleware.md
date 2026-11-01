@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) and 2b-1/2b-2 (built-ins converted in place) done; `RequestParser` and security headers next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) and 2b-1/2b-2/2b-3 (built-ins converted in place, body parsing after routing) done; security headers next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -509,8 +509,33 @@ adapter (P3) the same class reads from Node directly.
   `expressPipeline.test.ts` +3 bridge cases (continue in scope with one `appInfo`, answer with
   staged headers, throw to the error handler).
 
-**Still open for P1m:** `RequestParser` and the security headers (owner questions: a raw-body
-design for the parser; staged security headers would undo a route's `res.removeHeader()`),
+**Phase 2b-3 — body parsing after routing (done 2026-11-01; owner decision A):**
+
+- Follows the settled match-then-walk design (`reference/decisions.md`): `RequestParser` (now a
+  `Middleware`) runs after the match as the first step of every matched route — before app-wide and
+  route middleware — in the route's `bodyParsing` mode. The adapter keeps one parser instance per
+  mode (`params.bodyParsing`); chain routes get it as their first layer, routes with only 5.x code
+  call `parse(ctx)` before their 5.x middleware. The global mount in `HttpServer` is gone.
+- Modes, as settled: `'parsed'` (default) parses; `'raw'` captures `req.rawBody: Buffer` (bounded
+  by `maxFieldsSize`, 413 with `Connection: close`) and leaves the body unparsed; `'none'` leaves the
+  stream untouched. A request with no body (no length, not chunked) is not read at all.
+- Unmatched requests (404, 405, malformed URL) are not parsed — deviation from what was described
+  to the owner ("the 404 still parses"): nothing reads the body there, and it stops uploads to
+  unknown URLs from writing temp files.
+- Internal context hooks (not public API): `RequestContext.incoming(ctx)`, `setBody`, `setRawBody`
+  over new `RequestSource` fields; `createTestContext` accepts `incoming` and keeps a settable body.
+  Temp-file cleanup moved to `ctx.onFinish`; `Connection: close` is staged on `ctx.response`.
+- Break (CHANGELOG): Express middleware added in `bootHttp` no longer see a parsed `req.body`.
+- Not done (still open): a public raw-body accessor on `ctx` for `ctx` handlers on `'raw'` routes
+  (the v6 checklist reserves one); the parser registry (`app.parsers`, v5.1 extra); the runtime
+  warning for body-reading middleware on `'raw'`/`'none'` routes (decisions.md, optional).
+- Tests: `RequestParser.test.ts` harnesses run on contexts (all 19 cases kept) + a modes case
+  (`'raw'` bounded, `'none'` unread); `ExpressAdapter.test.ts` +2 over HTTP (the three modes;
+  parser before app-wide middleware and unmatched requests unparsed); the `GetUserByToken`
+  end-to-end case chains parser → `GetUserByToken` on one context.
+
+**Still open for P1m:** the security headers (owner question: staged security headers would undo
+a route's `res.removeHeader()`), a public raw-body accessor on `ctx`,
 the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
 re-measure.
 
