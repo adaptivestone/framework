@@ -324,3 +324,50 @@ stages + opt-in ctx.scope(wrap)    onion (context.with around next)
   requests whose middleware asked for it pay for the wrapping.
 
 Experiment source: session scratchpad (outside the repository).
+
+## Node's built-in tracing hooks: `diagnostics_channel` (experiment, 2026-11-01)
+
+`node:diagnostics_channel` lets a library publish named events; anyone can subscribe. Publishing
+with no subscriber is close to free. `tracingChannel(name)` publishes `start`, `end`,
+`asyncStart`, `asyncEnd` and `error` around a call (`tracePromise(fn, message)`), and
+`channel.start.bindStore(asyncLocalStorage, …)` lets the **subscriber** make a value — an
+OpenTelemetry span — active for the traced call. So the framework stays OTel-free and an OTel
+integration still gets spans that parent the handler's work.
+
+Measured on Node 26.12.1 with real OTel (`exp-dc.cjs`, session scratchpad):
+
+- Built-in channels that fired for one request, in order: `net.server.socket`,
+  `http.server.response.created`, `http.server.request.start`, `http.server.response.finish`.
+  Node has no `TracingChannel` for the HTTP server (`tracing:http.server.request:*` never fired);
+  it gives start/finish points, not spans.
+- A stages runner wrapping only the handler in `tracingChannel('adaptivestone:handler')`, plus a
+  subscriber that starts a span in `start.bindStore(...)` and ends it on `asyncEnd`:
+
+  ```
+  - POST /orders
+    - db find user          ← middleware work, under the server span
+    - handler POST /orders  ← created by the subscriber, not by the framework
+      - db insert order     ← handler work nests under it
+  ```
+
+- Cost per call: plain await 49 ns; `tracePromise` with no subscriber 66 ns; with a subscriber
+  263 ns. No subscriber, no allocation beyond the message object.
+- Caveat: the OTel API does not expose its `AsyncLocalStorage`; the experiment used the context
+  manager's internal field. A real integration ships its own subscriber package.
+
+Who already publishes channels (sources read in the session clones):
+
+| Library | Channels |
+|---|---|
+| Express `router` 2.2.0 (installed here via Express 5.3.0) | `express.router.request` per layer |
+| Fastify | `fastify.initialization`, `fastify.request.handler` (tracing) |
+| AdonisJS http-server | `adonisjs.http.request`, `.middleware`, `.route.handler`, `.exception.handler`, `.response.serializer` (tracing) |
+| h3 v2 | `h3.request` (tracing plugin, middleware and routes) |
+| undici / `fetch` | `undici:request:*`; the official `@opentelemetry/instrumentation-undici` 0.34.0 is built on them |
+
+For us: our middleware and handlers run inside one Express layer (the routing adapter), so
+`express.router.request` sees that one layer, not our middleware or handlers. The framework should
+publish its own tracing channels (request, each middleware, handler, error resolution, response
+write), the way AdonisJS does. That closes the stages gap above without `ctx.scope`, costs ~17 ns
+per traced call when nobody listens, and gives OTel, APM agents and tests one hook. Belongs to the
+`diagnostics_channel` namespace in [observability](../later/observability.md).

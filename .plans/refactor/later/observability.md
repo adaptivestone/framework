@@ -13,6 +13,9 @@ foundation: OTel HTTP + mongoose spans, framework `LogRecord` trace-ID enrichmen
 a health-check registry on top of the shipped `/health/live` + `/health/ready` ([health-endpoints](../done/health-endpoints.md), 5.5.0 — replaces the `/livez` + `/readyz` sketch),
 `diagnostics_channel` namespace, slow-handler/query logging and Pyroscope route auto-tag.
 
+Prior work: [the `diagnostics_channel` experiment](../reference/middleware-flow-models.md#nodes-built-in-tracing-hooks-diagnostics_channel-experiment-2026-11-01)
+(channel names other frameworks publish, cost, OTel subscriber pattern).
+
 Prometheus export, `/metrics`, parameterized-route HTTP RED metrics and runtime process metrics are
 owned by P1s. Logger ownership, Pino JSON output, Error serialization, redaction, direct Sentry
 delivery and sink lifecycle are owned by P1z. This phase enriches the framework-owned record with
