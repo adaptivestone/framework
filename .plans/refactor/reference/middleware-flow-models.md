@@ -284,3 +284,43 @@ clear framework error; an aborted client stops the chain and `onFinish` gets `ab
 Hooks receive `(response, ctx)` so a middleware without locals can register a shared method
 (no allocation). Naming: Fastify's `onResponse` runs _after_ sending — `beforeSend` would avoid
 that ambiguity.
+
+## OpenTelemetry with the stages model (experiment, 2026-11-01)
+
+Real packages (`@opentelemetry/api` 1.9, `sdk-trace-node`/`sdk-trace-base` 2.12.0,
+`instrumentation-http` 0.223.0 — the newest `instrumentation-http` 0.300.0 needs API 1.10 while
+SDK 2.12 accepts only < 1.10, so a matching set had to be chosen), a stages (C2) runner on plain
+Node `http`, spans exported in memory. Span trees per scenario:
+
+```
+stages, no tracing code            stages, middleware span for its own work
+- POST /orders [http.route]        - POST /orders [http.route]
+  - db find user                     - auth check
+  - db insert order                    - db find user
+                                     - db insert order
+
+stages, middleware wants the       stages, runner adds framework spans
+handler under its span             - POST /orders [http.route]
+- POST /orders [http.route]          - middleware auth
+  - db insert order   ← sibling        - db find user
+  - transaction                      - middleware timing
+                                     - handler POST /orders
+                                       - db insert order
+
+stages + opt-in ctx.scope(wrap)    onion (context.with around next)
+- POST /orders [http.route]        - POST /orders
+  - transaction                      - transaction
+    - db insert order                  - db insert order
+```
+
+- The server span (http instrumentation) is active through the whole stages runner; every
+  instrumented call (DB, Redis, outgoing HTTP) nests under it with no code in middleware.
+- The runner knows the route template and sets `http.route` and the span name on the server span.
+- A middleware span for its own work nests its own calls.
+- The one gap: a stages middleware cannot make its span the parent of the handler's work (it
+  ends up a sibling). Two fixes, both verified: framework-owned spans around each middleware and
+  the handler (the runner wraps the calls in `context.with`), or an opt-in
+  `ctx.scope((run) => context.with(…, run))` that the runner applies around the handler — only
+  requests whose middleware asked for it pay for the wrapping.
+
+Experiment source: session scratchpad (outside the repository).
