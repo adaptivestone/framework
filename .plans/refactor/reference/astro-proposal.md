@@ -12,6 +12,11 @@ This revisits [D1/D2.1](../queued/async-middleware.md), the
 BEFORE-only middleware must not mention `next` is therefore no longer a constraint for this
 proposal. Earlier reviewer recommendations made under that constraint remain historical evidence.
 
+**Owner clarification (2026-11-01):** native execution means route schemas exported as JSON Schema
+for a Rust validator, and selected middleware with separately authored JS and Rust implementations
+of the same behavioral contract. This is the intended architecture below. The first revision put
+too much emphasis on an automatic source-translation scenario that was not being proposed.
+
 ## Recommendation and the remaining disagreement
 
 Astro recommends **one explicit response-returning onion contract**, with a framework request
@@ -34,8 +39,9 @@ Shared conclusions:
   `try/catch/finally` semantics are promised.
 - A handler returning a response descriptor and a transport finishing that response are different
   events. Streams make this distinction unavoidable.
-- Interfaces make implementations replaceable; they do not make arbitrary JavaScript compilable
-  to Rust. Native optimization needs an explicitly representable operation and equivalent behavior.
+- A route can keep its JS/TS declaration while a Rust engine validates its supported JSON Schema.
+  A middleware capability can likewise select between paired JS and Rust implementations with
+  equivalent behavior. These are independent of the public continuation model.
 
 ## What is already implemented on this branch
 
@@ -213,15 +219,21 @@ for the chosen channel/context APIs. A trace exporter must not control business 
 
 ## One architecture for JS and native capabilities
 
+The intended model is **one application declaration, interchangeable execution backends**. The
+application describes its routes and schemas in JS/TS. Boot builds a route/schema plan; a Rust
+validator can execute the supported validation plan. Separately, a middleware author can provide
+a Rust implementation alongside the JS implementation, and deployment policy can select it.
+Neither change requires consumers to rewrite their routes or middleware usage.
+
 ```mermaid
 flowchart TD
-    Declarations["TS routes, schemas, declared operations"] --> Boot["Boot: normalize and select supported implementations"]
+    Declarations["TS routes, schemas, paired middleware implementations"] --> Boot["Boot: normalize and select supported implementations"]
     Boot --> Plan["Ordered execution plan"]
     Transport["Express / Node / future Rust transport"] --> Context["Portable context + trace entry"]
     Context --> Executor["JS orchestration: middleware, errors, hooks"]
     Plan --> Executor
-    Executor --> JS["JS handlers and arbitrary middleware"]
-    Executor --> Native["Optional native implementations of declared operations"]
+    Executor --> JS["JS handlers and selected JS implementations"]
+    Executor --> Native["Rust JSON Schema validator / paired Rust middleware"]
     JS --> Response["HttpResponse + response preparation"]
     Native --> Response
     Response --> Writer["Adapter writer: backpressure, cancellation, completion"]
@@ -235,25 +247,54 @@ Keep three boundaries independent:
 
 1. **Authoring:** portable context, immutable response descriptors, explicit continuation, schema
    validation, lifecycle hooks. Application code remains JS/TS.
-2. **Execution plan:** route identifiers, ordered built-in capabilities and configuration,
-   schema plans, JS callbacks and fallback decisions, prepared at boot. Ordinary closures are
-   opaque; do not infer purity or native eligibility from their TypeScript signatures.
+2. **Execution plan:** route identifiers, ordered middleware capabilities and configuration,
+   schema plans, implementation IDs and fallback decisions, prepared at boot. An explicitly
+   registered Rust peer supplies native eligibility for a middleware; it is not limited to
+   framework built-ins.
 3. **Transport/native ABI:** a small versioned representation of supported data, operation IDs,
    outcomes, cancellation and ownership. A TypeScript interface alone is not a wire/FFI contract.
 
-| Candidate                                  | Plausible native boundary                       | Conditions                                                                                                            |
-| ------------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| HTTP parsing/listening and route matching  | Transport adapter and compiled route table      | Preserve matching/decoding, limits, cancellation, routing metadata and fallback behavior.                             |
-| Validation                                 | Reusable compiled validator capability          | Exact supported semantics, transformed output and issue contract; otherwise original JS validator.                    |
-| Known stateless header/policy operations   | Declared operation + serializable configuration | Same ordered position, same failure/hooks/telemetry behavior; no hidden JS closures.                                  |
-| Rate limiting or caches                    | Driver/backend operation                        | Preserve store ownership, distributed semantics and fallback; a faster local map is not equivalent to a shared store. |
-| Arbitrary auth, DB work, custom middleware | JS callback in the execution plan               | Do not promise automatic Rust translation. Native helpers can be called from it.                                      |
-| Response serialization                     | Writer/serializer capability                    | Status/body restrictions, headers/cookies, errors and stream behavior remain identical.                               |
+| Candidate                                 | Plausible native boundary                               | Conditions                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| HTTP parsing/listening and route matching | Transport adapter and compiled route table              | Preserve matching/decoding, limits, cancellation, routing metadata and fallback behavior.                             |
+| Validation                                | Reusable compiled validator capability                  | Exact supported semantics, transformed output and issue contract; otherwise original JS validator.                    |
+| Known stateless header/policy operations  | Declared operation + serializable configuration         | Same ordered position, same failure/hooks/telemetry behavior; no hidden JS closures.                                  |
+| Rate limiting or caches                   | Driver/backend operation                                | Preserve store ownership, distributed semantics and fallback; a faster local map is not equivalent to a shared store. |
+| Application middleware with a Rust peer   | Versioned operation contract and paired implementations | Preserve its complete behavior, including external stores and response effects; select one implementation at boot.    |
+| Response serialization                    | Writer/serializer capability                            | Status/body restrictions, headers/cookies, errors and stream behavior remain identical.                               |
 
-Moving arbitrary JS into a native runtime still requires its dynamic semantics, closures,
-dependencies, and async behavior. A Rust-written compiler such as SWC produces transformed JS;
-that is not evidence that an arbitrary request handler can become a Rust function merely because
-it implements an interface. [SWC API](https://swc.rs/docs/usage/core).
+### Paired middleware implementations
+
+A middleware capability owns its configuration schema, versioned inputs/outputs, permitted
+context changes, errors and response behavior. It can ship a reference JS implementation, an
+optional hand-written Rust implementation and shared conformance fixtures. Applications register
+that capability once; the framework resolves its backend at boot. A production policy may prefer
+Rust when the binary and capability version are supported. Development and CI must also be able
+to select either backend so behavior differences are found before production. Expose the chosen
+backend and any fallback reason in boot diagnostics; do not branch on the environment on every
+request.
+
+The public middleware contract and the native call ABI have different jobs. A JS adapter can call
+the selected operation, apply its declared context changes and then call `next()`, or return its
+response descriptor. The native result can internally encode continue/response/failure; this does
+not introduce alternate continuation signals into the public onion API. Marshal only the fields
+that operation needs, and reuse its compiled configuration across requests.
+
+A Rust peer for a true wrapping middleware additionally needs a continuation bridge: invoke the
+JS suffix in its request context, await its response/error, then finish the native scope. That
+bridge must preserve single-use continuation and ALS/trace/error semantics. It is an optional
+capability with its own measured cost, not a requirement imposed on a schema validator or a simple
+request-stage operation. The distinction can stay inside the implementation adapter; it does not
+force two public middleware APIs.
+
+**Middleware selects an outcome; the response writer sends it.** A middleware may short-circuit
+by returning a response descriptor, but a native peer must not write directly to a socket and
+bypass remaining response hooks or completion telemetry. This keeps JS and Rust implementations
+under the same response contract. Raw socket routes remain an explicitly separate facility.
+
+Choose fallback before the operation starts. An error after a native implementation has performed
+side effects is an operation failure, not permission to rerun the JS implementation. A pure schema
+validator has a simpler boundary, but its fallback still needs an explicit policy.
 
 Initially, keep JS orchestration authoritative and call selected native operations. Later, fuse
 contiguous eligible native operations only after proving that no observable operation is moved.
@@ -272,7 +313,24 @@ store on a shared native callback. Across processes/threads, propagate trace con
 ALS itself is not transferable. Measure callback queues, copies, parses and backpressure as part
 of the request cost. [NAPI-RS ThreadsafeFunction](https://napi.rs/docs/concepts/threadsafe-function).
 
-## Standard Schema is a validation contract, not a native program
+## Route validation through JSON Schema
+
+The first native candidate should be the route's **validation operation**. A practical pipeline is:
+
+```text
+JS/TS route + Zod/Yup schema
+  -> boot-time vendor converter / Standard JSON Schema interface where supported
+  -> supported JSON Schema + explicit input/output normalization policy
+  -> reusable Rust validator selected for that route
+  -> framework validated value or validation issues
+```
+
+For the supported JSON Schema subset, Rust can perform the check without calling the schema
+library on each request. The route declaration and inferred handler types remain in JS/TS. This
+can first run behind the existing JS transport; a future Rust HTTP adapter can reuse the same
+route/schema plan. A validator's performance gate does not depend on replacing the whole server.
+The relevant question is whether the exported plan preserves that route's validation contract,
+not whether its schema library was written in JavaScript.
 
 The ecosystem now has two relevant, orthogonal specifications:
 
@@ -291,7 +349,7 @@ validation code. Neither result is sufficient authorization to replace runtime v
 Zod documents both unrepresentable constructs and different input/output schemas.
 [Zod conversion](https://zod.dev/json-schema).
 
-A future optional native compiler must return either a verified supported plan or an explicit
+A future optional schema-plan builder must return either a verified supported plan or an explicit
 unsupported reason. Selection happens at boot; unknown capability means JS fallback, never
 weaker validation. Maintain the existing `validate` contract as the semantic authority. Keep the
 native compilation seam separate from `toJsonSchema` so improving documentation cannot silently
@@ -357,10 +415,11 @@ heap, RSS/external memory, allocation/GC pressure, CPU per request, throughput a
 Node and Bun separately. Add real HTTP slow-client streams and disconnects; measure the native
 crossing against the JS work it replaces. Do not declare a winner from a toy ns/op delta.
 
-The existing engine spike remains authoritative: establish Express and Node controls, then the
-native-core comparison, and build Rust only when its rung gates pass. Preserve its realistic
-workload thresholds and include an optimized JS validator control. This proposal claims no Rust
-speedup and does not make HTTP/2 a Rust-only benefit.
+The existing transport spike remains authoritative: establish Express and Node controls, then the
+native-core comparison, and build a Rust HTTP engine only when its rung gates pass. Preserve its
+realistic workload thresholds. A Rust validator or paired middleware can instead be evaluated
+behind the current transport, with its own equivalence/performance gate and an optimized JS
+control. This proposal claims no Rust speedup and does not make HTTP/2 a Rust-only benefit.
 
 ## Delivery path and acceptance
 
@@ -372,10 +431,12 @@ speedup and does not make HTTP/2 a Rust-only benefit.
    bridge; do not silently change inherited middleware signatures.
 3. Add optional tracing integration against public APIs and one transport-completion seam. Prove
    concurrent isolation, span parentage, error visibility and log correlation on Node/Bun.
-4. Execute the existing Node/native transport spike. Separately propose native validator
-   compilation if it earns a place; keep original JS fallback.
-5. Only then consider compiled native operation segments. Applications keep the same context,
-   response and middleware contracts; backend selection is internal and inspectable at boot.
+4. Propose a focused JSON Schema validation experiment and a paired middleware experiment behind
+   the existing transport, with shared conformance fixtures and explicit JS fallback. Independently
+   execute the existing Node/native transport spike; its gates govern a Rust HTTP engine.
+5. After individual operations earn their place, consider fusing contiguous native segments.
+   Applications keep the same context, response and middleware contracts; backend selection is
+   internal and inspectable at boot.
 
 Required conformance scenarios: nested/async ALS and spans; early responses; thrown primitive and
 Error values; registry and hook failures; duplicate/late/unawaited continuation; callback retries;
@@ -384,13 +445,14 @@ resource cleanup; lazy stream context; native/JS validator parity; mixed native/
 native early responses with custom registry/transform behavior. A fallback must not duplicate a
 side effect or expose data from a rejected validation branch.
 
-**Out of scope:** arbitrary JS-to-Rust compilation, a Rust server implementation, moving Express
+**Out of scope:** implementing a Rust server or native middleware in this change, moving Express
 removal earlier, deploying a sidecar, changing schema acceptance, or migrating application code.
 No client-specific examples, data, paths or identifiers are included.
 
 ## Verification record
 
-Verified in an isolated checkout of the baseline on Node 26.12.1; production source files are
+The original research revision was verified in an isolated checkout of the baseline on Node
+26.12.1; production source files are
 unchanged. Research conformance and heap measurements are separate from production guarantees.
 
 | Check                                                                                                                 | Result                                                                                                                                      |
@@ -404,3 +466,6 @@ unchanged. Research conformance and heap measurements are separate from producti
 
 No Bun, real HTTP load, native implementation or production v2 middleware runner was benchmarked
 in this change. Those checks remain part of the proposed implementation/decision gates.
+
+The subsequent owner clarification changes documentation only. Its checks are `npm run check`
+and `git diff --check`; the runtime checks above belong to the original research revision.
