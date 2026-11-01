@@ -29,19 +29,14 @@ export const HTTP_METHODS = [
 export type HttpMethod = (typeof HTTP_METHODS)[number];
 
 /**
- * Body parsing mode per route.
+ * Body parsing mode per route. The body parser runs after routing, as the
+ * first step of the matched route, so the mode decides what it does:
  *
- * - `'parsed'` (default): Content-Type-aware parser dispatch. **The only mode
- *   that takes effect today.**
- *
- * `'raw'` and `'none'` are **reserved and not implemented yet**. The matcher
- * resolves and propagates the mode, but the request pipeline does not act on
- * it: `RequestParser` is mounted globally, so every body is parsed regardless —
- * `req.rawBody` is never set and the stream is always consumed. Do not rely on
- * them until they ship (the parser-registry design lives in the refactor plans).
- *
- * - `'raw'` *(reserved)*: capture bytes into `req.rawBody: Buffer`, skip parsing.
- * - `'none'` *(reserved)*: pass-through, leave the request stream untouched.
+ * - `'parsed'` (default): Content-Type-aware parsing into `req.body` /
+ *   `ctx.body` (json, urlencoded, multipart).
+ * - `'raw'`: capture the bytes into `req.rawBody: Buffer` (bounded like a
+ *   parsed body) and leave the body unparsed — e.g. signed webhooks.
+ * - `'none'`: leave the request stream untouched for the handler to read.
  */
 export type BodyParsingMode = 'parsed' | 'raw' | 'none';
 

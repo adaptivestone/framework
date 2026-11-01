@@ -1,5 +1,5 @@
 import { unlink } from 'node:fs/promises';
-import type { NextFunction, Response } from 'express';
+import type { IncomingMessage } from 'node:http';
 import formidable, {
   json,
   multipart,
@@ -8,32 +8,76 @@ import formidable, {
 } from 'formidable';
 import type ThttpConfig from '../../../config/http.ts';
 import { normalizeContentType } from '../../validate/contentType.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES, HttpError } from '../httpErrors.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
+import { type Next, RequestContext } from '../RequestContext.ts';
+import type { BodyParsingMode } from '../routing/RouteNode.ts';
+import Middleware from './Middleware.ts';
+
+/** Does the request carry a body at all (a length above zero, or chunked)? */
+function hasBody(
+  headers: Readonly<Record<string, string | string[] | undefined>>,
+): boolean {
+  const length = Number(headers['content-length']);
+  return (
+    (Number.isFinite(length) && length > 0) ||
+    headers['transfer-encoding'] !== undefined
+  );
+}
 
 /**
  * Parses multipart / urlencoded / json request bodies (via formidable) into
- * `req.body`. Size and count limits come from `config.http.requestParser`
- * (explicit per-mount params override them). Spooled upload temp files are
- * unlinked once the response finishes — a handler that needs to keep an upload
- * MUST move or copy it (e.g. `fs.rename`) before responding. An oversized body
- * (413) or an unparsable one (400) is passed on as an `HttpError`, so the
- * error-handler registry answers it.
+ * `ctx.body` (`req.body`). The framework runs it first on every matched route,
+ * after routing, in the route's `bodyParsing` mode (`params.bodyParsing`):
+ * `'parsed'` (default) parses; `'raw'` captures the bytes into `req.rawBody`
+ * and leaves the body unparsed; `'none'` leaves the request untouched. Size
+ * and count limits come from `config.http.requestParser` (explicit params
+ * override them). Spooled upload temp files are unlinked once the response
+ * ends — a handler that needs to keep an upload MUST move or copy it (e.g.
+ * `fs.rename`) before responding. An oversized body (413) or an unparsable one
+ * (400) is thrown as an `HttpError`, so the error-handler registry answers it.
  */
-class RequestParser extends AbstractMiddleware {
+class RequestParser extends Middleware {
   static get description() {
     return 'Parses incoming request. Based on Formidable library';
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
-    const time = Date.now();
-    this.logger?.verbose(`Parsing request`);
+  async middleware(ctx: RequestContext<object>, next: Next) {
+    await this.parse(ctx);
+    return next();
+  }
 
+  /** Read the body in this parser's `bodyParsing` mode; throws a 413 or 400 `HttpError`. */
+  async parse(ctx: RequestContext<object>): Promise<void> {
+    const { bodyParsing, ...params } = (this.params ?? {}) as {
+      bodyParsing?: BodyParsingMode;
+    };
+    const mode = bodyParsing ?? 'parsed';
+    const req = RequestContext.incoming(ctx) as IncomingMessage | undefined;
+    if (mode === 'none' || !req) {
+      return;
+    }
     const { requestParser } = this.app.getConfig('http') as typeof ThttpConfig;
     // Config defaults bound unauthenticated uploads; explicit per-mount params win.
-    const parserOptions = { ...requestParser, ...this.params };
-    const mediaType = normalizeContentType(req.headers?.['content-type']);
+    const parserOptions = { ...requestParser, ...params };
+    const maxBodySize =
+      typeof parserOptions.maxFieldsSize === 'number'
+        ? parserOptions.maxFieldsSize
+        : 2 * 1024 * 1024;
+    if (mode === 'raw') {
+      RequestContext.setRawBody(
+        ctx,
+        await this.#readRaw(ctx, req, maxBodySize),
+      );
+      return;
+    }
+    if (!hasBody(ctx.headers)) {
+      // Nothing to parse (a GET, an empty POST): the same `{}` formidable gives.
+      RequestContext.setBody(ctx, { ...((ctx.body as object) ?? {}) });
+      return;
+    }
+    const time = Date.now();
+    this.logger?.verbose(`Parsing request`);
+    const mediaType = normalizeContentType(ctx.header('content-type'));
     const isMultipart =
       mediaType === 'multipart/form-data' || mediaType === 'multipart/related';
     // Formidable's default plugins inspect the entire header. Select one for
@@ -52,23 +96,12 @@ class RequestParser extends AbstractMiddleware {
       ...(plugin ? { enabledPlugins: [plugin] } : {}),
     });
 
-    // JSON/urlencoded parsing buffers the body; multipart has its own field
-    // and file limits. Unknown media types retain the v5 fallback, bounded below.
-    const maxBodySize =
-      typeof parserOptions.maxFieldsSize === 'number'
-        ? parserOptions.maxFieldsSize
-        : 2 * 1024 * 1024;
+    // JSON/urlencoded parsing buffers the body (bounded by `maxBodySize`);
+    // multipart has its own field and file limits. Unknown media types retain
+    // the v5 fallback, bounded below.
     let bodyTooLarge = false;
     if (!isMultipart) {
-      const declaredLength = Number(req.headers?.['content-length']);
-      if (Number.isFinite(declaredLength) && declaredLength > maxBodySize) {
-        this.logger?.error(
-          `Request body ${declaredLength}B exceeds maxFieldsSize ${maxBodySize}B`,
-        );
-        // Close after the 413 instead of draining the unread body.
-        res.setHeader('Connection', 'close');
-        return next(this.#entityTooLarge(req));
-      }
+      this.#assertDeclaredLength(ctx, maxBodySize);
     }
     // Also guard chunked bodies. Only a genuinely selected multipart parser
     // may rely on the separate file/field limits. Pausing (not destroying) the
@@ -108,8 +141,8 @@ class RequestParser extends AbstractMiddleware {
         unlink(file.filepath).catch(() => {});
       }
     };
-    res.once('finish', cleanup);
-    res.once('close', cleanup);
+    // Once the response has ended: finished, aborted or failed alike.
+    ctx.onFinish(cleanup);
 
     let fields: formidable.Fields<string>;
     let files: formidable.Files<string>;
@@ -128,20 +161,18 @@ class RequestParser extends AbstractMiddleware {
       if (bodyTooLarge || (err as { httpCode?: number })?.httpCode === 413) {
         if (bodyTooLarge) {
           // The rest of the body stays unread; close rather than drain it.
-          res.setHeader('Connection', 'close');
+          ctx.response.setHeader('connection', 'close');
         }
-        return next(this.#entityTooLarge(req));
+        throw this.#entityTooLarge(ctx);
       }
-      return next(
-        new HttpError(400, {
-          code: FRAMEWORK_ERROR_CODES.malformedBody,
-          message: this.translate(
-            req,
-            'middleware.requestParser.parseError',
-            `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
-          ),
-        }),
-      );
+      throw new HttpError(400, {
+        code: FRAMEWORK_ERROR_CODES.malformedBody,
+        message: this.translate(
+          ctx,
+          'middleware.requestParser.parseError',
+          `Error to parse your request. You provided invalid content type or content-length. Please check your request headers and content type.`,
+        ),
+      });
     }
     this.logger?.verbose(
       `Parsing multipart/formdata request DONE ${Date.now() - time}ms`,
@@ -166,20 +197,58 @@ class RequestParser extends AbstractMiddleware {
         )
       : fields;
 
-    req.body = {
+    RequestContext.setBody(ctx, {
       // todo avoid body in next versions
-      ...(req.body || {}),
+      ...((ctx.body as object) || {}),
       ...normalizedFields,
       ...files,
-    };
-    return next();
+    });
   }
 
-  #entityTooLarge(req: FrameworkRequest) {
+  /** A declared length above the limit is refused before anything is read. */
+  #assertDeclaredLength(ctx: RequestContext<object>, maxBodySize: number) {
+    const declaredLength = Number(ctx.header('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > maxBodySize) {
+      this.logger?.error(
+        `Request body ${declaredLength}B exceeds maxFieldsSize ${maxBodySize}B`,
+      );
+      // Close after the 413 instead of draining the unread body.
+      ctx.response.setHeader('connection', 'close');
+      throw this.#entityTooLarge(ctx);
+    }
+  }
+
+  /** The bytes of a `bodyParsing: 'raw'` route, bounded like a parsed body. */
+  async #readRaw(
+    ctx: RequestContext<object>,
+    req: IncomingMessage,
+    maxBodySize: number,
+  ): Promise<Buffer> {
+    this.#assertDeclaredLength(ctx, maxBodySize);
+    if (!hasBody(ctx.headers)) {
+      return Buffer.alloc(0);
+    }
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of req) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += bytes.length;
+      if (size > maxBodySize) {
+        // Pausing (not destroying) keeps the socket writable for the 413.
+        req.pause();
+        ctx.response.setHeader('connection', 'close');
+        throw this.#entityTooLarge(ctx);
+      }
+      chunks.push(bytes);
+    }
+    return Buffer.concat(chunks);
+  }
+
+  #entityTooLarge(ctx: RequestContext<object>) {
     return new HttpError(413, {
       code: FRAMEWORK_ERROR_CODES.payloadTooLarge,
       message: this.translate(
-        req,
+        ctx,
         'middleware.requestParser.entityTooLarge',
         'Request entity too large. Your upload exceeds the allowed size or count limits.',
       ),

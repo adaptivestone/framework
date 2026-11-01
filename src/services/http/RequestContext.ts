@@ -43,6 +43,12 @@ export interface RequestSource {
   readonly routeMethods?: readonly string[] | undefined;
   /** @internal Address of the connection's peer (a proxy, or the client). */
   readonly peerAddress?: string | undefined;
+  /** @internal The Node request stream, for the framework's body parser. */
+  readonly incoming?: NodeJS.ReadableStream | undefined;
+  /** @internal Store the parsed body (`body` reads it back). */
+  setBody?(body: unknown): void;
+  /** @internal Store the captured bytes of a `bodyParsing: 'raw'` route. */
+  setRawBody?(bytes: Buffer): void;
   readonly params: Readonly<Record<string, string>>;
   readonly query: Readonly<Record<string, unknown>>;
   readonly body: unknown;
@@ -369,6 +375,23 @@ export class RequestContext<
    */
   static peerAddress(ctx: RequestContext<object>): string | undefined {
     return ctx.#source.peerAddress;
+  }
+
+  /** @internal The Node request stream (the framework's body parser reads it). */
+  static incoming(
+    ctx: RequestContext<object>,
+  ): NodeJS.ReadableStream | undefined {
+    return ctx.#source.incoming;
+  }
+
+  /** @internal Store the parsed body. */
+  static setBody(ctx: RequestContext<object>, body: unknown): void {
+    ctx.#source.setBody?.(body);
+  }
+
+  /** @internal Store the captured bytes of a `bodyParsing: 'raw'` route. */
+  static setRawBody(ctx: RequestContext<object>, bytes: Buffer): void {
+    ctx.#source.setRawBody?.(bytes);
   }
 
   /** @internal Record the error the registry turned into the response. */

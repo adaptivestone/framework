@@ -17,9 +17,12 @@ import {
 } from '../../../tests/assertions.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import { builtInResponse } from '../builtInResponse.ts';
+import Middleware from '../middleware/Middleware.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
+import type { Next, RequestContext } from '../RequestContext.ts';
 import { HttpResponse } from '../responses.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
+import type { MiddlewareEntry } from './RouteNode.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
 
 // ─── minimal mocks ───────────────────────────────────────────────────
@@ -862,6 +865,109 @@ describe('registered route rate-limit budgets', () => {
       assert.strictEqual(template, '/late/:id');
       assert.strictEqual(status, 200);
       assert.strictEqual((await send('GET', '/late/43')).status, 429);
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe('body parsing after routing (bodyParsing modes)', () => {
+  /** A real server whose routes record what their handler saw. */
+  const setup = async (appMiddleware: MiddlewareEntry[] = []) => {
+    const registry = new RouteRegistry();
+    const seen: Record<string, unknown> = {};
+    registry.registerRoute('POST', '/parsed', {
+      handler: (req: Request, res: Response) => {
+        seen.parsed = req.body;
+        res.json({ ok: true });
+      },
+    });
+    registry.registerRoute('POST', '/raw', {
+      bodyParsing: 'raw',
+      handler: (req: Request, res: Response) => {
+        seen.raw = {
+          body: req.body,
+          rawBody: (req as Request & { rawBody?: Buffer }).rawBody?.toString(),
+        };
+        res.json({ ok: true });
+      },
+    });
+    registry.registerRoute('POST', '/none', {
+      bodyParsing: 'none',
+      handler: async (req: Request, res: Response) => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) {
+          chunks.push(chunk as Buffer);
+        }
+        seen.none = { body: req.body, read: Buffer.concat(chunks).toString() };
+        res.json({ ok: true });
+      },
+    });
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as unknown as { appInfo: object }).appInfo = {
+        app: appInstance,
+        request: {},
+        query: {},
+        params: {},
+      };
+      next();
+    });
+    app.use(
+      createExpressAdapter(registry, appInstance, undefined, { appMiddleware }),
+    );
+    app.use((_req, res) => {
+      res.status(404).json({ fallthrough: true });
+    });
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const post = async (path: string, body: string) => {
+      const response = await fetch(`${origin}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      await response.arrayBuffer();
+      return response.status;
+    };
+    const close = () => {
+      server.closeAllConnections();
+      return new Promise((resolve) => server.close(resolve));
+    };
+    return { seen, post, close };
+  };
+
+  it("'parsed' (default) parses the body; 'raw' keeps the bytes; 'none' leaves the stream", async () => {
+    const { seen, post, close } = await setup();
+    try {
+      const json = '{"a":1}';
+      assert.strictEqual(await post('/parsed', json), 200);
+      assert.deepStrictEqual(seen.parsed, { a: 1 });
+
+      assert.strictEqual(await post('/raw', json), 200);
+      assert.deepStrictEqual(seen.raw, { body: undefined, rawBody: json });
+
+      assert.strictEqual(await post('/none', json), 200);
+      assert.deepStrictEqual(seen.none, { body: undefined, read: json });
+    } finally {
+      await close();
+    }
+  });
+
+  it('parses before app-wide middleware, and leaves unmatched requests unparsed', async () => {
+    const bodies: unknown[] = [];
+    class SeeBody extends Middleware {
+      middleware(ctx: RequestContext, next: Next) {
+        bodies.push(ctx.body);
+        return next();
+      }
+    }
+    const { post, close } = await setup([{ Class: SeeBody }]);
+    try {
+      assert.strictEqual(await post('/parsed', '{"a":1}'), 200);
+      assert.strictEqual(await post('/missing', '{"a":1}'), 404);
+      assert.deepStrictEqual(bodies, [{ a: 1 }, undefined]);
     } finally {
       await close();
     }

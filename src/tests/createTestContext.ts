@@ -23,6 +23,8 @@ export interface TestContextInit<AppInfo extends object> {
   signal?: AbortSignal;
   /** Address the connection came from (a proxy, or the client). Default `127.0.0.1`. */
   peerAddress?: string;
+  /** The raw request stream, for code that reads the body itself (e.g. `RequestParser`). */
+  incoming?: NodeJS.ReadableStream;
 }
 
 /**
@@ -48,6 +50,7 @@ export function createTestContext<
   } catch {
     // keep the raw path when it is not valid percent-encoding
   }
+  let body = init.body;
   const source: RequestSource = {
     method: (init.method ?? 'GET').toUpperCase(),
     url,
@@ -59,9 +62,15 @@ export function createTestContext<
     query:
       init.query ??
       Object.fromEntries(new URL(url, 'http://localhost').searchParams),
-    body: init.body,
+    get body() {
+      return body;
+    },
     signal: init.signal ?? new AbortController().signal,
     peerAddress: init.peerAddress ?? '127.0.0.1',
+    incoming: init.incoming,
+    setBody(value) {
+      body = value;
+    },
   };
   return new RequestContext<AppInfo>(source, (init.appInfo ?? {}) as AppInfo, {
     runInScope: runInRequestScope,

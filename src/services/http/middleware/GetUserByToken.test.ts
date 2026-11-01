@@ -1,16 +1,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { describe, it, mock } from 'node:test';
-import type { NextFunction, Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { createTestContext } from '../../../tests/createTestContext.ts';
 import { defaultAuthToken } from '../../../tests/testHelpers.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
 import { HttpResponse } from '../responses.ts';
-import GetUserByToken, {
-  type GetUserByTokenAppInfo,
-  type UserContext,
-} from './GetUserByToken.ts';
+import GetUserByToken, { type UserContext } from './GetUserByToken.ts';
 import RequestParser from './RequestParser.ts';
 
 /** Run the middleware on a test context; reports whether it continued. */
@@ -90,34 +85,28 @@ describe('getUserByToken middleware methods', () => {
   // so `token.replace(...)` no longer throws a 500. Pins the original symptom.
   it('resolves a urlencoded token end-to-end (RequestParser → GetUserByToken)', async () => {
     const status = await new Promise<number>((resolve) => {
-      const server = createServer((req, res) => {
-        const frReq = req as unknown as FrameworkRequest &
-          GetUserByTokenAppInfo;
-        frReq.appInfo = {
-          app: appInstance,
-          request: {},
-          query: {},
-          params: {},
-        };
-        frReq.body = {};
-
-        new RequestParser(appInstance).middleware(
-          frReq,
-          { once: () => {} } as unknown as Response,
-          (() => {
-            // The parsed body reaches GetUserByToken through the context.
-            const ctx = createTestContext<UserContext['appInfo']>({
-              body: frReq.body,
-              appInfo: frReq.appInfo,
-            });
-            new GetUserByToken(appInstance).middleware(ctx, async () => {
-              const code = ctx.appInfo.user ? 200 : 401;
-              res.writeHead(code);
-              res.end();
-              resolve(code);
-              return HttpResponse.empty(204);
-            });
-          }) as NextFunction,
+      const server = createServer(async (req, res) => {
+        // The parser fills the context's body; GetUserByToken reads it next.
+        const ctx = createTestContext<UserContext['appInfo']>({
+          method: 'POST',
+          headers: req.headers,
+          incoming: req,
+          body: {},
+          appInfo: {
+            app: appInstance,
+            request: {},
+            query: {},
+            params: {},
+          } as never,
+        });
+        await new RequestParser(appInstance).middleware(ctx, () =>
+          new GetUserByToken(appInstance).middleware(ctx, async () => {
+            const code = ctx.appInfo.user ? 200 : 401;
+            res.writeHead(code);
+            res.end();
+            resolve(code);
+            return HttpResponse.empty(204);
+          }),
         );
       });
       server.listen(null, async () => {

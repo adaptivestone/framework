@@ -1,12 +1,6 @@
 import type { Server } from 'node:http';
 import http from 'node:http';
-import type {
-  Express,
-  Handler,
-  NextFunction,
-  Request,
-  Response,
-} from 'express';
+import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 import type ThttpConfig from '../../config/http.ts';
 import Base from '../../modules/Base.ts';
@@ -34,7 +28,6 @@ import I18nMiddleware from './middleware/I18n.ts';
 import IpDetector from './middleware/IpDetector.ts';
 import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
 import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
-import RequestParserMiddleware from './middleware/RequestParser.ts';
 import { HttpResponse } from './responses.ts';
 import { createExpressAdapter } from './routing/ExpressAdapter.ts';
 import {
@@ -137,9 +130,8 @@ class HttpServer extends Base {
       );
     }
 
-    this.express.use(
-      new RequestParserMiddleware(this.app).getMiddleware() as Handler,
-    );
+    // Request bodies are parsed after routing, as the first step of each
+    // matched route (its `bodyParsing` mode decides how).
 
     this.httpServer = http.createServer(this.express);
 

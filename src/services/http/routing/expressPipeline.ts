@@ -430,6 +430,13 @@ function expressSource(
     get peerAddress() {
       return req.socket?.remoteAddress;
     },
+    incoming: req,
+    setBody(body: unknown) {
+      req.body = body;
+    },
+    setRawBody(bytes: Buffer) {
+      (req as Request & { rawBody?: Buffer }).rawBody = bytes;
+    },
     get routeMethods() {
       const methods = (
         req.route as { methods?: Record<string, boolean> } | undefined

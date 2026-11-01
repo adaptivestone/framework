@@ -15,15 +15,18 @@ import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
+import RequestParser from '../middleware/RequestParser.ts';
 import type { ResponseWriter } from '../ResponseWriter.ts';
 import { HttpResponse } from '../responses.ts';
 import {
   dispatchV2,
+  expressContext,
   isV2Middleware,
   middlewareInstance,
 } from './expressPipeline.ts';
 import { getMatchedNode, MalformedPathError } from './match.ts';
 import type {
+  BodyParsingMode,
   HandlerEntry,
   MatchResult,
   MiddlewareEntry,
@@ -103,6 +106,14 @@ export function createExpressAdapter(
   options: ExpressAdapterOptions = {},
 ): ExpressAdapter {
   const appMiddleware = options.appMiddleware ?? [];
+  // The body parser runs first on every matched route, in its `bodyParsing`
+  // mode (one instance per mode; `'none'` needs no parser).
+  const parsers: Record<'parsed' | 'raw', MiddlewareEntry> = {
+    parsed: { Class: RequestParser, params: { bodyParsing: 'parsed' } },
+    raw: { Class: RequestParser, params: { bodyParsing: 'raw' } },
+  };
+  const parserFor = (mode: BodyParsingMode | undefined) =>
+    mode === 'none' ? undefined : parsers[mode ?? 'parsed'];
   const routeTemplates = new WeakMap<RouteNode, string>();
   const indexTemplates = () =>
     registry.walk((node, path) => routeTemplates.set(node, path));
@@ -196,25 +207,30 @@ export function createExpressAdapter(
       ...(result.entry.meta ?? {}),
     };
 
-    if (appMiddleware.length > 0) {
-      // App-wide middleware: one chain around the route's own.
+    const parser = parserFor(result.bodyParsing);
+    if (
+      appMiddleware.length > 0 ||
+      result.entry.contract === 2 ||
+      result.middlewares.some(isV2Middleware)
+    ) {
+      // A strict-onion chain: the body parser, app-wide middleware, then the
+      // route's own middleware and handler.
       return runChain(
         result.entry,
-        [...appMiddleware, ...result.middlewares],
+        [...(parser ? [parser] : []), ...appMiddleware, ...result.middlewares],
         req,
         res,
         next,
       );
     }
-    if (
-      result.entry.contract === 2 ||
-      result.middlewares.some(isV2Middleware)
-    ) {
-      // A v2 handler or `Middleware` on the route: run it as a strict-onion chain.
-      return runChain(result.entry, result.middlewares, req, res, next);
-    }
 
     try {
+      // Only 5.x code on the route: parse the body first, then the 5.x dispatch.
+      if (parser) {
+        await (middlewareInstance(app, parser) as RequestParser).parse(
+          expressContext(app, req, res),
+        );
+      }
       for (const mwEntry of result.middlewares) {
         await runMiddleware(app, mwEntry, req, res);
         // Stop if the response finished (writableEnded) OR the client aborted

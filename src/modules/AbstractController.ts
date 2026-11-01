@@ -56,9 +56,9 @@ type RouteObject = {
    */
   params?: StandardSchemaV1 | null;
   /**
-   * Per-route body parsing mode. Only `'parsed'` (the default) takes effect;
-   * `'raw'` and `'none'` are reserved, not implemented yet, and currently do
-   * nothing (the parser runs globally). See {@link BodyParsingMode}.
+   * Per-route body parsing mode: `'parsed'` (default), `'raw'` (bytes in
+   * `req.rawBody`, body unparsed) or `'none'` (stream untouched). See
+   * {@link BodyParsingMode}.
    */
   bodyParsing?: BodyParsingMode;
 };

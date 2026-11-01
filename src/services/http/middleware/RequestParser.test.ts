@@ -1,22 +1,70 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
-import type { IncomingMessage } from 'node:http';
-import { createServer, request } from 'node:http';
+import { createServer, type IncomingMessage, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
-import type { Handler, NextFunction, Response } from 'express';
+import type { NextFunction, Response } from 'express';
 import express from 'express';
 import { PersistentFile } from 'formidable';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import {
+  createTestContext,
+  finishTestContext,
+} from '../../../tests/createTestContext.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { HttpError } from '../httpErrors.ts';
-
+import { HttpResponse } from '../responses.ts';
+import { expressMiddleware } from '../routing/expressPipeline.ts';
 import RequestParser from './RequestParser.ts';
+
+type Headers = Record<string, string | string[] | undefined>;
+const baseAppInfo = () => ({
+  app: appInstance,
+  request: {},
+  query: {},
+  params: {},
+});
+
+/**
+ * Run the parser on a context over `incoming`. Resolves to the outcome: 200
+ * with the parsed body, or the thrown `HttpError`'s status, code and message.
+ */
+const parseWith = async (
+  incoming: NodeJS.ReadableStream & { headers: Headers },
+  params?: Record<string, unknown>,
+  appInfo: Record<string, unknown> = baseAppInfo(),
+) => {
+  const ctx = createTestContext({
+    method: 'POST',
+    headers: incoming.headers,
+    incoming,
+    body: {},
+    appInfo,
+  });
+  try {
+    await new RequestParser(appInstance, params).middleware(ctx, async () =>
+      HttpResponse.empty(204),
+    );
+    return { ctx, status: 200, body: ctx.body as Record<string, unknown> };
+  } catch (err) {
+    if (!(err instanceof HttpError)) {
+      throw err;
+    }
+    return {
+      ctx,
+      status: err.status,
+      code: err.code,
+      payload: { message: err.message },
+      body: ctx.body as Record<string, unknown>,
+    };
+  }
+};
 
 const boundary = 'testboundary18';
 const multipartBody =
@@ -42,9 +90,8 @@ const waitFor = async (pred: () => boolean, timeoutMs = 2000) => {
 };
 
 // Drives RequestParser through a real HTTP round-trip and returns the resulting
-// status + parsed `req.body`. A shim gives the (Express-shaped) status/json the
-// error path needs while delegating `once` to the real response so the
-// temp-file cleanup (registered on 'finish'/'close') actually runs.
+// status + parsed body. The context is finished when the response ends, so the
+// temp-file cleanup (an `onFinish` callback) actually runs.
 const postToParser = ({
   body,
   contentType,
@@ -57,48 +104,14 @@ const postToParser = ({
   new Promise((resolve) => {
     let result = { status: 0, body: {} as Record<string, unknown> };
     const server = createServer(async (req, res) => {
-      const frReq = req as unknown as FrameworkRequest;
-      frReq.appInfo = { app: appInstance, request: {}, query: {}, params: {} };
-      frReq.body = {};
-      let status = 200;
-      const resShim = {
-        status(code: number) {
-          status = code;
-          return resShim;
-        },
-        json() {
-          res.writeHead(status);
-          res.end('{}');
-          return resShim;
-        },
-        once(event: string, cb: () => void) {
-          res.once(event, cb);
-          return resShim;
-        },
-        setHeader(name: string, value: string) {
-          res.setHeader(name, value);
-          return resShim;
-        },
-      };
-      await new RequestParser(appInstance, params).middleware(
-        frReq,
-        resShim as unknown as Response,
-        ((err?: unknown) => {
-          // Rejections arrive as an `HttpError` for the error sink.
-          if (err) {
-            status = (err as HttpError).status;
-            res.writeHead(status);
-            res.end('{}');
-            return;
-          }
-          result = { status: 200, body: frReq.body };
-          res.writeHead(200);
-          res.end('ok');
-        }) as NextFunction,
+      const outcome = await parseWith(
+        req as IncomingMessage & { headers: Headers },
+        params,
       );
-      if (status !== 200) {
-        result = { status, body: frReq.body };
-      }
+      res.once('close', () => finishTestContext(outcome.ctx));
+      result = { status: outcome.status, body: outcome.body };
+      res.writeHead(outcome.status);
+      res.end(outcome.status === 200 ? 'ok' : '{}');
     });
     server.listen(null, async () => {
       const address = server.address();
@@ -123,139 +136,31 @@ describe('reqest parser limiter methods', () => {
   });
 
   it('middleware that works', async () => {
-    await new Promise<boolean>((done) => {
-      // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
-
-      const server = createServer(async (req: IncomingMessage, res) => {
-        // Add appInfo property to req
-        (req as unknown as FrameworkRequest).appInfo = {
-          app: appInstance,
-          request: {},
-          query: {},
-          params: {},
-        };
-
-        const middleware = new RequestParser(appInstance);
-        middleware.middleware(
-          req as FrameworkRequest,
-          // pass the real response so the cleanup hooks (res.once) attach
-          res as unknown as Response,
-          ((err?: Error) => {
-            assert.strictEqual(err, undefined);
-
-            // Get the body once to avoid linting issues
-            const reqBody = (req as unknown as FrameworkRequest).body;
-            assert.notStrictEqual(reqBody.title, undefined);
-            assert.notStrictEqual(reqBody.multipleFiles, undefined);
-            assert.ok(reqBody.multipleFiles[0] instanceof PersistentFile);
-
-            res.writeHead(200);
-            res.end('ok');
-          }) as NextFunction,
-        );
-      });
-      server.listen(null, async () => {
-        const address = server.address();
-        const chosenPort = typeof address === 'string' ? 0 : address?.port;
-        const body = `----13068458571765726332503797717\r
-Content-Disposition: form-data; name="title"\r
-\r
-a\r
-----13068458571765726332503797717\r
-Content-Disposition: form-data; name="multipleFiles"; filename="x.txt"\r
-Content-Type: application/x-javascript\r
-\r
-\r
-\r
-a\r
-b\r
-c\r
-d\r
-\r
-----13068458571765726332503797717--\r
-`;
-        await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
-          method: 'POST',
-          headers: {
-            'Content-Length': body.length.toString(),
-            Host: `localhost:${chosenPort}`,
-            'Content-Type':
-              'multipart/form-data; boundary=--13068458571765726332503797717',
-          },
-          body,
-        }).catch((err) => {
-          console.error(err);
-          done(err);
-        });
-        server.close(() => {
-          done(true);
-        });
-      });
+    const formBoundary = '--13068458571765726332503797717';
+    const { status, body } = await postToParser({
+      body:
+        `--${formBoundary}\r\n` +
+        'Content-Disposition: form-data; name="title"\r\n\r\na\r\n' +
+        `--${formBoundary}\r\n` +
+        'Content-Disposition: form-data; name="multipleFiles"; filename="x.txt"\r\n' +
+        'Content-Type: application/x-javascript\r\n\r\n\r\n\r\na\r\nb\r\nc\r\nd\r\n\r\n' +
+        `--${formBoundary}--\r\n`,
+      contentType: `multipart/form-data; boundary=${formBoundary}`,
     });
+
+    assert.strictEqual(status, 200);
+    assert.notStrictEqual(body.title, undefined);
+    const files = body.multipleFiles as unknown[];
+    assert.ok(files[0] instanceof PersistentFile);
   });
 
   it('middleware with a problem', async () => {
-    await new Promise<boolean>((done) => {
-      // from https://github.com/node-formidable/formidable/blob/master/test-node/standalone/promise.test.js
-
-      const server = createServer(async (req: IncomingMessage, res) => {
-        const frReq = {
-          ...req,
-          appInfo: {
-            app: appInstance,
-            request: {},
-            query: {},
-          },
-          body: {},
-        } as FrameworkRequest;
-        const middleware = new RequestParser(appInstance);
-        let status = 0;
-
-        const resp = {
-          status: (code: number) => {
-            status = code;
-            return resp;
-          },
-          json: () => resp,
-          once: () => resp,
-        };
-        await middleware.middleware(
-          frReq,
-          resp as unknown as Response,
-          ((err?: unknown) => {
-            // The rejection is passed on for the error sink to answer.
-            status = err instanceof HttpError ? err.status : status;
-          }) as NextFunction,
-        );
-
-        assert.strictEqual(status, 400);
-        // expect(err).toBeDefined();
-
-        res.writeHead(200);
-        res.end('ok');
-      });
-      server.listen(null, async () => {
-        const address = server.address();
-        const chosenPort = typeof address === 'string' ? 0 : address?.port;
-        const body = 'someBadBody';
-
-        await fetch(String(new URL(`http:localhost:${chosenPort}/`)), {
-          method: 'POST',
-          headers: {
-            'Content-Length': body.length.toString(),
-            Host: `localhost:${chosenPort}`,
-            'Content-Type': 'badContentType',
-          },
-          body,
-        }).catch((err) => {
-          console.error(err);
-          done(err);
-        });
-        server.close(() => {
-          done(true);
-        });
-      });
+    const { status } = await postToParser({
+      body: 'someBadBody',
+      contentType: 'badContentType',
     });
+    // The rejection is thrown for the error handlers to answer.
+    assert.strictEqual(status, 400);
   });
 
   describe('limits + cleanup + field shapes (doc 18)', () => {
@@ -343,42 +248,12 @@ const makeRequest = ({
   return req;
 };
 
-const runParser = async (
-  req: FrameworkRequest,
-  params?: Record<string, unknown>,
-) => {
-  let status = 0;
-  let code: string | undefined;
-  let payload: Record<string, unknown> = {};
-  const res = {
-    status(statusCode: number) {
-      status = statusCode;
-      return res;
-    },
-    json(body: Record<string, unknown>) {
-      payload = body;
-      return res;
-    },
-    once() {
-      return res;
-    },
-    setHeader() {
-      return res;
-    },
-  };
-  await new RequestParser(appInstance, params).middleware(
-    req,
-    res as unknown as Response,
-    ((err?: unknown) => {
-      if (err instanceof HttpError) {
-        status = err.status;
-        code = err.code;
-        payload = { message: err.message };
-      }
-    }) as NextFunction,
+const runParser = (req: FrameworkRequest, params?: Record<string, unknown>) =>
+  parseWith(
+    req as unknown as NodeJS.ReadableStream & { headers: Headers },
+    params,
+    req.appInfo as unknown as Record<string, unknown>,
   );
-  return { status, code, payload };
-};
 
 /**
  * All three rejection bodies go through `translate()`: an app that ships the
@@ -522,7 +397,7 @@ describe('request parser media-type isolation', () => {
     req.headers['transfer-encoding'] = 'chunked';
     const result = await runParser(req, { maxFieldsSize: 32 });
     assert.strictEqual(result.status, 413);
-    assert.deepStrictEqual(req.body, {});
+    assert.deepStrictEqual(result.body, {});
   });
 
   it('answers an oversized streamed body with 413, not a connection reset', async () => {
@@ -537,9 +412,11 @@ describe('request parser media-type isolation', () => {
       next();
     });
     app.use(
-      new RequestParser(appInstance, {
-        maxFieldsSize: 32,
-      }).getMiddleware() as Handler,
+      expressMiddleware(
+        appInstance,
+        new ExpressResponseWriter(),
+        new RequestParser(appInstance, { maxFieldsSize: 32 }),
+      ),
     );
     app.use((_req, res) => {
       res.json({ ok: true });
@@ -587,5 +464,28 @@ describe('request parser media-type isolation', () => {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+});
+
+describe('request parser modes', () => {
+  it("'raw' is bounded like a parsed body; 'none' does not read the stream", async () => {
+    const tooBig = makeRequest({
+      body: 'x'.repeat(64),
+      contentType: 'application/octet-stream',
+    });
+    const raw = await runParser(tooBig, {
+      bodyParsing: 'raw',
+      maxFieldsSize: 8,
+    });
+    assert.strictEqual(raw.status, 413);
+
+    const untouched = makeRequest({
+      body: '{"a":1}',
+      contentType: 'application/json',
+    });
+    const none = await runParser(untouched, { bodyParsing: 'none' });
+    assert.strictEqual(none.status, 200);
+    assert.deepStrictEqual(none.body, {});
+    assert.strictEqual((untouched as unknown as Readable).readableEnded, false);
   });
 });
