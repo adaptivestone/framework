@@ -1,7 +1,11 @@
 # P3 — `NodeAdapter` (drop Express router)
 
-**Status**: ⏸ deferred
-**Depends on**: P1b, [P1q universal HTTP responses](../active/universal-http-responses.md), P2c
+**Status**: ⏸ deferred — **owner target (2026-11-01): ships in 5.x as an opt-in adapter**, so Express
+becomes optional before v6 removes it. Needs a design pass before it moves to `queued/`.
+**Depends on**: P1b, [P1q universal HTTP responses](../active/universal-http-responses.md),
+[P1m](../queued/async-middleware.md) (the portable pipeline it runs), the app-wide middleware API
+([v6-api-stability](../queued/v6-api-stability.md) item 1). The P2c performance gate below no
+longer blocks it (owner target).
 **Unblocks**: P4
 
 ## Goal (one-line)
@@ -46,4 +50,4 @@ What still needs work when h2 is activated:
 
 ## Out of scope until activated
 
-Skip until P2c's perf gate is met or explicitly skipped.
+Superseded 2026-11-01: the owner targets this adapter for 5.x regardless of the P2c gate.

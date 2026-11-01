@@ -1,6 +1,8 @@
 # P5 — Edge / drop Express
 
-**Status**: ⏸ deferred
+**Status**: ⏸ deferred — **owner target (2026-11-01): removing the Express adapter and the `express`
+dependency is the v6 milestone.** The other goals below (Fetch-style, Bun and Deno adapters,
+Cloudflare Containers, MCP items) stay later and ship as 6.x minors.
 **Depends on**: P4
 **Unblocks**: nothing — terminal phase
 
