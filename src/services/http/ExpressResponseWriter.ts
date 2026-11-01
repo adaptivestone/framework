@@ -1,4 +1,3 @@
-import { pipeline } from 'node:stream/promises';
 import type { Request, Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
@@ -57,7 +56,11 @@ export class ExpressResponseWriter
     const { statusCode, statusMessage } = res;
     const headers = res.getHeaders();
     try {
-      await render(this.#transformed(response, req), req, res);
+      const final = this.#transformed(response, req);
+      if (final !== response) {
+        discardReplacedBody(response, final);
+      }
+      await render(final, req, res);
     } catch (err) {
       if (!res.headersSent) {
         for (const name of res.getHeaderNames()) {
@@ -184,6 +187,41 @@ function applyHeaders(res: Response, headers: ResponseHeaders): void {
   }
 }
 
+/** The byte source a response would read, if any. */
+function bodySource(response: HttpResponse): ByteStream | undefined {
+  if (response.kind === 'stream') {
+    return response.body;
+  }
+  if (response.kind === 'native') {
+    return response.response.body ?? undefined;
+  }
+  return undefined;
+}
+
+/** A transform that replaced a streaming response: stop the source it dropped. */
+function discardReplacedBody(
+  original: HttpResponse,
+  replacement: HttpResponse,
+): void {
+  const dropped = bodySource(original);
+  if (dropped && dropped !== bodySource(replacement)) {
+    cancelSource(dropped);
+  }
+}
+
+/** Stop a byte source that will not be read. A failure to stop is ignored. */
+function cancelSource(body: ByteStream): void {
+  try {
+    const stopped =
+      body instanceof ReadableStream
+        ? body.cancel()
+        : body[Symbol.asyncIterator]().return?.();
+    Promise.resolve(stopped).catch(() => {});
+  } catch {
+    // A source that throws while stopping is already broken; nothing more to do.
+  }
+}
+
 /** A `ReadableStream` read through its reader, so a disconnect cancels a pending read at once. */
 function iterate(body: ByteStream): AsyncIterator<Uint8Array> {
   if (body instanceof ReadableStream) {
@@ -199,11 +237,15 @@ function iterate(body: ByteStream): AsyncIterator<Uint8Array> {
   return body[Symbol.asyncIterator]();
 }
 
+const DISCONNECTED = Symbol('disconnected');
+
 /**
  * Send a byte source. Nothing is committed until the first chunk arrives, so
  * an error before it rejects with `res` untouched. After that, an error
  * destroys the response and rejects. A client disconnect stops the source
- * and resolves.
+ * and resolves, also while a chunk is still pending — Node's `pipeline` keeps
+ * waiting on a pending read after the client has gone, so each read is raced
+ * against the disconnect here.
  */
 async function writeStream(
   req: Request,
@@ -212,36 +254,84 @@ async function writeStream(
   commit: () => void,
 ): Promise<void> {
   const source = iterate(body);
+  let stopped = false;
   const stop = () => {
-    Promise.resolve(source.return?.()).catch(() => {});
+    if (stopped) {
+      return;
+    }
+    stopped = true;
+    try {
+      Promise.resolve(source.return?.()).catch(() => {});
+    } catch {
+      // A source that throws while stopping is already broken; nothing more to do.
+    }
   };
-  if (req.method === 'HEAD') {
+  if (req.method === 'HEAD' || res.destroyed) {
     stop();
-    commit();
-    res.end();
+    if (!res.destroyed) {
+      commit();
+      res.end();
+    }
     return;
   }
-  res.once('close', stop);
-  try {
-    const first = await source.next();
-    if (res.destroyed) {
-      // 'close' may not have fired yet, and `finally` drops its listener.
+  let disconnected: () => void = () => {};
+  const closed = new Promise<typeof DISCONNECTED>((resolve) => {
+    disconnected = () => resolve(DISCONNECTED);
+  });
+  const onClose = () => {
+    stop();
+    disconnected();
+  };
+  // A transport error is followed by 'close', which ends the write.
+  const onError = () => {};
+  res.once('close', onClose);
+  res.on('error', onError);
+  /** The next chunk, or `undefined` once the client has gone. */
+  const read = async (): Promise<IteratorResult<Uint8Array> | undefined> => {
+    const pending = source.next();
+    const step = await Promise.race([pending, closed]);
+    if (step === DISCONNECTED || res.destroyed) {
+      // The chunk may still arrive (or fail) later; nobody reads it.
+      Promise.resolve(pending).catch(() => {});
       stop();
+      return undefined;
+    }
+    return step;
+  };
+  try {
+    let step = await read();
+    if (!step) {
       return;
     }
     commit();
-    if (first.done) {
-      res.end();
-      return;
+    while (!step.done) {
+      if (!res.write(step.value)) {
+        const drained = await Promise.race([once(res, 'drain'), closed]);
+        if (drained === DISCONNECTED) {
+          return;
+        }
+      }
+      step = await read();
+      if (!step) {
+        return;
+      }
     }
-    res.write(first.value);
-    await pipeline({ [Symbol.asyncIterator]: () => source }, res);
+    res.end();
   } catch (err) {
-    if ((err as { code?: unknown }).code === 'ERR_STREAM_PREMATURE_CLOSE') {
-      return;
+    if (res.headersSent) {
+      stop();
+      res.destroy();
     }
     throw err;
   } finally {
-    res.off('close', stop);
+    res.off('close', onClose);
+    res.off('error', onError);
   }
+}
+
+/** Resolves on the first `event`; `closed` covers the transport going away. */
+function once(res: Response, event: 'drain'): Promise<void> {
+  return new Promise((resolve) => {
+    res.once(event, () => resolve());
+  });
 }

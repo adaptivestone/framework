@@ -351,6 +351,101 @@ describe('ExpressResponseWriter — streams', () => {
     assert.strictEqual(await withTimeout(handled, 'write settles'), undefined);
   });
 
+  it('a disconnect before the first chunk settles the write and stops the source', async () => {
+    let nextCalled: () => void = () => {};
+    const waiting = new Promise<void>((resolve) => {
+      nextCalled = resolve;
+    });
+    let returns = 0;
+    serve(() =>
+      HttpResponse.stream(200, {
+        [Symbol.asyncIterator]: () => ({
+          next: () => {
+            nextCalled();
+            // The first chunk never comes: only the disconnect ends this write.
+            return new Promise<IteratorResult<Uint8Array>>(() => {});
+          },
+          return: async () => {
+            returns += 1;
+            return { done: true as const, value: undefined };
+          },
+        }),
+      }),
+    );
+    const request = http.get(origin);
+    request.on('error', () => {});
+    await withTimeout(waiting, 'first next() called');
+    request.destroy();
+    assert.strictEqual(await withTimeout(handled, 'write settles'), undefined);
+    assert.ok(returns >= 1);
+  });
+
+  it('a disconnect while a later chunk is pending settles the write', async () => {
+    let first = true;
+    let returns = 0;
+    serve(() =>
+      HttpResponse.stream(200, {
+        [Symbol.asyncIterator]: () => ({
+          next: () => {
+            if (first) {
+              first = false;
+              return Promise.resolve({ done: false, value: bytesOf('first') });
+            }
+            return new Promise<IteratorResult<Uint8Array>>(() => {});
+          },
+          return: async () => {
+            returns += 1;
+            return { done: true as const, value: undefined };
+          },
+        }),
+      }),
+    );
+    await abortAfterFirstChunk();
+    assert.strictEqual(await withTimeout(handled, 'write settles'), undefined);
+    assert.strictEqual(returns, 1);
+  });
+
+  it('a large stream arrives whole (backpressure)', async () => {
+    const chunk = new Uint8Array(64 * 1024).fill(97);
+    const count = 160; // 10 MiB, well past the socket buffer
+    serve(() =>
+      HttpResponse.stream(
+        200,
+        (async function* () {
+          for (let i = 0; i < count; i += 1) {
+            yield chunk;
+          }
+        })(),
+      ),
+    );
+    const response = await fetch(origin);
+    const body = new Uint8Array(await response.arrayBuffer());
+    assert.strictEqual(body.byteLength, chunk.byteLength * count);
+    assert.strictEqual(await handled, undefined);
+  });
+
+  it('a source whose return() throws does not break the disconnect', async () => {
+    let first = true;
+    serve(() =>
+      HttpResponse.stream(200, {
+        [Symbol.asyncIterator]: () => ({
+          next: () => {
+            if (first) {
+              first = false;
+              return Promise.resolve({ done: false, value: bytesOf('first') });
+            }
+            return new Promise<IteratorResult<Uint8Array>>(() => {});
+          },
+          return: () => {
+            throw new Error('return() is broken');
+          },
+        }),
+      }),
+    );
+    await abortAfterFirstChunk();
+    assert.strictEqual(await withTimeout(handled, 'write settles'), undefined);
+  });
+
   it('HEAD cancels the source without reading it', async () => {
     let pulls = 0;
     let cancels = 0;
@@ -471,6 +566,44 @@ describe('ExpressResponseWriter — transform', () => {
     const response = await fetch(`${origin}/seen`);
     assert.strictEqual(await response.text(), 'plain');
     assert.strictEqual(seenPath, '/seen');
+  });
+
+  it('cancels a stream the transform replaced, keeps one it re-wrapped', async () => {
+    let cancels = 0;
+    const source = () =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytesOf('body'));
+          controller.close();
+        },
+        cancel() {
+          cancels += 1;
+        },
+      });
+    serveWith(
+      (response) =>
+        response.kind === 'stream' ? HttpResponse.empty(204) : response,
+      () => HttpResponse.stream(200, source()),
+    );
+    const replaced = await fetch(origin);
+    await handled;
+    assert.strictEqual(replaced.status, 204);
+    assert.strictEqual(cancels, 1);
+
+    serveWith(
+      (response) =>
+        response.kind === 'stream'
+          ? HttpResponse.stream(response.status, response.body, {
+              headers: { 'x-wrapped': '1' },
+            })
+          : response,
+      () => HttpResponse.stream(200, source()),
+    );
+    const rewrapped = await fetch(origin);
+    assert.strictEqual(rewrapped.headers.get('x-wrapped'), '1');
+    assert.strictEqual(await rewrapped.text(), 'body');
+    await handled;
+    assert.strictEqual(cancels, 1);
   });
 
   it('sends the original and reports a transform that throws', async () => {
