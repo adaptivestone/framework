@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) and 2b (built-ins converted in place, body parsing after routing, security headers) done; raw-body accessor on `ctx` next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) 2b (built-ins converted in place, body parsing after routing, security headers) and the raw-body accessors on `ctx` done; the response-kind fixture, re-measure and migration docs next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -36,6 +36,7 @@ descriptors, `transformResponse`).
 | App-wide middleware      | **Decided 2026-11-01 (A):** a `Server` option, `middleware: [Class, [Class, params], …]` — v2 `Middleware` classes only, after the built-ins and around routing (routes, 404, 405). Supersedes the older `app.useGlobal()` / `registerGlobalMiddleware()` sketches (never built); a registration call can still be added in a minor. |
 | Built-ins                | **Decided 2026-11-01 (A):** converted in place in 5.x — one version, same names and paths; old-shape subclass overrides are refused at registration; direct `(req, res, next)` callers get a CHANGELOG note.                                                                                                                         |
 | Security headers         | **Decided 2026-11-01 (A):** stay the response's starting headers — set by the adapter before any middleware runs (`services/http/securityHeaders.ts`, shared by the Express and future Node adapters), not a staged `Middleware`; a route can still override or remove one.                                                          |
+| Raw body on `ctx`        | **Decided 2026-11-01 (A, after a Fable review):** `ctx.rawBody: Buffer \| undefined` (`'raw'` routes) and `ctx.bodyStream: ReadableStream<Uint8Array> \| undefined` (`'none'` routes, read once). `ctx.request` (a lazy Fetch `Request` view) is reserved for later; not shipped.                                                    |
 | Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
@@ -527,9 +528,18 @@ adapter (P3) the same class reads from Node directly.
   over new `RequestSource` fields; `createTestContext` accepts `incoming` and keeps a settable body.
   Temp-file cleanup moved to `ctx.onFinish`; `Connection: close` is staged on `ctx.response`.
 - Break (CHANGELOG): Express middleware added in `bootHttp` no longer see a parsed `req.body`.
-- Not done (still open): a public raw-body accessor on `ctx` for `ctx` handlers on `'raw'` routes
-  (the v6 checklist reserves one); the parser registry (`app.parsers`, v5.1 extra); the runtime
-  warning for body-reading middleware on `'raw'`/`'none'` routes (decisions.md, optional).
+- Raw body on `ctx` (done 2026-11-01, owner decision A after a Fable review that weighed the Fetch
+  `Request` model): `ctx.rawBody` (the captured `Buffer`, set on every `'raw'` route, empty without
+  a body) and `ctx.bodyStream` (the unread body as a standard `ReadableStream`, built over the
+  request's async iterator — not `Readable.toWeb`, which may still be marked experimental — one
+  stream per context, `undefined` once the framework parsed or captured the body). Fetch helpers come
+  from `new Response(ctx.bodyStream)`. No cancel on finish: Node discards an unread body itself (a
+  plain Node server closes that connection; Bun reuses it) and cancelling would destroy the socket.
+  `ctx.request` (a lazy Fetch `Request` view) stays reserved for later. Tests: `RequestContext.test.ts`
+  +3, `ExpressAdapter.test.ts` +2 over HTTP (ctx reads both; an unread `'none'` body does not stall
+  later requests); the packed type fixture reads both.
+- Not done (still open): the parser registry (`app.parsers`, v5.1 extra); the runtime warning for
+  body-reading middleware on `'raw'`/`'none'` routes (decisions.md, optional).
 - Tests: `RequestParser.test.ts` harnesses run on contexts (all 19 cases kept) + a modes case
   (`'raw'` bounded, `'none'` unread); `ExpressAdapter.test.ts` +2 over HTTP (the three modes;
   parser before app-wide middleware and unmatched requests unparsed); the `GetUserByToken`
@@ -542,7 +552,7 @@ reads its list from `securityHeaders(getConfig)` (`services/http/securityHeaders
 adapter applies the same headers the same way. No behaviour change; `securityHeaders.test.ts` +1.
 Phase 2b is complete: every built-in is a `Middleware`, one version, same names and paths.
 
-**Still open for P1m:** a public raw-body accessor on `ctx` (owner question),
+**Still open for P1m:**
 the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
 re-measure.
 
