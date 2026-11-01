@@ -111,6 +111,14 @@ export interface NativeResponse extends ResponseBase<'native', number> {
   readonly response: Response;
 }
 
+/**
+ * 5.x only: the response was already written by code that used `res`
+ * directly (a v1 handler or middleware inside a v2 chain). Nothing is left to
+ * write, and it cannot be replaced — the bytes are gone. Pass it through
+ * unchanged. Removed in v6 together with `res`.
+ */
+export interface SentResponse extends ResponseBase<'sent', number> {}
+
 /** Statuses that never carry a body, as a runtime set. */
 export const NO_BODY_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([
@@ -327,6 +335,19 @@ function native(response: Response): NativeResponse {
   });
 }
 
+/**
+ * @internal A v1 handler or middleware wrote `status` through `res` itself.
+ * Not a public factory: only the 5.x bridge produces it.
+ */
+export function legacySentResponse(status: number): SentResponse {
+  return Object.freeze({
+    [BRAND]: true as const,
+    kind: 'sent' as const,
+    status,
+    headers: NO_HEADERS,
+  });
+}
+
 /** Is `value` a response built by an `HttpResponse` factory? */
 function is(value: unknown): value is HttpResponse {
   return (
@@ -361,4 +382,5 @@ export type HttpResponse =
   | StreamResponse<number, string>
   | RedirectResponse
   | EmptyResponse
-  | NativeResponse;
+  | NativeResponse
+  | SentResponse;

@@ -16,6 +16,11 @@ import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import type { ResponseWriter } from '../ResponseWriter.ts';
 import { HttpResponse } from '../responses.ts';
+import {
+  dispatchV2,
+  isV2Middleware,
+  middlewareInstance,
+} from './expressPipeline.ts';
 import { getMatchedNode, MalformedPathError } from './match.ts';
 import type {
   HandlerEntry,
@@ -24,8 +29,6 @@ import type {
   RouteNode,
 } from './RouteNode.ts';
 import type { RouteRegistry } from './RouteRegistry.ts';
-
-const instanceCache = new WeakMap<MiddlewareEntry, AbstractMiddleware>();
 
 const warnedDroppedResponse = new Set<string>();
 
@@ -121,6 +124,25 @@ export function createExpressAdapter(
       ...(result.entry.meta ?? {}),
     };
 
+    if (result.middlewares.some(isV2Middleware)) {
+      // A v2 `Middleware` on the route: run it as a strict-onion chain.
+      try {
+        await dispatchV2(
+          app,
+          writer,
+          result.entry,
+          result.middlewares,
+          req,
+          res,
+          next,
+          warnDroppedResponse,
+        );
+      } catch (err) {
+        next(err);
+      }
+      return;
+    }
+
     try {
       for (const mwEntry of result.middlewares) {
         await runMiddleware(app, mwEntry, req, res);
@@ -167,13 +189,7 @@ function runMiddleware(
   req: Request,
   res: Response,
 ): Promise<void> {
-  let instance = instanceCache.get(entry);
-  if (!instance) {
-    // Default params to `{}` — matches legacy `parseMiddlewares` behavior
-    // and prevents middlewares that destructure `this.params` from crashing.
-    instance = new entry.Class(app, entry.params ?? {});
-    instanceCache.set(entry, instance);
-  }
+  const instance = middlewareInstance(app, entry);
 
   return new Promise<void>((resolve, reject) => {
     let resolved = false;

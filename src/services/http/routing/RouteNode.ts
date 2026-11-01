@@ -6,9 +6,11 @@
  * shape.
  */
 
+import type { IApp } from '../../../server.ts';
 import type { RequestContentTypeMap } from '../../validate/contentType.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
+import type Middleware from '../middleware/Middleware.ts';
 
 /**
  * HTTP methods, upper-case. Single source of truth for the framework;
@@ -48,8 +50,21 @@ export type BodyParsingMode = 'parsed' | 'raw' | 'none';
  * tuple shorthand is normalized to this struct at the boundary
  * (`middlewareNormalization.ts`).
  */
+/**
+ * A v2 middleware class: extends `Middleware` (`(ctx, next)`), constructed
+ * like every middleware with `(app, params)`.
+ */
+export type V2MiddlewareClass = (new (
+  app: IApp,
+  params?: Record<string, unknown>,
+) => Middleware) &
+  Omit<typeof Middleware, 'prototype'>;
+
+/** Either middleware contract: `AbstractMiddleware` (5.x) or `Middleware` (v2). */
+export type MiddlewareClass = typeof AbstractMiddleware | V2MiddlewareClass;
+
 export interface MiddlewareEntry {
-  Class: typeof AbstractMiddleware;
+  Class: MiddlewareClass;
   params?: Record<string, unknown>;
 }
 
@@ -61,6 +76,12 @@ export interface MiddlewareEntry {
 export interface HandlerEntry {
   // biome-ignore lint/complexity/noBannedTypes: handlers are user-provided callables of varying shape
   handler: Function;
+  /**
+   * @internal Validation + handler without the controller's error catch: errors
+   * escape unchanged. Used when the route runs as a v2 (`Middleware`) chain.
+   */
+  // biome-ignore lint/complexity/noBannedTypes: handlers are user-provided callables of varying shape
+  rawHandler?: Function;
   request?: StandardSchemaV1 | RequestContentTypeMap;
   query?: StandardSchemaV1;
   params?: StandardSchemaV1;

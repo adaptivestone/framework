@@ -53,6 +53,10 @@ export class ExpressResponseWriter
     req: Request,
     res: Response,
   ): Promise<void> {
+    if (response.kind === 'sent') {
+      // Already written through `res` by 5.x code; nothing to transform or send.
+      return;
+    }
     const { statusCode, statusMessage } = res;
     const headers = res.getHeaders();
     try {
@@ -167,6 +171,9 @@ async function render(
       }
       return writeStream(req, res, native.body, commit);
     }
+    case 'sent':
+      // A transform that returned an already-sent response: nothing to write.
+      return;
   }
 }
 

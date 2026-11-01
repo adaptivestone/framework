@@ -1,14 +1,16 @@
 import type { IApp } from '../server.ts';
-import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import Auth from '../services/http/middleware/Auth.ts';
 import GetUserByToken from '../services/http/middleware/GetUserByToken.ts';
-import type { BodyParsingMode } from '../services/http/routing/RouteNode.ts';
+import type {
+  BodyParsingMode,
+  MiddlewareClass,
+} from '../services/http/routing/RouteNode.ts';
 import type { RequestContentTypeMap } from '../services/validate/contentType.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
 import Base from './Base.ts';
 
 type MiddlewareWithParamsTuple = readonly [
-  typeof AbstractMiddleware,
+  MiddlewareClass,
   Record<string, unknown>,
 ];
 
@@ -21,13 +23,11 @@ type MiddlewareWithParamsTuple = readonly [
  * runtime shape after that unavoidable widening.
  */
 type InferredMiddlewareWithParams = ReadonlyArray<
-  typeof AbstractMiddleware | Record<string, unknown>
+  MiddlewareClass | Record<string, unknown>
 >;
 
 export type TMiddleware = Array<
-  | typeof AbstractMiddleware
-  | MiddlewareWithParamsTuple
-  | InferredMiddlewareWithParams
+  MiddlewareClass | MiddlewareWithParamsTuple | InferredMiddlewareWithParams
 >;
 // biome-ignore lint/complexity/noBannedTypes: Route handlers are generic callable values from user controllers
 type RouteHandler = Function;

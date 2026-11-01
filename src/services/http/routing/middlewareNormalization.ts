@@ -4,12 +4,11 @@
  * shorthand exists at the user-authoring boundary.
  */
 
-import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
-import type { MiddlewareEntry } from './RouteNode.ts';
+import type { MiddlewareClass, MiddlewareEntry } from './RouteNode.ts';
 
 export type MiddlewareSpec =
-  | typeof AbstractMiddleware
-  | readonly [typeof AbstractMiddleware, Record<string, unknown>];
+  | MiddlewareClass
+  | readonly [MiddlewareClass, Record<string, unknown>];
 
 /** Throws `TypeError` on malformed input. */
 export function normalizeMiddleware(spec: MiddlewareSpec): MiddlewareEntry {
@@ -36,7 +35,7 @@ export function normalizeMiddleware(spec: MiddlewareSpec): MiddlewareEntry {
       );
     }
     return {
-      Class: Class as typeof AbstractMiddleware,
+      Class: Class as MiddlewareClass,
       params: params as Record<string, unknown>,
     };
   }
