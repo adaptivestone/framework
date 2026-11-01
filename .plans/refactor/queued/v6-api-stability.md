@@ -1,8 +1,9 @@
 # v6 API stability — settle before v6 so it lasts
 
 **Status**: ⏸ queued — created 2026-11-01 at the owner's request: v6 must stay the current major
-for years; a later feature (new middleware ability, new adapter, new response kind) must ship in a
-6.x minor, never force a v7. **Corrected the same day:** removing Express is the v6 milestone
+for years. **Stable means no breaking changes, not no changes** (owner): what is decided now holds
+for years, and a later need (new middleware ability, new adapter, new response kind) is added in a
+6.x minor without breaking apps — never a v7. **Corrected the same day:** removing Express is the v6 milestone
 itself (owner) — 5.x makes Express optional with a Node.js adapter, v6 removes the Express adapter.
 **Kind**: cross-cutting checklist. Each item names the plan that implements it; this card tracks
 that, when v6 ships, Express is gone and every public API can grow in minors.
@@ -31,9 +32,9 @@ v6   the Express adapter and the `express` dependency are removed (P5's Express 
 2. **Apps read framework objects, they never implement them.** `RequestContext` and response
    objects are created by the framework only. Tests get `createTestContext()` instead of
    hand-built objects, so adding a member to `RequestContext` stays a minor change.
-3. **Open or frozen sets are stated, not implied.** `HttpResponse` kinds and `onFinish` outcomes
-   are either declared open (docs and types say: pass unknown kinds through) or frozen for v6 —
-   decision 2 below.
+3. **Sets are complete at v6 and may only grow.** `HttpResponse` kinds and `onFinish` outcomes are
+   decided now (decision 2); docs and types tell apps to pass kinds they do not handle through, so a
+   kind added later in a minor is not a breaking change.
 4. **No transport types in the public surface** — no Express, and no Node `IncomingMessage` /
    `ServerResponse` outside an explicit raw-transport route (item 4), so Bun/Deno/Fetch adapters
    can be added in 6.x minors.
@@ -58,7 +59,7 @@ v6   the Express adapter and the `express` dependency are removed (P5's Express 
 | 5   | Hook signatures             | `ErrorHandlerFn(err, req)`, `transformResponse(response, { req })` with Express `FrameworkRequest`                                      | `(value, { ctx })` with the portable `RequestContext`                                                                                     | 5.x opt-in, v6 only form — P1m, P1q  |
 | 6   | Controller handlers         | `(req, res)`                                                                                                                            | `(ctx) => HttpResponse` with per-route context types (D2.7)                                                                               | 5.x opt-in, v6 only form — P1m, P1q  |
 | 7   | Request body                | parsed by the global Express `RequestParser`                                                                                            | per-route parsing mode (exists: `bodyParsing`), parsed `ctx.body`, and a reserved raw/streaming body accessor for large uploads           | 5.x — P1m (D2.2), P3                 |
-| 8   | Response kinds and outcomes | closed unions in the types                                                                                                              | decision 2: declared open or frozen                                                                                                       | before v6 — P1q, P1m                 |
+| 8   | Response kinds and outcomes | closed unions in the types                                                                                                              | decided (B): complete list now incl. `file`, `sse`; may only grow                                                                         | before v6 — P1q, P1m                 |
 | 9   | Test helpers                | `getTestServerURL` and friends                                                                                                          | `createTestContext()` so `RequestContext` can grow                                                                                        | 5.x — P1m                            |
 | 10  | Lifecycle order             | defined in P1m                                                                                                                          | the `beforeSend` slot reserved in the spec                                                                                                | done in P1m                          |
 | 11  | Logger contract             | `ctx.logger` planned                                                                                                                    | its type is the framework logger interface from P1z, settled before v6                                                                    | before v6 — P1z                      |
@@ -68,7 +69,7 @@ v6   the Express adapter and the `express` dependency are removed (P5's Express 
 ## Can ship after v6 in minors (by design)
 
 Per-request `beforeSend`; signed/encrypted cookies; sessions; a typed-keys state API; new `ctx`
-members; new response kinds (if decision 2 = open); Bun, Deno and Fetch-style adapters; HTTP/2
+members; new response kinds when a real need appears (decision 2); Bun, Deno and Fetch-style adapters; HTTP/2
 options; native validation and paired Rust middleware (internal backends behind the same
 contracts); tracing channels (if experimental); new built-in middleware.
 
@@ -77,7 +78,10 @@ contracts); tracing channels (if experimental); new built-in middleware.
 1. **Decided 2026-11-01: B.** The Node.js adapter ships in 5.x as an opt-in, becomes the default in a
    later 5.x minor (after one release as an option), and Express stays a deprecated opt-in until v6
    removes it.
-2. `HttpResponse` kinds and `onFinish` outcomes: declared open, or frozen for v6.
+2. **Decided 2026-11-01: B.** v6 starts with a complete list — `json`, `text`, `bytes`, `stream`,
+   `file`, `sse`, `redirect`, `empty`, `native` (`file` and `sse` land before v6) — and `onFinish`
+   outcomes `finished`, `aborted`, `failed`. If a real need appears later, a kind is added in a minor;
+   apps pass unknown kinds through, so the addition does not break them.
 3. Express-only packages after v6 (passport, multer, template engines): no bridge (document
    replacements), or a small Connect-style bridge that runs such middleware on the Node.js adapter.
 
