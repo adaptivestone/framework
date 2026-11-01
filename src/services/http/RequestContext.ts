@@ -1,3 +1,4 @@
+import { parseCookie, stringifySetCookie } from 'cookie';
 import type { HttpResponse } from './responses.ts';
 import type { AppInfoExtensions, BaseAppInfo } from './types.ts';
 
@@ -54,14 +55,59 @@ export interface RequestContextOptions {
 }
 
 /**
- * Headers (and, later, cookies) staged before any response exists. They are
- * applied to whatever response is sent — the handler's, an early stop, or an
- * error response. Staging after the response has started throws.
+ * Options for `ctx.response.setCookie()`. Defaults: `path: '/'`,
+ * `httpOnly: true`, `sameSite: 'lax'`, and `secure: true` — except outside
+ * production for plain HTTP requests to `localhost` / loopback addresses.
+ */
+export interface CookieOptions {
+  /** Lifetime in seconds (`Max-Age`). Without it (and `expires`) the cookie ends with the browser session. */
+  maxAge?: number;
+  expires?: Date;
+  domain?: string;
+  path?: string;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: 'lax' | 'strict' | 'none';
+  partitioned?: boolean;
+  priority?: 'low' | 'medium' | 'high';
+}
+
+/** The request's cookies, parsed from the `Cookie` header on first read. */
+export class RequestCookies {
+  readonly #header: string | undefined;
+
+  #parsed: Record<string, string | undefined> | undefined;
+
+  constructor(header: string | undefined) {
+    this.#header = header;
+  }
+
+  /** A cookie's value (URL-decoded), or `undefined` when the client sent none. */
+  get(name: string): string | undefined {
+    this.#parsed ??= this.#header ? parseCookie(this.#header) : {};
+    return Object.hasOwn(this.#parsed, name) ? this.#parsed[name] : undefined;
+  }
+}
+
+/**
+ * Headers and cookies staged before any response exists. They are applied to
+ * whatever response is sent — the handler's, an early stop, or an error
+ * response. Staging after the response has started throws.
  */
 export class ResponseStaging {
   readonly #headers = new Map<string, string[]>();
 
+  /** `Set-Cookie` values by cookie identity (name, domain, path). */
+  readonly #cookies = new Map<string, string>();
+
+  readonly #secureByDefault: () => boolean;
+
   #sealed = false;
+
+  /** @internal Created by the request context. */
+  constructor(secureByDefault: () => boolean = () => true) {
+    this.#secureByDefault = secureByDefault;
+  }
 
   /** Set a header, replacing earlier staged values of the same name. */
   setHeader(name: string, value: string): void {
@@ -81,13 +127,51 @@ export class ResponseStaging {
     }
   }
 
-  /** @internal The staged headers as lower-case `[name, value]` pairs. */
+  /**
+   * Set a cookie on the response. Setting the same name (with the same
+   * `domain` and `path`) again replaces it. Invalid names, values, domains or
+   * paths throw.
+   */
+  setCookie(name: string, value: string, options: CookieOptions = {}): void {
+    this.#assertOpen('set-cookie');
+    const path = options.path ?? '/';
+    const header = stringifySetCookie({
+      name,
+      value,
+      path,
+      httpOnly: options.httpOnly ?? true,
+      secure: options.secure ?? this.#secureByDefault(),
+      sameSite: options.sameSite ?? 'lax',
+      ...(options.domain === undefined ? {} : { domain: options.domain }),
+      ...(options.maxAge === undefined ? {} : { maxAge: options.maxAge }),
+      ...(options.expires === undefined ? {} : { expires: options.expires }),
+      ...(options.partitioned ? { partitioned: true } : {}),
+      ...(options.priority === undefined ? {} : { priority: options.priority }),
+    });
+    this.#cookies.set(`${name};${options.domain ?? ''};${path}`, header);
+  }
+
+  /**
+   * Tell the client to remove a cookie. Pass the `domain` and `path` it was
+   * set with (the path defaults to `/`, like `setCookie`).
+   */
+  deleteCookie(
+    name: string,
+    options: Omit<CookieOptions, 'maxAge' | 'expires'> = {},
+  ): void {
+    this.setCookie(name, '', { ...options, maxAge: 0, expires: new Date(0) });
+  }
+
+  /** @internal The staged headers as lower-case `[name, value]` pairs, cookies last. */
   entries(): Array<readonly [string, string]> {
     const pairs: Array<readonly [string, string]> = [];
     for (const [name, values] of this.#headers) {
       for (const value of values) {
         pairs.push([name, value]);
       }
+    }
+    for (const value of this.#cookies.values()) {
+      pairs.push(['set-cookie', value]);
     }
     return pairs;
   }
@@ -118,8 +202,8 @@ export class RequestContext<
   /** Per-request state that middleware add for later code. */
   readonly appInfo: AppInfo;
 
-  /** Headers to apply to whatever response is sent, errors included. */
-  readonly response = new ResponseStaging();
+  /** Headers and cookies to apply to whatever response is sent, errors included. */
+  readonly response = new ResponseStaging(() => !this.#isLocalDevelopment());
 
   readonly #source: RequestSource;
 
@@ -128,6 +212,8 @@ export class RequestContext<
   readonly #startedAt = performance.now();
 
   #url: URL | undefined;
+
+  #cookies: RequestCookies | undefined;
 
   #id: string | undefined;
 
@@ -177,6 +263,18 @@ export class RequestContext<
   header(name: string): string | undefined {
     const value = this.#source.headers[name.toLowerCase()];
     return Array.isArray(value) ? value.join(', ') : value;
+  }
+
+  /** The request's cookies: `ctx.cookies.get(name)`. */
+  get cookies(): RequestCookies {
+    if (!this.#cookies) {
+      const raw = this.#source.headers.cookie;
+      // HTTP/2 may send several `cookie` headers; they join with `; `.
+      this.#cookies = new RequestCookies(
+        Array.isArray(raw) ? raw.join('; ') : raw,
+      );
+    }
+    return this.#cookies;
   }
 
   /** Raw path params; validated ones are on `appInfo.params`. */
@@ -234,6 +332,22 @@ export class RequestContext<
     this.#finish.push(callback);
   }
 
+  /**
+   * Plain HTTP to `localhost` outside production: cookies default to not
+   * `Secure` there. In production they are always `Secure` by default — a
+   * proxy that forwards `Host: localhost` must not weaken them.
+   */
+  #isLocalDevelopment(): boolean {
+    if (process.env.NODE_ENV === 'production') {
+      return false;
+    }
+    try {
+      return isLocalHttp(new URL(this.#source.origin));
+    } catch {
+      return false;
+    }
+  }
+
   /** @internal Record the error the registry turned into the response. */
   static recordError(ctx: RequestContext<object>, error: unknown): void {
     ctx.#error = error;
@@ -278,4 +392,18 @@ export class RequestContext<
       runAll();
     }
   }
+}
+
+/** Plain HTTP to `localhost` or a loopback address, where some clients drop `Secure` cookies. */
+function isLocalHttp(url: URL): boolean {
+  if (url.protocol !== 'http:') {
+    return false;
+  }
+  const host = url.hostname;
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '[::1]' ||
+    /^127(?:\.\d{1,3}){3}$/.test(host)
+  );
 }

@@ -91,6 +91,42 @@ const { ensureTestServerReady } = await import(
 assert.equal(typeof ensureTestServerReady, 'function');
 console.log('  ✓ test helpers export ensureTestServerReady');
 
+// 1b. The v2 middleware contract runs from the dist under Bun: cookies (the
+//     `cookie` package must resolve from the install) and `requestContext()`.
+{
+  const { default: Middleware } = await import(
+    '@adaptivestone/framework/services/http/middleware/Middleware.js'
+  );
+  const { HttpResponse } = await import(
+    '@adaptivestone/framework/services/http/responses.js'
+  );
+  const { requestContext, runInRequestScope } = await import(
+    '@adaptivestone/framework/services/http/requestScope.js'
+  );
+  const { createTestContext } = await import(
+    '@adaptivestone/framework/tests/createTestContext.js'
+  );
+  class Session extends Middleware {
+    middleware(ctx, next) {
+      ctx.response.setCookie('seen', ctx.cookies.get('sid') ?? 'none');
+      return next();
+    }
+  }
+  const ctx = createTestContext({ headers: { cookie: 'sid=abc' } });
+  const response = await runInRequestScope(ctx, () =>
+    new Session(null).middleware(ctx, async () => {
+      assert.equal(requestContext(), ctx);
+      return HttpResponse.empty(204);
+    }),
+  );
+  assert.equal(response.status, 204);
+  assert.deepEqual(
+    ctx.response.entries().filter(([n]) => n === 'set-cookie'),
+    [['set-cookie', 'seen=abc; Path=/; HttpOnly; SameSite=Lax']],
+  );
+  console.log('  ✓ v2 middleware, cookies and requestContext() from the dist');
+}
+
 // 2. Internal subpaths stay blocked under Bun's resolver too. Bun reports a
 //    blocked subpath as ERR_MODULE_NOT_FOUND where Node uses
 //    ERR_PACKAGE_PATH_NOT_EXPORTED — same outcome, different code.

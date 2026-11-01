@@ -50,6 +50,7 @@ EOF
 npm install --silent --no-audit --no-fund
 
 cp "$ROOT/scripts/fixtures/optional-i18n.mts" ./consumer.mts
+cp "$ROOT/scripts/fixtures/middleware-v2.mts" ./middleware-v2.mts
 cat > tsconfig.json <<'EOF'
 {
   "compilerOptions": {
@@ -60,7 +61,7 @@ cat > tsconfig.json <<'EOF'
     "noEmit": true,
     "types": ["node"]
   },
-  "files": ["consumer.mts"]
+  "files": ["consumer.mts", "middleware-v2.mts"]
 }
 EOF
 
@@ -134,6 +135,50 @@ if (typeof ensureTestServerReady !== 'function') {
   throw new Error('Public test helpers are missing ensureTestServerReady');
 }
 console.log('  ✓ test helpers export ensureTestServerReady');
+
+// 2a. The v2 middleware contract runs from the published dist without a
+//     server: `createTestContext`, `ctx.cookies` and `setCookie` (the `cookie`
+//     package must resolve from the install), `requestContext()` in scope.
+{
+  const { default: Middleware } = await import(
+    '@adaptivestone/framework/services/http/middleware/Middleware.js'
+  );
+  const { HttpResponse } = await import(
+    '@adaptivestone/framework/services/http/responses.js'
+  );
+  const { requestContext, runInRequestScope } = await import(
+    '@adaptivestone/framework/services/http/requestScope.js'
+  );
+  const { createTestContext } = await import(
+    '@adaptivestone/framework/tests/createTestContext.js'
+  );
+  class Session extends Middleware {
+    middleware(ctx, next) {
+      ctx.response.setCookie('seen', ctx.cookies.get('sid') ?? 'none');
+      return next();
+    }
+  }
+  const ctx = createTestContext({ headers: { cookie: 'sid=abc' } });
+  const response = await runInRequestScope(ctx, () =>
+    new Session(null).middleware(ctx, async () => {
+      if (requestContext() !== ctx) {
+        throw new Error('requestContext() did not return the scoped context');
+      }
+      return HttpResponse.empty(204);
+    }),
+  );
+  const cookies = ctx.response.entries().filter(([n]) => n === 'set-cookie');
+  if (
+    response.status !== 204 ||
+    cookies.length !== 1 ||
+    cookies[0][1] !== 'seen=abc; Path=/; HttpOnly; SameSite=Lax'
+  ) {
+    throw new Error(
+      `v2 middleware from the dist: ${response.status} ${JSON.stringify(cookies)}`,
+    );
+  }
+  console.log('  ✓ v2 middleware, cookies and requestContext() from the dist');
+}
 
 // 2b. Config files are the extension surface: consumers import a framework
 //     default config and re-export an edited copy (see the example project's

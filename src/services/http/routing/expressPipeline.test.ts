@@ -333,6 +333,80 @@ describe('v2 chain on Express — misuse', () => {
   });
 });
 
+describe('v2 chain on Express — cookies', () => {
+  let read: string | undefined;
+  class Session extends Middleware {
+    middleware(ctx: RequestContext, next: Next) {
+      read = ctx.cookies.get('in');
+      ctx.response.setCookie('sid', 'abc');
+      return next();
+    }
+  }
+  const staged = 'sid=abc; Path=/; HttpOnly; SameSite=Lax';
+
+  it('a staged cookie reaches a returned response, after its own Set-Cookie', async () => {
+    route([Session], () =>
+      HttpResponse.json(
+        200,
+        { ok: true },
+        { headers: { 'set-cookie': 'theme=dark' } },
+      ),
+    );
+    const response = await fetch(`${origin}/r`, {
+      headers: { cookie: 'in=hello%20there' },
+    });
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(read, 'hello there');
+    assert.deepStrictEqual(response.headers.getSetCookie(), [
+      staged,
+      'theme=dark',
+    ]);
+  });
+
+  it('a staged cookie reaches an error response', async () => {
+    route(
+      [Session],
+      async () => HttpResponse.empty(204),
+      async () => {
+        throw new HttpError(409, 'conflict');
+      },
+    );
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 409);
+    assert.deepStrictEqual(response.headers.getSetCookie(), [staged]);
+  });
+
+  it('a staged cookie reaches a response 5.x code writes, next to its own', async () => {
+    class LegacyCookie extends AbstractMiddleware {
+      async middleware(_req: unknown, res: Response) {
+        res.cookie('legacy', '1');
+        res.status(202).json({ legacy: true });
+      }
+    }
+    route([Session, LegacyCookie], () => HttpResponse.empty(204));
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 202);
+    assert.deepStrictEqual(response.headers.getSetCookie().sort(), [
+      'legacy=1; Path=/',
+      staged,
+    ]);
+  });
+
+  it('deleteCookie sends an expired cookie', async () => {
+    class Logout extends Middleware {
+      middleware(ctx: RequestContext) {
+        ctx.response.deleteCookie('sid');
+        return HttpResponse.empty(204);
+      }
+    }
+    route([Logout], () => HttpResponse.empty(500));
+    const response = await fetch(`${origin}/r`);
+    assert.deepStrictEqual(response.headers.getSetCookie(), [
+      'sid=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; SameSite=Lax',
+    ]);
+  });
+});
+
 describe('v2 chain on Express — client abort', () => {
   it('a client that leaves while the handler runs: signal aborts, onFinish reports aborted', async () => {
     let aborted = false;

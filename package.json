@@ -63,6 +63,7 @@
   "author": "Andrei Lahunou",
   "license": "MIT",
   "dependencies": {
+    "cookie": "^2.0.1",
     "deepmerge": "^4.2.2",
     "express": "^5.0.1",
     "formidable": "^3.5.1",

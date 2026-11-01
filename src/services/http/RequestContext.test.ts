@@ -75,6 +75,119 @@ describe('RequestContext — response staging', () => {
   });
 });
 
+describe('RequestContext — cookies', () => {
+  const cookies = (ctx: ReturnType<typeof createTestContext>) =>
+    ctx.response
+      .entries()
+      .filter(([name]) => name === 'set-cookie')
+      .map(([, value]) => value);
+
+  it('reads request cookies, URL-decoded; a missing one is undefined', () => {
+    const ctx = createTestContext({
+      headers: { cookie: 'sid=abc; note=a%20b; __proto__=x' },
+    });
+    assert.strictEqual(ctx.cookies.get('sid'), 'abc');
+    assert.strictEqual(ctx.cookies.get('note'), 'a b');
+    assert.strictEqual(ctx.cookies.get('missing'), undefined);
+    assert.strictEqual(ctx.cookies.get('toString'), undefined);
+    assert.strictEqual(createTestContext().cookies.get('sid'), undefined);
+  });
+
+  it('joins several cookie headers', () => {
+    const ctx = createTestContext({ headers: { cookie: ['a=1', 'b=2'] } });
+    assert.strictEqual(ctx.cookies.get('a'), '1');
+    assert.strictEqual(ctx.cookies.get('b'), '2');
+  });
+
+  it('secure defaults over HTTPS', () => {
+    const ctx = createTestContext({ origin: 'https://example.com' });
+    ctx.response.setCookie('sid', 'abc');
+    assert.deepStrictEqual(cookies(ctx), [
+      'sid=abc; Path=/; HttpOnly; Secure; SameSite=Lax',
+    ]);
+  });
+
+  it('plain HTTP to localhost is not Secure outside production', () => {
+    for (const origin of [
+      'http://localhost:3000',
+      'http://127.0.0.1:3000',
+      'http://[::1]:3000',
+      'http://app.localhost',
+    ]) {
+      const ctx = createTestContext({ origin });
+      ctx.response.setCookie('sid', 'abc');
+      assert.deepStrictEqual(
+        cookies(ctx),
+        ['sid=abc; Path=/; HttpOnly; SameSite=Lax'],
+        origin,
+      );
+    }
+    const remote = createTestContext({ origin: 'http://example.com' });
+    remote.response.setCookie('sid', 'abc');
+    assert.match(cookies(remote)[0] ?? '', /; Secure;/);
+  });
+
+  it('in production localhost cookies stay Secure (a proxy may forward Host: localhost)', () => {
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const ctx = createTestContext({ origin: 'http://localhost:3000' });
+      ctx.response.setCookie('sid', 'abc');
+      assert.match(cookies(ctx)[0] ?? '', /; Secure;/);
+    } finally {
+      process.env.NODE_ENV = previous;
+    }
+  });
+
+  it('options override the defaults', () => {
+    const ctx = createTestContext({ origin: 'https://example.com' });
+    ctx.response.setCookie('theme', 'dark', {
+      httpOnly: false,
+      sameSite: 'strict',
+      path: '/app',
+      domain: 'example.com',
+      maxAge: 3600,
+      priority: 'high',
+    });
+    assert.deepStrictEqual(cookies(ctx), [
+      'theme=dark; Max-Age=3600; Domain=example.com; Path=/app; Secure; Priority=High; SameSite=Strict',
+    ]);
+  });
+
+  it('the same name, domain and path replaces; another path is a second cookie', () => {
+    const ctx = createTestContext({ origin: 'https://example.com' });
+    ctx.response.setCookie('sid', 'one');
+    ctx.response.setCookie('sid', 'two');
+    ctx.response.setCookie('sid', 'admin', { path: '/admin' });
+    assert.deepStrictEqual(cookies(ctx), [
+      'sid=two; Path=/; HttpOnly; Secure; SameSite=Lax',
+      'sid=admin; Path=/admin; HttpOnly; Secure; SameSite=Lax',
+    ]);
+  });
+
+  it('deleteCookie expires it and replaces a staged value', () => {
+    const ctx = createTestContext({ origin: 'https://example.com' });
+    ctx.response.setCookie('sid', 'abc');
+    ctx.response.deleteCookie('sid');
+    assert.deepStrictEqual(cookies(ctx), [
+      'sid=; Max-Age=0; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; HttpOnly; Secure; SameSite=Lax',
+    ]);
+  });
+
+  it('cookies come after staged headers; invalid input and late staging throw', () => {
+    const ctx = createTestContext();
+    ctx.response.setCookie('a', '1');
+    ctx.response.setHeader('x-one', '1');
+    assert.deepStrictEqual(
+      ctx.response.entries().map(([name]) => name),
+      ['x-one', 'set-cookie'],
+    );
+    assert.throws(() => ctx.response.setCookie('bad name', 'x'), TypeError);
+    finishTestContext(ctx);
+    assert.throws(() => ctx.response.setCookie('b', '2'), /already started/);
+  });
+});
+
 describe('RequestContext — onFinish', () => {
   it('runs callbacks once, newest first, with the outcome and a duration', () => {
     const ctx = createTestContext();
