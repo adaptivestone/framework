@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
 import {
   createTestContext,
   finishTestContext,
 } from '../../tests/createTestContext.ts';
-import type { FinishResult } from './RequestContext.ts';
+import { type FinishResult, RequestContext } from './RequestContext.ts';
 import { requestContext } from './requestScope.ts';
 
 describe('RequestContext — request data', () => {
@@ -185,6 +186,35 @@ describe('RequestContext — cookies', () => {
     assert.throws(() => ctx.response.setCookie('bad name', 'x'), TypeError);
     finishTestContext(ctx);
     assert.throws(() => ctx.response.setCookie('b', '2'), /already started/);
+  });
+});
+
+describe('RequestContext — raw body and body stream', () => {
+  it('rawBody is the bytes the route captured; undefined otherwise', () => {
+    assert.strictEqual(createTestContext().rawBody, undefined);
+    const bytes = Buffer.from('{"a":1}');
+    assert.strictEqual(createTestContext({ rawBody: bytes }).rawBody, bytes);
+  });
+
+  it('bodyStream is the unread request body as one ReadableStream', async () => {
+    const ctx = createTestContext({
+      incoming: Readable.from([Buffer.from('he'), Buffer.from('llo')]),
+    });
+    const stream = ctx.bodyStream;
+    assert.ok(stream instanceof ReadableStream);
+    assert.strictEqual(ctx.bodyStream, stream);
+    assert.strictEqual(await new Response(stream).text(), 'hello');
+  });
+
+  it('bodyStream is undefined without a stream, or once the body was parsed or captured', () => {
+    assert.strictEqual(createTestContext().bodyStream, undefined);
+    const parsed = createTestContext({ incoming: Readable.from([]) });
+    RequestContext.setBody(parsed, {});
+    assert.strictEqual(parsed.bodyStream, undefined);
+    const raw = createTestContext({ incoming: Readable.from([]) });
+    RequestContext.setRawBody(raw, Buffer.alloc(0));
+    assert.strictEqual(raw.bodyStream, undefined);
+    assert.strictEqual(raw.rawBody?.length, 0);
   });
 });
 

@@ -111,3 +111,8 @@ const appWide: ServerOptions['middleware'] = [Session, [Deny, { reason: 'x' }]];
 // @ts-expect-error — a 5.x AbstractMiddleware cannot be app-wide middleware
 const legacyAppWide: ServerOptions['middleware'] = [Legacy];
 void [appWide, legacyAppWide];
+
+// Raw bytes and the unread stream for `bodyParsing: 'raw'` / `'none'` routes.
+const rawBytes: Buffer | undefined = ctx.rawBody;
+const unread: ReadableStream<Uint8Array> | undefined = ctx.bodyStream;
+void [rawBytes, unread];

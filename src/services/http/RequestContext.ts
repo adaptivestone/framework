@@ -45,6 +45,8 @@ export interface RequestSource {
   readonly peerAddress?: string | undefined;
   /** @internal The Node request stream, for the framework's body parser. */
   readonly incoming?: NodeJS.ReadableStream | undefined;
+  /** @internal Bytes captured on a `bodyParsing: 'raw'` route (`rawBody` reads them). */
+  readonly rawBody?: Buffer | undefined;
   /** @internal Store the parsed body (`body` reads it back). */
   setBody?(body: unknown): void;
   /** @internal Store the captured bytes of a `bodyParsing: 'raw'` route. */
@@ -225,6 +227,11 @@ export class RequestContext<
 
   #cookies: RequestCookies | undefined;
 
+  #bodyStream: ReadableStream<Uint8Array> | undefined;
+
+  /** Set once the framework has parsed or captured the body. */
+  #bodyTaken = false;
+
   #id: string | undefined;
 
   #finish: FinishCallback[] | undefined;
@@ -300,6 +307,52 @@ export class RequestContext<
   /** Parsed body; the validated body is on `appInfo.request`. */
   get body(): unknown {
     return this.#source.body;
+  }
+
+  /**
+   * The exact request bytes on a `bodyParsing: 'raw'` route — set on every
+   * such route (empty when the request has no body), bounded by
+   * `requestParser.maxFieldsSize`. `undefined` on other routes.
+   */
+  get rawBody(): Buffer | undefined {
+    return this.#source.rawBody;
+  }
+
+  /**
+   * The unread request body as a standard `ReadableStream`, on a
+   * `bodyParsing: 'none'` route. Every read returns the same stream, so it can
+   * be consumed once (`await new Response(ctx.bodyStream).text()` for the
+   * Fetch helpers); the framework puts no size limit on it — the handler owns
+   * that. `undefined` when there is no request stream, or once the framework
+   * has parsed or captured the body.
+   */
+  get bodyStream(): ReadableStream<Uint8Array> | undefined {
+    if (this.#bodyTaken) {
+      return undefined;
+    }
+    const incoming = this.#source.incoming;
+    if (!incoming) {
+      return undefined;
+    }
+    if (!this.#bodyStream) {
+      const chunks = incoming[Symbol.asyncIterator]();
+      this.#bodyStream = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          const { value, done } = await chunks.next();
+          if (done) {
+            controller.close();
+          } else {
+            controller.enqueue(
+              typeof value === 'string' ? Buffer.from(value) : value,
+            );
+          }
+        },
+        async cancel() {
+          await chunks.return?.();
+        },
+      });
+    }
+    return this.#bodyStream;
   }
 
   /** Client address from the framework's IP detection (trusted-proxy aware). */
@@ -386,11 +439,13 @@ export class RequestContext<
 
   /** @internal Store the parsed body. */
   static setBody(ctx: RequestContext<object>, body: unknown): void {
+    ctx.#bodyTaken = true;
     ctx.#source.setBody?.(body);
   }
 
   /** @internal Store the captured bytes of a `bodyParsing: 'raw'` route. */
   static setRawBody(ctx: RequestContext<object>, bytes: Buffer): void {
+    ctx.#bodyTaken = true;
     ctx.#source.setRawBody?.(bytes);
   }
 

@@ -23,8 +23,10 @@ export interface TestContextInit<AppInfo extends object> {
   signal?: AbortSignal;
   /** Address the connection came from (a proxy, or the client). Default `127.0.0.1`. */
   peerAddress?: string;
-  /** The raw request stream, for code that reads the body itself (e.g. `RequestParser`). */
+  /** The raw request stream: `ctx.bodyStream` reads it, as on a `bodyParsing: 'none'` route. */
   incoming?: NodeJS.ReadableStream;
+  /** The bytes `ctx.rawBody` returns, as on a `bodyParsing: 'raw'` route. */
+  rawBody?: Buffer;
 }
 
 /**
@@ -51,6 +53,7 @@ export function createTestContext<
     // keep the raw path when it is not valid percent-encoding
   }
   let body = init.body;
+  let rawBody = init.rawBody;
   const source: RequestSource = {
     method: (init.method ?? 'GET').toUpperCase(),
     url,
@@ -68,8 +71,14 @@ export function createTestContext<
     signal: init.signal ?? new AbortController().signal,
     peerAddress: init.peerAddress ?? '127.0.0.1',
     incoming: init.incoming,
+    get rawBody() {
+      return rawBody;
+    },
     setBody(value) {
       body = value;
+    },
+    setRawBody(bytes) {
+      rawBody = bytes;
     },
   };
   return new RequestContext<AppInfo>(source, (init.appInfo ?? {}) as AppInfo, {

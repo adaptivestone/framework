@@ -431,6 +431,9 @@ function expressSource(
       return req.socket?.remoteAddress;
     },
     incoming: req,
+    get rawBody() {
+      return (req as Request & { rawBody?: Buffer }).rawBody;
+    },
     setBody(body: unknown) {
       req.body = body;
     },

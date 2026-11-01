@@ -903,6 +903,35 @@ describe('body parsing after routing (bodyParsing modes)', () => {
         res.json({ ok: true });
       },
     });
+    // `ctx` code reads the same bytes: a middleware answering from the context.
+    class ReadRaw extends Middleware {
+      middleware(ctx: RequestContext) {
+        return HttpResponse.json(200, { raw: ctx.rawBody?.toString() });
+      }
+    }
+    class ReadStream extends Middleware {
+      async middleware(ctx: RequestContext) {
+        const text = await new Response(ctx.bodyStream).text();
+        return HttpResponse.json(200, { streamed: text });
+      }
+    }
+    const answered = () => HttpResponse.empty(500);
+    registry.registerRoute('POST', '/ctx-raw', {
+      bodyParsing: 'raw',
+      handler: answered,
+      middlewares: [{ Class: ReadRaw }],
+    });
+    registry.registerRoute('POST', '/ctx-none', {
+      bodyParsing: 'none',
+      handler: answered,
+      middlewares: [{ Class: ReadStream }],
+    });
+    registry.registerRoute('POST', '/ignored', {
+      bodyParsing: 'none',
+      handler: (_req: Request, res: Response) => {
+        res.json({ ignored: true }); // answers without reading the body
+      },
+    });
     const app = express();
     app.use((req, _res, next) => {
       (req as unknown as { appInfo: object }).appInfo = {
@@ -922,20 +951,21 @@ describe('body parsing after routing (bodyParsing modes)', () => {
     const server = http.createServer(app);
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-    const post = async (path: string, body: string) => {
+    const send = async (path: string, body: string) => {
       const response = await fetch(`${origin}${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
       });
-      await response.arrayBuffer();
-      return response.status;
+      return { status: response.status, text: await response.text() };
     };
+    const post = async (path: string, body: string) =>
+      (await send(path, body)).status;
     const close = () => {
       server.closeAllConnections();
       return new Promise((resolve) => server.close(resolve));
     };
-    return { seen, post, close };
+    return { seen, post, send, close };
   };
 
   it("'parsed' (default) parses the body; 'raw' keeps the bytes; 'none' leaves the stream", async () => {
@@ -968,6 +998,38 @@ describe('body parsing after routing (bodyParsing modes)', () => {
       assert.strictEqual(await post('/parsed', '{"a":1}'), 200);
       assert.strictEqual(await post('/missing', '{"a":1}'), 404);
       assert.deepStrictEqual(bodies, [{ a: 1 }, undefined]);
+    } finally {
+      await close();
+    }
+  });
+
+  it('ctx code reads ctx.rawBody on a raw route and ctx.bodyStream on a none route', async () => {
+    const { send, close } = await setup();
+    try {
+      const json = '{"a":1}';
+      assert.deepStrictEqual(await send('/ctx-raw', json), {
+        status: 200,
+        text: JSON.stringify({ raw: json }),
+      });
+      assert.deepStrictEqual(await send('/ctx-none', json), {
+        status: 200,
+        text: JSON.stringify({ streamed: json }),
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it('a none route that answers without reading does not stall later requests', async () => {
+    // Node closes a connection whose request body went unread (a plain Node
+    // server does the same); Bun reuses it. Either way the next requests are
+    // served — that is what the framework must keep.
+    const { post, close } = await setup();
+    try {
+      const large = JSON.stringify({ pad: 'x'.repeat(256 * 1024) });
+      for (const path of ['/ignored', '/parsed', '/ignored', '/parsed']) {
+        assert.strictEqual(await post(path, large), 200, path);
+      }
     } finally {
       await close();
     }
