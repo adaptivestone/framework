@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers) and 4 (cookies) done; hook types, docs and Phase 2 next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies) and 5 (hooks get `ctx`) done; Phase 2 next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -32,6 +32,7 @@ descriptors, `transformResponse`).
 | D2.5 cookies             | `ctx.cookies.get`, `ctx.response.setCookie/deleteCookie`, secure defaults; `cookie` becomes a direct dependency.                                                                                                                                                                                                                     |
 | D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                                                                                                                                    |
 | D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                                                                                                                                         |
+| Hooks                    | **Decided 2026-11-01 (B):** `transformResponse(response, { req, ctx })` (v6 drops `req`); error handlers opt in per registration with `{ contractVersion: 2 }` and get `(err, ctx)` — the same rule as controllers; one context per request, made on first use on 5.x-only routes.                                                   |
 | Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
@@ -417,9 +418,28 @@ adapter (P3) the same class reads from Node directly.
   over HTTP: returned response with its own `Set-Cookie`, error response, 5.x-written response,
   delete).
 
-**Still open for P1m:** portable types for `transformResponse` and error handlers (owner question),
-the response-type consumer fixture with a simulated added kind (with P1q), docs, the real-runner
-re-measure, and Phase 2 (app-wide middleware API and portable built-ins).
+**Slice 5 — the hooks get the context (done 2026-11-01; owner decision B):**
+
+- `expressContext(app, req)` (`routing/expressPipeline.ts`): one `RequestContext` per request. A
+  v2 route creates it at dispatch; a 5.x-only route creates it only when a hook reads it, with the
+  same transport (staged headers flushed when headers are written, `onFinish`, `signal`). A context
+  made after the response started is sealed; one made after it ended is already finished.
+- `transformResponse(response, { req, ctx })`: `ctx` is a lazy getter (a transform that never reads
+  it builds nothing) and its staging is closed there — the transform changes the returned response.
+- `registerErrorHandler(Cls, (err, ctx) => …, { contractVersion: 2 })` (overloads; the stored entry
+  carries `contract`). The handler gets the request's context; headers and cookies it stages reach
+  the error response on v2 routes (applied before the writer) and on 5.x routes (flushed at
+  `writeHead`). Built-ins stay contract 1. Without the option a handler still gets `req`.
+- Tests: `ExpressResponseWriter.test.ts` (+1: context, lazy, staging closed),
+  `expressPipeline.test.ts` (+2: the middleware's context on a v2 route; a context made on first
+  read with `onFinish` on a 5.x route), `controllers/contractVersion.test.ts` (+3 over the live app:
+  ctx handler error with the same context, errors from a 5.x handler and a 5.x middleware; plus a
+  compile-time check that a handler without the option gets `req`). The packed type fixture
+  registers both hook forms.
+
+**Still open for P1m:** the response-type consumer fixture with a simulated added kind (with P1q),
+the real-runner re-measure, and Phase 2 (app-wide middleware API and portable built-ins; owner
+questions on the API shape and the built-ins' names/paths).
 
 ## API change
 
