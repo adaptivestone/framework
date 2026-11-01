@@ -357,13 +357,13 @@ Measured on Node 26.12.1 with real OTel (`exp-dc.cjs`, session scratchpad):
 
 Who already publishes channels (sources read in the session clones):
 
-| Library | Channels |
-|---|---|
-| Express `router` 2.2.0 (installed here via Express 5.3.0) | `express.router.request` per layer |
-| Fastify | `fastify.initialization`, `fastify.request.handler` (tracing) |
-| AdonisJS http-server | `adonisjs.http.request`, `.middleware`, `.route.handler`, `.exception.handler`, `.response.serializer` (tracing) |
-| h3 v2 | `h3.request` (tracing plugin, middleware and routes) |
-| undici / `fetch` | `undici:request:*`; the official `@opentelemetry/instrumentation-undici` 0.34.0 is built on them |
+| Library                                                   | Channels                                                                                                         |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Express `router` 2.2.0 (installed here via Express 5.3.0) | `express.router.request` per layer                                                                               |
+| Fastify                                                   | `fastify.initialization`, `fastify.request.handler` (tracing)                                                    |
+| AdonisJS http-server                                      | `adonisjs.http.request`, `.middleware`, `.route.handler`, `.exception.handler`, `.response.serializer` (tracing) |
+| h3 v2                                                     | `h3.request` (tracing plugin, middleware and routes)                                                             |
+| undici / `fetch`                                          | `undici:request:*`; the official `@opentelemetry/instrumentation-undici` 0.34.0 is built on them                 |
 
 For us: our middleware and handlers run inside one Express layer (the routing adapter), so
 `express.router.request` sees that one layer, not our middleware or handlers. The framework should
