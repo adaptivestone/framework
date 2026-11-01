@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) and 2b-1/2b-2/2b-3 (built-ins converted in place, body parsing after routing) done; security headers next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) and 2b (built-ins converted in place, body parsing after routing, security headers) done; raw-body accessor on `ctx` next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -35,6 +35,7 @@ descriptors, `transformResponse`).
 | Hooks                    | **Decided 2026-11-01 (B):** `transformResponse(response, { req, ctx })` (v6 drops `req`); error handlers opt in per registration with `{ contractVersion: 2 }` and get `(err, ctx)` — the same rule as controllers; one context per request, made on first use on 5.x-only routes.                                                   |
 | App-wide middleware      | **Decided 2026-11-01 (A):** a `Server` option, `middleware: [Class, [Class, params], …]` — v2 `Middleware` classes only, after the built-ins and around routing (routes, 404, 405). Supersedes the older `app.useGlobal()` / `registerGlobalMiddleware()` sketches (never built); a registration call can still be added in a minor. |
 | Built-ins                | **Decided 2026-11-01 (A):** converted in place in 5.x — one version, same names and paths; old-shape subclass overrides are refused at registration; direct `(req, res, next)` callers get a CHANGELOG note.                                                                                                                         |
+| Security headers         | **Decided 2026-11-01 (A):** stay the response's starting headers — set by the adapter before any middleware runs (`services/http/securityHeaders.ts`, shared by the Express and future Node adapters), not a staged `Middleware`; a route can still override or remove one.                                                          |
 | Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
@@ -534,8 +535,14 @@ adapter (P3) the same class reads from Node directly.
   parser before app-wide middleware and unmatched requests unparsed); the `GetUserByToken`
   end-to-end case chains parser → `GetUserByToken` on one context.
 
-**Still open for P1m:** the security headers (owner question: staged security headers would undo
-a route's `res.removeHeader()`), a public raw-body accessor on `ctx`,
+**Phase 2b-4 — security headers (done 2026-11-01; owner decision A):** they stay the response's
+starting headers, set on the response before any middleware runs — a route can still override or
+remove one (staging them would undo a route's `res.removeHeader()`). The inline Express step now
+reads its list from `securityHeaders(getConfig)` (`services/http/securityHeaders.ts`) so the Node
+adapter applies the same headers the same way. No behaviour change; `securityHeaders.test.ts` +1.
+Phase 2b is complete: every built-in is a `Middleware`, one version, same names and paths.
+
+**Still open for P1m:** a public raw-body accessor on `ctx` (owner question),
 the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
 re-measure.
 
