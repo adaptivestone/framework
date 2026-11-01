@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
-import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import { assertCalledTimes } from '../../../tests/assertions.ts';
+import { createTestContext } from '../../../tests/createTestContext.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpResponse } from '../responses.ts';
+import type { AppInfoExtensions, BaseAppInfo } from '../types.ts';
 import Pagination, { type PaginationMiddlewareAppInfo } from './Pagination.ts';
 
 /**
@@ -27,12 +28,15 @@ const runMiddleware = async (
   query: Record<string, unknown>,
 ) => {
   const mw = new Pagination(appInstance, params);
-  const req = { query, appInfo: {} } as unknown as FrameworkRequest &
-    PaginationMiddlewareAppInfo;
-  const next = mock.fn();
-  await mw.middleware(req, {} as Response, next);
+  const ctx = createTestContext<
+    BaseAppInfo & AppInfoExtensions & PaginationMiddlewareAppInfo['appInfo']
+  >({
+    query,
+  });
+  const next = mock.fn(async () => HttpResponse.empty(204));
+  await mw.middleware(ctx, next);
   assertCalledTimes(next, 1);
-  return req.appInfo.pagination;
+  return ctx.appInfo.pagination;
 };
 
 describe('Pagination — relatedQueryParameters schema', () => {

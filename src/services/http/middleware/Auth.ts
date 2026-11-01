@@ -1,11 +1,10 @@
-import type { NextFunction, Response } from 'express';
 import type { AppUser } from '../../../models/User.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
 import { UnauthorizedError } from '../httpErrors.ts';
-import type { GetUserByTokenAppInfo } from '../middleware/GetUserByToken.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
+import type { Next } from '../RequestContext.ts';
+import type { UserContext } from './GetUserByToken.ts';
+import Middleware from './Middleware.ts';
 
-class AuthMiddleware extends AbstractMiddleware {
+class AuthMiddleware extends Middleware {
   static get description() {
     return 'Allow to pass only if the user provided. Please use any middleware that provide user instance before';
   }
@@ -27,14 +26,8 @@ class AuthMiddleware extends AbstractMiddleware {
     return {} as { user: AppUser };
   }
 
-  async middleware(
-    req: FrameworkRequest & GetUserByTokenAppInfo,
-    _res: Response,
-    next: NextFunction,
-  ): // Base return type, so a subclass may still answer with a response.
-  // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
-  Promise<void | Response> {
-    if (!req.appInfo.user) {
+  async middleware(ctx: UserContext, next: Next) {
+    if (!ctx.appInfo.user) {
       this.logger?.info('User try to access resource without credentials');
       throw new UnauthorizedError({
         code: 'AUTH001',

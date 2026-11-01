@@ -1,88 +1,54 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
-import type { TUser } from '../../../models/User.ts';
+import { createTestContext } from '../../../tests/createTestContext.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { ForbiddenError, UnauthorizedError } from '../httpErrors.ts';
-import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+import { HttpResponse } from '../responses.ts';
 import Role from './Role.ts';
+
+/** Run Role with `params`; `next` records that the request went on. */
+const run = (params: Record<string, unknown> | undefined, appInfo: object) => {
+  const ctx = createTestContext({
+    appInfo: appInfo as Record<string, unknown>,
+  });
+  let passed = false;
+  const result = new Role(appInstance, params).middleware(ctx, async () => {
+    passed = true;
+    return HttpResponse.empty(204);
+  });
+  return { ctx, result, passed: () => passed };
+};
 
 describe('role middleware methods', () => {
   it('have description fields', async () => {
-    // const middleware = new Role(appInstance);
-
     assert.notStrictEqual(Role.description, undefined);
   });
 
   it('middleware pass when user presented with a right role', async () => {
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: {
-          roles: ['role1', 'role2'],
-        },
-      },
-    };
-    const middleware = new Role(appInstance, {
-      roles: ['admin', 'role1'],
-    });
-
-    await middleware.middleware(
-      req as FrameworkRequest &
-        GetUserByTokenAppInfo & { user: InstanceType<TUser> },
-      {} as Response,
-      nextFunction,
+    const { result, passed } = run(
+      { roles: ['admin', 'role1'] },
+      { user: { roles: ['role1', 'role2'] } },
     );
-
-    assert.ok(isCalled);
+    assert.strictEqual((await result).status, 204);
+    assert.ok(passed());
   });
 
   it('middleware NOT pass when user NOT presented', async () => {
-    let isCalled = false;
-    const req = {
-      appInfo: {}, // no user
-    };
-    const middleware = new Role(appInstance);
-    await assert.rejects(
-      middleware.middleware(
-        req as FrameworkRequest &
-          GetUserByTokenAppInfo & { user: InstanceType<TUser> },
-        {} as Response,
-        () => {
-          isCalled = true;
-        },
-      ),
-      UnauthorizedError,
-    );
-    assert.ok(!isCalled);
+    const { result, passed } = run(undefined, {});
+    await assert.rejects(result, UnauthorizedError);
+    assert.ok(!passed());
   });
 
   it('middleware NOT pass when user  have a wrong role', async () => {
-    let isCalled = false;
-    const req = {
-      appInfo: {
-        user: { roles: ['role1', 'role2'] },
-      },
-    };
-    const middleware = new Role(appInstance, { roles: ['admin'] });
-    await assert.rejects(
-      middleware.middleware(
-        req as FrameworkRequest &
-          GetUserByTokenAppInfo & { user: InstanceType<TUser> },
-        {} as Response,
-        () => {
-          isCalled = true;
-        },
-      ),
-      ForbiddenError,
+    const { result, passed } = run(
+      { roles: ['admin'] },
+      { user: { roles: ['role1', 'role2'] } },
     );
-    assert.ok(!isCalled);
+    await assert.rejects(result, ForbiddenError);
+    assert.ok(!passed());
   });
 });
 
@@ -100,16 +66,16 @@ describe('role middleware message translation', () => {
     i18n?: TI18n;
     user?: { roles: string[] };
   }) => {
-    const req = { appInfo: { i18n, user } } as unknown as FrameworkRequest &
-      GetUserByTokenAppInfo & { user: InstanceType<TUser> };
-    const thrown = await new Role(appInstance, { roles: ['admin'] })
-      .middleware(req, {} as Response, () => {})
-      .then(
-        () => null,
-        (err: unknown) => err,
-      );
+    const { ctx, result } = run({ roles: ['admin'] }, { i18n, user });
+    const thrown = await result.then(
+      () => null,
+      (err: unknown) => err,
+    );
     // Answered the way the HTTP layer answers a middleware error.
-    const answer = await appInstance.httpServer?.resolveError(thrown, req);
+    const answer = await appInstance.httpServer?.resolveError(
+      thrown,
+      ctx as unknown as FrameworkRequest,
+    );
     return { status: answer?.status, payload: answer?.body };
   };
 

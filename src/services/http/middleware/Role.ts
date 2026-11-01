@@ -1,11 +1,9 @@
-import type { NextFunction, Response } from 'express';
-import type { TUser } from '../../../models/User.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
 import { ForbiddenError, UnauthorizedError } from '../httpErrors.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
-import type { GetUserByTokenAppInfo } from './GetUserByToken.ts';
+import type { Next } from '../RequestContext.ts';
+import type { UserContext } from './GetUserByToken.ts';
+import Middleware from './Middleware.ts';
 
-class RoleMiddleware extends AbstractMiddleware {
+class RoleMiddleware extends Middleware {
   static get description() {
     return 'Check user role (user.roles property). If the user has no role then stop request and return error. OR logic (any role will pass user)';
   }
@@ -14,15 +12,8 @@ class RoleMiddleware extends AbstractMiddleware {
     return true;
   }
 
-  async middleware(
-    req: FrameworkRequest &
-      GetUserByTokenAppInfo & { user: InstanceType<TUser> },
-    _res: Response,
-    next: NextFunction,
-  ): // Base return type, so a subclass may still answer with a response.
-  // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
-  Promise<void | Response> {
-    const { user } = req.appInfo;
+  async middleware(ctx: UserContext, next: Next) {
+    const { user } = ctx.appInfo;
 
     if (!user) {
       // Same meaning for the client as the Auth 401: log in first.

@@ -3,12 +3,30 @@ import { createServer } from 'node:http';
 import { describe, it, mock } from 'node:test';
 import type { NextFunction, Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { createTestContext } from '../../../tests/createTestContext.ts';
 import { defaultAuthToken } from '../../../tests/testHelpers.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpResponse } from '../responses.ts';
 import GetUserByToken, {
   type GetUserByTokenAppInfo,
+  type UserContext,
 } from './GetUserByToken.ts';
 import RequestParser from './RequestParser.ts';
+
+/** Run the middleware on a test context; reports whether it continued. */
+const run = async (init: {
+  body?: unknown;
+  headers?: Record<string, string>;
+  appInfo?: Record<string, unknown>;
+}) => {
+  const ctx = createTestContext<UserContext['appInfo']>(init);
+  let passed = false;
+  await new GetUserByToken(appInstance).middleware(ctx, async () => {
+    passed = true;
+    return HttpResponse.empty(204);
+  });
+  return { passed, user: ctx.appInfo.user };
+};
 
 describe('getUserByToken middleware methods', () => {
   it('have description fields', async () => {
@@ -34,119 +52,37 @@ describe('getUserByToken middleware methods', () => {
   });
 
   it('should not called twice', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: {},
-      },
-    };
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
+    const existing = { id: 'already' };
+    const { passed, user } = await run({ appInfo: { user: existing } });
+    assert.ok(passed);
+    assert.strictEqual(user, existing);
   });
 
   it('should not getuser without token', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {},
-      body: {},
-      get: () => {},
-    };
-
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
+    const { passed, user } = await run({ body: {} });
+    assert.ok(passed);
+    assert.strictEqual(user, undefined);
   });
 
   it('should not getuser with a wrong token', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: undefined,
-      },
-      body: {
-        token: 'fake',
-      },
-      get: () => {},
-    };
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
-    assert.strictEqual(req.appInfo.user, undefined);
+    const { passed, user } = await run({ body: { token: 'fake' } });
+    assert.ok(passed);
+    assert.strictEqual(user, undefined);
   });
 
   it('should not getuser with a good token in body', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: undefined,
-      },
-      body: {
-        token: defaultAuthToken,
-      },
-      get: () => {},
-    };
-
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
-    assert.notStrictEqual(req.appInfo.user, undefined);
+    const { passed, user } = await run({ body: { token: defaultAuthToken } });
+    assert.ok(passed);
+    assert.notStrictEqual(user, undefined);
   });
 
   it('should not getuser with a good token in header', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: undefined,
-      },
+    const { passed, user } = await run({
       body: {},
-      get: () => defaultAuthToken,
-    };
-
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
-    assert.notStrictEqual(req.appInfo.user, undefined);
+      headers: { authorization: defaultAuthToken },
+    });
+    assert.ok(passed);
+    assert.notStrictEqual(user, undefined);
   });
 
   // End-to-end belt-and-braces for doc 18: a urlencoded token reaches
@@ -164,23 +100,23 @@ describe('getUserByToken middleware methods', () => {
           params: {},
         };
         frReq.body = {};
-        // GetUserByToken reads req.get('Authorization') (logging + fallback).
-        frReq.get = (() => undefined) as FrameworkRequest['get'];
 
         new RequestParser(appInstance).middleware(
           frReq,
           { once: () => {} } as unknown as Response,
           (() => {
-            new GetUserByToken(appInstance).middleware(
-              frReq,
-              {} as Response,
-              (() => {
-                const code = frReq.appInfo.user ? 200 : 401;
-                res.writeHead(code);
-                res.end();
-                resolve(code);
-              }) as NextFunction,
-            );
+            // The parsed body reaches GetUserByToken through the context.
+            const ctx = createTestContext<UserContext['appInfo']>({
+              body: frReq.body,
+              appInfo: frReq.appInfo,
+            });
+            new GetUserByToken(appInstance).middleware(ctx, async () => {
+              const code = ctx.appInfo.user ? 200 : 401;
+              res.writeHead(code);
+              res.end();
+              resolve(code);
+              return HttpResponse.empty(204);
+            });
           }) as NextFunction,
         );
       });
@@ -203,55 +139,15 @@ describe('getUserByToken middleware methods', () => {
   // parsed as an array) reaches resolveToken before schema validation. It must
   // be treated as absent — no `token.replace(...)` on a non-string, no 500.
   it('treats a number body token as absent, not a 500', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: undefined,
-      },
-      body: {
-        token: 123,
-      },
-      get: () => undefined,
-    };
-
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
-    assert.strictEqual(req.appInfo.user, undefined);
+    const { passed, user } = await run({ body: { token: 123 } });
+    assert.ok(passed);
+    assert.strictEqual(user, undefined);
   });
 
   it('treats an array body token as absent, not a 500', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: undefined,
-      },
-      body: {
-        token: ['a', 'b'],
-      },
-      get: () => undefined,
-    };
-
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
-    );
-
-    assert.ok(isCalled);
-    assert.strictEqual(req.appInfo.user, undefined);
+    const { passed, user } = await run({ body: { token: ['a', 'b'] } });
+    assert.ok(passed);
+    assert.strictEqual(user, undefined);
   });
 
   it('never logs the token value (doc 20)', async () => {
@@ -260,13 +156,11 @@ describe('getUserByToken middleware methods', () => {
     const SECRET = 'super-secret-token-value-xyz';
 
     await middleware.middleware(
-      {
-        appInfo: {},
+      createTestContext({
         body: { token: SECRET },
-        get: () => undefined,
-      } as unknown as FrameworkRequest,
-      {} as Response,
-      (() => {}) as NextFunction,
+        headers: { authorization: SECRET },
+      }),
+      async () => HttpResponse.empty(204),
     );
 
     const logged = spy.mock.calls
@@ -277,27 +171,24 @@ describe('getUserByToken middleware methods', () => {
   });
 
   it('should getuser with a Bearer token in header', async () => {
-    const middleware = new GetUserByToken(appInstance);
-    let isCalled = false;
-    const nextFunction = () => {
-      isCalled = true;
-    };
-    const req = {
-      appInfo: {
-        user: undefined,
-      },
+    const { passed, user } = await run({
       body: {},
-      get: (name: string) =>
-        name === 'Authorization' ? `Bearer ${defaultAuthToken}` : undefined,
-    };
+      headers: { authorization: `Bearer ${defaultAuthToken}` },
+    });
+    assert.ok(passed);
+    assert.notStrictEqual(user, undefined);
+  });
 
-    await middleware.middleware(
-      req as unknown as FrameworkRequest,
-      {} as Response,
-      nextFunction,
+  it('resolveToken reads a request and a context alike', () => {
+    const fromReq = GetUserByToken.resolveToken({
+      body: {},
+      header: (name: string) =>
+        name === 'authorization' ? 'Bearer abc' : undefined,
+    });
+    const fromCtx = GetUserByToken.resolveToken(
+      createTestContext({ headers: { authorization: 'Bearer abc' } }),
     );
-
-    assert.ok(isCalled);
-    assert.notStrictEqual(req.appInfo.user, undefined);
+    assert.strictEqual(fromReq, 'abc');
+    assert.strictEqual(fromCtx, 'abc');
   });
 });

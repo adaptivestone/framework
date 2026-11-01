@@ -39,6 +39,7 @@ export function normalizeMiddleware(spec: MiddlewareSpec): MiddlewareEntry {
         `normalizeMiddleware: tuple form expected a params object but got ${params === null ? 'null' : Array.isArray(params) ? 'array' : typeof params}`,
       );
     }
+    assertMiddlewareShape(Class as MiddlewareClass);
     return {
       Class: Class as MiddlewareClass,
       params: params as Record<string, unknown>,
@@ -49,7 +50,26 @@ export function normalizeMiddleware(spec: MiddlewareSpec): MiddlewareEntry {
       `normalizeMiddleware: expected middleware class or [Class, params] tuple, got ${typeof spec}`,
     );
   }
+  assertMiddlewareShape(spec);
   return { Class: spec };
+}
+
+/**
+ * A `Middleware` subclass whose `middleware` still takes `(req, res, next)` —
+ * typically a subclass of a built-in written before the built-ins moved to
+ * `(ctx, next)` — would get a context where it expects `req`. Fail when the
+ * route is registered, naming the fix, instead of at the first request.
+ */
+export function assertMiddlewareShape(Class: MiddlewareClass): void {
+  if (!(Class.prototype instanceof Middleware)) {
+    return;
+  }
+  const method = (Class.prototype as { middleware?: unknown }).middleware;
+  if (typeof method === 'function' && method.length >= 3) {
+    throw new TypeError(
+      `${Class.name || 'A middleware'}.middleware takes (req, res, next), but the class extends Middleware, whose middleware takes (ctx, next). The built-ins (Auth, GetUserByToken, Role, Pagination, …) use (ctx, next) since 5.7: rewrite the override as middleware(ctx, next) (read ctx.appInfo, ctx.header(), ctx.body; return next(); throw instead of next(err)), or extend AbstractMiddleware for a 5.x middleware.`,
+    );
+  }
 }
 
 export function normalizeMiddlewares(

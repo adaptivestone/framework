@@ -1,8 +1,8 @@
-import type { NextFunction, Response } from 'express';
 import { defineSchema } from '../../validate/defineSchema.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
-import type { FrameworkRequest } from '../HttpServer.ts';
-import AbstractMiddleware from './AbstractMiddleware.ts';
+import type { Next, RequestContext } from '../RequestContext.ts';
+import type { AppInfoExtensions, BaseAppInfo } from '../types.ts';
+import Middleware from './Middleware.ts';
 
 export interface PaginationMiddlewareAppInfo {
   appInfo: {
@@ -59,7 +59,7 @@ const paginationQueryParameters = defineSchema<{
 /**
  * Middleware for reusing pagination
  */
-class Pagination extends AbstractMiddleware {
+class Pagination extends Middleware {
   static get description() {
     return 'Pagination middleware. You can use limit=10 and maxLimit=100 parameters';
   }
@@ -73,9 +73,12 @@ class Pagination extends AbstractMiddleware {
   }
 
   async middleware(
-    req: FrameworkRequest & PaginationMiddlewareAppInfo,
-    _res: Response,
-    next: NextFunction,
+    ctx: RequestContext<
+      BaseAppInfo &
+        AppInfoExtensions &
+        Partial<PaginationMiddlewareAppInfo['appInfo']>
+    >,
+    next: Next,
   ) {
     let { limit, maxLimit } = this.params as {
       limit: number;
@@ -89,10 +92,9 @@ class Pagination extends AbstractMiddleware {
     // A malformed `?limit=` (NaN) or a non-positive value falls back to the
     // configured default — never 0, which Mongoose treats as "no limit" and
     // would bypass `maxLimit`. Then clamp to `maxLimit`.
+    const { query } = ctx;
     const requestedLimit =
-      typeof req?.query?.limit === 'string'
-        ? parseInt(req.query.limit, 10)
-        : limit;
+      typeof query.limit === 'string' ? parseInt(query.limit, 10) : limit;
     let effectiveLimit =
       Number.isFinite(requestedLimit) && requestedLimit > 0
         ? requestedLimit
@@ -102,7 +104,7 @@ class Pagination extends AbstractMiddleware {
     }
 
     const requestedPage =
-      typeof req?.query?.page === 'string' ? parseInt(req.query.page, 10) : 1;
+      typeof query.page === 'string' ? parseInt(query.page, 10) : 1;
     // A malformed, non-positive or absurdly large page (hundreds of digits
     // parse to Infinity) falls back to 1, so `skip` is always a safe integer.
     let page =
@@ -113,7 +115,7 @@ class Pagination extends AbstractMiddleware {
       page = 1;
     }
 
-    req.appInfo.pagination = {
+    ctx.appInfo.pagination = {
       page,
       limit: effectiveLimit,
       skip: (page - 1) * effectiveLimit,

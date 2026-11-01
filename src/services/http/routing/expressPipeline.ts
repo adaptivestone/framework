@@ -39,6 +39,7 @@ import {
 import type { ResponseWriter } from '../ResponseWriter.ts';
 import { runInRequestScope } from '../requestScope.ts';
 import { HttpResponse, legacySentResponse } from '../responses.ts';
+import { assertMiddlewareShape } from './middlewareNormalization.ts';
 import type { HandlerEntry, MiddlewareEntry } from './RouteNode.ts';
 
 type Ctx = RequestContext;
@@ -111,6 +112,8 @@ export function middlewareInstance(
 ): AbstractMiddleware | Middleware {
   let instance = instanceCache.get(entry);
   if (!instance) {
+    // Routes registered with entries directly skip `normalizeMiddleware`.
+    assertMiddlewareShape(entry.Class);
     // Default params to `{}` — matches legacy behaviour and keeps middleware
     // that destructure `this.params` from crashing.
     instance = new entry.Class(app, entry.params ?? {});

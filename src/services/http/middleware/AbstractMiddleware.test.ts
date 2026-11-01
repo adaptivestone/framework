@@ -2,9 +2,17 @@ import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
-import { assertCalledTimes } from '../../../tests/assertions.ts';
+import {
+  assertCalledTimes,
+  assertThrowsLike,
+} from '../../../tests/assertions.ts';
 import { mockImplementation } from '../../../tests/mocks.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpResponse } from '../responses.ts';
+import {
+  type MiddlewareSpec,
+  normalizeMiddleware,
+} from '../routing/middlewareNormalization.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 import Auth from './Auth.ts';
 import RateLimiter from './RateLimiter.ts';
@@ -148,37 +156,54 @@ describe('AbstractMiddleware translate()', () => {
   });
 });
 
-// A built-in that only throws must keep the base return type, or a subclass
-// answering with `res.json(...)` stops compiling (`check:types:tests`).
+// A 5.x built-in that only throws must keep the base return type, or a
+// subclass answering with `res.json(...)` stops compiling (`check:types:tests`).
 describe('built-in middleware subclasses', () => {
-  it('may answer with a response instead of calling next()', async () => {
+  it('a 5.x built-in subclass may answer with a response instead of calling next()', async () => {
     const answered = { answered: true } as unknown as Response;
-    const answer = (res: Response) => res.status(401).json({});
-    class MyAuth extends Auth {
-      async middleware(_req: FrameworkRequest, res: Response) {
-        return answer(res);
-      }
-    }
-    class MyRole extends Role {
-      async middleware(_req: FrameworkRequest, res: Response) {
-        return answer(res);
-      }
-    }
     class MyRateLimiter extends RateLimiter {
       async middleware(_req: FrameworkRequest, res: Response) {
-        return answer(res);
+        return res.status(401).json({});
       }
     }
     const res = {
       status: () => res,
       json: () => answered,
     } as unknown as Response;
-    for (const Mw of [MyAuth, MyRole, MyRateLimiter]) {
-      const result = await new Mw(appInstance).middleware(
-        {} as FrameworkRequest,
-        res,
-      );
-      assert.strictEqual(result, answered);
+    const result = await new MyRateLimiter(appInstance).middleware(
+      {} as FrameworkRequest,
+      res,
+    );
+    assert.strictEqual(result, answered);
+  });
+
+  it('a (ctx, next) built-in subclass may answer with a response instead of next()', async () => {
+    class MyAuth extends Auth {
+      async middleware() {
+        return HttpResponse.json(401, { mine: true });
+      }
     }
+    class MyRole extends Role {
+      async middleware() {
+        return HttpResponse.json(401, { mine: true });
+      }
+    }
+    for (const Mw of [MyAuth, MyRole]) {
+      const response = await new Mw(appInstance).middleware();
+      assert.strictEqual(response.status, 401);
+    }
+  });
+
+  it('an override still written as middleware(req, res, next) is refused at registration', () => {
+    class OldAuth extends Auth {
+      // @ts-expect-error — Auth takes (ctx, next) since 5.7
+      async middleware(_req: FrameworkRequest, res: Response, _next: unknown) {
+        return res.status(401).json({});
+      }
+    }
+    assertThrowsLike(
+      () => normalizeMiddleware(OldAuth as unknown as MiddlewareSpec),
+      /OldAuth\.middleware takes \(req, res, next\), but the class extends Middleware/,
+    );
   });
 });

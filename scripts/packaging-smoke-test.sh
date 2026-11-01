@@ -367,11 +367,16 @@ const { default: AuthMiddleware } = await import(
 const { builtInErrorHandlers } = await import(
   '@adaptivestone/framework/services/http/builtinErrorHandlers.js'
 );
+const { createTestContext: createCtx } = await import(
+  '@adaptivestone/framework/tests/createTestContext.js'
+);
 // The middleware throws its 401; render it the way the HTTP layer does, with
 // the built-in HttpError mapper (no HTTP server is started here).
-const middlewareReq = { appInfo: { i18n } };
+const middlewareReq = createCtx({ appInfo: { i18n } });
 const thrown = await new AuthMiddleware(server.app)
-  .middleware(middlewareReq, {}, () => {})
+  .middleware(middlewareReq, async () => {
+    throw new Error('Auth let an anonymous request through');
+  })
   .then(
     () => null,
     (err) => err,
