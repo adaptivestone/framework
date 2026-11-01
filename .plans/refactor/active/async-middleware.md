@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies) and 5 (hooks get `ctx`) done; Phase 2 next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`) and Phase 2a (app-wide middleware) done; Phase 2b (portable built-ins) next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -33,6 +33,7 @@ descriptors, `transformResponse`).
 | D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                                                                                                                                    |
 | D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                                                                                                                                         |
 | Hooks                    | **Decided 2026-11-01 (B):** `transformResponse(response, { req, ctx })` (v6 drops `req`); error handlers opt in per registration with `{ contractVersion: 2 }` and get `(err, ctx)` — the same rule as controllers; one context per request, made on first use on 5.x-only routes.                                                   |
+| App-wide middleware      | **Decided 2026-11-01 (A):** a `Server` option, `middleware: [Class, [Class, params], …]` — v2 `Middleware` classes only, after the built-ins and around routing (routes, 404, 405). Supersedes the older `app.useGlobal()` / `registerGlobalMiddleware()` sketches (never built); a registration call can still be added in a minor. |
 | Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
@@ -437,9 +438,29 @@ adapter (P3) the same class reads from Node directly.
   compile-time check that a handler without the option gets `req`). The packed type fixture
   registers both hook forms.
 
-**Still open for P1m:** the response-type consumer fixture with a simulated added kind (with P1q),
-the real-runner re-measure, and Phase 2 (app-wide middleware API and portable built-ins; owner
-questions on the API shape and the built-ins' names/paths).
+**Phase 2a — app-wide middleware (done 2026-11-01; owner decision A):**
+
+- `Server` option `middleware: ReadonlyArray<AppMiddlewareSpec>` (`Class` or `[Class, params]`,
+  v2 `Middleware` only), also through `configureTestServer`. `normalizeAppMiddlewares`
+  (`routing/middlewareNormalization.ts`) refuses anything else with the entry's position and name;
+  `HttpServer` runs it when the HTTP server boots (`server.ts` keeps `HttpServer` lazy).
+- `createExpressAdapter(registry, app, writer, { appMiddleware })`: with entries present, every
+  request the adapter sees runs as one strict-onion chain — app middleware, then the route's
+  middleware and handler, or a framework answer (`notFoundResponse`, the 405 with `Allow`, the
+  malformed-URL 400) as the chain end. Without entries nothing changes (5.x dispatch, the 404 page
+  stays an Express middleware). The 404 body is shared (`builtinErrorHandlers.notFoundResponse`).
+- On Express the built-ins (security headers, `RequestLogger`, `PrepareAppInfo`, `IpDetector`,
+  `I18n`, `Cors`, `RequestParser`) still run first as Express middleware, so an error they raise
+  goes to the final sink without passing app middleware. The portable built-ins (Phase 2b) move into
+  the same chain.
+- Tests: `middlewareNormalization.test.ts` (+3), `expressPipeline.test.ts` (+4 over HTTP: 5.x-only
+  route wrapped, 404 / 405 / malformed 400 wrapped, order and early answer, route error reaching
+  it), `testServerOptions.test.ts` (+1: the real `Server` option in a booted test server, route and
+  404). The packed type fixture accepts `Class` / `[Class, params]` and rejects a 5.x middleware.
+
+**Still open for P1m:** Phase 2b (portable built-ins; owner question on names/paths), the
+response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
+re-measure.
 
 ## API change
 
