@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`) and Phase 2a (app-wide middleware) done; Phase 2b (built-ins converted in place) in progress.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) and 2b-1/2b-2 (built-ins converted in place) done; `RequestParser` and security headers next.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -484,7 +484,33 @@ adapter (P3) the same class reads from Node directly.
   member. The 500 for a limiter that failed to start is returned, not written to `res`. The adapter's
   route-budget tests moved to a real HTTP server (their `res` stubs never emit `finish`).
 
-**Still open for P1m:** Phase 2b-2 (global built-ins),
+**Phase 2b-2 — global built-ins converted in place (done 2026-11-01; owner decision A):**
+
+- `RequestLogger` (logs from `ctx.onFinish`, path from `ctx.url.pathname`), `PrepareAppInfo` (fills
+  missing `appInfo` fields), `IpDetector` (`clientAddress(peerAddress, headers)`; the
+  `getIpAdressFromIncomingMessage(req)` helper stays for raw Node requests), `I18n` (`detectors` and
+  `detectLang` take the context) and `Cors` (staged headers; a preflight returns its 204) extend
+  `Middleware`.
+- `expressMiddleware(app, writer, instance)` (`routing/expressPipeline.ts`) mounts a `Middleware`
+  as an Express middleware in the same position: `next()` calls Express's `next` inside the request
+  scope (so `requestContext()` works on every route) and resolves when the response ends; a returned
+  response is written with the staged headers; a throw goes to the Express error handler.
+  `HttpServer` mounts the five through it, in the old order, before anything `bootHttp` adds.
+- `expressContext` creates `req.appInfo` when the context comes first (one shared object) and
+  installs the deprecated `req.i18n` getter (one `DeprecationWarning`, `ASF_DEP_REQ_I18N`) — a 5.x
+  compatibility shim that lives in the Express layer and leaves with it in v6.
+- `RequestContext.peerAddress(ctx)` (internal, like `routeMethods`) carries the socket peer for IP
+  detection; `createTestContext` accepts `peerAddress` (default `127.0.0.1`).
+- Behaviour notes: CORS headers are applied when the response is written (a route's own value
+  wins, as before; `res.getHeader()` no longer sees them earlier). The framework creates the five
+  itself, so their changed extension points (`I18n.detectors`) reach no app code.
+- Tests: the five unit tests use `createTestContext()` (`RequestLogger` gains a no-query and an
+  aborted case), `Cors` over HTTP through the bridge, `I18n` checks the `req.i18n` alias over HTTP;
+  `expressPipeline.test.ts` +3 bridge cases (continue in scope with one `appInfo`, answer with
+  staged headers, throw to the error handler).
+
+**Still open for P1m:** `RequestParser` and the security headers (owner questions: a raw-body
+design for the parser; staged security headers would undo a route's `res.removeHeader()`),
 the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
 re-measure.
 
