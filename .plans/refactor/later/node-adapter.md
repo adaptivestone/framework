@@ -3,8 +3,8 @@
 **Status**: ⏸ deferred — **owner target (2026-11-01): ships in 5.x as an opt-in adapter**, so Express
 becomes optional before v6 removes it. Needs a design pass before it moves to `queued/`.
 **Depends on**: P1b, [P1q universal HTTP responses](../active/universal-http-responses.md),
-[P1m](../queued/async-middleware.md) (the portable pipeline it runs), the app-wide middleware API
-([v6-api-stability](../queued/v6-api-stability.md) item 1). The P2c performance gate below no
+[P1m](../queued/async-middleware.md) (the portable pipeline it runs), the app-wide middleware API and portable built-ins
+([P1m Phase 2](../queued/async-middleware.md), [v6-api-stability](../queued/v6-api-stability.md) item 1). The P2c performance gate below no
 longer blocks it (owner target).
 **Unblocks**: P4
 

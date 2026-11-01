@@ -155,41 +155,38 @@ Transaction; _heavy_ = 8 async + 2 wrappers. Raw results:
 [Bun](middleware-experiments/contract-check-bun.json).
 
 Retained heap per request pending in the handler (bytes, median of 5, 10 000 pending), production
-(`safe`) runners with the revised guards (§11):
+(`safe`) runners with the final guards (§11, §12):
 
 | Route            | Node 24 onion | Node 24 H | Node 26 onion | Node 26 H | Bun onion | Bun H |
 | ---------------- | ------------- | --------- | ------------- | --------- | --------- | ----- |
-| minimal          | 324           | 487       | 599           | 543       | 188       | 92    |
-| typical          | 2 265         | 486       | 2 321         | 545       | 1 808     | 92    |
-| typical+scope    | 2 634         | 1 103     | 2 695         | 1 159     | 1 920     | 288   |
-| typical+scope+tx | 3 480         | 1 929     | 3 547         | 2 001     | 2 528     | 1 040 |
-| heavy            | 4 363         | 1 103     | 4 418         | 1 158     | 3 536     | 288   |
+| minimal          | 1 215         | 488       | 1 265         | 543       | 880       | 92    |
+| typical          | 2 937         | 436       | 2 999         | 325       | 2 448     | 92    |
+| typical+scope    | 3 642         | 1 431     | 3 696         | 1 481     | 2 880     | 784   |
+| typical+scope+tx | 4 482         | 2 258     | 4 555         | 2 329     | 3 488     | 1 376 |
+| heavy            | 5 035         | 1 754     | 5 090         | 1 809     | 4 176     | 1 088 |
 
 Dispatch CPU per request (ns, no HTTP, median of 5 × 100 000), production runners (noisier than
 memory; differences below ≈ 300 ns are not meaningful):
 
 | Route            | Node 24 onion | Node 24 H | Node 26 onion | Node 26 H | Bun onion | Bun H |
 | ---------------- | ------------- | --------- | ------------- | --------- | --------- | ----- |
-| minimal          | 1 341         | 523       | 1 141         | 465       | 1 791     | 1 400 |
-| typical          | 3 616         | 1 248     | 3 774         | 1 282     | 6 539     | 3 060 |
-| typical+scope    | 4 131         | 2 279     | 3 810         | 2 119     | 7 056     | 4 195 |
-| typical+scope+tx | 3 845         | 2 362     | 4 253         | 2 614     | 7 624     | 4 410 |
-| heavy            | 6 449         | 3 557     | 5 983         | 2 979     | 10 583    | 5 417 |
+| minimal          | 1 357         | 568       | 1 797         | 637       | 2 455     | 1 105 |
+| typical          | 3 391         | 1 062     | 3 883         | 1 322     | 5 602     | 2 770 |
+| typical+scope    | 4 501         | 2 894     | 4 544         | 2 725     | 6 587     | 3 826 |
+| typical+scope+tx | 5 993         | 2 819     | 4 903         | 3 350     | 6 866     | 4 347 |
+| heavy            | 6 417         | 4 725     | 6 190         | 3 579     | 9 978     | 5 691 |
 
 Reading:
 
-- With the complete guards, strict onion keeps ≈ 1.5–1.8 KB more per pending request than H on a
-  realistic route (Node 24, Node 26 and Bun alike), ≈ 3.3 KB on the heavy mix — ≈ 15–33 MB at
-  10 000 pending requests, against ≈ 63 MB that Express itself holds for them. It costs
-  ≈ 1.5–2.5 µs (Node) / ≈ 3–3.5 µs (Bun) more per request; one framework request is ≈ 45 µs, so
-  ≈ 3–6 % on Node, ≈ 7–8 % on Bun. (Before the review the guards were incomplete and the gap was
-  ≈ 0.8 KB / 0.3–0.6 µs.)
-- The cost is the per-invocation expiry: every `async` middleware's own result must be observed.
-  Without guards the two models are close (onion raw 1 353 B vs H raw 1 159 B, Node 26,
-  typical+scope+tx). Development diagnostics add ≈ 1–1.5 KB more; development only.
+- With the complete guards, strict onion keeps ≈ 2.2 KB more per pending request than H on a
+  realistic route (Node 24, Node 26 and Bun alike), ≈ 3.3 KB on the heavy mix — ≈ 22–33 MB at
+  10 000 pending requests, against ≈ 63 MB that Express itself holds for them. It costs ≈ 2–3 µs
+  (Node) / ≈ 2.5–4 µs (Bun) more per request; one framework request is ≈ 45 µs. The guards grew
+  in two steps: ≈ 0.8 KB before the contract review, ≈ 1.5–1.8 KB after it, ≈ 2.2 KB after the
+  final review (forwarding middleware now also expire).
+- The cost is per-invocation expiry: every middleware's own result is observed. Without guards the
+  two models are close. Development diagnostics add ≈ 1–1.5 KB more; development only.
 - Small values (and the few negative Bun values) are within measurement noise of the baseline.
-- Both are still faster than today's 5.x bridge (≈ 4.7 µs dispatch for 10 middleware, Fable's
-  measurement) on Node.
 
 ## 5. Node 24 vs Node 26
 
@@ -293,3 +290,18 @@ code before acting.
 | Writer: `return()` throwing synchronously escapes               | true (uncaught exception)                                                                                                   | Fixed: stopping a source never throws; test added.                                                                                                                                                                   |
 | Writer: `transformResponse` replacing a stream leaks its source | true                                                                                                                        | Fixed: a replaced stream source is cancelled; a re-wrapped one is kept; test added.                                                                                                                                  |
 | Files/acceptance additions                                      | accepted                                                                                                                    | Added to P1m (base module, `AbstractController`, `RouteNode`, `middlewareNormalization`, handler version, codegen, extension-hook types, export subpath, lockfile, request-entry scope).                             |
+
+## 12. Final review by Astra (2026-11-01) — responses
+
+[Review](middleware-final-review-astro.md) of `2b0777c`. Each finding was checked first.
+
+| Finding                                                   | Checked                                                                                                        | Action                                                                                                                                                                                       |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Long streams retain finished cancellation races        | true and severe: +70 MB over 300 000 chunks of an open stream (≈ 245 B per chunk); the old `pipeline` was flat | Fixed in `ExpressResponseWriter`: one short-lived disconnect waiter per read or drain, released when it ends; flat again (+0.1 MB). Regression test: fails at +34.5 MB on the leaky version. |
+| 2a. Forwarding shortcut never expires                     | true (production turned a late call into "called twice")                                                       | Fixed in the kernels; conformance case added; fails on the old kernel.                                                                                                                       |
+| 2b. Development wrapper can reject unobserved             | true (`unhandledRejection` in development only)                                                                | Fixed; conformance case added; fails on the old kernel.                                                                                                                                      |
+| 3. Built-in migration timing contradicts the Node adapter | true                                                                                                           | Assigned to P1m Phase 2: app-wide middleware API and portable built-ins next to the unchanged v1 classes, before the Node adapter.                                                           |
+| 4. v6 acceptance not executable                           | true                                                                                                           | `createTestContext()` file, export and packed check added to P1m; forward-compatible response type + consumer fixture required; v6 "done" now separates capabilities from policies.          |
+
+Memory and CPU re-measured with the final guards (§4). Conformance and the review probes pass on
+Node 24, Node 26 and Bun, with the real OpenTelemetry case run, not skipped.

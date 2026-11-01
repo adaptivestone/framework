@@ -1,5 +1,5 @@
 {
-  "revision": "guards revised after the contract review (2026-11-01)",
+  "revision": "guards revised after the final review (2026-11-01)",
   "conformance": {
     "runtime": "node v24.22.2",
     "conformance": [
@@ -137,6 +137,24 @@
         "hybrid/raw": "early: next(...).then is not a function; error: sync failure",
         "hybrid/safe": true,
         "hybrid/dev": true
+      },
+      {
+        "case": "Guard: a late call after a forwarding middleware finished keeps the chosen response",
+        "onion/raw": "result: 200",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "result: 200",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Guard: a delayed outer middleware leaves no unhandledRejection",
+        "onion/raw": "unhandled rejection: true",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "unhandled rejection: true",
+        "hybrid/safe": true,
+        "hybrid/dev": true
       }
     ],
     "failures": [],
@@ -150,47 +168,47 @@
       {
         "scenario": "minimal",
         "onion/raw": -24,
-        "onion/safe": 324,
-        "onion/dev": 1327,
+        "onion/safe": 1215,
+        "onion/dev": 1514,
         "hybrid/raw": 70,
-        "hybrid/safe": 487,
+        "hybrid/safe": 488,
         "hybrid/dev": 487
       },
       {
         "scenario": "typical",
         "onion/raw": 361,
-        "onion/safe": 2265,
-        "onion/dev": 3274,
-        "hybrid/raw": 17,
-        "hybrid/safe": 486,
-        "hybrid/dev": 486
+        "onion/safe": 2937,
+        "onion/dev": 3849,
+        "hybrid/raw": 16,
+        "hybrid/safe": 436,
+        "hybrid/dev": 487
       },
       {
         "scenario": "typical+scope",
-        "onion/raw": 729,
-        "onion/safe": 2634,
-        "onion/dev": 4035,
+        "onion/raw": 728,
+        "onion/safe": 3642,
+        "onion/dev": 4707,
         "hybrid/raw": 534,
-        "hybrid/safe": 1103,
-        "hybrid/dev": 1481
+        "hybrid/safe": 1431,
+        "hybrid/dev": 1580
       },
       {
         "scenario": "typical+scope+tx",
         "onion/raw": 1273,
-        "onion/safe": 3480,
-        "onion/dev": 4931,
-        "hybrid/raw": 1081,
-        "hybrid/safe": 1929,
-        "hybrid/dev": 2370
+        "onion/safe": 4482,
+        "onion/dev": 5699,
+        "hybrid/raw": 1082,
+        "hybrid/safe": 2258,
+        "hybrid/dev": 2572
       },
       {
         "scenario": "heavy",
         "onion/raw": 928,
-        "onion/safe": 4363,
-        "onion/dev": 5595,
+        "onion/safe": 5035,
+        "onion/dev": 6555,
         "hybrid/raw": 353,
-        "hybrid/safe": 1103,
-        "hybrid/dev": 1866
+        "hybrid/safe": 1754,
+        "hybrid/dev": 2058
       }
     ]
   },
@@ -201,48 +219,48 @@
     "rows": [
       {
         "scenario": "minimal",
-        "onion/raw": 265,
-        "onion/safe": 1341,
-        "onion/dev": 1555,
-        "hybrid/raw": 277,
-        "hybrid/safe": 523,
-        "hybrid/dev": 686
+        "onion/raw": 247,
+        "onion/safe": 1357,
+        "onion/dev": 1602,
+        "hybrid/raw": 463,
+        "hybrid/safe": 568,
+        "hybrid/dev": 512
       },
       {
         "scenario": "typical",
-        "onion/raw": 948,
-        "onion/safe": 3616,
-        "onion/dev": 4139,
-        "hybrid/raw": 938,
-        "hybrid/safe": 1248,
-        "hybrid/dev": 1367
+        "onion/raw": 1289,
+        "onion/safe": 3391,
+        "onion/dev": 3745,
+        "hybrid/raw": 1700,
+        "hybrid/safe": 1062,
+        "hybrid/dev": 1133
       },
       {
         "scenario": "typical+scope",
-        "onion/raw": 1265,
-        "onion/safe": 4131,
-        "onion/dev": 4199,
-        "hybrid/raw": 1243,
-        "hybrid/safe": 2279,
-        "hybrid/dev": 2248
+        "onion/raw": 1176,
+        "onion/safe": 4501,
+        "onion/dev": 5210,
+        "hybrid/raw": 1505,
+        "hybrid/safe": 2894,
+        "hybrid/dev": 3276
       },
       {
         "scenario": "typical+scope+tx",
-        "onion/raw": 1355,
-        "onion/safe": 3845,
-        "onion/dev": 4936,
-        "hybrid/raw": 1315,
-        "hybrid/safe": 2362,
-        "hybrid/dev": 2849
+        "onion/raw": 1572,
+        "onion/safe": 5993,
+        "onion/dev": 6362,
+        "hybrid/raw": 1380,
+        "hybrid/safe": 2819,
+        "hybrid/dev": 3097
       },
       {
         "scenario": "heavy",
-        "onion/raw": 1803,
-        "onion/safe": 6449,
-        "onion/dev": 6233,
-        "hybrid/raw": 2304,
-        "hybrid/safe": 3557,
-        "hybrid/dev": 4224
+        "onion/raw": 3066,
+        "onion/safe": 6417,
+        "onion/dev": 7377,
+        "hybrid/raw": 3426,
+        "hybrid/safe": 4725,
+        "hybrid/dev": 4036
       }
     ]
   }

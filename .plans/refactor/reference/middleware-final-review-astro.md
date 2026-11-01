@@ -5,6 +5,8 @@
 **Scope:** [async-middleware](../queued/async-middleware.md),
 [v6-api-stability](../queued/v6-api-stability.md), their contract checks and the accompanying
 response-writer fix. Source line references below refer to this reviewed commit.
+**Responses (2026-11-01):** every finding checked and acted on —
+[final recommendation §12](middleware-final-recommendation.md#12-final-review-by-astra-2026-11-01--responses).
 **Handoff:** published at the owner's request for implementation by Opus. This document records
 review findings; it does not change the settled contract or implement the fixes.
 
