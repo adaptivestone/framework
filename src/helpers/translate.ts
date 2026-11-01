@@ -1,4 +1,9 @@
-import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import type { TI18n } from '../services/i18n/types.ts';
+
+/** Anything carrying the request's `appInfo.i18n`: a request or a request context. */
+interface HasI18n {
+  readonly appInfo?: { readonly i18n?: TI18n } | object;
+}
 
 /**
  * Translate a framework message with an in-code English default — the single
@@ -10,10 +15,11 @@ import type { FrameworkRequest } from '../services/http/HttpServer.ts';
  * wins.
  */
 export const translateWithDefault = (
-  req: FrameworkRequest,
+  req: HasI18n,
   key: string,
   defaultValue: string,
 ): string => {
-  const translated = req.appInfo?.i18n?.t(key, { defaultValue });
+  const appInfo = req.appInfo as { i18n?: TI18n } | undefined;
+  const translated = appInfo?.i18n?.t(key, { defaultValue });
   return typeof translated === 'string' ? translated : defaultValue;
 };

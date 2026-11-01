@@ -1,59 +1,20 @@
 import type { NextFunction, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
-import Base from '../../../modules/Base.ts';
-import type { IApp } from '../../../server.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import BaseMiddleware, { type AuthParameter } from './BaseMiddleware.ts';
+
+export type { AuthParameter } from './BaseMiddleware.ts';
 
 /**
- * One security scheme a middleware contributes to the OpenAPI document
- * (`components.securitySchemes`). Mirrors the OpenAPI Security Scheme Object:
- * `type: 'apiKey'` uses `name` + `in`; `type: 'http'` uses `scheme`.
+ * Middleware with the 5.x contract `(req, res, next)`. New middleware extend
+ * `Middleware` (`(ctx, next)`) instead; this class is removed in v6.
  */
-export interface AuthParameter {
-  name: string;
-  type: string;
-  in?: string;
-  scheme?: string;
-  description: string;
-}
-
-class AbstractMiddleware extends Base {
-  params?: Record<string, unknown>;
-
-  constructor(app: IApp, params?: Record<string, unknown>) {
-    super(app);
-    this.params = params;
-  }
-
-  static get description() {
-    return 'Middleware description. Please provide own';
-  }
-
-  /**
-   * How requests send the credentials this middleware reads (a bearer token,
-   * an API-key header, …), as OpenAPI security schemes. Declared
-   * **statically** so the generator reads them off the class with zero
-   * instantiation. Default `[]`. Reading alone documents auth as optional;
-   * see {@link requiresAuth}.
-   */
-  static get authSchemes(): AuthParameter[] {
-    return [];
-  }
-
+class AbstractMiddleware extends BaseMiddleware {
   /** @deprecated Renamed to {@link authSchemes}; removed in v6. */
   static get usedAuthParameters(): AuthParameter[] {
     // `this` is the concrete subclass, so its `authSchemes` override answers.
     return this.authSchemes;
-  }
-
-  /**
-   * Whether this middleware rejects requests without an authenticated user
-   * (`Auth`, `Role`). One such middleware anywhere in a route's chain makes
-   * the route's OpenAPI security required; without one it is optional.
-   */
-  static get requiresAuth(): boolean {
-    return false;
   }
 
   /**
@@ -62,29 +23,6 @@ class AbstractMiddleware extends Base {
    */
   get usedAuthParameters(): AuthParameter[] {
     return [];
-  }
-
-  /**
-   * Schema describing query parameters this middleware consumes. Declared
-   * **statically** so the framework (and codegen) can read it without
-   * instantiating the middleware. Override with any Standard Schema-conformant
-   * schema (Zod, Valibot, ArkType, yup ≥1.7, `defineSchema`). Default `null`.
-   *
-   * Example:
-   *   static get relatedQueryParameters() {
-   *     return z.object({ page: z.number(), limit: z.number() });
-   *   }
-   */
-  static get relatedQueryParameters(): StandardSchemaV1 | null {
-    return null;
-  }
-
-  /**
-   * Schema describing request-body parameters this middleware consumes. Static;
-   * same rules as `relatedQueryParameters`.
-   */
-  static get relatedRequestParameters(): StandardSchemaV1 | null {
-    return null;
   }
 
   /**
@@ -143,10 +81,6 @@ class AbstractMiddleware extends Base {
 
   getMiddleware() {
     return this.middleware.bind(this);
-  }
-
-  static get loggerGroup() {
-    return 'middleware';
   }
 }
 
