@@ -98,10 +98,13 @@ Rules:
    through every middleware unchanged and is resolved by the registry once, at the top.
 2. `void`, patch objects and sentinels are not continuation signals. The final value must be a
    response.
-3. **Production guards** (the `safe` runner in §4): `next()` works once — a second call throws;
-   `next()` is refused once the response has been chosen; every started downstream promise is
-   marked handled, so misuse never becomes an `unhandledRejection`; a started handler is awaited
-   before the answer is used; a final value that is not a response is a `TypeError`.
+3. **Production guards** (the `safe` runner in §4; revised after the contract review, §11):
+   `next()` always returns a Promise; it works once — a second call fails the request; it is
+   refused once its own middleware call has settled (per-invocation expiry) or the request has
+   chosen its response — a late call is refused without touching the chosen response; every
+   started suffix (later middleware, handler, wrapper cleanup) is awaited before the answer is
+   used; no misuse can become an `unhandledRejection`; a final value that is not a response is a
+   `TypeError`.
 4. **Development diagnostics** (the `dev` runner): additionally checks each middleware's result and
    names the one that broke the rule ("`Forgot` must return a response — missing `return next()`?").
    koa-compose 4.2 splits production and development checks the same way.
@@ -112,24 +115,29 @@ Rules:
 
 [contract-check.mjs](middleware-experiments/contract-check.mjs) `conformance`, both models, three
 runner modes, real timers, Node 24.22.2, Node 26.12.1 and Bun 1.4.4. **Results are identical on all
-three runtimes.**
+three runtimes.** The script exits 1 when a guarded (`safe`/`dev`) case fails and reports skipped
+cases (none: the OTel case ran with real packages). Astra's
+[review probes](middleware-experiments/contract-review-probes.mjs) pass on all three runtimes.
 
-| Requirement / case                                                   | Strict onion (safe, dev)               | H (safe, dev) | Without guards (raw), both models                    |
-| -------------------------------------------------------------------- | -------------------------------------- | ------------- | ---------------------------------------------------- |
-| R1 early response stops the chain (Role → 403)                       | ✅                                     | ✅            | ✅                                                   |
-| R1 request-only middleware stay simple                               | `return next()` needed (owner accepts) | no `next`     | —                                                    |
-| R2 after-part sees and replaces the response                         | ✅                                     | ✅            | ✅                                                   |
-| R3 after send (`onFinish`)                                           | same mechanism in both                 | same          | —                                                    |
-| R4 own store reaches later middleware, handler, deep code (40 conc.) | ✅                                     | ✅            | ✅                                                   |
-| R5 middleware span parents the handler span (real OTel)              | ✅                                     | ✅            | ✅                                                   |
-| R6 handler throws → rollback, original error reaches the top         | ✅                                     | ✅            | ✅                                                   |
-| R6 commit on success; a non-`Error` throw passes unchanged           | ✅                                     | ✅            | ✅                                                   |
-| R8 lazy stream read after the transaction closed (documented rule)   | closed — as documented                 | same          | same                                                 |
-| `next()` called twice                                                | ✅ error, handler once                 | ✅            | handler ran 2×                                       |
-| `next()` not awaited, other response returned, handler throws        | ✅ 202 after handler, no unhandled     | ✅            | answered before handler ended + `unhandledRejection` |
-| stored `next()` called after the answer                              | ✅ refused, handler never runs         | ✅            | handler ran after the answer                         |
-| forgotten `return` (`await next()` only)                             | ✅ `TypeError` (dev names it)          | ✅ (wrappers) | no response at all                                   |
-| throw after an un-awaited `next()`                                   | ✅ error after handler ended           | ✅            | answered before handler ended                        |
+| Requirement / case                                                    | Strict onion (safe, dev)                | H (safe, dev) | Without guards (raw), both models                    |
+| --------------------------------------------------------------------- | --------------------------------------- | ------------- | ---------------------------------------------------- |
+| R1 early response stops the chain (Role → 403)                        | ✅                                      | ✅            | ✅                                                   |
+| R1 request-only middleware stay simple                                | `return next()` needed (owner accepts)  | no `next`     | —                                                    |
+| R2 after-part sees and replaces the response                          | ✅                                      | ✅            | ✅                                                   |
+| R3 after send (`onFinish`)                                            | same mechanism in both                  | same          | —                                                    |
+| R4 own store reaches later middleware, handler, deep code (40 conc.)  | ✅                                      | ✅            | ✅                                                   |
+| R5 middleware span parents the handler span (real OTel)               | ✅                                      | ✅            | ✅                                                   |
+| R6 handler throws → rollback, original error reaches the top          | ✅                                      | ✅            | ✅                                                   |
+| R6 commit on success; a non-`Error` throw passes unchanged            | ✅                                      | ✅            | ✅                                                   |
+| R8 lazy stream read after the transaction closed (documented rule)    | closed — as documented                  | same          | same                                                 |
+| `next()` called twice                                                 | ✅ error, handler once                  | ✅            | handler ran 2×                                       |
+| `next()` not awaited, other response returned, handler throws         | ✅ 202 after handler, no unhandled      | ✅            | answered before handler ended + `unhandledRejection` |
+| stored `next()` called after the answer                               | ✅ refused, handler never runs          | ✅            | handler ran after the answer                         |
+| forgotten `return` (`await next()` only)                              | ✅ `TypeError` (dev names it)           | ✅ (wrappers) | no response at all                                   |
+| throw after an un-awaited `next()`                                    | ✅ error after handler ended            | ✅            | answered before handler ended                        |
+| started cleanup awaited before answering (review)                     | ✅                                      | ✅            | answered before cleanup                              |
+| a finished middleware cannot start its discarded suffix (review)      | ✅ refused, 403 kept, handler never ran | ✅            | handler ran though 403 was chosen                    |
+| `next()` is a Promise for sync early response and sync error (review) | ✅                                      | ✅            | (raw returns plain values)                           |
 
 Both designs meet every requirement once guarded. Without guards both fail the same misuse cases,
 so the guards are required in either design; the difference is only how many middleware pay for
@@ -146,37 +154,41 @@ Transaction; _heavy_ = 8 async + 2 wrappers. Raw results:
 [Bun](middleware-experiments/contract-check-bun.json).
 
 Retained heap per request pending in the handler (bytes, median of 5, 10 000 pending), production
-(`safe`) runners:
+(`safe`) runners with the revised guards (§11):
 
 | Route            | Node 24 onion | Node 24 H | Node 26 onion | Node 26 H | Bun onion | Bun H |
 | ---------------- | ------------- | --------- | ------------- | --------- | --------- | ----- |
-| minimal          | 455           | 360       | 297           | 415       | 29        | 152   |
-| typical          | 1 222         | 141       | 1 280         | 417       | 541       | −67   |
-| typical+scope    | 1 687         | 919       | 1 743         | 977       | 784       | 224   |
-| typical+scope+tx | 2 463         | 1 681     | 2 530         | 1 760     | 1 520     | 944   |
-| heavy            | 2 359         | 1 014     | 2 415         | 1 074     | 1 361     | 304   |
+| minimal          | 324           | 487       | 599           | 543       | 188       | 92    |
+| typical          | 2 265         | 486       | 2 321         | 545       | 1 808     | 92    |
+| typical+scope    | 2 634         | 1 103     | 2 695         | 1 159     | 1 920     | 288   |
+| typical+scope+tx | 3 480         | 1 929     | 3 547         | 2 001     | 2 528     | 1 040 |
+| heavy            | 4 363         | 1 103     | 4 418         | 1 158     | 3 536     | 288   |
 
-Dispatch CPU per request (ns, no HTTP, median of 5 × 100 000), production runners:
+Dispatch CPU per request (ns, no HTTP, median of 5 × 100 000), production runners (noisier than
+memory; differences below ≈ 300 ns are not meaningful):
 
 | Route            | Node 24 onion | Node 24 H | Node 26 onion | Node 26 H | Bun onion | Bun H |
 | ---------------- | ------------- | --------- | ------------- | --------- | --------- | ----- |
-| minimal          | 486           | 412       | 451           | 376       | 1 331     | 940   |
-| typical          | 1 279         | 945       | 1 205         | 872       | 3 728     | 2 192 |
-| typical+scope    | 1 495         | 1 322     | 1 429         | 1 286     | 4 195     | 2 792 |
-| typical+scope+tx | 1 816         | 1 430     | 1 895         | 1 334     | 5 075     | 3 317 |
-| heavy            | 2 438         | 1 956     | 2 731         | 1 959     | 7 181     | 4 617 |
+| minimal          | 1 341         | 523       | 1 141         | 465       | 1 791     | 1 400 |
+| typical          | 3 616         | 1 248     | 3 774         | 1 282     | 6 539     | 3 060 |
+| typical+scope    | 4 131         | 2 279     | 3 810         | 2 119     | 7 056     | 4 195 |
+| typical+scope+tx | 3 845         | 2 362     | 4 253         | 2 614     | 7 624     | 4 410 |
+| heavy            | 6 449         | 3 557     | 5 983         | 2 979     | 10 583    | 5 417 |
 
 Reading:
 
-- For a realistic route, strict onion keeps ≈ 0.8 KB (Node) / ≈ 0.6 KB (Bun) more per pending
-  request than H, ≈ 1.3 KB on the heavy mix — ≈ 8–13 MB at 10 000 pending requests, against
-  ≈ 63 MB that Express itself holds for them. It costs ≈ 0.3–0.6 µs (Node) / ≈ 1.5–1.8 µs (Bun)
-  more per request; one framework request is ≈ 45 µs, so ≈ 1 % on Node, ≈ 4 % on Bun.
-- The guards are most of the difference: without them the two models are close (onion raw 1 351 B
-  vs H raw 1 153 B, Node 26, typical+scope+tx). Development diagnostics add ≈ 1.5 KB more; they are
-  for development only.
+- With the complete guards, strict onion keeps ≈ 1.5–1.8 KB more per pending request than H on a
+  realistic route (Node 24, Node 26 and Bun alike), ≈ 3.3 KB on the heavy mix — ≈ 15–33 MB at
+  10 000 pending requests, against ≈ 63 MB that Express itself holds for them. It costs
+  ≈ 1.5–2.5 µs (Node) / ≈ 3–3.5 µs (Bun) more per request; one framework request is ≈ 45 µs, so
+  ≈ 3–6 % on Node, ≈ 7–8 % on Bun. (Before the review the guards were incomplete and the gap was
+  ≈ 0.8 KB / 0.3–0.6 µs.)
+- The cost is the per-invocation expiry: every `async` middleware's own result must be observed.
+  Without guards the two models are close (onion raw 1 353 B vs H raw 1 159 B, Node 26,
+  typical+scope+tx). Development diagnostics add ≈ 1–1.5 KB more; development only.
 - Small values (and the few negative Bun values) are within measurement noise of the baseline.
-- Both are far below today's 5.x bridge (≈ 4.7 µs dispatch for 10 middleware, Fable's measurement).
+- Both are still faster than today's 5.x bridge (≈ 4.7 µs dispatch for 10 middleware, Fable's
+  measurement) on Node.
 
 ## 5. Node 24 vs Node 26
 
@@ -231,10 +243,8 @@ From the Astro Proposal and the earlier version of this file:
 
 - Kernels, not the production runner and not real HTTP; re-measure the real runner (heap, RSS,
   CPU, p95/p99, Node 24, Node 26, Bun) before shipping, as Astra's decision gate asks.
-- The `safe` runner refuses `next()` once the whole request has chosen its response. A stored
-  `next()` called after its own middleware returned but before the request finished is not refused
-  (a narrow window; the handler's result is still awaited, nothing is written twice). Closing it
-  needs one more check per middleware; decide whether development diagnostics are enough.
+- The earlier window (a stored `next()` called after its own middleware returned, before the
+  request finished) is closed by per-invocation expiry since the review (§11).
 - Every built-in middleware gains a `return next()` line when it moves to v2.
 
 ## 9. Decisions (owner, 2026-11-01)
@@ -259,3 +269,21 @@ All D2 decisions are settled; the plan is [async-middleware](../queued/async-mid
    Express; reuse the cases in `contract-check.mjs`.
 3. Connect it to the existing writer and the Express adapter; keep the v1 bridge.
 4. Continue the Node adapter and Express removal plans.
+
+## 11. Contract review by Astra (2026-11-01) — responses
+
+[Review](middleware-contract-review-astro.md) of `dd6a39a`. Each finding was checked against the
+code before acting.
+
+| Finding                                                         | Checked                                                                                                                     | Action                                                                                                                                                                                                               |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. v2 base class (TS2416)                                       | true (same conflict P1m flagged)                                                                                            | Recommend a separate typed v2 base, usable in v6; owner to choose the name. Added to P1m with the affected files.                                                                                                    |
+| 2. v1 handler inside a v2 chain commits on error                | true (`controllers/index.ts` catches and returns 400/500)                                                                   | P1m: when a v1 handler runs inside the portable chain, its errors escape to the outer wrappers first; the standalone v1 path is unchanged. Bridge `next(err)`/sync throw/rejection keep raw identity.                |
+| 3. Legacy terminal outcome                                      | true (`ExpressAdapter` treats `close` as success; staged headers would miss legacy writes)                                  | Astra's outcome table adopted into P1m: flush staged headers/cookies at the legacy write boundary, reject later staging, `aborted` on premature close, `sent` kind visible in the v5 response union (removed in v6). |
+| 4. Guards: started cleanup, per-invocation expiry               | true (reproduced: answered before cleanup; handler ran though 403 was chosen)                                               | Fixed in the kernels; conformance cases added; re-measured (§4).                                                                                                                                                     |
+| 5. `next()` not a Promise in production                         | true (`next(...).then is not a function`)                                                                                   | Fixed: `next()` always returns a Promise; case added.                                                                                                                                                                |
+| 6. `onFinish` shape; conformance not a gate                     | true                                                                                                                        | P1m interface updated to `{ outcome, status?, error?, durationMs }`, exactly once; conformance now exits 1 on a failed guarded case and reports skips.                                                               |
+| Writer: pending first chunk after disconnect never settles      | true, and wider: Node's `pipeline` also never settles when a **later** chunk is pending after a disconnect (Node 24 and 26) | Fixed in `ExpressResponseWriter`: every read races the disconnect; own write loop with backpressure instead of `pipeline`. Tests for first and later chunk, large stream.                                            |
+| Writer: `return()` throwing synchronously escapes               | true (uncaught exception)                                                                                                   | Fixed: stopping a source never throws; test added.                                                                                                                                                                   |
+| Writer: `transformResponse` replacing a stream leaks its source | true                                                                                                                        | Fixed: a replaced stream source is cancelled; a re-wrapped one is kept; test added.                                                                                                                                  |
+| Files/acceptance additions                                      | accepted                                                                                                                    | Added to P1m (base module, `AbstractController`, `RouteNode`, `middlewareNormalization`, handler version, codegen, extension-hook types, export subpath, lockfile, request-entry scope).                             |

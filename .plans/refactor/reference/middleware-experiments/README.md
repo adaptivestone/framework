@@ -85,8 +85,8 @@ node contract-check.mjs cpu
 
 `contract-review-probes.mjs` loads the unchanged kernel functions from `contract-check.mjs` and
 checks pending downstream cleanup, per-layer continuation expiry and the Promise return contract.
-At the reviewed `dd6a39a`, five of six checks fail; the script intentionally exits 1 when an
-invariant fails. These are findings for implementation, not a production runner or benchmark.
+At the reviewed `dd6a39a`, five of six checks failed; after the guard revision of 2026-11-01 all six
+pass on Node 24, Node 26 and Bun. The script exits 1 when an invariant fails. These are findings for implementation, not a production runner or benchmark.
 See [the review](../middleware-contract-review-astro.md).
 
 ```sh

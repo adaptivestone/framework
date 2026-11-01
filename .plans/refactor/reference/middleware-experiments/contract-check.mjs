@@ -3,10 +3,12 @@
 //
 // Runner modes (both models):
 //   raw  — no guards (koa-compose production style)
-//   safe — production guards: next() single use; next() refused once the response is chosen;
-//          every started downstream promise is marked handled (no unhandledRejection);
-//          the runner waits for a started handler before answering; the final value must be a
-//          response (generic error)
+//   safe — production guards (revised after the review of 2026-11-01): next() always returns a
+//          Promise; it works once; it is refused once its own middleware call has settled
+//          (per-invocation expiry) or the request has chosen its response; every started suffix
+//          is recorded, the runner waits for all of them (handler, later middleware, wrapper
+//          cleanup) before answering, and none can become an unhandledRejection; the final value
+//          must be a response (generic error)
 //   dev  — safe + every layer's result checked, naming the middleware that broke the rule
 //
 // usage:
@@ -43,40 +45,135 @@ function callHandler(ctx, handler) {
   }
 }
 
-// Shared top-level settle: mark the request decided, wait for a started handler, check result.
+// A refused or failed start must never become an unhandledRejection.
+function rejected(err) {
+  const p = Promise.reject(err);
+  p.then(undefined, noop);
+  return p;
+}
+
+// Shared top-level settle: mark the request decided, wait for every started suffix (handler,
+// later middleware, wrapper cleanup), then check the result.
 function finish(req, failed, value) {
   req.settled = true;
   const done = () => {
+    if (req.misuse) throw req.misuse;
     if (failed) throw value;
     if (!isResponse(value))
       throw new TypeError('the middleware chain did not return a response');
     return value;
   };
-  return req.handler ? req.handler.then(done, done) : done();
+  return req.started.length
+    ? Promise.allSettled(req.started).then(done)
+    : done();
 }
 
-function guardedNext(name, req, start) {
-  let called = false;
-  return () => {
-    if (called) throw new Error(`${name}: next() called twice`);
-    if (req.settled)
-      throw new Error(`${name}: next() called after the response was chosen`);
-    called = true;
-    const downstream = start();
-    if (downstream && typeof downstream.then === 'function')
-      downstream.then(undefined, noop);
+// Misuse is refused with a rejected Promise that cannot become an unhandledRejection. A second
+// call while the request runs also fails the request; a late call (after its middleware already
+// finished) is only refused — the response that middleware chose stands.
+function refuse(req, name, message, failRequest) {
+  const err = new Error(`${name}: ${message}`);
+  if (failRequest && !req.settled) req.misuse ??= err;
+  return rejected(err);
+}
+
+const isThenable = (v) =>
+  v !== null && typeof v === 'object' && typeof v.then === 'function';
+
+/**
+ * One continuation-taking layer with the production guards (review 2026-11-01): next() always
+ * returns a Promise; it works once; it is refused once this layer's own call has settled
+ * (per-invocation expiry) or the request has chosen its response; every started suffix is
+ * recorded so the runner waits for it. Rejections are handled where they are created (handler,
+ * failed start, layer result), so misuse never leaves an unhandledRejection.
+ * `dev` additionally checks this layer's result and names it.
+ */
+function guardedLayer(req, name, fn, ctx, suffix, dev) {
+  let state = 0; // 0 open, 1 next() called, 2 this call settled
+  let downstream;
+  const next = () => {
+    if (state === 1) return refuse(req, name, 'next() called twice', true);
+    if (state === 2 || req.settled)
+      return refuse(
+        req,
+        name,
+        'next() called after its middleware finished',
+        false,
+      );
+    state = 1;
+    try {
+      downstream = Promise.resolve(suffix());
+    } catch (err) {
+      downstream = rejected(err);
+    }
+    req.started.push(downstream);
     return downstream;
   };
-}
-
-function checkLayer(name, result) {
-  return Promise.resolve(result).then((r) => {
-    if (!isResponse(r))
+  let result;
+  try {
+    result = fn(ctx, next);
+  } catch (err) {
+    state = 2;
+    throw err;
+  }
+  if (!isThenable(result)) {
+    // A synchronous return settles this call now.
+    state = 2;
+    if (dev && !isResponse(result))
       throw new TypeError(
         `${name} must return a response (missing "return next()"?)`,
       );
-    return r;
-  });
+    return result;
+  }
+  if (result === downstream && !dev) {
+    // `return next()`: this call settles with its suffix; next() is already spent.
+    return result;
+  }
+  if (!dev) {
+    const expire = () => {
+      state = 2;
+    };
+    result.then(expire, expire); // also marks the layer's own result handled
+    return result;
+  }
+  return result.then(
+    (r) => {
+      state = 2;
+      if (!isResponse(r))
+        throw new TypeError(
+          `${name} must return a response (missing "return next()"?)`,
+        );
+      return r;
+    },
+    (err) => {
+      state = 2;
+      throw err;
+    },
+  );
+}
+
+function guardedHandler(ctx, handler) {
+  const p = callHandler(ctx, handler);
+  p.then(undefined, noop); // a misused next() must not leave the handler's rejection unhandled
+  return p;
+}
+
+const newRequestState = () => ({ settled: false, started: [] });
+
+function topLevel(chain) {
+  return (ctx) => {
+    const req = newRequestState();
+    let top;
+    try {
+      top = Promise.resolve(chain(ctx, req));
+    } catch (err) {
+      top = Promise.reject(err);
+    }
+    return top.then(
+      (v) => finish(req, false, v),
+      (e) => finish(req, true, e),
+    );
+  };
 }
 
 /** Strict onion: every middleware is (ctx, next) => response. */
@@ -93,32 +190,25 @@ function onion(mws, handler, mode) {
       }
     };
   }
+  const dev = mode === 'dev';
   const invoke = (ctx, req, i) => {
-    if (i === n) return (req.handler = callHandler(ctx, handler));
+    if (i === n) return guardedHandler(ctx, handler);
     const mw = mws[i];
-    const result = mw.onion(
+    return guardedLayer(
+      req,
+      mw.name,
+      mw.onion,
       ctx,
-      guardedNext(mw.name, req, () => invoke(ctx, req, i + 1)),
-    );
-    return mode === 'dev' ? checkLayer(mw.name, result) : result;
-  };
-  return (ctx) => {
-    const req = { settled: false, handler: null };
-    let top;
-    try {
-      top = Promise.resolve(invoke(ctx, req, 0));
-    } catch (err) {
-      top = Promise.reject(err);
-    }
-    return top.then(
-      (v) => finish(req, false, v),
-      (e) => finish(req, true, e),
+      () => invoke(ctx, req, i + 1),
+      dev,
     );
   };
+  return topLevel((ctx, req) => invoke(ctx, req, 0));
 }
 
 /** H: stages (ctx) => void | response, wrappers around(ctx, next) => response; composed once. */
 function hybrid(mws, handler, mode) {
+  const dev = mode === 'dev';
   const compile = (pos) => {
     const stages = [];
     let j = pos;
@@ -126,17 +216,19 @@ function hybrid(mws, handler, mode) {
     const wrapper = j < mws.length ? mws[j] : null;
     const inner = wrapper ? compile(j + 1) : null;
     const rest = (ctx, req) => {
-      if (!wrapper) {
-        const p = callHandler(ctx, handler);
-        if (req) req.handler = p;
-        return p;
-      }
+      if (!wrapper)
+        return mode === 'raw'
+          ? callHandler(ctx, handler)
+          : guardedHandler(ctx, handler);
       if (mode === 'raw') return wrapper.around(ctx, () => inner(ctx, req));
-      const result = wrapper.around(
+      return guardedLayer(
+        req,
+        wrapper.name,
+        wrapper.around,
         ctx,
-        guardedNext(wrapper.name, req, () => inner(ctx, req)),
+        () => inner(ctx, req),
+        dev,
       );
-      return mode === 'dev' ? checkLayer(wrapper.name, result) : result;
     };
     if (stages.length === 0) return rest;
     // One async loop per segment: a stage's frame is gone before the handler waits.
@@ -163,19 +255,7 @@ function hybrid(mws, handler, mode) {
       }
     };
   }
-  return (ctx) => {
-    const req = { settled: false, handler: null };
-    let top;
-    try {
-      top = Promise.resolve(chain(ctx, req));
-    } catch (err) {
-      top = Promise.reject(err);
-    }
-    return top.then(
-      (v) => finish(req, false, v),
-      (e) => finish(req, true, e),
-    );
-  };
+  return topLevel(chain);
 }
 
 const build = (model, mws, handler, mode) =>
@@ -525,11 +605,11 @@ async function conformance() {
       const ctx = makeCtx();
       const late = (c, next) => {
         setTimeout(() => {
-          try {
-            next();
-          } catch (e) {
-            c.lateError = e.message;
-          }
+          Promise.resolve()
+            .then(() => next())
+            .catch((e) => {
+              c.lateError = e.message;
+            });
         }, 5);
         return response(200, {});
       };
@@ -544,7 +624,8 @@ async function conformance() {
       await sleep(30);
       return mode === 'raw'
         ? `handler ran ${runs}× after the answer`
-        : runs === 0 && /after the response/.test(ctx.lateError ?? '');
+        : runs === 0 &&
+            /after its middleware finished/.test(ctx.lateError ?? '');
     },
   );
 
@@ -622,6 +703,128 @@ async function conformance() {
     },
   );
 
+  // Cases from the contract review (2026-11-01), mirrored from contract-review-probes.mjs.
+  add(
+    'Guard: waits for started downstream cleanup before answering',
+    async (model, mode) => {
+      let release;
+      const cleanup = new Promise((r) => {
+        release = r;
+      });
+      let cleaned = false;
+      let answered = false;
+      const drop = (_ctx, next) => {
+        next();
+        return response(202, {});
+      };
+      const tidy = async (_ctx, next) => {
+        try {
+          return await next();
+        } finally {
+          await cleanup;
+          cleaned = true;
+        }
+      };
+      const pending = build(
+        model,
+        [
+          custom('Drop', drop, { around: drop }),
+          custom('Cleanup', tidy, { around: tidy }),
+        ],
+        () => OK,
+        mode,
+      )(makeCtx()).then((v) => {
+        answered = true;
+        return v;
+      });
+      await sleep(5);
+      const early = answered;
+      release();
+      const r = await outcome(pending);
+      if (mode === 'raw') return `answered before cleanup: ${early}`;
+      return !early && cleaned && r.value?.status === 202;
+    },
+  );
+
+  add(
+    'Guard: a finished middleware cannot start its discarded suffix',
+    async (model, mode) => {
+      let saved;
+      let runs = 0;
+      let release;
+      const outerGate = new Promise((r) => {
+        release = r;
+      });
+      const outer = async (_ctx, next) => {
+        const v = await next();
+        await outerGate;
+        return v;
+      };
+      const short = (_ctx, next) => {
+        saved = next;
+        return response(403, {});
+      };
+      const pending = outcome(
+        build(
+          model,
+          [
+            custom('Outer', outer, { around: outer }),
+            custom('Short', short, { around: short }),
+          ],
+          () => (runs++, OK),
+          mode,
+        )(makeCtx()),
+      );
+      await sleep(5);
+      let refused = false;
+      try {
+        await saved();
+      } catch {
+        refused = true;
+      }
+      release();
+      const r = await pending;
+      if (mode === 'raw') return `handler ran ${runs}× though 403 was chosen`;
+      return refused && runs === 0 && r.value?.status === 403;
+    },
+  );
+
+  add(
+    'Guard: next() returns a Promise (sync early response and sync error)',
+    async (model, mode) => {
+      const consume = (_ctx, next) => next().then((r) => r);
+      const deny = () => response(403, {});
+      const fail = () => {
+        throw new Error('sync failure');
+      };
+      const a = await outcome(
+        build(
+          model,
+          [
+            custom('Consumer', consume, { around: consume }),
+            custom('Deny', deny, { around: deny }),
+          ],
+          () => OK,
+          mode,
+        )(makeCtx()),
+      );
+      const b = await outcome(
+        build(
+          model,
+          [
+            custom('Consumer', consume, { around: consume }),
+            custom('Fail', fail, { around: fail }),
+          ],
+          () => OK,
+          mode,
+        )(makeCtx()),
+      );
+      if (mode === 'raw')
+        return `early: ${a.value?.status ?? a.error?.message}; error: ${b.error?.message}`;
+      return a.value?.status === 403 && b.error?.message === 'sync failure';
+    },
+  );
+
   const results = [];
   for (const { name, fn } of cases) {
     const row = { case: name };
@@ -630,9 +833,24 @@ async function conformance() {
         row[`${model}/${mode}`] = await fn(model, mode);
     results.push(row);
   }
-  console.log(
-    JSON.stringify({ runtime: RUNTIME, conformance: results }, null, 2),
+  const failures = results.flatMap((row) =>
+    Object.entries(row)
+      .filter(([k, v]) => /\/(safe|dev)$/.test(k) && v === false)
+      .map(([k]) => `${row.case} — ${k}`),
   );
+  const skipped = results.flatMap((row) =>
+    Object.entries(row)
+      .filter(([k, v]) => /\/(safe|dev)$/.test(k) && v === 'skipped')
+      .map(([k]) => `${row.case} — ${k}`),
+  );
+  console.log(
+    JSON.stringify(
+      { runtime: RUNTIME, conformance: results, failures, skipped },
+      null,
+      2,
+    ),
+  );
+  if (failures.length) process.exitCode = 1;
 }
 
 let otelCache;

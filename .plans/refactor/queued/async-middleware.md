@@ -14,18 +14,18 @@ descriptors, `transformResponse`).
 
 ## Settled contract (2026-11-01)
 
-| Decision                 | Outcome                                                                                                                                                                                                                |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D2.1 flow                | Strict onion. `return next()` continues, a returned `HttpResponse` stops, a throw travels up unchanged; the registry resolves it once at the top.                                                                      |
-| Guards                   | Production: `next()` once, refused after the response is chosen, started downstream marked handled, started handler awaited, final value must be a response. Development: name the culprit.                            |
-| v5 bridge                | A v1 handler/middleware that wrote `res` itself yields an internal "already sent" response kind; `Next` stays `Promise<HttpResponse>` in v5 and v6.                                                                    |
-| D2.2 context             | A separate `RequestContext` object per v2 request in 5.x (80 B measured); `ctx.appInfo` is the same object as `req.appInfo`. Names: `route` (template), `url` (`URL`), `path` (decoded), `ip` (IpDetector), `cookies`. |
-| D2.3 state               | Keep `ctx.appInfo`, typed per route by codegen from `provides`; packages namespace their data.                                                                                                                         |
-| D2.4 staged headers      | `ctx.response.setHeader/appendHeader` apply to every response, errors included.                                                                                                                                        |
-| D2.5 cookies             | `ctx.cookies.get`, `ctx.response.setCookie/deleteCookie`, secure defaults; `cookie` becomes a direct dependency.                                                                                                       |
-| D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                      |
-| D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                           |
-| Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                               |
+| Decision                 | Outcome                                                                                                                                                                                                                                                                                                                          |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D2.1 flow                | Strict onion. `return next()` continues, a returned `HttpResponse` stops, a throw travels up unchanged; the registry resolves it once at the top.                                                                                                                                                                                |
+| Guards                   | Production: `next()` always returns a Promise, works once, expires when its own middleware call settles, is refused once the response is chosen; every started suffix is awaited; no misuse becomes an `unhandledRejection`; final value must be a response. Development: name the culprit. (Revised after the contract review.) |
+| v5 bridge                | A v1 handler/middleware that wrote `res` itself yields a `sent` response kind, visible in the v5 response union and removed in v6; `Next` stays `Promise<HttpResponse>`. Full outcome rules below.                                                                                                                               |
+| D2.2 context             | A separate `RequestContext` object per v2 request in 5.x (80 B measured); `ctx.appInfo` is the same object as `req.appInfo`. Names: `route` (template), `url` (`URL`), `path` (decoded), `ip` (IpDetector), `cookies`.                                                                                                           |
+| D2.3 state               | Keep `ctx.appInfo`, typed per route by codegen from `provides`; packages namespace their data.                                                                                                                                                                                                                                   |
+| D2.4 staged headers      | `ctx.response.setHeader/appendHeader` apply to every response, errors included.                                                                                                                                                                                                                                                  |
+| D2.5 cookies             | `ctx.cookies.get`, `ctx.response.setCookie/deleteCookie`, secure defaults; `cookie` becomes a direct dependency.                                                                                                                                                                                                                 |
+| D2.6 store               | One framework AsyncLocalStorage store per request, on by default (`requestContext()`); `id`, `logger`, `signal`, `onFinish` lazy.                                                                                                                                                                                                |
+| D2.7 handlers            | v6 handlers receive the same `ctx` and return an `HttpResponse`; a 5.x controller opts in with `static contractVersion = 2`.                                                                                                                                                                                                     |
+| Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                         |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
 once → global `transformResponse` → writer merges staged headers/cookies → `onFinish` exactly once
@@ -45,10 +45,33 @@ once → global `transformResponse` → writer merges staged headers/cookies →
 - v5 docs mark v1 deprecated with a mechanical migration table; consumers migrate class by class.
 - v6: default flips to 2, v1 dispatch and the Promise bridge are deleted, built-ins migrate,
   `contractVersion` becomes vestigial (kept one major as a no-op or dropped — decide at cutover).
-- **Open implementation question:** TypeScript will not accept a v2 subclass overriding
-  `middleware(ctx, next)` on a base that declares the v1 `middleware(req, res, next)` (TS2416), and
-  the forgotten-`return` check needs the strict base type. Options: a separate v2 base class (the
-  flag becomes implicit), or a base typed by `contractVersion`. Decide when implementation starts.
+- **v2 base class (open, owner to choose the name):** TypeScript rejects a v2 subclass overriding
+  `middleware(ctx, next)` on the v1 base `middleware(req, res, next)` (TS2416), and the
+  forgotten-`return` check needs the strict base type. Recommended (contract review): a separately
+  typed v2 base that stays the import in v6, sharing metadata/implementation with the v1 base; not
+  a base widened to `any`/`void`. Affects `typeof AbstractMiddleware` constraints in
+  `src/modules/AbstractController.ts`, `routing/RouteNode.ts` (`MiddlewareEntry`) and
+  `routing/middlewareNormalization.ts`.
+- **v1 code inside a v2 chain (contract review, proposed resolution):** a v1 controller handler or
+  validator running inside the portable chain keeps its `(req, res, next)` call, but its errors
+  escape to the outer v2 wrappers before the registry (so a v2 transaction rolls back); the old
+  standalone v1 dispatch keeps normalising inside the controller wrapper. A v1 middleware's
+  `next(err)`, synchronous throw and rejection pass the original value through (today's `settle`
+  wraps non-`Error` values and ignores falsy ones — not copied).
+- **Legacy terminal outcomes in v5** (contract review):
+
+  | Legacy event                                                 | Bridge behaviour                                                                                                                                                                                     |
+  | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | v1 middleware calls `next()`                                 | Advance exactly once with legacy callback semantics; the suffix runs inside any enclosing v2 context. A v1 middleware's own ALS scope gains no wrapping semantics.                                   |
+  | v1 handler returns `void` / pipes to `res` before any byte   | Track the pending legacy send explicitly; do not produce `sent` while nothing has started (today's adapter allows a later raw write).                                                                |
+  | v1 code commits headers/body                                 | Flush already-staged `ctx.response` headers and cookies at the legacy write boundary (`on-headers`); staging after the commit throws instead of being silently lost.                                 |
+  | v1 response finishes normally                                | Yield `sent`; skip transform/render; deliver `onFinish` once, also when the legacy response finished before the bridge unwound.                                                                      |
+  | v1 response closes prematurely                               | Reject with the request's abort reason; `onFinish` reports `aborted` (today's bridge treats `close` as success — not reused unchanged). A lazy `ctx.signal` reflects an abort that already happened. |
+  | outer middleware replaces `sent`, or throws after raw commit | Report the misuse or failure without attempting a second HTTP response; decide from the real transport state, not from the returned object.                                                          |
+
+  `sent` is part of the v5 `HttpResponse` union (documented, not hidden by a cast): it is an
+  already committed side effect, not a replaceable response. Descriptor-path ordering does not
+  apply retroactively to legacy raw writes.
 
 ## Current contract (what we have)
 
@@ -151,12 +174,13 @@ interface RequestContext<AppInfo = BaseAppInfo> {
   readonly logger: Logger; //                  child logger tagged with `id`
   readonly signal: AbortSignal; //             aborts when the client disconnects
   onFinish(
-    cb: (outcome: {
-      status: number;
-      aborted: boolean;
-      durationMs: number;
+    cb: (result: {
+      outcome: 'finished' | 'aborted' | 'failed'; // server-side completion, not client receipt
+      status?: number; //                       the status sent, when one was sent
+      error?: unknown; //                       for 'failed'
+      durationMs: number; //                    from request entry
     }) => void,
-  ): void;
+  ): void; //                                   exactly once across finish/close/error races
   // Per-request state: unchanged, typed per route by codegen + static `provides`
   appInfo: AppInfo;
   // Response staging: applied to whatever response is sent
@@ -344,10 +368,26 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 - `src/services/http/ExpressResponseWriter.ts`, `responses.ts` — staged headers and cookies merged
   into every response; internal "already sent" kind skipped; one completion seam for `onFinish`
   (`finished | aborted | failed`); cancel a replaced stream source.
-- `src/services/http/HttpServer.ts`, `src/services/http/types.ts`, `src/index.ts` — `RequestContext`
-  and `Next` types, `requestContext()` export, registry entry for the pipeline.
-- `src/codegen/*` — per-route context types for v2 handlers; `appInfo` typing for `ctx`.
-- `package.json` — `cookie` as a direct dependency.
+- `src/services/http/HttpServer.ts`, `src/services/http/types.ts` — `RequestContext` and `Next`
+  types, registry entry for the pipeline.
+- `src/services/http/requestContext.ts` (new) — the `requestContext()` accessor, side-effect free,
+  imported as `@adaptivestone/framework/services/http/requestContext.js` (the `./services/*`
+  export); `src/index.ts` boots a server and is not a package export. Packaging smoke imports it.
+- The chosen v2 base module, `src/modules/AbstractController.ts`, `routing/RouteNode.ts`,
+  `routing/middlewareNormalization.ts` and their tests — mixed v1/v2 middleware lists and tuples.
+- Controller version recorded when methods become bound `HandlerEntry` functions; defaults for
+  ad-hoc handlers and inheritance (a subclass changing its version must not call an inherited v1
+  method as `(ctx)`); tests for discovery, class/instance registration and ad-hoc routes.
+- `src/server.ts`, `services/http/builtinErrorHandlers.ts` — `TransformResponseHook`,
+  `ErrorHandlerFn` and registry calls receive Express-derived `FrameworkRequest` today: give the
+  portable core framework-owned types and keep explicit v5 adapters.
+- Request entry vs route context: define how parser failures and 404/405 (outside a matched route)
+  get context and completion behaviour, or limit the first release's guarantee explicitly.
+- `src/codegen/*` — per-route context types for v2 handlers next to the request aliases (or the
+  controller version carried through the AST model); `appInfo` from `provides` and schema outputs
+  preserved in both forms; type fixtures.
+- `package.json` and `package-lock.json` — `cookie` as a direct dependency; acceptance cases for
+  cookie/header precedence, error responses, append/delete and legacy commits.
 - Tests: conformance suite ported from
   [contract-check.mjs](../reference/middleware-experiments/contract-check.mjs) (requirements and
   misuse cases) for the pipeline without Express; adapter, controller, writer and codegen tests;
@@ -364,7 +404,7 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 | `next(err)` / mutate `res`                                                          | `throw` / return `HttpResponse`                               |
 | `als.run(store, next)` silently does nothing                                        | wraps everything after the middleware                         |
 | Express `req`/`res`/`next` threaded through middleware and handlers                 | one framework `ctx`                                           |
-| Dispatch ≈ 4.7 µs for 10 middleware (v1 bridge)                                     | ≈ 1.2–2.7 µs on Node (measured kernels)                       |
+| Dispatch ≈ 4.7 µs for 10 middleware (v1 bridge)                                     | ≈ 1.1–6.4 µs on Node with complete guards (kernels)           |
 
 ## Out of scope
 
@@ -385,13 +425,26 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
   misuse cases) on Node 24, Node 26 and Bun.
 - Errors thrown in a v2 chain unwind wrappers before the registry; staged headers and cookies apply
   to error responses; `onFinish` fires exactly once.
-- TypeScript rejects a forgotten `return next()` in a v2 middleware.
+- TypeScript rejects a forgotten `return next()` (sync, async, one branch) against the real
+  exported v2 base, and both versions compile in real route registration forms (type fixtures
+  against the packed package).
+- Mixed routes: a v1 handler error inside a v2 transaction rolls it back; every legacy outcome row
+  above has a test.
+- Guards: per-invocation expiry, waiting for started cleanup, `next()` Promise parity in
+  production and development — the cases in `contract-check.mjs` and
+  [contract-review-probes.mjs](../reference/middleware-experiments/contract-review-probes.mjs).
+- Real response completion and cancellation over HTTP: first-chunk and later-chunk abort,
+  cancellation failure, replaced source, one completion notification with the framework context
+  restored.
+- Extension hooks (`transformResponse`, error handlers) have portable types or explicit legacy
+  adapters; the new public imports work from the packed package.
 - The real runner is re-measured (heap, RSS, CPU, p95/p99) on Node 24, Node 26 and Bun.
 - Docs and CHANGELOG updated; full suite, `check`, `check:types`, `check:types:tests`, `smoke` green.
 
 ## Trade-offs
 
 - Every middleware writes `return next()`; in exchange there is one contract for every middleware.
-- Production guards cost ≈ 0.6–0.8 KB per pending request and ≈ 0.3–1.8 µs per request more than
-  the H alternative (measured; accepted by the owner for the simpler contract).
+- Complete production guards cost ≈ 1.5–1.8 KB per pending request and ≈ 1.5–3.5 µs per request
+  more than the H alternative on a realistic route (re-measured after the contract review; the
+  owner accepted a memory difference for the simpler contract — the size changed from ≈ 0.8 KB).
 - 5.x pays one small `ctx` object per v2 request (80 B); v6 pays nothing extra.

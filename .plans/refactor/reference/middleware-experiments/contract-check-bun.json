@@ -1,4 +1,5 @@
 {
+  "revision": "guards revised after the contract review (2026-11-01)",
   "conformance": {
     "runtime": "bun 1.4.4",
     "conformance": [
@@ -109,8 +110,37 @@
         "hybrid/raw": "tx open while streaming: false",
         "hybrid/safe": "tx open while streaming: false",
         "hybrid/dev": "tx open while streaming: false"
+      },
+      {
+        "case": "Guard: waits for started downstream cleanup before answering",
+        "onion/raw": "answered before cleanup: true",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "answered before cleanup: true",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Guard: a finished middleware cannot start its discarded suffix",
+        "onion/raw": "handler ran 1\u00d7 though 403 was chosen",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "handler ran 1\u00d7 though 403 was chosen",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Guard: next() returns a Promise (sync early response and sync error)",
+        "onion/raw": "early: next().then is not a function. (In 'next().then((r) => r)', 'next().then' is undefined); error: sync failure",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "early: next().then is not a function. (In 'next().then((r) => r)', 'next().then' is undefined); error: sync failure",
+        "hybrid/safe": true,
+        "hybrid/dev": true
       }
-    ]
+    ],
+    "failures": [],
+    "skipped": []
   },
   "memory": {
     "runtime": "bun 1.4.4",
@@ -119,48 +149,48 @@
     "rows": [
       {
         "scenario": "minimal",
-        "onion/raw": -96,
-        "onion/safe": 29,
-        "onion/dev": 317,
-        "hybrid/raw": -64,
-        "hybrid/safe": 152,
-        "hybrid/dev": 152
+        "onion/raw": -104,
+        "onion/safe": 188,
+        "onion/dev": 944,
+        "hybrid/raw": -72,
+        "hybrid/safe": 92,
+        "hybrid/dev": 92
       },
       {
         "scenario": "typical",
         "onion/raw": -195,
-        "onion/safe": 541,
-        "onion/dev": 1277,
+        "onion/safe": 1808,
+        "onion/dev": 2544,
         "hybrid/raw": -291,
-        "hybrid/safe": -67,
-        "hybrid/dev": -68
+        "hybrid/safe": 92,
+        "hybrid/dev": 92
       },
       {
         "scenario": "typical+scope",
         "onion/raw": -48,
-        "onion/safe": 784,
-        "onion/dev": 1712,
+        "onion/safe": 1920,
+        "onion/dev": 3008,
         "hybrid/raw": -112,
-        "hybrid/safe": 224,
-        "hybrid/dev": 336
+        "hybrid/safe": 288,
+        "hybrid/dev": 784
       },
       {
         "scenario": "typical+scope+tx",
         "onion/raw": 416,
-        "onion/safe": 1520,
-        "onion/dev": 2608,
+        "onion/safe": 2528,
+        "onion/dev": 3616,
         "hybrid/raw": 352,
-        "hybrid/safe": 944,
-        "hybrid/dev": 1216
+        "hybrid/safe": 1040,
+        "hybrid/dev": 1377
       },
       {
         "scenario": "heavy",
         "onion/raw": 80,
-        "onion/safe": 1361,
-        "onion/dev": 2944,
+        "onion/safe": 3536,
+        "onion/dev": 4272,
         "hybrid/raw": -112,
-        "hybrid/safe": 304,
-        "hybrid/dev": 576
+        "hybrid/safe": 288,
+        "hybrid/dev": 1120
       }
     ]
   },
@@ -171,48 +201,48 @@
     "rows": [
       {
         "scenario": "minimal",
-        "onion/raw": 472,
-        "onion/safe": 1331,
-        "onion/dev": 1769,
-        "hybrid/raw": 540,
-        "hybrid/safe": 940,
-        "hybrid/dev": 919
+        "onion/raw": 473,
+        "onion/safe": 1791,
+        "onion/dev": 2190,
+        "hybrid/raw": 597,
+        "hybrid/safe": 1400,
+        "hybrid/dev": 1573
       },
       {
         "scenario": "typical",
-        "onion/raw": 1930,
-        "onion/safe": 3728,
-        "onion/dev": 4687,
-        "hybrid/raw": 1818,
-        "hybrid/safe": 2192,
-        "hybrid/dev": 2288
+        "onion/raw": 2145,
+        "onion/safe": 6539,
+        "onion/dev": 6651,
+        "hybrid/raw": 1966,
+        "hybrid/safe": 3060,
+        "hybrid/dev": 3078
       },
       {
         "scenario": "typical+scope",
-        "onion/raw": 1933,
-        "onion/safe": 4195,
-        "onion/dev": 5441,
-        "hybrid/raw": 2283,
-        "hybrid/safe": 2792,
-        "hybrid/dev": 2837
+        "onion/raw": 2562,
+        "onion/safe": 7056,
+        "onion/dev": 7177,
+        "hybrid/raw": 2803,
+        "hybrid/safe": 4195,
+        "hybrid/dev": 3570
       },
       {
         "scenario": "typical+scope+tx",
-        "onion/raw": 2485,
-        "onion/safe": 5075,
-        "onion/dev": 6058,
-        "hybrid/raw": 2441,
-        "hybrid/safe": 3317,
-        "hybrid/dev": 3736
+        "onion/raw": 3064,
+        "onion/safe": 7624,
+        "onion/dev": 7476,
+        "hybrid/raw": 3152,
+        "hybrid/safe": 4410,
+        "hybrid/dev": 4293
       },
       {
         "scenario": "heavy",
-        "onion/raw": 3087,
-        "onion/safe": 7181,
-        "onion/dev": 9412,
-        "hybrid/raw": 3409,
-        "hybrid/safe": 4617,
-        "hybrid/dev": 5139
+        "onion/raw": 3877,
+        "onion/safe": 10583,
+        "onion/dev": 10025,
+        "hybrid/raw": 4231,
+        "hybrid/safe": 5417,
+        "hybrid/dev": 7011
       }
     ]
   }
