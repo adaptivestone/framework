@@ -366,6 +366,10 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 - [Settled middleware contract — Astro review](reference/middleware-contract-review-astro.md) —
   v2 base typing, mixed v1/v2 errors and terminal responses, reproduced guard gaps, and files/tests
   needed before implementation. Reviews `dd6a39a`; the settled onion decision is unchanged.
+- [Final middleware and v6 stability review — Astro](reference/middleware-final-review-astro.md) —
+  reviews `2b0777c`; the authoring and bridge decisions are resolved. Remaining findings cover
+  stream cancellation retention, two guard edge cases, built-in migration timing and v6
+  acceptance criteria. Implementation handoff for Opus.
 - [Prior art](./reference/prior-art.md) — Hono internals, TanStack Router codegen, Standard Schema, Encore.ts, OTel HTTP semconv
 - [Decisions](./reference/decisions.md) — settled architectural choices
 - [Open questions](./reference/open-questions.md) — unresolved trade-offs
