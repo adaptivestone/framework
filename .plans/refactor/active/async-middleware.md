@@ -2,7 +2,7 @@
 
 **Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) 2b (built-ins converted in place, body parsing after routing, security headers) and the raw-body accessors on `ctx` done; the response-kind fixture, re-measure and migration docs next.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) 2b (built-ins converted in place, body parsing after routing, security headers) the raw-body accessors on `ctx`, the response-kind fixture, the migration docs and the real-runner re-measure done; the owner's call on the JSON-POST cost (see the re-measure) is open.
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
@@ -572,7 +572,47 @@ Phase 2b is complete: every built-in is a `Middleware`, one version, same names 
   (rollback, `aborted`, `signal.aborted`), an outer throw after the raw commit (logged, not
   re-answered).
 
-**Still open for P1m:** the real-runner re-measure.
+**Real-runner re-measure (2026-11-02):** `benchmark/real-runner.mjs` against the `5.6.0` tag
+(fixture `benchmark/fixtures/realistic.ts`, no MongoDB; 5.x `(req, res)` handlers so the same file
+runs on both; built-ins are v2 on head). Server pinned to one core, load from two others, 64
+connections, 3 runs × 10 s, medians. Before it, profiling found per-request costs in the Express
+bridge (a per-request `defineProperty` for `req.i18n`, object-literal getters, closures, listeners,
+repeated scope entry, URL parsing); they were cut first. CPU per request, µs (base → head):
+
+| Route                           | Node 24       | Node 26       | Bun           |
+| ------------------------------- | ------------- | ------------- | ------------- |
+| `GET /bench/plaintext`          | 123.4 → 97.4  | 119.7 → 89.8  | 78.0 → 54.9   |
+| `GET /bench/chain` (1 built-in) | 137.3 → 101.3 | 117.9 → 100.9 | 83.0 → 73.0   |
+| `GET /benchdefault` (401)       | 256.5 → 249.4 | 210.5 → 200.3 | 133.8 → 144.4 |
+| `POST /bench/echo` (JSON + yup) | 194.1 → 213.8 | 151.0 → 216.4 | 125.3 → 134.0 |
+| `GET /nope` (404)               | 149.2 → 118.3 | 131.2 → 110.5 | 99.5 → 72.0   |
+
+Plaintext throughput +24 % / +28 % / +35 %; p99 lower on every Node route except the POST on
+Node 26 (+14.9 ms), Bun's 401 +2.6 ms. Settled heap after all phases +1.1–1.3 MB (≈ +5 %); Bun's settled RSS +17 MB in one run (not re-checked).
+
+This VM varies ±25 µs between runs of the same build (base alone 167–217 µs on the POST), more
+than the +4 µs budget, so the failing cells were re-run as interleaved base/head pairs (5 s each,
+median of the pair deltas):
+
+- `POST` JSON: **+35 µs** Node 24 (+17 %), **+51 µs** Node 26 (+28 %), **+39 µs** Bun (+33 %).
+- 401 route: −14 µs Node 24, −33 µs Node 26, **+37 µs** Bun.
+- Memory per pending request (isolated, 2 × 3 rounds): +105 B Node 24, +400 B Node 26 — within
+  the +3072 B budget; the runner's +4.2 KB on Node 24 was noise (Bun −350 B).
+
+Where the POST cost goes (Node 26 CPU profile, self time): framework code 17.7 → 31.0 µs — half of
+it the bridge's per-request context (`expressContext`, `ExpressTransport`, staged headers, the
+context getters), the rest spread thinly over the parser, `I18n`, `IpDetector`, `RequestLogger`
+and dispatch. The remaining ≈ 30 µs sits in unchanged library code (formidable, yup, `writev`,
+hashing) that runs the same number of times per request (counted: one hash, one `writev`, equal
+`nextTick`s, the body already buffered when the parser attaches in both). Ruled out: connection
+reuse, extra writes, extra ticks, the parser's own code (unchanged), `AbortController` (≈ 0.1 µs).
+Running the parser before the chain instead of as its first layer measured ≈ −17 µs in one noisy
+four-pair run — not conclusive, and not a behaviour-neutral change (app-wide middleware must wrap
+it). GETs got faster mainly because 5.6.0 ran formidable on every request; head parses only
+matched routes with a body.
+
+**Open (owner):** whether the JSON-POST cost (+35–51 µs on Node, +39 µs on Bun; Bun's 401 path
++37 µs) is acceptable for 5.7, or a further pass on a quiet machine comes first.
 
 ## API change
 
