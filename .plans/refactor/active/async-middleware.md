@@ -552,9 +552,27 @@ reads its list from `securityHeaders(getConfig)` (`services/http/securityHeaders
 adapter applies the same headers the same way. No behaviour change; `securityHeaders.test.ts` +1.
 Phase 2b is complete: every built-in is a `Middleware`, one version, same names and paths.
 
-**Still open for P1m:**
-the response-type consumer fixture with a simulated added kind (with P1q), and the real-runner
-re-measure.
+**Closing items (2026-11-02; designs from a Fable review):**
+
+- Forward-compatible response type (v6 decision 2): `HttpResponse` is derived from an exported
+  `HttpResponseKinds` interface (`HttpResponse = HttpResponseKinds[HttpResponseKind]`) — the same
+  closed union for consumers today, so narrowing works unchanged; an open `kind: string` member was
+  rejected because it breaks `if (r.kind === 'json') r.body`. The framework adds kinds there in
+  minors; apps read it. Packed-package fixture `scripts/fixtures/response-kinds.mts`, compiled as
+  its own program by `scripts/packaging-smoke-test.sh` (declaration merging would leak into the
+  other fixtures): with a simulated kind merged in, `transformResponse` narrowing, a pass-through
+  `switch`, a middleware inspecting `await next()` and the grown `HttpResponseKind` compile; an
+  exhaustive `never` check is the documented break (`@ts-expect-error`).
+- `AbstractMiddleware` carries a class-level `@deprecated` (types only, no runtime warning) linking
+  the docs migration table; internal imports are marked as the 5.x bridge. Docs: deprecation notice
+  on the middleware page and a mechanical migration table on the context page.
+- Bridge-table audit: every legacy outcome row now has a test — added in `expressPipeline.test.ts`
+  ("5.x outcomes"): v1 `next()` inside the wrapper and scope, a v1 handler that writes later, one
+  `onFinish` and no `transformResponse` for a 5.x-written response, a client abort during a 5.x write
+  (rollback, `aborted`, `signal.aborted`), an outer throw after the raw commit (logged, not
+  re-answered).
+
+**Still open for P1m:** the real-runner re-measure.
 
 ## API change
 
