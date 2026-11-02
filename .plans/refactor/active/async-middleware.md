@@ -570,7 +570,8 @@ Phase 2b is complete: every built-in is a `Middleware`, one version, same names 
   ("5.x outcomes"): v1 `next()` inside the wrapper and scope, a v1 handler that writes later, one
   `onFinish` and no `transformResponse` for a 5.x-written response, a client abort during a 5.x write
   (rollback, `aborted`, `signal.aborted`), an outer throw after the raw commit (logged, not
-  re-answered).
+  re-answered). The abort case caught a Bun difference: Bun reports `writableFinished` once `end()`
+  runs on a response whose client already left, so the bridge checks "closed early" first.
 
 **Real-runner re-measure (2026-11-02):** `benchmark/real-runner.mjs` against the `5.6.0` tag
 (fixture `benchmark/fixtures/realistic.ts`, no MongoDB; 5.x `(req, res)` handlers so the same file

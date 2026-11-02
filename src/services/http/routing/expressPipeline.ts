@@ -423,11 +423,13 @@ class ExpressTransport {
 
   #watchOutcome(): Promise<HttpResponse> {
     const res = this.#res;
-    if (res.writableFinished) {
-      return Promise.resolve(legacySentResponse(res.statusCode));
-    }
+    // Gone before it finished. First: Bun reports `writableFinished` once
+    // `end()` runs on a response whose client already left.
     if (this.#closedEarly) {
       return Promise.reject(new ClientGoneError());
+    }
+    if (res.writableFinished) {
+      return Promise.resolve(legacySentResponse(res.statusCode));
     }
     return new Promise((resolve, reject) => {
       const onFinish = () => {
