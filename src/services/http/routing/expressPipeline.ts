@@ -16,6 +16,7 @@
  *   staging after that throws.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { IncomingMessage } from 'node:http';
 import type { NextFunction, Request, Response } from 'express';
 import type { IApp } from '../../../server.ts';
 import { answerError, validationFallback } from '../answerError.ts';
@@ -34,11 +35,12 @@ import {
 import {
   type Next,
   RequestContext,
+  type RequestContextOptions,
   type RequestSource,
   type ResponseStaging,
 } from '../RequestContext.ts';
 import type { ResponseWriter } from '../ResponseWriter.ts';
-import { runInRequestScope } from '../requestScope.ts';
+import { requestContext, runInRequestScope } from '../requestScope.ts';
 import { HttpResponse, legacySentResponse } from '../responses.ts';
 import { assertMiddlewareShape } from './middlewareNormalization.ts';
 import type { HandlerEntry, MiddlewareEntry } from './RouteNode.ts';
@@ -55,10 +57,43 @@ interface Binding {
 /** The Express objects behind a context, for the 5.x layers of its chain. */
 const bindings = new WeakMap<Ctx, Binding>();
 
-/** One context per Express request, whichever code asks for it first. */
-const contexts = new WeakMap<Request, Ctx>();
+/** One context per Express request, whichever code asks for it first (kept on the request). */
+const CONTEXT = Symbol('adaptivestone.requestContext');
+
+type WithContext = Request & { [CONTEXT]?: Ctx };
 
 const noopNext: NextFunction = () => {};
+
+const optionsByApp = new WeakMap<IApp, RequestContextOptions>();
+
+const reportTo =
+  (app: IApp | undefined) =>
+  (message: string, error: unknown): void => {
+    const line = `${message}: ${error instanceof Error ? (error.stack ?? error.message) : error}`;
+    if (app?.logger) {
+      app.logger.error(line);
+    } else {
+      console.error(line);
+    }
+  };
+
+const defaultOptions: RequestContextOptions = {
+  runInScope: runInRequestScope,
+  reportError: reportTo(undefined),
+};
+
+/** The context options for an app, built once (not per request). */
+function contextOptions(app: IApp | undefined): RequestContextOptions {
+  if (!app) {
+    return defaultOptions;
+  }
+  let options = optionsByApp.get(app);
+  if (!options) {
+    options = { runInScope: runInRequestScope, reportError: reportTo(app) };
+    optionsByApp.set(app, options);
+  }
+  return options;
+}
 
 /**
  * The request's `RequestContext`, created on first use. A route with a v2
@@ -72,7 +107,7 @@ export function expressContext(
   req: Request,
   res: Response | undefined = req.res,
 ): Ctx {
-  const existing = contexts.get(req);
+  const existing = (req as WithContext)[CONTEXT];
   if (existing) {
     return existing;
   }
@@ -83,21 +118,11 @@ export function expressContext(
   frameworkReq.appInfo ??= {} as FrameworkRequest['appInfo'];
   installLegacyI18nAlias(req);
   const ctx = new RequestContext(
-    expressSource(req, transport),
+    new ExpressSource(req, transport),
     frameworkReq.appInfo as Ctx['appInfo'],
-    {
-      runInScope: runInRequestScope,
-      reportError: (message, error) => {
-        const line = `${message}: ${error instanceof Error ? (error.stack ?? error.message) : error}`;
-        if (app?.logger) {
-          app.logger.error(line);
-        } else {
-          console.error(line);
-        }
-      },
-    },
+    contextOptions(app),
   );
-  contexts.set(req, ctx);
+  (req as WithContext)[CONTEXT] = ctx;
   if (res && transport) {
     bindings.set(ctx, { req, res, next: noopNext, transport });
     transport.attach(ctx);
@@ -162,18 +187,29 @@ function applyStaged(
 
 let warnedI18nAlias = false;
 
+/** Request prototypes that already carry the `req.i18n` alias. */
+const aliasedPrototypes = new WeakSet<object>();
+
 /**
  * `req.i18n` — the deprecated alias of `req.appInfo.i18n` that the 5.x `I18n`
  * middleware set. Kept for 5.x code on Express; v6 removes it with Express.
+ * Defined once on the Express app's request prototype (not per request, which
+ * would change every request object's shape).
  */
 function installLegacyI18nAlias(req: Request): void {
-  if (Object.hasOwn(req, 'i18n')) {
+  const proto = Object.getPrototypeOf(req) as object | null;
+  if (!proto || aliasedPrototypes.has(proto)) {
     return;
   }
-  Object.defineProperty(req, 'i18n', {
+  aliasedPrototypes.add(proto);
+  // Only Express's own request prototype, never Node's shared IncomingMessage.
+  if (proto === IncomingMessage.prototype || Object.hasOwn(proto, 'i18n')) {
+    return;
+  }
+  Object.defineProperty(proto, 'i18n', {
     configurable: true,
     enumerable: false,
-    get() {
+    get(this: Partial<FrameworkRequest>) {
       if (!warnedI18nAlias) {
         warnedI18nAlias = true;
         process.emitWarning(
@@ -181,7 +217,15 @@ function installLegacyI18nAlias(req: Request): void {
           { type: 'DeprecationWarning', code: 'ASF_DEP_REQ_I18N' },
         );
       }
-      return (req as Partial<FrameworkRequest>).appInfo?.i18n;
+      return this.appInfo?.i18n;
+    },
+    set(this: object, value: unknown) {
+      Object.defineProperty(this, 'i18n', {
+        value,
+        writable: true,
+        configurable: true,
+        enumerable: true,
+      });
     },
   });
 }
@@ -214,8 +258,11 @@ export function expressMiddleware(
     };
     let result: Promise<HttpResponse>;
     try {
+      // The first bridged middleware opens the request scope for the rest.
       result = Promise.resolve(
-        runInRequestScope(ctx, () => instance.middleware(ctx, forward)),
+        requestContext() === ctx
+          ? instance.middleware(ctx, forward)
+          : runInRequestScope(ctx, () => instance.middleware(ctx, forward)),
       );
     } catch (err) {
       result = Promise.reject(err);
@@ -366,8 +413,15 @@ class ExpressTransport {
     this.#failure = { error };
   }
 
-  /** Settles when a response written through `res` ends. */
+  #outcome: Promise<HttpResponse> | undefined;
+
+  /** Settles when a response written through `res` ends (one promise per response). */
   legacyOutcome(): Promise<HttpResponse> {
+    this.#outcome ??= this.#watchOutcome();
+    return this.#outcome;
+  }
+
+  #watchOutcome(): Promise<HttpResponse> {
     const res = this.#res;
     if (res.writableFinished) {
       return Promise.resolve(legacySentResponse(res.statusCode));
@@ -394,78 +448,104 @@ class ExpressTransport {
   }
 }
 
-/** `RequestSource` over an Express request, read lazily. */
-function expressSource(
-  req: Request,
-  transport: ExpressTransport | undefined,
-): RequestSource {
-  let signal: AbortSignal | undefined;
-  let path: string | undefined;
-  return {
-    get method() {
-      return req.method;
-    },
-    get url() {
-      return req.originalUrl ?? req.url;
-    },
-    get origin() {
-      return `${req.protocol}://${req.get('host') ?? 'localhost'}`;
-    },
-    get path() {
-      if (path === undefined) {
-        try {
-          path = decodeURIComponent(req.path);
-        } catch {
-          path = req.path;
-        }
+/**
+ * `RequestSource` over an Express request, read lazily. A class, so the
+ * accessors live once on the prototype instead of being rebuilt per request.
+ */
+class ExpressSource implements RequestSource {
+  readonly #req: Request;
+
+  readonly #transport: ExpressTransport | undefined;
+
+  #path: string | undefined;
+
+  #signal: AbortSignal | undefined;
+
+  constructor(req: Request, transport: ExpressTransport | undefined) {
+    this.#req = req;
+    this.#transport = transport;
+  }
+
+  get method() {
+    return this.#req.method;
+  }
+
+  get url() {
+    return this.#req.originalUrl ?? this.#req.url;
+  }
+
+  get origin() {
+    return `${this.#req.protocol}://${this.#req.get('host') ?? 'localhost'}`;
+  }
+
+  get path() {
+    if (this.#path === undefined) {
+      try {
+        this.#path = decodeURIComponent(this.#req.path);
+      } catch {
+        this.#path = this.#req.path;
       }
-      return path;
-    },
-    get headers() {
-      return req.headers;
-    },
-    get route() {
-      const template = (req.route as { path?: string } | undefined)?.path;
-      return template && template !== 'unmatched' ? template : undefined;
-    },
-    get peerAddress() {
-      return req.socket?.remoteAddress;
-    },
-    incoming: req,
-    get rawBody() {
-      return (req as Request & { rawBody?: Buffer }).rawBody;
-    },
-    setBody(body: unknown) {
-      req.body = body;
-    },
-    setRawBody(bytes: Buffer) {
-      (req as Request & { rawBody?: Buffer }).rawBody = bytes;
-    },
-    get routeMethods() {
-      const methods = (
-        req.route as { methods?: Record<string, boolean> } | undefined
-      )?.methods;
-      return methods
-        ? Object.keys(methods)
-            .filter((name) => methods[name])
-            .map((name) => name.toUpperCase())
-        : undefined;
-    },
-    get params() {
-      return req.params as Record<string, string>;
-    },
-    get query() {
-      return req.query as Record<string, unknown>;
-    },
-    get body() {
-      return req.body;
-    },
-    get signal() {
-      // Without a response to watch (a request built by hand) it never aborts.
-      signal ??= transport?.signal ?? new AbortController().signal;
-      return signal;
-    },
-  };
+    }
+    return this.#path;
+  }
+
+  get headers() {
+    return this.#req.headers;
+  }
+
+  get route() {
+    const template = (this.#req.route as { path?: string } | undefined)?.path;
+    return template && template !== 'unmatched' ? template : undefined;
+  }
+
+  get peerAddress() {
+    return this.#req.socket?.remoteAddress;
+  }
+
+  get incoming() {
+    return this.#req;
+  }
+
+  get rawBody() {
+    return (this.#req as Request & { rawBody?: Buffer }).rawBody;
+  }
+
+  setBody(body: unknown) {
+    this.#req.body = body;
+  }
+
+  setRawBody(bytes: Buffer) {
+    (this.#req as Request & { rawBody?: Buffer }).rawBody = bytes;
+  }
+
+  get routeMethods() {
+    const methods = (
+      this.#req.route as { methods?: Record<string, boolean> } | undefined
+    )?.methods;
+    return methods
+      ? Object.keys(methods)
+          .filter((name) => methods[name])
+          .map((name) => name.toUpperCase())
+      : undefined;
+  }
+
+  get params() {
+    return this.#req.params as Record<string, string>;
+  }
+
+  get query() {
+    return this.#req.query as Record<string, unknown>;
+  }
+
+  get body() {
+    return this.#req.body;
+  }
+
+  get signal() {
+    // Without a response to watch (a request built by hand) it never aborts.
+    this.#signal ??= this.#transport?.signal ?? new AbortController().signal;
+    return this.#signal;
+  }
 }
 
 /** A 5.x `(req, res, next)` middleware as a chain layer. */

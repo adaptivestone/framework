@@ -8,8 +8,8 @@ class RequestLogger extends Middleware {
 
   async middleware(ctx: RequestContext<object>, next: Next) {
     // Log the path only, not the URL — the query string can carry secrets
-    // (e.g. `/auth/verify?verification_token=…`).
-    const path = ctx.url.pathname;
+    // (e.g. `/auth/verify?verification_token=…`). `ctx.path` needs no `URL`.
+    const { path } = ctx;
     const text = `Request is  [${ctx.method}] ${path}`;
     // Probes hit the built-in Health controller (default mount) every few
     // seconds: log them only when they fail.

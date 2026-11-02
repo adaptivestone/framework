@@ -18,7 +18,7 @@
  */
 import type Middleware from './middleware/Middleware.ts';
 import { type Next, RequestContext } from './RequestContext.ts';
-import { runInRequestScope } from './requestScope.ts';
+import { requestContext, runInRequestScope } from './requestScope.ts';
 import { HttpResponse } from './responses.ts';
 
 /** The handler at the end of the chain. */
@@ -256,12 +256,14 @@ export function handleRequest<C extends RequestContext<object>>(
     ctx: C,
   ) => HttpResponse | Promise<HttpResponse>,
 ): Promise<HttpResponse> {
-  return runInRequestScope(ctx, async () => {
+  const run = async () => {
     try {
       return await chain(ctx);
     } catch (error) {
       RequestContext.recordError(ctx, error);
       return resolveError(error, ctx);
     }
-  });
+  };
+  // Already inside this request's scope (an adapter opened it earlier): no second frame.
+  return requestContext() === ctx ? run() : runInRequestScope(ctx, run);
 }

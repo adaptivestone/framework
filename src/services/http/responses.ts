@@ -340,13 +340,21 @@ function native(response: Response): NativeResponse {
  * Not a public factory: only the 5.x bridge produces it.
  */
 export function legacySentResponse(status: number): SentResponse {
-  return Object.freeze({
-    [BRAND]: true as const,
-    kind: 'sent' as const,
-    status,
-    headers: NO_HEADERS,
-  });
+  // Immutable, so one per status is shared (it is built on every 5.x write).
+  let response = sentResponses.get(status);
+  if (!response) {
+    response = Object.freeze({
+      [BRAND]: true as const,
+      kind: 'sent' as const,
+      status,
+      headers: NO_HEADERS,
+    });
+    sentResponses.set(status, response);
+  }
+  return response;
 }
+
+const sentResponses = new Map<number, SentResponse>();
 
 /** Is `value` a response built by an `HttpResponse` factory? */
 function is(value: unknown): value is HttpResponse {

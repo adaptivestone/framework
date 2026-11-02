@@ -107,10 +107,11 @@ export class RequestCookies {
  * response. Staging after the response has started throws.
  */
 export class ResponseStaging {
-  readonly #headers = new Map<string, string[]>();
+  // Created on first use: most requests stage nothing.
+  #headers: Map<string, string[]> | undefined;
 
   /** `Set-Cookie` values by cookie identity (name, domain, path). */
-  readonly #cookies = new Map<string, string>();
+  #cookies: Map<string, string> | undefined;
 
   readonly #secureByDefault: () => boolean;
 
@@ -124,6 +125,7 @@ export class ResponseStaging {
   /** Set a header, replacing earlier staged values of the same name. */
   setHeader(name: string, value: string): void {
     this.#assertOpen(name);
+    this.#headers ??= new Map();
     this.#headers.set(name.toLowerCase(), [value]);
   }
 
@@ -131,6 +133,7 @@ export class ResponseStaging {
   appendHeader(name: string, value: string): void {
     this.#assertOpen(name);
     const key = name.toLowerCase();
+    this.#headers ??= new Map();
     const values = this.#headers.get(key);
     if (values) {
       values.push(value);
@@ -160,6 +163,7 @@ export class ResponseStaging {
       ...(options.partitioned ? { partitioned: true } : {}),
       ...(options.priority === undefined ? {} : { priority: options.priority }),
     });
+    this.#cookies ??= new Map();
     this.#cookies.set(`${name};${options.domain ?? ''};${path}`, header);
   }
 
@@ -177,12 +181,12 @@ export class ResponseStaging {
   /** @internal The staged headers as lower-case `[name, value]` pairs, cookies last. */
   entries(): Array<readonly [string, string]> {
     const pairs: Array<readonly [string, string]> = [];
-    for (const [name, values] of this.#headers) {
+    for (const [name, values] of this.#headers ?? []) {
       for (const value of values) {
         pairs.push([name, value]);
       }
     }
-    for (const value of this.#cookies.values()) {
+    for (const value of this.#cookies?.values() ?? []) {
       pairs.push(['set-cookie', value]);
     }
     return pairs;
