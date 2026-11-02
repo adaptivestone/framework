@@ -14,7 +14,7 @@ considerations. This document contains research and proposed contracts, not runt
 for Opus review. The author's recommended candidate is strict onion. D2.1 remains open pending
 review and the owner's final decision; this handoff does not authorize implementation.
 
-This revisits [D1/D2.1](../active/async-middleware.md), the
+This revisits [D1/D2.1](../done/async-middleware.md), the
 [existing options](middleware-design-proposals.md), and the
 [native engine spike](../queued/http-engine-spike.md). The owner now permits explicit
 `return next()` in ordinary middleware and substantial redesign. The old requirement that

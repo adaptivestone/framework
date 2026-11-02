@@ -6,7 +6,7 @@
 reviews `2b0777c` and records the remaining implementation findings.
 **Responses (2026-11-01):** each finding checked and acted on —
 [final recommendation §11](middleware-final-recommendation.md#11-contract-review-by-astra-2026-11-01--responses).
-**Scope:** [P1m](../active/async-middleware.md),
+**Scope:** [P1m](../done/async-middleware.md),
 [final recommendation](middleware-final-recommendation.md), the contract checks and their
 integration with the existing runtime. Source line references below refer to this reviewed commit.
 

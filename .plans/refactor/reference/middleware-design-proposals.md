@@ -1,6 +1,6 @@
 # Middleware flow — design proposals (for review)
 
-**Status**: **decided 2026-11-01 — strict onion** (D2.1 in [async-middleware](../active/async-middleware.md);
+**Status**: **decided 2026-11-01 — strict onion** (D2.1 in [async-middleware](../done/async-middleware.md);
 see [middleware-final-recommendation](middleware-final-recommendation.md)). Written
 2026-11-01 to be read on its own by reviewers who have not seen the other plans. Measurements and
 source evidence behind every number here: [middleware-flow-models](middleware-flow-models.md).
@@ -411,7 +411,7 @@ middleware to document; `next` rules apply to `around` only. Precedent: NestJS g
   hook replaces a stream, and abort handling.
 - `onFinish` means the server finished (Node's `finish`: the last bytes were handed to the OS), not
   that the client received them; also define the async context its callbacks run in.
-- D1 in [async-middleware](../active/async-middleware.md) settled the linear contract "until a
+- D1 in [async-middleware](../done/async-middleware.md) settled the linear contract "until a
   concrete wrap-around use case". Requirements 4–6 are such cases; D1 must be reopened explicitly.
 
 ## 9. Ideas from the independent review (Fable)

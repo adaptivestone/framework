@@ -1,15 +1,15 @@
 # P1m — Async/await middleware contract (breaking)
 
-**Status**: ▶ active — **contract settled 2026-11-01** (owner); implementation started the same day.
+**Status**: ✅ done 2026-11-02 (unreleased; ships in 5.7 as an opt-in) — **contract settled 2026-11-01** (owner); implementation started the same day.
 Progress (slices in [Implementation progress](#implementation-progress)): slices 1 (portable core),
-2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) 2b (built-ins converted in place, body parsing after routing, security headers) the raw-body accessors on `ctx`, the response-kind fixture, the migration docs and the real-runner re-measure done; the owner's call on the JSON-POST cost (see the re-measure) is open.
+2 (Express adapter), 3 (v2 controllers), 4 (cookies), 5 (hooks get `ctx`), Phase 2a (app-wide middleware) 2b (built-ins converted in place, body parsing after routing, security headers) the raw-body accessors on `ctx`, the response-kind fixture, the migration docs and the real-runner re-measure done; the JSON-POST cost it found is accepted for 5.7 (decision row "Performance"), follow-up in [request-path-performance](../queued/request-path-performance.md).
 **Contract:** strict explicit-next onion — `middleware(ctx, next)` returns `next()` or an
 `HttpResponse`, throws travel up through every middleware and the registry resolves them once.
 Full contract, rules and measurements: [middleware-final-recommendation](../reference/middleware-final-recommendation.md);
 decision record: D1 and D2 below.
 **Target**: the next minor (5.7) as an opt-in — middleware extend the new `Middleware` base,
 controllers set `static contractVersion = 2` — landing with
-[P1q universal HTTP responses](universal-http-responses.md) (its writer renders the
+[P1q universal HTTP responses](../active/universal-http-responses.md) (its writer renders the
 returned responses). v6 flips the default, drops v1, migrates built-ins, together with
 [static-middleware-cutover](../later/static-middleware-cutover.md).
 **v6 stability**: this contract is part of the v6 public API that must last for years; it follows
@@ -37,6 +37,7 @@ descriptors, `transformResponse`).
 | Built-ins                | **Decided 2026-11-01 (A):** converted in place in 5.x — one version, same names and paths; old-shape subclass overrides are refused at registration; direct `(req, res, next)` callers get a CHANGELOG note.                                                                                                                         |
 | Security headers         | **Decided 2026-11-01 (A):** stay the response's starting headers — set by the adapter before any middleware runs (`services/http/securityHeaders.ts`, shared by the Express and future Node adapters), not a staged `Middleware`; a route can still override or remove one.                                                          |
 | Raw body on `ctx`        | **Decided 2026-11-01 (A, after a Fable review):** `ctx.rawBody: Buffer \| undefined` (`'raw'` routes) and `ctx.bodyStream: ReadableStream<Uint8Array> \| undefined` (`'none'` routes, read once). `ctx.request` (a lazy Fetch `Request` view) is reserved for later; not shipped.                                                    |
+| Performance              | **Decided 2026-11-02 (A):** the JSON-POST cost the real-runner re-measure found (+35–51 µs per request on Node, +39 µs on Bun; Bun's 401 path +37 µs; simple GETs faster) is accepted for 5.7. Follow-up without API change: [request-path-performance](../queued/request-path-performance.md).                                      |
 | Not in the first version | Per-request `beforeSend` hook; signed/encrypted cookies; sessions; typed-keys state API.                                                                                                                                                                                                                                             |
 
 Order of one request: pipeline (middleware → validation → handler) → wrappers unwind → registry
@@ -612,8 +613,9 @@ four-pair run — not conclusive, and not a behaviour-neutral change (app-wide m
 it). GETs got faster mainly because 5.6.0 ran formidable on every request; head parses only
 matched routes with a body.
 
-**Open (owner):** whether the JSON-POST cost (+35–51 µs on Node, +39 µs on Bun; Bun's 401 path
-+37 µs) is acceptable for 5.7, or a further pass on a quiet machine comes first.
+**Decided (owner, 2026-11-02, A):** the JSON-POST cost is acceptable for 5.7. The follow-up — a
+quiet-machine measurement, profiles and fixes with no API change — is
+[request-path-performance](../queued/request-path-performance.md).
 
 ## API change
 

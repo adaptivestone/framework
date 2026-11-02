@@ -1,6 +1,6 @@
 # Middleware flow models (2026-10-31)
 
-Input for [async-middleware D2.1](../active/async-middleware.md). Which flow should the v2
+Input for [async-middleware D2.1](../done/async-middleware.md). Which flow should the v2
 middleware contract use: request-only (what we have), onion, separate request + response stages,
 or a hybrid? Read from the **source code** of 14 frameworks (shallow clones of their current
 default branches, Oct 2026) plus a dispatch-cost benchmark.

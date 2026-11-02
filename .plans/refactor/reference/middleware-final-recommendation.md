@@ -1,7 +1,7 @@
 # Middleware v2 — final recommendation
 
 **Date:** 2026-11-01. **Status:** **decided 2026-11-01 — strict onion** (owner). Outcomes of the other decisions in §9;
-they are recorded in [async-middleware](../active/async-middleware.md).
+they are recorded in [async-middleware](../done/async-middleware.md).
 **Inputs:** the [Astro Proposal](astro-proposal.md) (at `0b4f6de`, with its five review
 questions), [design proposals](middleware-design-proposals.md) (Sol and Astra notes),
 [Fable review](middleware-review-fable.md), [experiments](middleware-experiments/README.md).
@@ -263,7 +263,7 @@ From the Astro Proposal and the earlier version of this file:
     transaction around an old controller rolls back. v6 removes Express and must stay final for
     years: [v6-api-stability](../queued/v6-api-stability.md).
 
-All D2 decisions are settled; the plan is [async-middleware](../active/async-middleware.md).
+All D2 decisions are settled; the plan is [async-middleware](../done/async-middleware.md).
 
 ## 10. After the decision
 
