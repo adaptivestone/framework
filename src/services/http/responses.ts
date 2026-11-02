@@ -374,13 +374,27 @@ export const HttpResponse = Object.freeze({
   is,
 });
 
+/**
+ * Every response kind, by its `kind`. The framework adds kinds in minor
+ * releases, so code reading a response narrows on the kinds it handles and
+ * passes every other response through unchanged. An exhaustive `never` check
+ * or a `Record<HttpResponseKind, …>` table breaks when a kind is added.
+ * Applications read this interface; they do not add to it.
+ */
+export interface HttpResponseKinds {
+  json: JsonResponse<number, unknown, string>;
+  text: TextResponse<number, string>;
+  bytes: BytesResponse<number, string>;
+  stream: StreamResponse<number, string>;
+  redirect: RedirectResponse;
+  empty: EmptyResponse;
+  native: NativeResponse;
+  /** 5.x only: written through `res` by 5.x code; pass it through. Removed in v6. */
+  sent: SentResponse;
+}
+
+/** The `kind` of any response. */
+export type HttpResponseKind = keyof HttpResponseKinds;
+
 /** Any response a handler can return. */
-export type HttpResponse =
-  | JsonResponse<number, unknown, string>
-  | TextResponse<number, string>
-  | BytesResponse<number, string>
-  | StreamResponse<number, string>
-  | RedirectResponse
-  | EmptyResponse
-  | NativeResponse
-  | SentResponse;
+export type HttpResponse = HttpResponseKinds[HttpResponseKind];

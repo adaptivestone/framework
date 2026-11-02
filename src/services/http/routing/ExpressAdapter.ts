@@ -14,6 +14,7 @@ import { notFoundResponse } from '../builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
+// 5.x bridge: removed with `AbstractMiddleware` in v6.
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import RequestParser from '../middleware/RequestParser.ts';
 import type { ResponseWriter } from '../ResponseWriter.ts';

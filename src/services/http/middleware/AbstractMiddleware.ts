@@ -7,8 +7,12 @@ import BaseMiddleware, { type AuthParameter } from './BaseMiddleware.ts';
 export type { AuthParameter } from './BaseMiddleware.ts';
 
 /**
- * Middleware with the 5.x contract `(req, res, next)`. New middleware extend
- * `Middleware` (`(ctx, next)`) instead; this class is removed in v6.
+ * Middleware with the 5.x contract `(req, res, next)`.
+ *
+ * @deprecated Since 5.7 — extend `Middleware` (`middleware(ctx, next)`) from
+ * `services/http/middleware/Middleware.js`; this class is removed in v6. It
+ * keeps working through 5.x. Migration table:
+ * https://framework.adaptivestone.com/docs/Controllers/context#migrating-a-5x-middleware
  */
 class AbstractMiddleware extends BaseMiddleware {
   /** @deprecated Renamed to {@link authSchemes}; removed in v6. */

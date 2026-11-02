@@ -15,6 +15,7 @@ import {
 } from '../services/http/answerError.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../services/http/httpErrors.ts';
+// 5.x bridge: removed with `AbstractMiddleware` in v6.
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import type { RequestContext } from '../services/http/RequestContext.ts';
 import { requestContext } from '../services/http/requestScope.ts';

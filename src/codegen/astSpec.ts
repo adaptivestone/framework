@@ -19,6 +19,7 @@ import {
   convertPathSyntax,
   parseScopeKey,
 } from '../controllers/index.ts';
+// 5.x bridge: removed with `AbstractMiddleware` in v6.
 import type AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import type {
   HandlerEntry,

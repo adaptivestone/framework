@@ -329,6 +329,95 @@ describe('v2 chain on Express — 5.x code inside', () => {
   });
 });
 
+describe('v2 chain on Express — 5.x outcomes (every row of the bridge table)', () => {
+  it('a v1 next() runs the rest inside the v2 wrapper and its request scope', async () => {
+    let scoped: unknown;
+    route([Stage, Transaction, LegacyPass], () => {
+      scoped = requestContext();
+      return HttpResponse.json(200, { ok: true });
+    });
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 200);
+    assert.deepStrictEqual(txLog, ['begin', 'commit json', 'end']);
+    assert.strictEqual(scoped, lastCtx);
+  });
+
+  it('a v1 handler that returns before writing: the wrapper waits for the write', async () => {
+    route([Stage, Transaction], (_req: Request, res: Response) => {
+      setTimeout(() => {
+        txLog.push('write');
+        res.status(200).json({ late: true });
+      }, 20);
+    });
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 200);
+    assert.deepStrictEqual(await response.json(), { late: true });
+    await sleep(10);
+    assert.deepStrictEqual(txLog, ['begin', 'write', 'commit sent', 'end']);
+    assert.strictEqual(finishes[0]?.status, 200);
+  });
+
+  it('a response 5.x code wrote finishes once and skips transformResponse', async () => {
+    let transformed = 0;
+    writer = new ExpressResponseWriter({
+      transform: (response) => {
+        transformed += 1;
+        return response;
+      },
+    });
+    route([Stage, LegacyAnswers], () => HttpResponse.empty(500));
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 202);
+    await sleep(10);
+    assert.strictEqual(finishes.length, 1);
+    assert.strictEqual(finishes[0]?.outcome, 'finished');
+    assert.strictEqual(transformed, 0);
+  });
+
+  it('a client that leaves while 5.x code writes: rollback, aborted, signal aborted', async () => {
+    route([Transaction, Stage], async (_req: Request, res: Response) => {
+      res.write('partial');
+      await sleep(200);
+      res.end();
+    });
+    const controller = new AbortController();
+    const pending = fetch(`${origin}/r`, { signal: controller.signal })
+      .then((r) => r.text())
+      .catch(() => undefined);
+    await sleep(50);
+    controller.abort();
+    await pending;
+    await sleep(250);
+    assert.ok(txLog.includes('rollback'), JSON.stringify(txLog));
+    assert.strictEqual(finishes[0]?.outcome, 'aborted');
+    assert.strictEqual(lastCtx?.signal.aborted, true);
+  });
+
+  it('an outer middleware that throws after 5.x code sent the response: logged, not re-answered', async () => {
+    class LateThrow extends Middleware {
+      async middleware(
+        _ctx: RequestContext,
+        next: Next,
+      ): Promise<HttpResponse> {
+        await next();
+        throw new Error('late failure');
+      }
+    }
+    route([LateThrow, Stage, LegacyAnswers], () => HttpResponse.empty(500));
+    const response = await fetch(`${origin}/r`);
+    assert.strictEqual(response.status, 202);
+    assert.deepStrictEqual(await response.json(), { legacy: true });
+    await sleep(10);
+    assert.ok(
+      logged.some((m) =>
+        m.includes('Request failed after the response started'),
+      ),
+      JSON.stringify(logged),
+    );
+    assert.strictEqual(finishes.length, 1);
+  });
+});
+
 describe('v2 chain on Express — misuse', () => {
   it('replacing a response 5.x code already sent is reported, not written twice', async () => {
     class Replacer extends Middleware {

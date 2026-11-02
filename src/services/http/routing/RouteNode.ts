@@ -9,6 +9,7 @@
 import type { IApp } from '../../../server.ts';
 import type { RequestContentTypeMap } from '../../validate/contentType.ts';
 import type { StandardSchemaV1 } from '../../validate/types.ts';
+// 5.x bridge: removed with `AbstractMiddleware` in v6.
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import type Middleware from '../middleware/Middleware.ts';
 

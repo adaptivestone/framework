@@ -21,6 +21,7 @@ import type { IApp } from '../../../server.ts';
 import { answerError, validationFallback } from '../answerError.ts';
 import { producedBuiltInResponse } from '../builtInResponse.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+// 5.x bridge: removed with `AbstractMiddleware` in v6.
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
 import Middleware from '../middleware/Middleware.ts';
 import {

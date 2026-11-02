@@ -81,6 +81,17 @@ for (const from of [
 EOF
 "$ROOT/node_modules/.bin/tsc" --project tsconfig.json --checkers 1
 
+echo "→ Type-checking a consumer against a simulated added response kind"
+# Its own program: the fixture's declaration merging would leak into the others.
+cp "$ROOT/scripts/fixtures/response-kinds.mts" ./response-kinds.mts
+cat > tsconfig.kinds.json <<'EOF'
+{
+  "extends": "./tsconfig.json",
+  "files": ["response-kinds.mts"]
+}
+EOF
+"$ROOT/node_modules/.bin/tsc" --project tsconfig.kinds.json --checkers 1
+
 cat > check.mjs <<'EOF'
 import { existsSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
