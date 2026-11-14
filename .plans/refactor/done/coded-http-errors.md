@@ -56,6 +56,7 @@ throw new ConflictError({
 ## Audit (2026-10-02, Fable + independent inventory) — follow-ups, not in this change
 
 31 framework error sites, 6 body shapes before this change. Remaining deviations:
+
 - ✅ 2026-10-03 (5.5): 405, "Malformed URL" 400, 415, 404 and both 500 paths translate through
   `http.methodNotAllowed` / `http.malformedUrl` / `http.unsupportedContentType` (`{{types}}`) /
   `http.notFound` / `http.serverError`; one 500 text everywhere ("Something went wrong. Please try

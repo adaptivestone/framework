@@ -35,6 +35,7 @@ Implements the v5.x portion of [P1f](../later/static-middleware-cutover.md). Add
 Codegen reads each controller's `routes` / `getHttpPath()` from a prototype-only `Object.create(Class.prototype)` ghost (`app`/`prefix` defined, no constructor fired), then hands the ghost to the **existing** subtree builder — so route/middleware tree semantics live in one place and `RouteRegistry.flatten()` resolves cross-controller chains exactly as runtime does.
 
 **Architecture (settled by a 4-lens design panel + adversarial critique, 2026-06-05):**
+
 - `src/codegen/ghostController.ts` — the ghost lives in the **codegen layer** (out of the autoload folder; correct codegen→controllers dependency direction). Exports `ghostController(Class, app, prefix)`.
 - `src/controllers/index.ts` — `registerController` is single-purpose (always `new`); new `registerControllerInstance(instance, prefix, {skipWrap})` is the seam runtime and codegen share; `loadControllerClasses()` made public so codegen drives its own load→register loop. Runtime middleware-schema helpers (`overridesInstanceSchema`, `warnInstanceSchemaDeprecated`) stay here (module-internal, no public path) — un-lumped from the codegen ghost.
 - `src/helpers/deprecation.ts` — `makeOncePerClassWarner` in a **neutral** layer, shared by the runtime middleware-schema warner and the codegen ctor-routes warner (avoids a runtime→codegen import).

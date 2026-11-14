@@ -24,12 +24,14 @@ Make the framework's test surface usable from both `vitest` and `node:test`. The
 ## API change
 
 Today (vitest-only consumer):
+
 ```ts
 // tests/setup.ts
 import '@adaptivestone/framework/tests/setupVitest';
 ```
 
 After (consumer picks one):
+
 ```ts
 // vitest consumer (unchanged)
 import '@adaptivestone/framework/tests/setupVitest';

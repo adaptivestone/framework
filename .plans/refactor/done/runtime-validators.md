@@ -25,6 +25,7 @@ Decouple framework runtime from yup. Replace today's class-hierarchy drivers (`A
 ## Files shipped
 
 **New**:
+
 - `src/services/validate/types.ts` — `StandardSchemaV1` (inlined spec), `ValidationIssue`, `ValidationError` (interface), `ValidatorDriver`, `JsonSchema`.
 - `src/services/validate/ValidationError.ts` — framework-owned class. `.message` is path-keyed payload (always-array values, wire-shape compatible with old yup pipeline). `.issues` is structured list for logging. `static isValidationError` for cross-realm checks.
 - `src/services/validate/ValidateService.ts` — minimal dispatcher. Surface: `{constructor(app, schema), validate(data, i18n?), static resolve(schema), static register(driver, position?)}`. Throws at construction with migration message for legacy `{validate, cast}` shapes.
@@ -33,6 +34,7 @@ Decouple framework runtime from yup. Replace today's class-hierarchy drivers (`A
 - `src/services/http/middleware/schemas.ts` — `collectMiddlewareSchemas(app, controllerMws, routeMws, method, path, prefix)` helper. Walks middleware-info, returns the `relatedRequestParameters` / `relatedQueryParameters` declared by middlewares attached to the route.
 
 **Edited**:
+
 - `src/services/http/middleware/AbstractMiddleware.ts` — `relatedQueryParameters` / `relatedRequestParameters` defaults changed from `yup.object().shape({})` to `null`. Type as `StandardSchemaV1 | null`. Yup import removed.
 - `src/services/http/middleware/Pagination.ts` — kept on yup (built-in middleware, matches `Auth.ts` default-controller pattern; Path A).
 - `src/modules/AbstractController.ts` — `#validateRouteSlot` private method replaces the inline `validateFields` + `castFields` two-step. Calls `collectMiddlewareSchemas` + `new ValidateService(app, schema).validate(data, i18n)` for the route schema and each middleware schema, merges results. Passes `req.appInfo.i18n` for auto-translation.
@@ -41,6 +43,7 @@ Decouple framework runtime from yup. Replace today's class-hierarchy drivers (`A
 - `package.json` — yup `^1.0.0` → `^1.7.0` (Standard Schema requirement). Stays in `dependencies` (Path A — framework's built-in `Auth` requires it). Zod added as optional peer for downstream users who want to bring their own validator.
 
 **Deleted**:
+
 - `src/services/validate/ValidateService.js`
 - `src/services/validate/drivers/AbstractValidator.{js,ts}`
 - `src/services/validate/drivers/YupValidator.js`

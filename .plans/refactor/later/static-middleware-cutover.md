@@ -19,6 +19,7 @@ A middleware has two responsibilities:
 Today (1) and (2) share an instance. Reading the schema requires constructing the class. The constructor runs ALL of its setup — opening Redis clients (`RateLimiter`), wiring config (`Pagination`), etc. — even though we only wanted to peek at a static fact.
 
 Result for a project like tht-server (28 controllers, ~500 `MiddlewareEntry` references in handler chains):
+
 - ~500 middleware instances created at boot **just to read schemas** (thrown away after the read)
 - All side effects fire 500 times
 - 5-second shutdown stall on the codegen process because Redis connections keep the event loop alive

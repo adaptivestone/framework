@@ -44,6 +44,7 @@ Routes (registered at 2026-05-10T22:39:16Z):
 ```
 
 Format details TBD — but the shape is:
+
 - Indented tree following the registry structure
 - Node-level middlewares shown in `(mw: ...)` immediately under the node line
 - Method entries show `METHOD → handlerName` plus `[request:]`, `[query:]`, route-level `[mw:]` tags

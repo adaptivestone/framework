@@ -20,6 +20,7 @@ The original plan called for an AST scanner using the TypeScript compiler API. W
 ## Files shipped
 
 **New**:
+
 - `src/services/http/types.ts` — P0 types (covered in `P0-type-contracts.md`).
 - `src/codegen/collectMetadata.ts` — `collectMetadata(config)` boots the framework into an inspectable state and walks controllers; `extractControllerMeta(controller)` extracts metadata from a single instance (used by tests). Public types `ControllerMeta`, `RouteMeta`, `MiddlewareMapEntryMeta`, `MiddlewareRef`.
 - `src/codegen/resolveChains.ts` — `resolveRouteChain(route, controller)` evaluates which Map entries match a route (Express 5 splat / param syntax + method scoping) and returns the ordered middleware tuple.
@@ -27,6 +28,7 @@ The original plan called for an AST scanner using the TypeScript compiler API. W
 - `src/tests/codegenMetadata.test.ts` — 5 tests covering Auth + SomeController metadata extraction.
 
 **Edited**:
+
 - `src/services/http/middleware/GetUserByToken.ts` — added `static get provides()` returning `{} as { user?: InstanceType<TUser> }`. Type-only phantom.
 - `src/commands/GenerateTypes.ts` — `run()` now does both app-level (existing) and per-controller route-type generation. Composes `collectMetadata` → `resolveAllRouteChains` → `emitGenFile`.
 - `src/controllers/Auth.ts` — all 7 handlers migrated to typed `<Method>Request` aliases (~95 lines of hand-written intersection types removed, +11 lines of typed imports).
