@@ -102,6 +102,19 @@ describe('custom winston transport loading (doc 13)', () => {
     await waitForMarker(child, getOutput, /FIXTURE_TRANSPORT_LOADED/);
   });
 
+  it('loads the Sentry wrapper from TypeScript source', {
+    timeout: 40000,
+  }, async () => {
+    const { child, getOutput } = spawnFixture('sentry');
+    running.push(child);
+    await waitForMarker(
+      child,
+      getOutput,
+      /Sentry Winston transport loaded successfully/,
+    );
+    assertTextNotMatch(getOutput(), /Sentry transport not available/);
+  });
+
   it('a nonexistent transport module logs an error without crashing', {
     timeout: 40000,
   }, async () => {

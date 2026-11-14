@@ -93,7 +93,6 @@ function supervisePrimary(
     const restartTimers = new Set<NodeJS.Timeout>();
     let restartTimes: number[] = [];
     let shutdownTimer: NodeJS.Timeout | undefined;
-    let shutdownSignal: ShutdownSignal | undefined;
     let shuttingDown = false;
     let exitCode = 0;
     let finished = false;
@@ -149,7 +148,6 @@ function supervisePrimary(
         return;
       }
       shuttingDown = true;
-      shutdownSignal = signal;
       report(
         'cluster:shutdown',
         code === 0 ? 'info' : 'error',
@@ -215,13 +213,19 @@ function supervisePrimary(
 
     function onWorkerExit(
       worker: Worker,
-      code: number,
+      code: number | null,
       rawSignal: string | null,
     ): void {
       const signal = rawSignal as NodeJS.Signals | null;
       activeWorkers.delete(worker.id);
       if (shuttingDown) {
-        if (code !== 0 || (signal && signal !== shutdownSignal)) {
+        // Node reports code=null when a worker exits because it received a
+        // signal. A worker may receive the shutdown signal directly as part
+        // of a process-group signal, as well as through the primary's
+        // forwarding; that is still a clean shutdown if no non-zero exit code
+        // was reported. The timeout path already sets exitCode=1 before it
+        // sends SIGKILL.
+        if (code !== null && code !== 0) {
           exitCode = 1;
         }
         finishIfIdle();

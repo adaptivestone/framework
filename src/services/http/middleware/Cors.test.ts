@@ -247,6 +247,32 @@ describe('cors middleware methods', () => {
     );
   });
 
+  it('matches global and sticky origin regexes on every request', async () => {
+    const origin = 'https://allowed.example';
+    for (const pattern of [
+      /^https:\/\/allowed\.example$/g,
+      /^https:\/\/allowed\.example$/y,
+    ]) {
+      const middleware = new Cors(appInstance, { origins: [pattern] });
+      for (let requestNumber = 0; requestNumber < 2; requestNumber += 1) {
+        const headers = new Map<string, string>();
+        await middleware.middleware(
+          { method: 'GET', headers: { origin } } as FrameworkRequest,
+          {
+            set: (key: string, value: string) => headers.set(key, value),
+            vary: () => {},
+          } as unknown as Response,
+          () => {},
+        );
+        assert.strictEqual(
+          headers.get('Access-Control-Allow-Origin'),
+          origin,
+          `request ${requestNumber + 1} with /${pattern.source}/${pattern.flags}`,
+        );
+      }
+    }
+  });
+
   it('an unanchored regex matches unintended origins; an anchored one does not (doc 21)', async () => {
     const reflect = async (origins: (string | RegExp)[], origin: string) => {
       const map = new Map();

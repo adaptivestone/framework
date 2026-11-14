@@ -16,17 +16,20 @@ import {
 import { isBaseModelSource } from './astModel.ts';
 import { sq } from './emit.ts';
 
-/** A `./`-rooted, forward-slash specifier from `dir` to `target` for the emitted
- * `import('…')`. Throws if `target` is outside `dir` (can't be a relative import)
- * — better a clear error than an accidental absolute path baked into the file. */
+/** A relative, forward-slash specifier from `dir` to `target` for the emitted
+ * `import('…')`. Targets may be in a sibling package (for example a hoisted
+ * framework install); only paths on a different volume lack a relative form. */
 function toRelativeSpecifier(dir: string, target: string): string {
   const rel = path.relative(dir, target);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+  if (path.isAbsolute(rel)) {
     throw new Error(
-      `Model path "${target}" is outside the project root "${dir}"; cannot emit a relative import into genTypes.d.ts`,
+      `Model path "${target}" is on a different volume from the project root "${dir}"; cannot emit a relative import into genTypes.d.ts`,
     );
   }
-  return `./${rel.split(path.sep).join('/')}`;
+  const specifier = rel.split(path.sep).join('/');
+  return specifier === '..' || specifier.startsWith('../')
+    ? specifier
+    : `./${specifier}`;
 }
 
 /** Subset of the framework logger we use here. */

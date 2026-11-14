@@ -269,6 +269,7 @@ export type Request<
 ```
 
 Notes:
+
 - `UnionAppInfoProvides<MWs>` reduces a tuple of MW classes to the intersection of their `provides()` shapes — which are declared at the _appInfo_ level (§4 Middlewares).
 - The flat per-route `middlewares` tuple is computed by the codegen by _evaluating the Map's path/method scoping rules at build time_: for each route, walk every entry in `static get middleware()`, check whether the entry's method/path pattern matches this route, and append the entries that match. This preserves today's Map semantics without leaking them into per-route types.
 - Middlewares declared with parameters (`[RoleMiddleware, { roles: ['client'] }]`, `SomeController.ts:165`) reduce to `typeof RoleMiddleware` for type purposes — the params don't affect the `provides` shape.
@@ -455,6 +456,7 @@ Two consumers:
 **External tools** read the static `routes.gen.ts` directly — same data, no runtime needed. Codegen + `RouteRegistry` are two views of the same model.
 
 CLI:
+
 ```
 npm run docs           # emits openapi.json from a running app (live data, e.g. enum values from config)
 npm run docs:static    # emits from routes.gen.ts (no boot, faster, deterministic)
@@ -589,6 +591,7 @@ app.useSentry({ dsn: process.env.SENTRY_DSN });
 ```
 
 This wires:
+
 - `Sentry.withIsolationScope()` per request (prevents user/tag leakage between concurrent requests).
 - Auto-tags `route`, `controller`, `request_id`; `setUser({ id })` when `req.appInfo.user` is populated.
 - **Auto-disables Sentry's `httpIntegration` / `nodeFetchIntegration` / `mongooseIntegration`** so we don't double-instrument the same spans the framework already emits. Set `Sentry.init({ defaultIntegrations: false, integrations: [...keep-the-non-conflicting-ones] })` automatically — the user does not have to remember to turn things off. Override with `app.useSentry({ disableConflictingIntegrations: false })` if they really know what they're doing.
@@ -699,6 +702,7 @@ The single biggest "free" perf win in 2026 V8. The `RequestContext` constructor 
 ### 8e. Lazy parsing patterns from Hono
 
 Hono's Context defers expensive work via lazy getters ([`honojs/hono` — `src/context.ts`](https://github.com/honojs/hono/blob/main/src/context.ts)):
+
 - `ctx.req` (HonoRequest) is undefined until accessed.
 - `ctx.var` (Map for set/get) is undefined until used.
 - `ctx.res` (Response) lazily allocated on first method call.
@@ -710,6 +714,7 @@ We do the same in `RequestContext`. Most routes don't touch `headers`/`cookies`/
 Node 22+'s `fetch` is undici under the hood, but `undici.request` direct + a shared `Agent` (connection pool) gives ~3× over `fetch`/`axios`/`got` for high-throughput proxying/webhook fan-out.
 
 Framework exposes:
+
 ```ts
 app.http.request(url, opts); // direct undici call, shared pool
 app.http.fetch(url, opts); // standard fetch, same dispatcher
@@ -760,6 +765,7 @@ await startMcpServer(app, {
 ```
 
 Auto-derived tool definition per route:
+
 - `name` = `<controller>.<method>` namespace (e.g. `auth.postLogin`)
 - `description` = JSDoc above the controller method (or route's `description` field)
 - `inputSchema` = merged body+query+params, exported as JSON Schema (Standard Schema → JSON Schema via lib-specific introspector)
@@ -839,6 +845,7 @@ The Linux Foundation AGENTS.md spec is now standard across Claude Code/Cursor/Co
 `hidden` is _opt-out for visibility_, not authorization. The MCP surface needs a real authz story before Phase 2d ships, otherwise `app.toMcpServer()` is exposure-by-default.
 
 **Default policy: deny.** A route is exposed via MCP **only if both**:
+
 1. It is not `hidden` (default false for routes with no auth middleware; default `true` for routes whose middleware stack includes any class declared as `static authMiddleware = true`).
 2. It is reachable via an `allow` list configured at server start (or `allow: '*'` for trusted local stdio transports).
 
@@ -895,6 +902,7 @@ User.toMcpResource({
 `filter` is mandatory for non-admin reads — it enforces row-level scoping. Without it, the resource is rejected at registration.
 
 **Side-effect tier as a gating dimension.** The MCP client init flag `{ allowSideEffects: 'read' | 'write' | 'all' }` filters the exposed tool set. Combined with `requires`, this gives four meaningful client modes:
+
 - `public + read` — anonymous, idempotent.
 - `authenticated + read` — user-scoped reads.
 - `authenticated + write` — user-scoped mutations.
@@ -924,6 +932,7 @@ RouterAdapter (interface)
 ```
 
 The Phase 1 work that **enables this for free**:
+
 - `Pipeline` consumes a normalized `RequestContext` built from `Request` (Web Fetch).
 - Handlers return `Response` (or anything coerced to `Response`).
 - Test client is `app.fetch(new Request(...))` — Hono's pattern.
@@ -971,6 +980,7 @@ CI runs both benchmarks (plaintext via `autocannon`, realistic via a controller 
 ### Bench fixtures
 
 Add `bench/fixtures/realistic.ts` — a controller that:
+
 - Validates a 5-field request via Standard Schema (mix of required/optional/email/regex).
 - Reads from a mongoose model with `mongodb-memory-server`.
 - Translates an i18n key.

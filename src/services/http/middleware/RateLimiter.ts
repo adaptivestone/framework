@@ -98,6 +98,7 @@ class RateLimiter extends AbstractMiddleware {
       this.limiter = new RateLimiterRedis({
         storeClient: redisClient,
         useRedisPackage: true,
+        rejectIfRedisNotReady: true,
         // Memory fallback so a Redis outage doesn't drop limiting entirely; the
         // library serves from this when the store errors, and doc-10's fail-open
         // in `consumeResult` is the last resort.

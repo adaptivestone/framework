@@ -51,6 +51,7 @@ describe('configureTestServer — consumer Server options in the test bootstrap'
     // being built, exactly as it does in production.
     assertTextMatch(out, /ROUTE_STATUS:200/);
     assertTextMatch(out, /ROUTE_BODY:\{"bootHttp":"ran"\}/);
+    assertTextMatch(out, /TEST_DATABASE_DROPPED/);
     assert.strictEqual(code, 0);
   });
 

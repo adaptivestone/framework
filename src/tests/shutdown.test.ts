@@ -11,6 +11,12 @@ import { assertTextMatch } from './assertions.ts';
 const fixture = fileURLToPath(
   new URL('./fixtures/shutdownServer.ts', import.meta.url),
 );
+const clusterFixture = fileURLToPath(
+  new URL('./fixtures/clusterShutdownServer.ts', import.meta.url),
+);
+const crashFixture = fileURLToPath(
+  new URL('./fixtures/crashSentryServer.ts', import.meta.url),
+);
 
 const childEnv = () => {
   const env = { ...process.env } as NodeJS.ProcessEnv;
@@ -39,6 +45,34 @@ const getFreePort = (): Promise<number> =>
 
 const spawnFixture = (port: number) => {
   const child = spawn('node', [fixture, String(port)], { env: childEnv() });
+  let out = '';
+  child.stdout?.on('data', (d) => {
+    out += d.toString();
+  });
+  child.stderr?.on('data', (d) => {
+    out += d.toString();
+  });
+  return { child, getOutput: () => out };
+};
+
+const spawnClusterFixture = (port: number) => {
+  const child = spawn('node', [clusterFixture, String(port)], {
+    env: childEnv(),
+    detached: true,
+  });
+  let out = '';
+  child.stdout?.on('data', (d) => {
+    out += d.toString();
+  });
+  child.stderr?.on('data', (d) => {
+    out += d.toString();
+  });
+  return { child, getOutput: () => out };
+};
+
+const spawnCrashFixture = (mode?: string) => {
+  const args = mode ? [crashFixture, mode] : [crashFixture];
+  const child = spawn('node', args, { env: childEnv() });
   let out = '';
   child.stdout?.on('data', (d) => {
     out += d.toString();
@@ -88,6 +122,10 @@ const waitForExit = (
   timeoutMs = 20000,
 ): Promise<{ code: number | null; signal: NodeJS.Signals | null }> =>
   new Promise((resolve, reject) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve({ code: child.exitCode, signal: child.signalCode });
+      return;
+    }
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`Timed out waiting for exit.\n${getOutput()}`));
@@ -125,6 +163,63 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     assertTextMatch(getOutput(), /SHUTDOWN_EVENT_FIRED/);
   });
 
+  it('drains a clustered worker after a signal sent only to the primary', {
+    timeout: 40000,
+  }, async () => {
+    const port = await getFreePort();
+    const { child, getOutput } = spawnClusterFixture(port);
+    running.push(child);
+
+    await waitForMarker(child, getOutput, /SERVER_LISTENING:/);
+    const responsePromise = fetch(`http://127.0.0.1:${port}/hold`, {
+      headers: { connection: 'close' },
+    }).then(async (response) => ({
+      status: response.status,
+      body: await response.text(),
+    }));
+    await waitForMarker(child, getOutput, /REQUEST_STARTED:/);
+    child.kill('SIGTERM');
+
+    const [response, { code, signal }] = await Promise.all([
+      responsePromise,
+      waitForExit(child, getOutput),
+    ]);
+    assert.deepStrictEqual(response, { status: 200, body: 'DRAINED' });
+    assert.strictEqual(code, 0, getOutput());
+    assert.strictEqual(signal, null);
+    assertTextMatch(getOutput(), /SHUTDOWN_EVENT_FIRED:/);
+    assertTextMatch(getOutput(), /PRIMARY_FINISHED/);
+  });
+
+  it('absorbs duplicate worker signals when the whole process group is signaled', {
+    timeout: 40000,
+  }, async () => {
+    const port = await getFreePort();
+    const { child, getOutput } = spawnClusterFixture(port);
+    running.push(child);
+
+    await waitForMarker(child, getOutput, /SERVER_LISTENING:/);
+    const responsePromise = fetch(`http://127.0.0.1:${port}/hold`, {
+      headers: { connection: 'close' },
+    }).then(async (response) => ({
+      status: response.status,
+      body: await response.text(),
+    }));
+    await waitForMarker(child, getOutput, /REQUEST_STARTED:/);
+    assert.ok(child.pid);
+    process.kill(-child.pid, 'SIGTERM');
+
+    const [response, { code, signal }] = await Promise.all([
+      responsePromise,
+      waitForExit(child, getOutput),
+    ]);
+    assert.deepStrictEqual(response, { status: 200, body: 'DRAINED' });
+    assert.strictEqual(code, 0, getOutput());
+    assert.strictEqual(signal, null);
+    assertTextMatch(getOutput(), /SHUTDOWN_EVENT_FIRED:/);
+    assertTextMatch(getOutput(), /PRIMARY_FINISHED/);
+  });
+
   it('a second server on a taken port exits non-zero (no zombie)', {
     timeout: 40000,
   }, async () => {
@@ -137,5 +232,45 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     running.push(second.child);
     const { code } = await waitForExit(second.child, second.getOutput);
     assert.strictEqual(code, 1);
+  });
+
+  it('flushes Sentry before exiting on an uncaught exception', {
+    timeout: 40000,
+  }, async () => {
+    const { child, getOutput } = spawnCrashFixture();
+    running.push(child);
+
+    await waitForMarker(
+      child,
+      getOutput,
+      /Sentry Winston transport loaded successfully/,
+    );
+    const { code, signal } = await waitForExit(child, getOutput);
+
+    assert.strictEqual(code, 1);
+    assert.strictEqual(signal, null);
+    assertTextMatch(getOutput(), /SENTRY_EVENT_SENT/);
+    assertTextMatch(getOutput(), /SENTRY_FLUSH_COMPLETED/);
+  });
+
+  it('forces the crash exit when Sentry flush does not complete', {
+    timeout: 40000,
+  }, async () => {
+    const { child, getOutput } = spawnCrashFixture('hang');
+    running.push(child);
+
+    await waitForMarker(
+      child,
+      getOutput,
+      /Sentry Winston transport loaded successfully/,
+    );
+    await waitForMarker(child, getOutput, /SENTRY_FLUSH_STARTED/);
+    const startedAt = Date.now();
+    const { code, signal } = await waitForExit(child, getOutput);
+
+    assert.strictEqual(code, 1);
+    assert.strictEqual(signal, null);
+    assert.ok(Date.now() - startedAt < 4_500);
+    assert.ok(!/SENTRY_FLUSH_COMPLETED/.test(getOutput()));
   });
 });

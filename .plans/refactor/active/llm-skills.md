@@ -139,6 +139,7 @@ any agent that supports the Agent Skills format — see https://agentskills.io.
 Previous version of this plan (npm-bundle distribution + Claude-Code-only) is superseded. Agent Skills is the open standard; `skills.sh` is the registry layer on top. The skill content lives in the docs repo, not the framework repo, because the docs are already the source of truth.
 
 References:
+
 - https://agentskills.io/specification — frontmatter, structure, token budget
 - https://agentskills.io/skill-creation/quickstart — minimal worked example
 - https://github.com/vercel-labs/skills — `skills` CLI source

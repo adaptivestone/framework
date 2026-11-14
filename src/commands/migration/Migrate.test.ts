@@ -80,6 +80,18 @@ describe('Migrate command (doc 15)', () => {
     assert.deepStrictEqual(migrationRunLog, []);
   });
 
+  it('recognizes an applied JavaScript migration after switching to TypeScript', async () => {
+    await Migration.create({ migrationFile: '100_a.js' });
+
+    await runMigrate();
+
+    assert.deepStrictEqual(migrationRunLog, ['200_b.ts']);
+    assert.deepStrictEqual((await Migration.distinct('migrationFile')).sort(), [
+      '100_a.js',
+      '200_b.ts',
+    ]);
+  });
+
   it('runs all pending migrations in filename-timestamp order', async () => {
     await runMigrate();
 

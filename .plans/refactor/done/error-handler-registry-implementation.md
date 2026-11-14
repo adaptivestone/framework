@@ -40,10 +40,12 @@
 ### Task 1: HttpError vocabulary
 
 **Files:**
+
 - Create: `src/services/http/httpErrors.ts`
 - Test: `src/services/http/httpErrors.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: `class HttpError extends Error { constructor(status: number, message: string, body?: unknown); readonly status: number; readonly body?: unknown }`; subclasses `BadRequestError`(400, default msg `'Bad request'`), `UnauthorizedError`(401, `'Unauthorized'`), `ForbiddenError`(403, `'Forbidden'`), `NotFoundError`(404, `'Not found'`), `ConflictError`(409, `'Conflict'`), each `constructor(message?: string, body?: unknown)`. Tasks 2–3 rely on these exact names.
 
@@ -186,12 +188,14 @@ Run: `npm run check:types:raw` and `npm run check` — both clean. Leave everyth
 ### Task 2: Registry on HttpServer + built-in entries
 
 **Files:**
+
 - Create: `src/services/http/builtinErrorHandlers.ts`
 - Modify: `src/services/http/HttpServer.ts` (fields after `routeRegistry: RouteRegistry;` ~line 45; methods after `mountAdapter()` ~line 127)
 - Modify: `src/controllers/index.ts` — DELETE the file-local `matchedClientValidationErrors` (lines ~537–573, incl. its JSDoc) and import it from the new module instead (the catch block itself is untouched until Task 3)
 - Test: `src/controllers/index.test.ts` (new describe; uses the booted `appInstance`)
 
 **Interfaces:**
+
 - Consumes: `HttpError` from Task 1; existing `FrameworkRequest` (type) from `HttpServer.ts`; existing `matchedClientValidationErrors` body moved verbatim.
 - Produces (Task 3 relies on these exactly):
   - `HttpServer.registerErrorHandler<E extends Error>(errorClass: abstract new (...args: never[]) => E, handler: ErrorHandlerFn<E>, opts?: { logLevel?: ErrorLogLevel }): () => void`
@@ -589,12 +593,14 @@ Run: `npm run check:types` and `npm run check` — clean. Leave everything uncom
 ### Task 3: Catch-block refactor + HTTP integration tests + changelog
 
 **Files:**
+
 - Modify: `src/controllers/index.ts` (the second try/catch in `#wrapHandlerEntry`, currently lines ~457–485)
 - Create: `src/tests/fixtures/controllers/ErrorRegistryController.ts`
 - Test: `src/controllers/index.test.ts` (new HTTP-level describe; hoist `CaptureTransport`)
 - Modify: `CHANGELOG.md`, `scripts/packaging-smoke-test.sh`
 
 **Interfaces:**
+
 - Consumes: `resolveError`/`registerErrorHandler` exactly as produced by Task 2; `HttpError`/`NotFoundError` from Task 1; existing test harness (`appInstance`, `getTestServerURL`, `registerController(Class, 'test')`, CaptureTransport pattern).
 - Produces: final behavior; no later task.
 

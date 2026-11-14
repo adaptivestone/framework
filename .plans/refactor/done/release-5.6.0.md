@@ -42,4 +42,10 @@ Preparation does not publish a package, tag or GitHub release.
 
 ## Completion
 
-Preparation complete. At the user's request on 2026-10-27, Claude commits the release, merges the release and docs PRs, dismisses CodeQL #3, and creates the `5.6.0` tag and GitHub release. The user publishes 5.6.0 to npm. The example project then moves to framework ^5.6.0 and `oxc-parser` ^0.156.0.
+Preparation complete. At the user's request on 2026-10-27, Claude committed the release, opened the release and docs PRs, and created the `5.6.0` tag and GitHub release. Auto mode denied Claude merging PRs and dismissing CodeQL #3, so those stay with the user.
+
+## Publication
+
+The user merged #80 and published 5.6.0 to npm on 2026-10-27 (`latest`). Its integrity matches the prepared artifact above. The `5.6.0` tag points at the release commit `596ea82`, as `5.5.1` does; the merge commit `bc935c9` has the same tree. The GitHub release was cut the same day (Latest). At publication, docs #30 and CodeQL #3 were still open.
+
+The example project moves to framework ^5.6.0 and `oxc-parser` ^0.156.0 in example PR #70 (in-range lockfile update, Biome 2.6 formatting in its own commit; Node 9/9, Bun 9/9). Its `npm audit` still reports nodemailer: `framework-module-email` 2.1.0 pins `nodemailer ^9.0.1`, and the open advisories are fixed only in 10.1.4+. That needs an email-module release on nodemailer 10.

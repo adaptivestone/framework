@@ -6,6 +6,28 @@ import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
+/** Accept standard IPs plus the common IPv4:port and [IPv6]:port proxy forms. */
+function forwardedIpAddress(value: string): string | null {
+  if (isIP(value)) {
+    return value;
+  }
+
+  const ipv4WithPort = /^(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})$/.exec(value);
+  const ipv6WithPort = /^\[([^\]]+)\]:(\d{1,5})$/.exec(value);
+  const address = ipv4WithPort?.[1] ?? ipv6WithPort?.[1];
+  const port = Number(ipv4WithPort?.[2] ?? ipv6WithPort?.[2]);
+  if (
+    address &&
+    Number.isInteger(port) &&
+    port >= 0 &&
+    port <= 65535 &&
+    isIP(address) > 0
+  ) {
+    return address;
+  }
+  return null;
+}
+
 class IpDetector extends AbstractMiddleware {
   static get description() {
     return 'Detect real user IP address. Support proxy and load balancer';
@@ -70,14 +92,15 @@ class IpDetector extends AbstractMiddleware {
           const candidate = entries[i];
           // A non-IP entry means the left part of the chain is attacker-
           // controlled garbage — stop and keep the last trustworthy value.
-          if (isIP(candidate) === 0) {
+          const address = forwardedIpAddress(candidate);
+          if (!address) {
             break;
           }
-          ip = candidate;
+          ip = address;
           // addressType must be per-candidate: an IPv6 socket can still carry
           // IPv4 entries in the header (and vice versa).
-          const type = candidate.includes(':') ? 'ipv6' : 'ipv4';
-          if (!this.blockList.check(candidate, type)) {
+          const type = address.includes(':') ? 'ipv6' : 'ipv4';
+          if (!this.blockList.check(address, type)) {
             // first untrusted hop = the client
             break;
           }

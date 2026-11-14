@@ -133,6 +133,29 @@ describe('cache', () => {
     assert.strictEqual(compute.mock.callCount(), 1);
   });
 
+  it('returns the same JSON representation on a miss and a hit', async () => {
+    const cache = new Cache(appInstance);
+    const original = {
+      date: new Date('2026-01-01T00:00:00.000Z'),
+      missing: undefined,
+      nested: { value: 1 },
+      custom: { toJSON: () => ({ serialized: true }) },
+      bigint: -2n,
+    };
+    const compute = mock.fn(async () => original);
+    const first = await cache.getSetValue('json-parity', compute);
+    const second = await cache.getSetValue('json-parity', compute);
+    assert.deepStrictEqual(first, second);
+    assert.notStrictEqual(first, original);
+    assert.deepStrictEqual(first, {
+      date: '2026-01-01T00:00:00.000Z',
+      nested: { value: 1 },
+      custom: { serialized: true },
+      bigint: -2n,
+    });
+    assert.strictEqual(compute.mock.callCount(), 1);
+  });
+
   it('isolates legacy serialized entries from the new codec', async () => {
     const cache = new Cache(appInstance);
     await cache.driver.set(

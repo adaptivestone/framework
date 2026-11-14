@@ -45,6 +45,11 @@ class Cors extends AbstractMiddleware {
     // response varies by it. `vary` appends instead of replacing other values.
     res.vary('Origin');
     for (const host of origins as (string | RegExp)[]) {
+      // Global/sticky regexes update lastIndex on test(), making the result
+      // depend on which request used this middleware instance most recently.
+      if (host instanceof RegExp) {
+        host.lastIndex = 0;
+      }
       if (
         (typeof host === 'string' && req.headers.origin === host) ||
         (host instanceof RegExp && host.test(req.headers.origin ?? ''))

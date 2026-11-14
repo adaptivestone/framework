@@ -230,9 +230,80 @@ describe('user model', () => {
   });
 });
 
+describe('password storage guards', () => {
+  it('does not hash null, undefined, or empty passwords on create', async () => {
+    const userModel = getUserModel();
+    const nullPassword = await userModel.create({
+      email: 'null-password@test.com',
+      password: null as never,
+    });
+    const undefinedPassword = await userModel.create({
+      email: 'undefined-password@test.com',
+      password: undefined,
+    });
+    const emptyPassword = await userModel.create({
+      email: 'empty-password@test.com',
+      password: '',
+    });
+
+    assert.strictEqual(nullPassword.password, null);
+    assert.strictEqual(undefinedPassword.password, undefined);
+    assert.strictEqual(emptyPassword.password, '');
+    assert.strictEqual(
+      await userModel.getUserByEmailAndPassword(
+        'null-password@test.com',
+        'null',
+      ),
+      false,
+    );
+    assert.strictEqual(
+      await userModel.getUserByEmailAndPassword(
+        'undefined-password@test.com',
+        'undefined',
+      ),
+      false,
+    );
+    assert.strictEqual(
+      await userModel.getUserByEmailAndPassword('empty-password@test.com', ''),
+      false,
+    );
+  });
+
+  it('clears an existing password when it is explicitly set to null', async () => {
+    const userModel = getUserModel();
+    const email = 'cleared-password@test.com';
+    const user = await userModel.create({
+      email,
+      password: userPassword,
+    });
+
+    user.password = null as never;
+    await user.save();
+
+    const stored = await userModel.findOne({ email }).orFail();
+    assert.strictEqual(stored.password, null);
+    assert.strictEqual(
+      await userModel.getUserByEmailAndPassword(email, userPassword),
+      false,
+    );
+    assert.strictEqual(
+      await userModel.getUserByEmailAndPassword(email, 'null'),
+      false,
+    );
+  });
+});
+
 describe('token security (doc 01)', () => {
   const email = 'token-sec@test.com';
   let user: InstanceType<TUser>;
+
+  it('declares an index on sessionTokens.token', () => {
+    assert.ok(
+      getUserModel()
+        .schema.indexes()
+        .some(([keys]) => Object.hasOwn(keys, 'sessionTokens.token')),
+    );
+  });
 
   it('issues random base64url tokens that differ each call', async () => {
     user = await getUserModel().create({

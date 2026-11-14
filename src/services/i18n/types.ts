@@ -17,7 +17,8 @@ type StringTranslationOptions = TranslationOptions & {
 
 /** String-key translator; object/detail results must be narrowed by the caller. */
 export interface TranslationFunction {
-  (key: string | string[], options?: StringTranslationOptions): string;
+  (key: string | string[]): string;
+  (key: string | string[], options: StringTranslationOptions): string;
   (key: string | string[], defaultValue: string): string;
   (
     key: string | string[],

@@ -12,10 +12,12 @@ Drop `vitest` + `@vitest/coverage-v8` in favor of Node's built-in `node:test` ru
 ## Why now (vs. earlier in 2026)
 
 The argument for waiting was:
+
 - `mock.module()` was experimental — needed for the `whenReady` parity test in P1a-runtime and the `ValidationError` parity test in P1b.
 - Native TypeScript type-stripping was still being refined.
 
 Both shipped stable in Node 25/26. The remaining trade-offs are no longer technical:
+
 - Migration cost is mechanical (~20-30 test files).
 - `node:assert/strict` vs vitest `expect()` is a DX preference, not a capability gap.
 - Watch mode polish and `vitest --ui` are real losses, but dev-only.
@@ -70,6 +72,7 @@ describe('Cache', () => {
 ```
 
 Module mocking:
+
 ```ts
 // Before
 import { vi } from 'vitest';

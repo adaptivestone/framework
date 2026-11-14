@@ -18,6 +18,7 @@
 Make `@redis/client` load only when RateLimiter is actually configured with the **redis** driver. Today `RateLimiter.ts` statically imports `getRedisClientSync` (→ `redisConnection.ts` → `@redis/client`), so merely using RateLimiter on _any_ driver pulls redis into the import graph.
 
 Scope correction from the earlier draft:
+
 - **Not** about `rate-limiter-flexible` — it ships all backends in one package, and the framework's own `Auth` controller uses it (`Auth.ts` → `['/{*splat}', [GetUserByToken, RateLimiter]]`), so it can't be optional.
 - **Not** about `mongoose` — a required core dep (Mongo is required in v5).
 - The "build the limiter once" worry is **already satisfied**: the constructor builds `this.limiter` and `middleware()` reuses it. No change needed there.

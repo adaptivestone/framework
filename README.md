@@ -70,6 +70,29 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.6.1)
+
+See the [5.6.1 release notes](CHANGELOG.md). Check these when you upgrade:
+
+- To accept browser CSP violation reports (`application/csp-report`) in an app
+  with its own `config/http.ts`, add
+  `mediaTypes: { 'application/csp-report': 'json' }` to its `requestParser`.
+  Your file replaces the framework's, so the new default does not reach it.
+- Child routes now validate middleware schemas inherited from parent
+  controllers. Input those schemas reject now receives a validation 400.
+- Cache misses return the same serialized value as hits (dates as strings,
+  `toJSON()` applied, undefined properties omitted).
+- The `User` model declares an index on `sessionTokens.token`. With automatic
+  index creation it is built on startup; plan the build for large collections.
+- The optional peers accept `oxc-parser` 0.156 or any later 0.x release and
+  i18next 26 or 27. Before moving to i18next 27, read its migration guide:
+  empty translations now fall back, and `/` is no longer escaped.
+- `TranslationFunction` (`req.appInfo.i18n.t`) splits `t(key, options?)` into
+  `t(key)` and `t(key, options)`, as i18next 27 does. A call that passes options
+  which may be `undefined` no longer compiles; pass them only when defined.
+- A failed test database drop now fails the shipped teardown hook instead of
+  being ignored.
+
 ## Upgrade notes (5.6.0)
 
 See the [5.6.0 release notes](CHANGELOG.md). Check these when you upgrade:

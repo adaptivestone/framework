@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+## [5.6.1] - 2026-11-14
+
+### Changed
+
+- **The optional `oxc-parser` and `i18next` peers accept their current releases.** `oxc-parser` is now `>=0.156.0 <1` instead of `^0.156.0`, which rejected each new weekly 0.x release with `ERESOLVE`; code generation output with 0.158.0 is byte-identical. `i18next` is now `^26.0.1 || ^27.0.0`. i18next 27 changes defaults that affect an app's own translations (an empty translation falls back instead of rendering blank, `/` is no longer escaped in interpolated values; see its [migration guide](https://www.i18next.com/misc/migration-guide#v26.x.x-to-v27.0.0)). The framework passes `fallbackLng` from `config/i18n.ts`, so i18next 27's new `fallbackLng` default does not apply.
+- **Cache misses now return the same serialized representation as cache hits.** Dates become strings, `toJSON()` is respected, and undefined object properties are omitted on the first call too; BigInts remain supported. A non-positive or `NaN` TTL still bypasses caching and returns the callback's original value.
+- **Middleware schemas inherited from parent controllers are now validated on child routes.** Invalid input that previously bypassed these schemas receives the usual validation 400.
+- **User session token lookups have an index on `sessionTokens.token`.** Existing deployments with automatic index creation enabled build it on startup; plan the index build for large user collections.
+
+### Added
+
+- **CLI argument descriptors accept `sensitive: true`.** Such values are replaced with `[REDACTED]` before generating the Mongo application name or its hash; `createuser` marks its password this way. Ordinary arguments, boolean flags, the existing long-name hash format, and an explicit `MONGO_APP_NAME` are preserved.
+- **`http.requestParser.mediaTypes` parses other media types as JSON or urlencoded.** It maps a media type to `'json'` or `'urlencoded'`, on top of `application/json`, any `+json` type and `application/x-www-form-urlencoded`. The default config maps `application/csp-report`, so browser CSP violation reports are parsed instead of answered with 400. An app's own `config/http.ts` replaces the framework's, so add the entry there: `mediaTypes: { 'application/csp-report': 'json' }`. Keys match case-insensitively, and mapped bodies share the `maxFieldsSize` limit.
+
+### Fixed
+
+- **An unavailable Redis no longer stalls cache reads or delays rate limiting.** Cache operations fail softly while the connection is pending, and the rate limiter immediately uses its memory insurance limiter. Redis cache TTLs now use milliseconds, so fractional seconds work.
+- **Cluster workers drain requests when shutdown signals are delivered more than once**, then disconnect their IPC channel. The primary no longer mistakes a signal exit with a null code for a nonzero exit code.
+- **Fatal crashes give Sentry a bounded opportunity to flush before exiting.** The source transport import also resolves correctly when running TypeScript directly, and calling `getModel` before initialization reports the intended diagnostic.
+- **Missing or empty model passwords are no longer hashed as login credentials**, and malformed stored password hashes with an incorrect decoded length are rejected.
+- **Method-scoped middleware runs in declaration order**, including overlapping wildcard and exact scopes.
+- **Mounted routes retain their own parameter names.** Sibling controller mounts that share a parameter position no longer borrow the first controller's name, including handlers without explicit parameter metadata.
+- **Applied migrations remain applied after a `.js`/`.ts` extension change.** `syncindexes` also handles models registered from subdirectories, and type generation supports framework/model files outside the consumer root, including hoisted installations.
+- **Trusted forwarded IP addresses accept validated IPv4/IPv6 addresses with ports.** Binary `application/octet-stream` uploads use the configured file-size limit; CORS regexes with `g`/`y` flags match consistently across requests; pagination accepts numeric exponent notation while retaining integer page and limit values.
+- **Lock waiting recognizes logically expired records**, without requiring MongoDB's TTL cleanup to remove them first.
+- **Test teardown drops its database before closing MongoDB.** The shipped test helpers drain HTTP requests, wait for the models' background collection builds, drop the per-suite database, then emit shutdown and disconnect. A build that finished after the drop used to recreate the database; a failed drop now fails the teardown hook instead of being ignored.
+- **`TranslationFunction` accepts the i18next 27 translator.** i18next 27 types `t(key)` and `t(key, options)` as separate signatures, so assigning an i18next 27 instance or its `t` to `I18nBaseInstance`, `TI18n` or `TranslationFunction` failed to compile (TS2322). `TranslationFunction` makes the same split, which still fits i18next 26. A call that passes an options value that may be `undefined` no longer compiles, as with i18next 27's own types; pass the options only when they are defined.
+- **Dependencies updated within their ranges** (lockfile), including Mongoose 9.12.1, Sentry 11.12.0 and rate-limiter-flexible 11.4.1. The Sentry update removes four moderate audit findings.
+
 ## [5.6.0] - 2026-10-27
 
 ### Changed
@@ -745,7 +774,6 @@ This is a big release that contains a lot of new features and breaking changes. 
 
 - **[UPDATE]** Update `rate-limiter-flexible` to v9.
 - **[UPDATE]** Remove 'winston-transport-sentry' and implementcustom logic based on 'sentry' itself (from v9.14 sentry have native winston support)
-
 
 ## [5.0.0-beta.39] - 2025-10-25
 

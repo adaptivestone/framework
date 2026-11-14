@@ -812,6 +812,124 @@ describe('ControllerManager — cross-controller middleware', () => {
       ['FakeMw', 'OtherMw'],
     );
   });
+
+  it('validates schemas from middleware inherited at an earlier mount point', async () => {
+    const inheritedSchema: StandardSchemaV1 = {
+      '~standard': {
+        version: 1,
+        vendor: 'inherited-controller-test',
+        validate(value) {
+          const input = (value ?? {}) as Record<string, unknown>;
+          return typeof input.tenant === 'string'
+            ? { value: { tenant: input.tenant } }
+            : {
+                issues: [{ message: 'tenant is required', path: ['tenant'] }],
+              };
+        },
+      },
+    };
+
+    class TenantMiddleware extends AbstractMiddleware {
+      static get relatedRequestParameters() {
+        return inheritedSchema;
+      }
+    }
+
+    class Root extends AbstractController {
+      static get middleware() {
+        return new Map([
+          ['/{*splat}', [TenantMiddleware as unknown as MiddlewareSpec]],
+        ]);
+      }
+      getHttpPath() {
+        return '/';
+      }
+    }
+
+    class Accounts extends AbstractController {
+      get routes() {
+        return { post: { '/read': { handler: this.read } } };
+      }
+      async read(req: FrameworkRequest, res: Response) {
+        return res.status(200).json({ request: req.appInfo.request });
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+
+    const { registry, cm } = setup();
+    cm.registerController(Root);
+    cm.registerController(Accounts);
+    const handler = registry.match('POST', '/accounts/read')?.entry?.handler;
+    assert.ok(handler);
+
+    const invalidResponse = responseForHandler();
+    await handler(
+      {
+        body: {},
+        headers: {},
+        appInfo: { request: {}, query: {}, params: {} },
+      } as unknown as FrameworkRequest,
+      invalidResponse as unknown as Response,
+      () => {},
+    );
+    assert.strictEqual(invalidResponse.statusCode, 400);
+    assert.deepStrictEqual(invalidResponse.body, {
+      message: 'Validation failed',
+      errors: { tenant: ['tenant is required'] },
+    });
+
+    const validResponse = responseForHandler();
+    await handler(
+      {
+        body: { tenant: 'acme' },
+        headers: {},
+        appInfo: { request: {}, query: {}, params: {} },
+      } as unknown as FrameworkRequest,
+      validResponse as unknown as Response,
+      () => {},
+    );
+    assert.deepStrictEqual(validResponse.body, {
+      request: { tenant: 'acme' },
+    });
+  });
+});
+
+describe('ControllerManager — method-scoped middleware order', () => {
+  it('preserves Map order across broad and exact method scopes', () => {
+    class RouteMiddleware {
+      readonly _kind = 'mw';
+    }
+    class C extends AbstractController {
+      get routes() {
+        return {
+          post: {
+            '/admin': {
+              handler: handlerStub,
+              middleware: [RouteMiddleware as unknown as MiddlewareSpec],
+            },
+          },
+        };
+      }
+      static get middleware() {
+        return new Map([
+          ['POST/{*splat}', [FakeMw as unknown as MiddlewareSpec]],
+          ['POST/admin', [OtherMw as unknown as MiddlewareSpec]],
+        ]);
+      }
+    }
+
+    const { registry, cm } = setup();
+    cm.registerController(C);
+
+    assert.deepStrictEqual(
+      registry
+        .match('POST', '/c/admin')
+        ?.middlewares.map((entry) => entry.Class.name),
+      ['FakeMw', 'OtherMw', 'RouteMiddleware'],
+    );
+  });
 });
 
 // ─── mixed-case path segments ────────────────────────────────────────

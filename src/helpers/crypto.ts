@@ -181,6 +181,9 @@ export const verifyPassword = async (
       return { valid: false, needsRehash: false };
     }
     const storedHash = Buffer.from(hashB64, 'base64url');
+    if (storedHash.length !== SCRYPT_KEYLEN) {
+      return { valid: false, needsRehash: false };
+    }
     const candidate = await scryptWithOptions(
       password + pepper,
       Buffer.from(saltB64, 'base64url'),

@@ -197,7 +197,6 @@ These are settled-in-direction but explicitly NOT shipping in v5 — preserving 
 
 - **Routing semantic flips: trailing slash + case sensitivity.** v5 matches Express's defaults (lenient + insensitive). v6 flips both to the modern majority: strict trailing slash by default (with opt-in canonical-redirect middleware), case-sensitive by default. URL decoding stays per-segment in both versions (already the safer model in v5).
 
-
 ## Phase ordering
 
 - Phase −1 (baseline) is a hard prerequisite for Phase 0.

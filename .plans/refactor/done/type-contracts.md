@@ -30,6 +30,7 @@ Land the type-only foundation that codegen output and the new tree-based `RouteR
 The original P0 plan included `Pipeline`, `Stage`, `RouteEntry`, `RouterAdapter`, `ValidatorBody`. These were pulled into P1b instead — they're load-bearing for the tree-based router and were better designed alongside the runtime than as standalone interfaces.
 
 What replaces them in the new architecture (see `glossary.md`):
+
 - `RouteEntry` → `HandlerEntry` (per-method) on `RouteNode` (tree-based)
 - `RouterAdapter` → still an interface, but with one canonical implementation (`ExpressAdapter`) shipping in P1b as a single-mount adapter (~30 lines)
 - `Pipeline` / `Stage` → land in P1b as the dispatch primitive

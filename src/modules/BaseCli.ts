@@ -17,6 +17,12 @@ export interface ParseArgsOptionsConfigExtended
    * Is it required?
    */
   required?: boolean;
+
+  /**
+   * Mark a secret option so BaseCli substitutes `[REDACTED]` before composing
+   * Mongo's connection diagnostic name. Boolean flags remain visible.
+   */
+  sensitive?: boolean;
 }
 
 class Cli extends Base {
@@ -185,9 +191,20 @@ class Cli extends Base {
       );
       // Only set when the operator hasn't — don't clobber a user-provided value.
       if (!process.env.MONGO_APP_NAME) {
+        const connectionArgs = Object.fromEntries(
+          Object.entries(parsedArgs.values).map(([key, value]) => {
+            const option = finalArguments[key];
+            return [
+              key,
+              option?.sensitive && option.type !== 'boolean'
+                ? '[REDACTED]'
+                : value,
+            ];
+          }),
+        );
         process.env.MONGO_APP_NAME = Command.getMongoConnectionName(
           command,
-          parsedArgs.values,
+          connectionArgs,
         );
       }
       await this.server.initAllModels({ waitForConnection: true });

@@ -36,6 +36,7 @@ middleware's import path/binding from the controller source (`importResolution.t
 writes `<File>.routes.gen.ts`.
 
 Pain points:
+
 - **`importResolution.ts` (~385 lines)** reverse-engineers import paths + bindings,
   because the registry hands codegen live **class objects**, and a JS class carries no
   source path. Source of bug 1b (binding ≠ class name), the bare-package-ancestor gap,

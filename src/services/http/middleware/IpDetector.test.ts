@@ -2,9 +2,17 @@ import assert from 'node:assert/strict';
 import type { IncomingMessage } from 'node:http';
 import { describe, it } from 'node:test';
 import type { Response } from 'express';
-import { appInstance } from '../../../helpers/appInstance.ts';
+import type { IApp } from '../../../server.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import IpDetector from './IpDetector.ts';
+
+const detectorFor = (trustedProxy: string[]) =>
+  new IpDetector({
+    getConfig: () => ({
+      headers: ['X-Forwarded-For'],
+      trustedProxy,
+    }),
+  } as unknown as IApp);
 
 const testVectors = [
   // IPv4 CIDR blocks
@@ -126,10 +134,7 @@ describe('ipDetector methods', () => {
   it('middleware that works', async () => {
     const nextFunction = () => {};
     for (const vector of testVectors) {
-      appInstance.updateConfig('ipDetector', {
-        trustedProxy: [vector.cidr],
-      });
-      const middleware = new IpDetector(appInstance);
+      const middleware = detectorFor([vector.cidr]);
       for (const test of vector.tests) {
         const req = {
           appInfo: {
@@ -170,11 +175,7 @@ describe('getIpAdressFromIncomingMessage trusted-hop walk', () => {
   // 127.0.0.1 = trusted socket peer; 10.0.0.0/8 = a trusted inner hop;
   // 203.0.113.x / 1.2.3.4 = untrusted (public) clients.
   const detector = () => {
-    appInstance.updateConfig('ipDetector', {
-      headers: ['X-Forwarded-For'],
-      trustedProxy: ['127.0.0.1/8', '10.0.0.0/8'],
-    });
-    return new IpDetector(appInstance);
+    return detectorFor(['127.0.0.1/8', '10.0.0.0/8']);
   };
 
   it('returns the right-most untrusted hop, not the spoofable left-most', () => {
@@ -183,6 +184,25 @@ describe('getIpAdressFromIncomingMessage trusted-hop walk', () => {
       makeReq('127.0.0.1', '1.2.3.4, 203.0.113.7'),
     );
     assert.strictEqual(ip, '203.0.113.7');
+  });
+
+  it('strips ports from IPv4 and bracketed IPv6 forwarded addresses', () => {
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', '203.0.113.7:4321, 10.0.0.5:8080'),
+    );
+    assert.strictEqual(ip, '203.0.113.7');
+
+    const ipv6 = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', '[2001:db8::7]:4321'),
+    );
+    assert.strictEqual(ipv6, '2001:db8::7');
+  });
+
+  it('still rejects a hostname with a port as a non-IP header entry', () => {
+    const ip = detector().getIpAdressFromIncomingMessage(
+      makeReq('127.0.0.1', 'client.example:4321'),
+    );
+    assert.strictEqual(ip, '127.0.0.1');
   });
 
   it('skips trailing trusted-proxy hops to find the client', () => {

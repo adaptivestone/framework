@@ -193,11 +193,16 @@ class User extends BaseModel {
     schema.pre(
       'save',
       async function userPreSaveHook(this: InstanceType<UserModelLite>) {
-        if (this.isModified('password')) {
+        if (
+          this.isModified('password') &&
+          typeof this.password === 'string' &&
+          this.password.length > 0
+        ) {
           this.password = await hashPassword(this.password as string);
         }
       },
     );
+    schema.index({ 'sessionTokens.token': 1 });
   }
 
   static get modelSchema() {

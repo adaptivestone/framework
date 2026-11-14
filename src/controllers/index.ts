@@ -78,6 +78,28 @@ function overridesInstanceSchema(Class: MiddlewareEntry['Class']): boolean {
   return false;
 }
 
+/** Collect middleware already attached to the registry path this subtree inherits. */
+function inheritedMiddlewaresAtPath(
+  root: RouteNode,
+  path: string,
+): MiddlewareEntry[] {
+  const middlewares = [...root.middlewares];
+  let node = root;
+  for (const segment of path.split('/').filter(Boolean)) {
+    const child = segment.startsWith(':')
+      ? node.paramChild
+      : segment.startsWith('*')
+        ? node.splatChild
+        : node.children.get(segment.toLowerCase());
+    if (!child) {
+      break;
+    }
+    node = child;
+    middlewares.push(...node.middlewares);
+  }
+  return middlewares;
+}
+
 /**
  * Class does autoloading a http controllers
  */
@@ -132,15 +154,20 @@ class ControllerManager extends Base {
     }
 
     const subtree = this.#buildSubtree(instance);
+    const mountPath = instance.getHttpPath();
     // `skipWrap` is the codegen escape hatch — we only need the tree
     // structure to emit types, not the runtime validation wrappers.
     // Wrapping instantiates every middleware in every handler's chain
     // to read schemas, which side-effects (Redis clients, timers, etc.)
     // and keeps the event loop open for codegen-only runs.
     if (!options.skipWrap) {
-      this.#wrapHandlersInSubtree(subtree, [], instance.constructor.name);
+      this.#wrapHandlersInSubtree(
+        subtree,
+        inheritedMiddlewaresAtPath(registry.root, mountPath),
+        instance.constructor.name,
+      );
     }
-    registry.registerSubtree(instance.getHttpPath(), subtree);
+    registry.registerSubtree(mountPath, subtree);
     return instance;
   }
 
@@ -575,7 +602,11 @@ export function buildSubtreeFromSpec(
   for (const h of spec.handlers) {
     attachHandler(subtree, h.method, h.path, h.entry);
   }
-  const ctx = { ctrlName: spec.ctrlName, onWarn };
+  const ctx = {
+    ctrlName: spec.ctrlName,
+    onWarn,
+    methodMiddlewareCounts: new WeakMap<HandlerEntry, number>(),
+  };
   for (const m of spec.middleware) {
     attachMiddlewares(subtree, m.method, m.path, m.entries, ctx);
   }
@@ -782,7 +813,11 @@ function attachMiddlewares(
   method: HttpMethod | 'ALL',
   pathStr: string,
   entries: MiddlewareEntry[],
-  ctx?: { ctrlName: string; onWarn?: (msg: string) => void },
+  ctx: {
+    ctrlName: string;
+    onWarn?: (msg: string) => void;
+    methodMiddlewareCounts: WeakMap<HandlerEntry, number>;
+  },
 ): void {
   const segments = pathStr.split('/').filter((s) => s.length > 0);
 
@@ -803,16 +838,17 @@ function attachMiddlewares(
   }
 
   if (hasSplat) {
-    attachToMethodHandlers(target, method, entries);
+    attachToMethodHandlers(target, method, entries, ctx.methodMiddlewareCounts);
     return;
   }
 
   const existingHandler = target.methods?.[method];
   if (existingHandler) {
-    existingHandler.middlewares = [
-      ...entries,
-      ...(existingHandler.middlewares ?? []),
-    ];
+    attachMethodScopedMiddlewares(
+      existingHandler,
+      entries,
+      ctx.methodMiddlewareCounts,
+    );
     return;
   }
   // No handler for this method at the walked node: the scope key targets a
@@ -827,20 +863,47 @@ function attachToMethodHandlers(
   node: RouteNode,
   method: HttpMethod,
   entries: MiddlewareEntry[],
+  methodMiddlewareCounts: WeakMap<HandlerEntry, number>,
 ): void {
   const handler = node.methods?.[method];
   if (handler) {
-    handler.middlewares = [...entries, ...(handler.middlewares ?? [])];
+    attachMethodScopedMiddlewares(handler, entries, methodMiddlewareCounts);
   }
   for (const child of node.children.values()) {
-    attachToMethodHandlers(child, method, entries);
+    attachToMethodHandlers(child, method, entries, methodMiddlewareCounts);
   }
   if (node.paramChild) {
-    attachToMethodHandlers(node.paramChild, method, entries);
+    attachToMethodHandlers(
+      node.paramChild,
+      method,
+      entries,
+      methodMiddlewareCounts,
+    );
   }
   if (node.splatChild) {
-    attachToMethodHandlers(node.splatChild, method, entries);
+    attachToMethodHandlers(
+      node.splatChild,
+      method,
+      entries,
+      methodMiddlewareCounts,
+    );
   }
+}
+
+/** Preserve Map declaration order and keep scoped middleware ahead of route middleware. */
+function attachMethodScopedMiddlewares(
+  handler: HandlerEntry,
+  entries: MiddlewareEntry[],
+  methodMiddlewareCounts: WeakMap<HandlerEntry, number>,
+): void {
+  const existing = handler.middlewares ?? [];
+  const count = methodMiddlewareCounts.get(handler) ?? 0;
+  handler.middlewares = [
+    ...existing.slice(0, count),
+    ...entries,
+    ...existing.slice(count),
+  ];
+  methodMiddlewareCounts.set(handler, count + entries.length);
 }
 
 function walkToNode(subtree: RouteNode, pathStr: string): RouteNode {

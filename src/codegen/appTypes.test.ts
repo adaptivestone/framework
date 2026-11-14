@@ -297,4 +297,26 @@ describe('appTypes — name escaping in emitted string literals (finding #20)', 
     assert.ok(out.includes("wei\\'rd\\\\Model.ts"));
     assert.deepStrictEqual(parseDiagnostics(out), []);
   });
+
+  it('emits a relative import for a model outside the project root', async () => {
+    const outside = path.resolve(
+      process.cwd(),
+      '..',
+      'framework-hoisted-fixture',
+      'src',
+      'models',
+      'User.ts',
+    );
+    const relative = path
+      .relative(process.cwd(), outside)
+      .split(path.sep)
+      .join('/');
+    const out = await getTemplate(new Map(), [
+      { file: 'FrameworkUser', path: outside },
+    ]);
+
+    assert.ok(out.includes(`import('${relative}')`));
+    assert.ok(!out.includes(outside));
+    assert.deepStrictEqual(parseDiagnostics(out), []);
+  });
 });

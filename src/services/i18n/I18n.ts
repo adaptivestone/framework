@@ -1,7 +1,7 @@
 import type { i18n } from 'i18next';
 import type i18nConfig from '../../config/i18n.ts';
 import Base from '../../modules/Base.ts';
-import type { I18nBaseInstance, TI18n } from './types.ts';
+import type { I18nBaseInstance, TI18n, TranslationOptions } from './types.ts';
 
 export type { TI18n } from './types.ts';
 
@@ -51,7 +51,7 @@ export class I18n extends Base {
    * leaking the raw key. A call with no default keeps returning the key.
    */
   #i18nFallback: TI18n = {
-    t: (key, options) =>
+    t: (key: string | string[], options?: string | TranslationOptions) =>
       typeof options === 'string'
         ? options
         : (options?.defaultValue ??

@@ -151,7 +151,9 @@ export function translateIssues(
       // 2-arg form: the message IS the key; if it isn't loaded i18next returns
       // the key string unchanged. `params` supplies interpolation values for the
       // (trusted, app-authored) translation string.
-      message: t(issue.message, issue.params) as unknown as string,
+      message: (issue.params
+        ? t(issue.message, issue.params)
+        : t(issue.message)) as unknown as string,
     };
   });
 }
