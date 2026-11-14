@@ -15,7 +15,6 @@ import {
   assertHasProperty,
   assertNthCalledWith,
   assertThrowsLike,
-  pattern,
 } from './tests/assertions.ts';
 import { mockImplementation, mockResolvedValue } from './tests/mocks.ts';
 import { serverInstance } from './tests/testHelpers.ts';
@@ -96,22 +95,24 @@ describe('Server lookups — DX guards', () => {
     resetAppInstance();
     try {
       const server = new Server(folderConfig);
-      const error = mock.fn();
-      Object.defineProperty(server.app, 'logger', {
-        value: { error, warn: mock.fn() },
-      });
-
-      assert.strictEqual(server.getModel('Uninitialized'), false);
-      assertThrowsLike(
-        () => server.getModelOrThrow('Uninitialized'),
-        "Model 'Uninitialized' is not available",
+      const error = mockImplementation(
+        mock.method(console, 'error'),
+        () => undefined,
       );
-      assertCalledWith(
-        error,
-        pattern.objectContaining({
-          message: 'You should call Server.init() before using getModel',
-        }),
-      );
+      try {
+        assert.strictEqual(server.getModel('Uninitialized'), false);
+        assertThrowsLike(
+          () => server.getModelOrThrow('Uninitialized'),
+          "Model 'Uninitialized' is not available",
+        );
+        assertCalledTimes(error, 2);
+        assertCalledWith(
+          error,
+          '[Framework] You should call Server.init() before using getModel',
+        );
+      } finally {
+        error.mock.restore();
+      }
       assertThrowsLike(
         () => server.getConfig('missing'),
         'You should call Server.init() before using getConfig',

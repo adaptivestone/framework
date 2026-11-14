@@ -4,6 +4,8 @@ import type { TLock } from '../../models/Lock.ts';
 import type { TMigration } from '../../models/Migration.ts';
 import AbstractCommand from '../../modules/AbstractCommand.ts';
 
+const migrationIdentity = (file: string) => file.replace(/\.[jt]s$/, '');
+
 class Migrate extends AbstractCommand {
   static get description() {
     return 'Run all pending migrations';
@@ -49,13 +51,15 @@ class Migrate extends AbstractCommand {
       // against the *set* of applied filenames — not the timestamp of the most
       // recent one — means a branch-merged migration with an older timestamp is
       // still run instead of silently skipped. Order by filename timestamp.
-      const applied = new Set(await MigrationModel.distinct('migrationFile'));
+      const applied = new Set(
+        (await MigrationModel.distinct('migrationFile')).map(migrationIdentity),
+      );
 
       // Discovery is recursive, so a migration can arrive as a subfolder-relative
       // path (`2024/1699…_x.ts`). Order by the numeric timestamp prefix of the
       // *basename* (strip directory segments), not the whole path.
       const pending = files
-        .filter((f) => !applied.has(f.file))
+        .filter((f) => !applied.has(migrationIdentity(f.file)))
         .map((f) => {
           const prefix = /^(\d+)_/.exec(path.basename(f.file));
           return { ...f, order: prefix ? Number(prefix[1]) : NaN };

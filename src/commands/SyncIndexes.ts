@@ -1,25 +1,14 @@
-import path from 'node:path';
-import * as url from 'node:url';
-import type { Model as TModel } from 'mongoose';
 import AbstractCommand from '../modules/AbstractCommand.ts';
 
 class SyncIndexes extends AbstractCommand {
   async run() {
-    const dirname = url.fileURLToPath(new URL('.', import.meta.url));
-    const files = await this.getFilesPathWithInheritance(
-      path.join(dirname, '/../models'),
-      this.app.foldersConfig.models,
+    const models = this.app.internalFilesCache.models;
+    const modelEntries = Array.from(models).sort(([a], [b]) =>
+      a.localeCompare(b),
     );
-    let models = [];
+    this.logger?.info(`Total found ${modelEntries.length} models`);
 
-    for (const file of files) {
-      models.push(path.basename(file.file, path.extname(file.file)));
-    }
-    models = models.sort();
-    this.logger?.info(`Total found ${models.length} models`);
-
-    for (const modelName of models) {
-      const Model = this.app.getModelOrThrow(modelName) as TModel<unknown>;
+    for (const [modelName, Model] of modelEntries) {
       const removedIndexes = await Model.syncIndexes(); // await in loop not a bug. Lets do one by one
       if (removedIndexes.length) {
         this.logger?.info(

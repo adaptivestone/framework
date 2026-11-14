@@ -85,7 +85,7 @@ class Lock extends BaseModel {
       },
 
       /**
-       * Resolve once the named lock is gone. Optionally reject after
+       * Resolve once the named lock is gone or expires. Optionally reject after
        * `timeoutMs` so callers can bound the wait.
        * @param {string} name
        * @param {number} [timeoutMs] reject after this many ms if still locked
@@ -101,31 +101,86 @@ class Lock extends BaseModel {
         // is missed forever. So: attach the listener (opening the cursor),
         // wait for 'resumeTokenChanged' — the wrapper's first signal that the
         // aggregate has run and the start point is fixed — and only then read.
-        // A delete after that point is guaranteed observed; if the lock is
-        // already gone, the re-check resolves.
+        // A delete after that point is guaranteed observed. The re-check also
+        // treats an expired record as unlocked, then schedules another check
+        // at a live lock's expiry so callers don't wait for Mongo's TTL reaper.
         const stream = this.watch([
           { $match: { operationType: 'delete', 'documentKey._id': name } },
         ]);
         try {
-          return await new Promise((resolve, reject) => {
-            stream.on('change', () => resolve(true));
+          return await new Promise<boolean | undefined>((resolve, reject) => {
+            let settled = false;
+            let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+            let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+            const clearTimers = () => {
+              if (expiryTimer) {
+                clearTimeout(expiryTimer);
+              }
+              if (timeoutTimer) {
+                clearTimeout(timeoutTimer);
+              }
+            };
+            const finish = (value: boolean | undefined) => {
+              if (settled) {
+                return;
+              }
+              settled = true;
+              clearTimers();
+              resolve(value);
+            };
+            const fail = (error: unknown) => {
+              if (settled) {
+                return;
+              }
+              settled = true;
+              clearTimers();
+              reject(error);
+            };
+            const checkActiveLock = async () => {
+              if (settled) {
+                return;
+              }
+              try {
+                const activeLock = await this.findOne({
+                  _id: name,
+                  expiredAt: { $gt: new Date() },
+                });
+                if (settled) {
+                  return;
+                }
+                if (!activeLock?.expiredAt) {
+                  finish(undefined);
+                  return;
+                }
+                const expiresAt = activeLock.expiredAt.getTime();
+                if (expiresAt <= Date.now()) {
+                  finish(undefined);
+                  return;
+                }
+                expiryTimer = setTimeout(
+                  () => void checkActiveLock(),
+                  Math.min(
+                    2_147_483_647,
+                    Math.max(1, expiresAt - Date.now() + 1),
+                  ),
+                );
+                expiryTimer.unref();
+              } catch (error) {
+                fail(error);
+              }
+            };
+
+            stream.on('change', () => finish(true));
             // A standalone Mongo (change streams need a replica set) or a stream
             // failure emits 'error'; unhandled, it would crash the process.
-            stream.on('error', reject);
-            stream.once('resumeTokenChanged', () => {
-              this.findOne({ _id: name })
-                .then((exists) => {
-                  if (!exists) {
-                    resolve(undefined);
-                  }
-                })
-                .catch(reject);
-            });
+            stream.on('error', fail);
+            stream.once('resumeTokenChanged', () => void checkActiveLock());
             if (timeoutMs) {
-              setTimeout(
-                () => reject(new Error(`waitForUnlock('${name}') timed out`)),
+              timeoutTimer = setTimeout(
+                () => fail(new Error(`waitForUnlock('${name}') timed out`)),
                 timeoutMs,
-              ).unref();
+              );
+              timeoutTimer.unref();
             }
           });
         } finally {

@@ -49,7 +49,10 @@ export class RouteRegistry {
     }
     // A handler's `paramNames` only covers params in its OWN path, not in the
     // mount prefix. `match()` zips paramNames against ALL collected values by
-    // index, so prefix params must be prepended or the values mis-align.
+    // index, so prefix params must be prepended or the values mis-align. When a
+    // handler has no explicit per-method names, derive its local names from the
+    // subtree path before prepending; relying on tree names fails when sibling
+    // subtrees with different prefix names merge onto the same param node.
     if (prefixParamNames.length > 0) {
       prependParamNames(subtree, prefixParamNames);
     }
@@ -162,28 +165,53 @@ export function ensureChildBySegment(
 }
 
 /**
- * Prepend mount-prefix param names to every handler in the subtree that already
- * carries a `paramNames` array. Handlers without `paramNames` rely on `match()`'s
- * tree-segment-name fallback, which already accounts for the prefix nodes.
+ * Give every handler the full parameter sequence. Explicit handler names take
+ * precedence for its local path; otherwise derive local names from the source
+ * subtree so merged sibling prefixes cannot leak their node's first name.
  */
-function prependParamNames(node: RouteNode, prefixNames: string[]): void {
+function prependParamNames(
+  node: RouteNode,
+  prefixNames: string[],
+  localParamNames: string[] = [],
+): void {
   if (node.methods) {
     for (const m of Object.keys(node.methods) as HttpMethod[]) {
       const handler = node.methods[m];
-      if (handler?.paramNames) {
-        handler.paramNames = [...prefixNames, ...handler.paramNames];
+      if (handler) {
+        handler.paramNames = [
+          ...prefixNames,
+          ...(handler.paramNames ?? localParamNames),
+        ];
       }
     }
   }
   for (const child of node.children.values()) {
-    prependParamNames(child, prefixNames);
+    prependParamNames(
+      child,
+      prefixNames,
+      localParamNamesForChild(child, localParamNames),
+    );
   }
   if (node.paramChild) {
-    prependParamNames(node.paramChild, prefixNames);
+    prependParamNames(
+      node.paramChild,
+      prefixNames,
+      localParamNamesForChild(node.paramChild, localParamNames),
+    );
   }
   if (node.splatChild) {
-    prependParamNames(node.splatChild, prefixNames);
+    prependParamNames(
+      node.splatChild,
+      prefixNames,
+      localParamNamesForChild(node.splatChild, localParamNames),
+    );
   }
+}
+
+function localParamNamesForChild(child: RouteNode, names: string[]): string[] {
+  return child.segment.startsWith(':') || child.segment.startsWith('*')
+    ? [...names, child.segment.slice(1)]
+    : names;
 }
 
 function mergeNode(target: RouteNode, source: RouteNode): void {

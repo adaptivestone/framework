@@ -6,6 +6,17 @@ import type { CacheDriver } from './CacheDriver.ts';
 import MemoryDriver from './drivers/MemoryDriver.ts';
 import RedisDriver from './drivers/RedisDriver.ts';
 
+function deserialize(value: string) {
+  return JSON.parse(value, (_key, item) => {
+    if (typeof item === 'string' && item.startsWith('~n:')) {
+      return BigInt(item.slice(3));
+    }
+    return typeof item === 'string' && item.startsWith('~s:')
+      ? item.slice(3)
+      : item;
+  });
+}
+
 /**
  * Resolve the configured driver. A `CacheDriver` instance may be injected
  * directly (escape hatch / tests); `'redis'` constructs the lazy redis driver
@@ -114,14 +125,7 @@ class Cache extends Base {
       let cacheHit = false;
       if (cached) {
         try {
-          parsedResult = JSON.parse(cached, (_jsonkey, value) => {
-            if (typeof value === 'string' && value.startsWith('~n:')) {
-              return BigInt(value.slice(3));
-            }
-            return typeof value === 'string' && value.startsWith('~s:')
-              ? value.slice(3)
-              : value;
-          });
+          parsedResult = deserialize(cached);
           cacheHit = true;
           this.logger?.verbose('Cache hit');
         } catch {
@@ -145,6 +149,11 @@ class Cache extends Base {
               ? `~s:${value}`
               : value,
         );
+        // Misses and hits expose the same JSON representation (including
+        // toJSON, dates, and omitted undefined properties).
+        if (serialized !== undefined) {
+          parsedResult = deserialize(serialized);
+        }
         // Skip the write when the cache is unreachable, or the value serializes
         // to `undefined` (which the redis client rejects). The write is
         // best-effort: the value is already computed, so a failed write — like a

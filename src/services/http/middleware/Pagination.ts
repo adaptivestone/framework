@@ -91,7 +91,7 @@ class Pagination extends AbstractMiddleware {
     // would bypass `maxLimit`. Then clamp to `maxLimit`.
     const requestedLimit =
       typeof req?.query?.limit === 'string'
-        ? parseInt(req.query.limit, 10)
+        ? Math.trunc(Number(req.query.limit))
         : limit;
     let effectiveLimit =
       Number.isFinite(requestedLimit) && requestedLimit > 0
@@ -102,7 +102,9 @@ class Pagination extends AbstractMiddleware {
     }
 
     const requestedPage =
-      typeof req?.query?.page === 'string' ? parseInt(req.query.page, 10) : 1;
+      typeof req?.query?.page === 'string'
+        ? Math.trunc(Number(req.query.page))
+        : 1;
     // A malformed, non-positive or absurdly large page (hundreds of digits
     // parse to Infinity) falls back to 1, so `skip` is always a safe integer.
     let page =

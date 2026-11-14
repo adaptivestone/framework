@@ -1,5 +1,7 @@
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import type { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { startTestServer, stopTestServer } from '../setupFramework.ts';
 import { configureTestServer, getTestServerURL } from '../testHelpers.ts';
 
@@ -24,11 +26,21 @@ configureTestServer({
   },
 });
 
-await startTestServer();
+const server = await startTestServer();
+const dbName = mongoose.connection.name;
+const connectionString = server.getConfig('mongo').connectionString;
+assert.ok(typeof connectionString === 'string');
+const observer = await new mongoose.mongo.MongoClient(
+  connectionString,
+).connect();
 
 const response = await fetch(getTestServerURL('/adhoc-from-boot-hook'));
 fs.writeSync(1, `ROUTE_STATUS:${response.status}\n`);
 fs.writeSync(1, `ROUTE_BODY:${JSON.stringify(await response.json())}\n`);
 
 await stopTestServer();
+const databases = await observer.db().admin().listDatabases();
+assert.ok(!databases.databases.some((database) => database.name === dbName));
+fs.writeSync(1, 'TEST_DATABASE_DROPPED\n');
+await observer.close();
 process.exit(0);

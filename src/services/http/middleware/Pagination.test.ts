@@ -42,6 +42,36 @@ describe('Pagination — relatedQueryParameters schema', () => {
     });
   });
 
+  it('uses the same scientific-notation coercion as its query schema', async () => {
+    assert.deepStrictEqual(await validateQuery({ page: '1e2', limit: '1e2' }), {
+      value: { page: 100, limit: 100 },
+    });
+    assert.deepStrictEqual(
+      await runMiddleware(
+        { limit: 10, maxLimit: 200 },
+        { page: '1e2', limit: '1e2' },
+      ),
+      { page: 100, limit: 100, skip: 9900 },
+    );
+  });
+
+  it('keeps query page and limit integral after numeric conversion', async () => {
+    assert.deepStrictEqual(
+      await runMiddleware(
+        { limit: 10, maxLimit: 200 },
+        { page: '2.9', limit: '10.9' },
+      ),
+      { page: 2, limit: 10, skip: 10 },
+    );
+    assert.deepStrictEqual(
+      await runMiddleware(
+        { limit: 10, maxLimit: 200 },
+        { page: '0.5', limit: '0.5' },
+      ),
+      { page: 1, limit: 10, skip: 0 },
+    );
+  });
+
   it('skips empty/undefined/null params', async () => {
     assert.deepStrictEqual(
       await validateQuery({ page: '', limit: undefined }),

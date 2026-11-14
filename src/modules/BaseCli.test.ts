@@ -5,7 +5,6 @@ import Transport from 'winston-transport';
 import {
   assertCalledTimes,
   assertCalledWith,
-  assertTextMatch,
   pattern,
 } from '../tests/assertions.ts';
 import { mockImplementation, mockResolvedValue } from '../tests/mocks.ts';
@@ -159,19 +158,42 @@ describe('BaseCli model-aware command lifecycle', () => {
       undefined,
     );
     mockImplementation(mock.method(console, 'info'), () => {});
-    process.argv = ['node', 'cli.ts', 'modelcmd'];
+    const secret =
+      'long-unsalted-password-that-used-to-affect-the-mongo-app-name';
+    process.argv = [
+      'node',
+      'cli.ts',
+      'modelcmd',
+      '--password',
+      secret,
+      '--label',
+      'x',
+    ];
 
     delete process.env.MONGO_APP_NAME;
     await assert.strictEqual(await cli.run('modelcmd'), true);
-    assert.ok(process.env.MONGO_APP_NAME);
-    assertTextMatch(process.env.MONGO_APP_NAME, /^CLI: modelcmd /);
+    const mongoAppName = String(process.env.MONGO_APP_NAME);
+    assert.strictEqual(
+      mongoAppName,
+      'CLI: modelcmd {"password":"[REDACTED]","label":"x"}',
+    );
+    assert.ok(!mongoAppName.includes(secret));
+
+    process.argv = ['node', 'cli.ts', 'modelcmd', '--token'];
+    delete process.env.MONGO_APP_NAME;
+    await assert.strictEqual(await cli.run('modelcmd'), true);
+    assert.strictEqual(
+      process.env.MONGO_APP_NAME,
+      'CLI: modelcmd {"token":true}',
+    );
 
     process.env.MONGO_APP_NAME = 'operator-supplied-name';
+    process.argv = ['node', 'cli.ts', 'modelcmd', '--password', secret];
     await assert.strictEqual(await cli.run('modelcmd'), true);
 
     assert.strictEqual(process.env.MONGO_APP_NAME, 'operator-supplied-name');
-    assertCalledTimes(getModelPaths, 2);
-    assertCalledTimes(initAllModels, 2);
+    assertCalledTimes(getModelPaths, 3);
+    assertCalledTimes(initAllModels, 3);
     assertCalledWith(initAllModels, { waitForConnection: true });
   });
 });

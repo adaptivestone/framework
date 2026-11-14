@@ -16,38 +16,43 @@ import type { CacheDriver } from '../CacheDriver.ts';
 class RedisDriver implements CacheDriver {
   whenReady: Promise<void>;
 
-  #getRedisClient!: () => Promise<RedisClientType>;
+  #getRedisClientSync!: () => RedisClientType;
 
   constructor() {
     this.whenReady = this.#init();
   }
 
   async #init(): Promise<void> {
-    // Only the dynamic import is awaited — not a connect. `getRedisClient`
-    // connects (single-flight) on first use; awaiting a connect here would hang
-    // when redis is down (node-redis retries with backoff), and the Cache
-    // orchestrator already degrades fail-soft if the backend is unreachable.
-    const { getRedisClient } = await import(
+    // Connect in the background; node-redis retries indefinitely when down.
+    const { getRedisClientSync } = await import(
       '../../../helpers/redis/redisConnection.ts'
     );
-    this.#getRedisClient = getRedisClient;
+    this.#getRedisClientSync = getRedisClientSync;
+  }
+
+  #readyClient(): RedisClientType {
+    const client = this.#getRedisClientSync();
+    if (!client.isReady) {
+      throw new Error('Redis cache is not ready');
+    }
+    return client;
   }
 
   async get(key: string): Promise<string | null> {
     await this.whenReady;
-    const client = await this.#getRedisClient();
+    const client = this.#readyClient();
     return client.get(key);
   }
 
   async set(key: string, value: string, ttlSeconds: number): Promise<void> {
     await this.whenReady;
-    const client = await this.#getRedisClient();
-    await client.set(key, value, { EX: ttlSeconds });
+    const client = this.#readyClient();
+    await client.set(key, value, { PX: Math.ceil(ttlSeconds * 1000) });
   }
 
   async del(key: string): Promise<number> {
     await this.whenReady;
-    const client = await this.#getRedisClient();
+    const client = this.#readyClient();
     return client.del(key);
   }
 }

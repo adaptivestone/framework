@@ -275,6 +275,34 @@ d\r
       }
     });
 
+    it('uses maxFileSize for octet-stream instead of maxFieldsSize', async () => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'rp-octetstream-'));
+      try {
+        const binary = 'binary upload larger than the field limit';
+        const { status, body } = await postToParser({
+          body: binary,
+          contentType: 'application/octet-stream',
+          params: {
+            maxFileSize: 128,
+            maxTotalFileSize: 128,
+            maxFieldsSize: 8,
+            uploadDir: dir,
+          },
+        });
+
+        assert.strictEqual(status, 200);
+        const fileValue = body.file as
+          | { size: number; filepath: string }
+          | { size: number; filepath: string }[];
+        const file = Array.isArray(fileValue) ? fileValue[0] : fileValue;
+        assert.ok(file);
+        assert.strictEqual(file.size, Buffer.byteLength(binary));
+        await waitFor(() => readdirSync(dir).length === 0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
     it('normalizes a single urlencoded field to a scalar (fixes GetUserByToken)', async () => {
       const { body } = await postToParser({
         body: 'token=abc',

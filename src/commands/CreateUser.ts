@@ -25,6 +25,7 @@ class CreateUser extends AbstractCommand {
       password: {
         type: 'string',
         description: 'New password for user',
+        sensitive: true,
       },
       roles: {
         type: 'string',

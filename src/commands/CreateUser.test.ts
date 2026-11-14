@@ -23,6 +23,10 @@ class CaptureTransport extends Transport {
 }
 
 describe('CreateUser command (doc 20)', () => {
+  it('marks its password option as sensitive for CLI diagnostics', () => {
+    assert.strictEqual(CreateUser.commandArguments.password.sensitive, true);
+  });
+
   it('logs the email but not the password hash or session tokens', async () => {
     const email = 'createusertest@example.com';
     const captured: string[] = [];

@@ -44,6 +44,17 @@ describe('crypto failure guards', () => {
       { valid: false, needsRehash: false },
     );
   });
+
+  it('rejects v2 hashes whose decoded digest is not the expected length', async () => {
+    assert.deepStrictEqual(
+      await verifyPassword('any password', 'v2:scrypt:ln=10,r=8,p=1:c2FsdA:'),
+      { valid: false, needsRehash: false },
+    );
+    assert.deepStrictEqual(
+      await verifyPassword('any password', 'v2:scrypt:ln=10,r=8,p=1:c2FsdA:AA'),
+      { valid: false, needsRehash: false },
+    );
+  });
 });
 
 describe('hashSecret / verifySecret', () => {

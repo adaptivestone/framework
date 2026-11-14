@@ -15,7 +15,7 @@ interface FakeWorker {
 
 type ExitListener = (
   worker: FakeWorker,
-  code: number,
+  code: number | null,
   signal: string | null,
 ) => void;
 
@@ -86,7 +86,7 @@ function worker(id: number): FakeWorker {
 
 function emitExit(
   value: FakeWorker,
-  code: number,
+  code: number | null,
   signal: NodeJS.Signals | null = null,
 ): void {
   clusterState.workers.delete(value.id);
@@ -241,6 +241,17 @@ describe('runCluster', () => {
     await done;
 
     assert.strictEqual(clusterState.nextWorkerId, 3);
+    assert.strictEqual(process.exitCode, 0);
+  });
+
+  it('treats a signal-terminated worker with no exit code as clean shutdown', async () => {
+    const done = runCluster(mock.fn(), { workers: 1, ...events() });
+    const value = worker(1);
+
+    emitSignal('SIGTERM');
+    emitExit(value, null, 'SIGTERM');
+    await done;
+
     assert.strictEqual(process.exitCode, 0);
   });
 

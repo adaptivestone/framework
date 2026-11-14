@@ -142,15 +142,14 @@ export function startTestServer(): Promise<Server> {
 
 /** Shut down the server, drop its database, and disconnect mongoose. */
 export async function stopTestServer(): Promise<void> {
-  if (serverInstance) {
-    serverInstance.app.httpServer?.shutdown();
-    serverInstance.app.events.emit('shutdown');
-  }
+  await serverInstance?.app.httpServer?.shutdown();
   try {
     await mongoose.connection.db?.dropDatabase(); // clean database after test
   } catch {
     // that ok. No mongoose connection
   }
+  // Model shutdown listeners close the connection synchronously; drop first.
+  serverInstance?.app.events.emit('shutdown');
   await mongoose.disconnect();
 }
 

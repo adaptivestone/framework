@@ -316,6 +316,51 @@ describe('RouteRegistry — registerSubtree', () => {
     );
   });
 
+  it('keeps distinct mount parameter names after sibling subtrees merge', () => {
+    const r = new RouteRegistry();
+    const makeSubtree = (): RouteNode => ({
+      segment: '',
+      middlewares: [],
+      children: new Map(),
+      methods: { GET: { handler: noop } },
+    });
+
+    // The matcher stores one param node at each position. The second mount's
+    // handler must retain its own prefix name instead of falling back to the
+    // first subtree's `:accountId` segment name.
+    r.registerSubtree('/:accountId/a', makeSubtree());
+    r.registerSubtree('/:tenantId/b', makeSubtree());
+
+    assert.deepStrictEqual(r.match('GET', '/acme/a')?.params, {
+      accountId: 'acme',
+    });
+    assert.deepStrictEqual(r.match('GET', '/acme/b')?.params, {
+      tenantId: 'acme',
+    });
+  });
+
+  it('keeps subtree param names when a mounted handler has no explicit names', () => {
+    const r = new RouteRegistry();
+    const subtree: RouteNode = {
+      segment: '',
+      middlewares: [],
+      children: new Map(),
+      paramChild: {
+        segment: ':recordId',
+        middlewares: [],
+        children: new Map(),
+        methods: { GET: { handler: noop } },
+      },
+    };
+
+    r.registerSubtree('/:tenantId', subtree);
+
+    assert.deepStrictEqual(r.match('GET', '/acme/42')?.params, {
+      tenantId: 'acme',
+      recordId: '42',
+    });
+  });
+
   it('merges splat subtrees and ignores sparse method entries', () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/api/*rest', { handler: noop });

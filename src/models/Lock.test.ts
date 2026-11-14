@@ -166,6 +166,38 @@ describe('Lock Model', () => {
       await assert.strictEqual(await Lock.waitForUnlock(name), undefined);
     });
 
+    it('resolves when the stored lock has expired but the TTL reaper has not removed it', {
+      timeout: 3000,
+    }, async () => {
+      const name = 'expired-wait-lock';
+      await Lock.create({ _id: name, expiredAt: new Date(Date.now() - 1000) });
+
+      try {
+        await assert.strictEqual(
+          await Lock.waitForUnlock(name, 500),
+          undefined,
+        );
+      } finally {
+        await Lock.deleteOne({ _id: name });
+      }
+    });
+
+    it('resolves at a live lock expiry without waiting for the TTL reaper', {
+      timeout: 4000,
+    }, async () => {
+      const name = 'expires-during-wait-lock';
+      await Lock.acquireLock(name, 1);
+
+      try {
+        await assert.strictEqual(
+          await Lock.waitForUnlock(name, 3000),
+          undefined,
+        );
+      } finally {
+        await Lock.deleteOne({ _id: name });
+      }
+    });
+
     it('observes a delete landing in the existence-check → stream-open window', {
       timeout: 3000,
     }, async () => {
@@ -180,7 +212,10 @@ describe('Lock Model', () => {
       // the existence check only after the stream is live, so the delete is
       // observed and the promise resolves.
       const spy = mockImplementationOnce(mock.method(Lock, 'findOne'), (() =>
-        Lock.releaseLock(name).then(() => ({ _id: name }))) as never);
+        Lock.releaseLock(name).then(() => ({
+          _id: name,
+          expiredAt: new Date(Date.now() + 10_000),
+        }))) as never);
 
       try {
         await assert.strictEqual(await Lock.waitForUnlock(name), true);

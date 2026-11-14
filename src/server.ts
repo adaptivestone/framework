@@ -130,6 +130,7 @@ try {
 // but be defensive). Tests skip registration because the runner owns process
 // signals and each test file gets an isolated module graph.
 let signalHandlersRegistered = false;
+const CRASH_SENTRY_FLUSH_TIMEOUT_MS = 2_000;
 
 /**
  * Main framework class.
@@ -309,11 +310,17 @@ class Server {
       return;
     }
     signalHandlersRegistered = true;
+    let shutdownStarted = false;
 
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-      // `once`: a second Ctrl-C falls through to Node's default (immediate
-      // termination) instead of being swallowed.
-      process.once(signal, async () => {
+      // Keep the handler installed while shutdown runs. In a cluster, an
+      // orchestrator may signal the whole process group and the primary may
+      // also forward that signal to this worker. Later deliveries are harmless.
+      process.on(signal, async () => {
+        if (shutdownStarted) {
+          return;
+        }
+        shutdownStarted = true;
         this.app.logger.info(`${signal} received — shutting down`);
         // Force-exit safety net: fires only if draining or a teardown hook
         // hangs past 10s. Unref'd, so it never keeps the process alive on its
@@ -336,6 +343,12 @@ class Server {
         // leaked handle is force-killed (code 1) by the timer above.
         this.app.events.emit('shutdown');
         process.exitCode = 0;
+        // A cluster worker's IPC channel is itself a live handle. Close it
+        // after HTTP has drained and teardown has started so the primary can
+        // observe the worker's clean exit without waiting for the force timer.
+        if (process.connected) {
+          process.disconnect?.();
+        }
       });
     }
   }
@@ -717,6 +730,7 @@ class Server {
    * Add error logging on promise reject
    */
   addErrorHandling(): void {
+    let crashExitStarted = false;
     process.on('uncaughtException', (e) => {
       this.app.logger.error('uncaughtException', e);
       // After an uncaught exception the process state is undefined — a
@@ -724,12 +738,37 @@ class Server {
       // cleanly, whereas one that keeps serving from a corrupted state is not.
       // (Skipped in tests so a stray assertion failure doesn't kill the run.)
       if (!process.env.FRAMEWORK_TEST) {
-        process.exit(1);
+        if (crashExitStarted) {
+          return;
+        }
+        crashExitStarted = true;
+        this.#flushSentryThenExit();
       }
     });
     process.on('unhandledRejection', (e) => {
       this.app.logger.error('unhandledRejection', e);
     });
+  }
+
+  /** Flush Sentry on an unrecoverable crash, but keep the crash path bounded. */
+  #flushSentryThenExit(): void {
+    const forceExit = setTimeout(
+      () => process.exit(1),
+      CRASH_SENTRY_FLUSH_TIMEOUT_MS,
+    );
+    void (async () => {
+      try {
+        // Sentry is an optional peer and is initialized by the consumer. The
+        // dynamic import keeps it out of ordinary framework startup.
+        const Sentry = await import('@sentry/node');
+        await Sentry.flush(CRASH_SENTRY_FLUSH_TIMEOUT_MS - 100);
+      } catch {
+        // Missing or uninitialized Sentry must not prevent the crash exit.
+      } finally {
+        clearTimeout(forceExit);
+        process.exit(1);
+      }
+    })();
   }
 
   /**
@@ -824,7 +863,7 @@ class Server {
           );
         } else if (log.transport === 'sentry') {
           // Special handling for Sentry - load our wrapper
-          import('./services/logging/SentryTransport.js')
+          import('./services/logging/SentryTransport.ts')
             .then((Tr) => {
               const Transport = Tr.default;
               logger.add(new Transport(log.transportOptions));
@@ -901,6 +940,15 @@ class Server {
    * @param {String} modelName name on config file to load
    */
   getModel(modelName: string): AppModel | false {
+    if (!this.#isInited) {
+      // The application logger is config-backed and cannot be constructed
+      // before init. Keep this diagnostic useful without triggering a second,
+      // misleading getConfig-before-init error while trying to log it.
+      console.error(
+        '[Framework] You should call Server.init() before using getModel',
+      );
+      return false;
+    }
     // Once per name: `getModel` runs per request, and a legitimate singular
     // ending in `s` (`Address`, `Status`) would otherwise warn on every call.
     if (modelName.endsWith('s') && !this.#pluralWarned.has(modelName)) {
@@ -908,12 +956,6 @@ class Server {
       this.app.logger.warn(
         `Probably your model name '${modelName}' in plural from. Try to avoid plural form`,
       );
-    }
-    if (!this.#isInited) {
-      this.app.logger.error(
-        new Error('You should call Server.init() before using getModel'),
-      );
-      return false;
     }
     const model = this.cache.models.get(modelName);
     if (!model) {
