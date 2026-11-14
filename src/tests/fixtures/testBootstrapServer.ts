@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { setTimeout } from 'node:timers/promises';
 import type { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { startTestServer, stopTestServer } from '../setupFramework.ts';
@@ -38,7 +39,24 @@ const response = await fetch(getTestServerURL('/adhoc-from-boot-hook'));
 fs.writeSync(1, `ROUTE_STATUS:${response.status}\n`);
 fs.writeSync(1, `ROUTE_BODY:${JSON.stringify(await response.json())}\n`);
 
+// A model compiled right before teardown creates its collection in the
+// background. The build is slowed so it is still running when teardown starts;
+// it must not recreate the database after the drop.
+const LateModel = mongoose.model(
+  'TeardownLateModel',
+  new mongoose.Schema({ name: String }),
+);
+const createCollection = LateModel.createCollection.bind(LateModel);
+LateModel.createCollection = (async () => {
+  await setTimeout(1000);
+  return createCollection();
+}) as typeof LateModel.createCollection;
+// `init()` returns the compile-time build; closing the connection resets it.
+const lateBuild = LateModel.init();
 await stopTestServer();
+const [build] = await Promise.allSettled([lateBuild]);
+// Teardown waited for the build; otherwise it times out on the closed connection.
+assert.strictEqual(build.status, 'fulfilled');
 const databases = await observer.db().admin().listDatabases();
 assert.ok(!databases.databases.some((database) => database.name === dbName));
 fs.writeSync(1, 'TEST_DATABASE_DROPPED\n');

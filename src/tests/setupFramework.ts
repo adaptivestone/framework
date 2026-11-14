@@ -140,17 +140,28 @@ export function startTestServer(): Promise<Server> {
   return ensureTestServerReady();
 }
 
-/** Shut down the server, drop its database, and disconnect mongoose. */
+/**
+ * Shut down the server, drop its database, and disconnect mongoose. A failed
+ * drop is rethrown after the connection is closed.
+ */
 export async function stopTestServer(): Promise<void> {
   await serverInstance?.app.httpServer?.shutdown();
   try {
-    await mongoose.connection.db?.dropDatabase(); // clean database after test
-  } catch {
-    // that ok. No mongoose connection
+    if (
+      mongoose.connection.readyState === mongoose.ConnectionStates.connected
+    ) {
+      // Compiled models create their collections in the background. A build
+      // still running after the drop would recreate the database.
+      await Promise.allSettled(
+        Object.values(mongoose.connection.models).map((model) => model.init()),
+      );
+      await mongoose.connection.dropDatabase();
+    }
+  } finally {
+    // Model shutdown listeners close the connection synchronously; drop first.
+    serverInstance?.app.events.emit('shutdown');
+    await mongoose.disconnect();
   }
-  // Model shutdown listeners close the connection synchronously; drop first.
-  serverInstance?.app.events.emit('shutdown');
-  await mongoose.disconnect();
 }
 
 // ── Per-test redis namespace isolation ──────────────────────────────────────
