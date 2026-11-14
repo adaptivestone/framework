@@ -39,5 +39,13 @@ export default {
     maxFiles: 10,
     maxFields: 1000,
     maxFieldsSize: 2 * 1024 * 1024, // 2 MB of field data / JSON / urlencoded body
+    // Media types parsed as 'json' or 'urlencoded' in addition to
+    // `application/json`, any `+json` type and
+    // `application/x-www-form-urlencoded`. Keep these entries when you copy
+    // this file into your app.
+    mediaTypes: {
+      // Browsers send CSP `report-uri` violation reports as JSON.
+      'application/csp-report': 'json',
+    } as Record<string, 'json' | 'urlencoded'>,
   },
 };

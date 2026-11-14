@@ -1,4 +1,5 @@
 import { unlink } from 'node:fs/promises';
+import type { IncomingHttpHeaders } from 'node:http';
 import type { NextFunction, Response } from 'express';
 import formidable, {
   json,
@@ -11,10 +12,64 @@ import { normalizeContentType } from '../../validate/contentType.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
+/** Built-in body formats that other media types can be parsed as. */
+export type RequestBodyFormat = 'json' | 'urlencoded';
+
+const bodyFormats = {
+  json: { plugin: json, mediaType: 'application/json' },
+  urlencoded: {
+    plugin: querystring,
+    mediaType: 'application/x-www-form-urlencoded',
+  },
+} as const;
+
+/**
+ * The body format `config.http.requestParser.mediaTypes` assigns to a media
+ * type. Keys match case-insensitively; unknown formats are ignored.
+ */
+function findBodyFormat(
+  mediaType: string | null,
+  mediaTypes: unknown,
+): (typeof bodyFormats)[RequestBodyFormat] | undefined {
+  if (!mediaType || typeof mediaTypes !== 'object' || mediaTypes === null) {
+    return undefined;
+  }
+  let format: unknown;
+  for (const [key, value] of Object.entries(mediaTypes)) {
+    if (key.toLowerCase() === mediaType) {
+      format = value;
+    }
+  }
+  return typeof format === 'string' && Object.hasOwn(bodyFormats, format)
+    ? bodyFormats[format as RequestBodyFormat]
+    : undefined;
+}
+
+/**
+ * Formidable's plugins check the `Content-Type` header themselves. Show the
+ * plugin its own media type so a mapped type reaches that parser.
+ */
+function asMediaType(
+  plugin: formidable.PluginFunction,
+  mediaType: string,
+): formidable.PluginFunction {
+  return (form, options) => {
+    const target = form as unknown as { headers: IncomingHttpHeaders };
+    const { headers } = target;
+    target.headers = { ...headers, 'content-type': mediaType };
+    try {
+      plugin(form, options);
+    } finally {
+      target.headers = headers;
+    }
+  };
+}
+
 /**
  * Parses multipart / urlencoded / json request bodies (via formidable) into
  * `req.body`. Size and count limits come from `config.http.requestParser`
- * (explicit per-mount params override them). Spooled upload temp files are
+ * (explicit per-mount params override them), and so do extra media types to
+ * parse as JSON or urlencoded (`mediaTypes`). Spooled upload temp files are
  * unlinked once the response finishes — a handler that needs to keep an upload
  * MUST move or copy it (e.g. `fs.rename`) before responding.
  */
@@ -29,22 +84,30 @@ class RequestParser extends AbstractMiddleware {
 
     const { requestParser } = this.app.getConfig('http') as typeof ThttpConfig;
     // Config defaults bound unauthenticated uploads; explicit per-mount params win.
-    const parserOptions = { ...requestParser, ...this.params };
+    const { mediaTypes, ...parserOptions } = {
+      ...requestParser,
+      ...this.params,
+    } as typeof requestParser & { mediaTypes?: unknown };
     const mediaType = normalizeContentType(req.headers?.['content-type']);
+    const mapped = findBodyFormat(mediaType, mediaTypes);
     const isMultipart =
-      mediaType === 'multipart/form-data' || mediaType === 'multipart/related';
-    const isOctetStream = mediaType === 'application/octet-stream';
+      !mapped &&
+      (mediaType === 'multipart/form-data' ||
+        mediaType === 'multipart/related');
+    const isOctetStream = !mapped && mediaType === 'application/octet-stream';
     // Formidable's default plugins inspect the entire header. Select one for
     // known media types so parameter text cannot switch the parser.
-    const plugin = isMultipart
-      ? multipart
-      : mediaType === 'application/json' || mediaType?.endsWith('+json')
-        ? json
-        : mediaType === 'application/x-www-form-urlencoded'
-          ? querystring
-          : isOctetStream
-            ? octetstream
-            : undefined;
+    const plugin = mapped
+      ? asMediaType(mapped.plugin, mapped.mediaType)
+      : isMultipart
+        ? multipart
+        : mediaType === 'application/json' || mediaType?.endsWith('+json')
+          ? json
+          : mediaType === 'application/x-www-form-urlencoded'
+            ? querystring
+            : isOctetStream
+              ? octetstream
+              : undefined;
     const form = formidable({
       ...parserOptions,
       ...(plugin ? { enabledPlugins: [plugin] } : {}),

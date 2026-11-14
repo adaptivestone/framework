@@ -510,6 +510,60 @@ describe('request parser media-type isolation', () => {
     }
   });
 
+  it('parses CSP violation reports as JSON (default config)', async () => {
+    const report = { 'csp-report': { 'blocked-uri': 'inline' } };
+    const result = await postToParser({
+      body: JSON.stringify(report),
+      contentType: 'Application/CSP-Report; charset=utf-8',
+    });
+    assert.strictEqual(result.status, 200);
+    assert.deepStrictEqual(result.body, report);
+  });
+
+  it('parses media types mapped in mediaTypes', async () => {
+    const json = await postToParser({
+      body: '{"ok":true}',
+      contentType: 'application/x-amz-json-1.1',
+      params: { mediaTypes: { 'Application/X-Amz-Json-1.1': 'json' } },
+    });
+    assert.deepStrictEqual(json, { status: 200, body: { ok: true } });
+
+    const urlencoded = await postToParser({
+      body: 'token=abc&tags=a&tags=b',
+      contentType: 'application/x-legacy-form; note=json',
+      params: { mediaTypes: { 'application/x-legacy-form': 'urlencoded' } },
+    });
+    assert.deepStrictEqual(urlencoded, {
+      status: 200,
+      body: { token: 'abc', tags: ['a', 'b'] },
+    });
+  });
+
+  it('bounds mapped JSON with maxFieldsSize', async () => {
+    const result = await postToParser({
+      body: JSON.stringify({ value: 'x'.repeat(100) }),
+      contentType: 'application/csp-report',
+      params: { maxFieldsSize: 32 },
+    });
+    assert.strictEqual(result.status, 413);
+  });
+
+  it('parses only the media types listed in mediaTypes', async () => {
+    for (const [contentType, mediaTypes] of [
+      ['application/csp-report', {}],
+      ['application/x-custom', { 'application/x-custom': 'xml' }],
+      ['constructor', {}],
+      ['__proto__', {}],
+    ] as const) {
+      const result = await postToParser({
+        body: '{"ok":true}',
+        contentType,
+        params: { mediaTypes },
+      });
+      assert.strictEqual(result.status, 400, contentType);
+    }
+  });
+
   it('keeps multipart boundaries containing json on the multipart parser', async () => {
     const result = await postToParser({
       body: multipartBody.replaceAll(boundary, 'boundary-json'),
