@@ -122,3 +122,131 @@ Our pieces already change the trade-offs:
   Router / SvelteKit choice), so outer middleware still run for errors.
 - During 5.x, handlers that write `res` themselves produce no response value; response-side
   middleware cannot see or change those responses (same limit as `transformResponse`).
+
+## How option B walks (onion with safe defaults)
+
+Route `POST /orders`, chain `Timing → GetUserByToken → Role → RateLimiter`, then validation and
+the handler. Only `Timing` calls `next()`; the others are request-only and never mention it.
+
+```
+                 IN (request)                              OUT (response)
+                 ────────────                              ──────────────
+ Timing          t0 = now()  ── await next() ──┐   ┌──►  log status + (now - t0)
+                                               │   │      return response
+ GetUserByToken  ctx.appInfo.user = …          │   │     (no OUT part: never called next)
+ Role            user has role? yes → continue │   │     (no OUT part)
+ RateLimiter     budget left?   yes → continue │   │     (no OUT part)
+ validation      body ok?       yes            │   │
+ handler         ──────────────────────────────┴──►  return HttpResponse.json(201, order)
+```
+
+A request-only middleware (Role) is written exactly as today, minus `res` and `next`:
+
+```ts
+class Role extends AbstractMiddleware {
+  async middleware(ctx) {
+    if (!ctx.appInfo.user) throw new UnauthorizedError();
+    if (!this.allows(ctx.appInfo.user)) throw new ForbiddenError();
+    // return nothing → the chain continues
+  }
+}
+```
+
+Only a middleware that needs the response asks for it:
+
+```ts
+class Timing extends AbstractMiddleware {
+  async middleware(ctx, next) {
+    const t0 = performance.now();
+    const response = await next(); //       everything further in runs here
+    ctx.logger.info(
+      `${ctx.method} ${ctx.route} ${response.status} ${performance.now() - t0}ms`,
+    );
+    return response; //                     or a new HttpResponse with an extra header
+  }
+}
+```
+
+### Edge cases
+
+Role denies — the walk turns around at Role; layers that called `next()` still see the response:
+
+```
+ Timing        t0 ── await next() ──┐   ┌──►  logs 403 + time
+ GetUser       set user             │   │
+ Role          throw Forbidden ─────┴─► registry → HttpResponse 403
+ RateLimiter   (not run)
+ handler       (not run)
+```
+
+The handler throws — `next()` never throws; the error registry turns it into a response and the
+original error is on `ctx.error`:
+
+```
+ Timing     t0 ── await next() ──┐   ┌──►  sees 404 (ctx.error = NotFoundError), logs, returns it
+ …                               │   │
+ handler    throw NotFoundError ─┴─► registry → HttpResponse 404
+```
+
+Streaming — the OUT part sees the stream response **before** the first byte, so headers can still
+be added; the time measured is "until the handler answered". For "until the last byte", use
+`ctx.onFinish(cb)`:
+
+```
+ Timing   t0 ── next() ──┐   ┌──► add header, return ──► writer sends headers + chunks … last byte
+                         │   │                                                    └─► onFinish
+ handler  return HttpResponse.stream(…) ┘
+```
+
+Legacy handler in 5.x writes `res` itself — there is no response value; `next()` resolves to
+`undefined` and the bytes are already sent, so the OUT part can only log:
+
+```
+ Timing   t0 ── next() ──┐   ┌──► response === undefined → log only
+ handler  res.json(...) ─┘   (already on the wire)
+```
+
+Mistakes the runner absorbs:
+
+| Mistake                                               | What happens                                         |
+| ----------------------------------------------------- | ---------------------------------------------------- |
+| Returns nothing and never calls `next` (request-only) | continue — this is the normal case                   |
+| `await next()` but forgets `return`                   | the downstream response is passed on                 |
+| `next()` without `await`, returns nothing             | the runner waits for it and passes it on             |
+| Returns an object that is not an `HttpResponse`       | ignored (continue) — only the branded value stops    |
+| Calls `next()` twice                                  | throws at the second call                            |
+| Throws in the OUT part                                | the registry turns it into the response that is sent |
+
+### Runner sketch (all of the above)
+
+```ts
+async function run(ctx, chain, i): Promise<HttpResponse | undefined> {
+  if (i === chain.length) return runHandler(ctx); //      validation + handler + registry
+  let downstream: Promise<HttpResponse | undefined> | undefined;
+  const next = () => {
+    if (downstream) throw new Error('next() called twice');
+    downstream = run(ctx, chain, i + 1);
+    return downstream;
+  };
+  let result: unknown;
+  try {
+    result = await chain[i].middleware(ctx, next);
+  } catch (err) {
+    return resolveError(ctx, err); //                     never throws outward
+  }
+  if (HttpResponse.is(result)) return result; //          stop, or replace downstream's response
+  return downstream ?? run(ctx, chain, i + 1); //         forgot return / didn't call next
+}
+```
+
+### What it gives us
+
+- **Request → response timing per route** in one middleware (logging, the P1s metrics seam).
+- **Tracing**: start a span on the way in, end it with the status on the way out (P2b).
+- **Headers that depend on the result**: `Cache-Control`/`ETag` only on 200, deprecation headers,
+  request id on every response.
+- **Cache / idempotency**: on the way in return a stored response (short-circuit); on the way out
+  store the new one.
+- **Work around the handler**: `try/finally` (release a lock, commit or roll back a transaction,
+  refresh a session cookie only when the handler succeeded).
+- Request-only middleware (auth, roles, rate limits, i18n, pagination) stay as simple as today.
