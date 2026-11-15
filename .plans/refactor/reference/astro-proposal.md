@@ -7,6 +7,11 @@
 adapter and can be removed. Native transport/validation capabilities are future compatibility
 considerations. This document contains research and proposed contracts, not runtime changes.
 
+**Review handoff (2026-11-01):** the owner requested this document and its concrete
+[onion/H API comparison](#api-comparison-for-review-auth-als-and-completion-logging) be recorded
+for Opus review. The author's recommended candidate is strict onion. D2.1 remains open pending
+review and the owner's final decision; this handoff does not authorize implementation.
+
 This revisits [D1/D2.1](../queued/async-middleware.md), the
 [existing options](middleware-design-proposals.md), and the
 [native engine spike](../queued/http-engine-spike.md). The owner now permits explicit
@@ -185,6 +190,208 @@ During v5, the bridge needs an explicit internal completed/aborted/legacy outcom
 bridge-specific return type. Full response inspection and transaction guarantees apply to the
 descriptor path; writing directly to `res` cannot be rolled back by outer middleware. Settle this
 bridge before publishing a v2 type that consumers are expected to keep unchanged in v6.
+
+## API comparison for review: Auth, ALS and completion logging
+
+These are alternative v2 API sketches with the same behavior, not runnable examples of today's
+Express-based `AbstractMiddleware`. Framework imports and unchanged static metadata are omitted.
+Keep Auth's `requiresAuth` and `provides` metadata so route-local user inference survives. In these
+examples `RequestContext.appInfo.user` is optional until Auth succeeds; `GetUserByToken` populates
+it first. Both models use the existing `HttpResponse` factories and error registry.
+
+Shared types and application-owned storage:
+
+```ts
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+type ResponseResult = HttpResponse | Promise<HttpResponse>;
+type Next = () => Promise<HttpResponse>;
+type StepResult = void | HttpResponse | Promise<void | HttpResponse>;
+
+type AuthenticatedContext = RequestContext & {
+  appInfo: { user: AppUser };
+};
+
+// One storage instance per module; each invocation supplies its own value.
+export const currentUser = new AsyncLocalStorage<AppUser>();
+```
+
+### Auth
+
+Strict onion explicitly delegates after a successful check:
+
+```ts
+class Auth {
+  middleware(ctx: RequestContext, next: Next): ResponseResult {
+    if (!ctx.appInfo.user) {
+      throw new UnauthorizedError({
+        code: 'AUTH001',
+        message: 'Please login to application',
+        i18nKey: 'middleware.auth.notLoggedIn',
+      });
+    }
+
+    return next();
+  }
+}
+```
+
+H continues after an ordinary step returns without a response:
+
+```ts
+class Auth {
+  middleware(ctx: RequestContext): StepResult {
+    if (!ctx.appInfo.user) {
+      throw new UnauthorizedError({
+        code: 'AUTH001',
+        message: 'Please login to application',
+        i18nKey: 'middleware.auth.notLoggedIn',
+      });
+    }
+  }
+}
+```
+
+Neither method needs `async` because the check does not await anything. If a middleware needs
+async preparation, add `async` and await that work; the continuation rule remains the same.
+Throwing stops downstream execution and unwinds wrappers before registry resolution. Alternatively,
+both models can short-circuit by returning a descriptor:
+
+```ts
+return HttpResponse.json(403, { error: 'ACCESS_DENIED' });
+```
+
+No later middleware or handler runs on that path. The writer sends the response after preparation.
+
+### Application-owned AsyncLocalStorage
+
+Put UserScope after Auth. Strict onion uses the same method as ordinary middleware:
+
+```ts
+class UserScope {
+  middleware(ctx: AuthenticatedContext, next: Next): ResponseResult {
+    return currentUser.run(ctx.appInfo.user, next);
+  }
+}
+```
+
+H marks this as wrapping behavior with `around`:
+
+```ts
+class UserScope {
+  around(ctx: AuthenticatedContext, next: Next): ResponseResult {
+    return currentUser.run(ctx.appInfo.user, next);
+  }
+}
+```
+
+For H, a class has exactly one execution method: `middleware` or `around`; `around` uses the strict
+continuation rules. The scope in both examples covers all later middleware, the handler and async
+work created inside them. Deep services can read the current request's user after awaiting:
+
+```ts
+async function businessOperation() {
+  await someAsyncOperation();
+  const user = currentUser.getStore();
+  // The user belonging to this request's scope.
+}
+```
+
+There is no manual per-request `disable()` or store clearing. Separate async operations retain
+their inherited context for their own lifetime. Deferred writer/completion callbacks do not
+automatically inherit this middleware-owned scope; capture needed values explicitly or use the
+documented context-binding policy. A resource lifetime, such as a database transaction, still
+needs explicit cleanup and must not be assumed to last through lazy stream consumption.
+
+### Logging after the response finishes
+
+Both models use the same proposed completion callback. For these sketches its payload is
+`{ outcome: 'finished' | 'aborted' | 'failed', status?: number, durationMs: number }`; the framework
+measures the duration from request entry. Exact public naming remains reviewable. `ctx.logger`
+denotes the proposed context logger with structured fields.
+
+Strict onion:
+
+```ts
+class RequestLogger {
+  middleware(ctx: RequestContext, next: Next): ResponseResult {
+    ctx.onFinish(({ outcome, status, durationMs }) => {
+      ctx.logger.info('HTTP request completed', {
+        method: ctx.method,
+        path: ctx.path,
+        outcome,
+        status,
+        durationMs,
+      });
+    });
+
+    return next();
+  }
+}
+```
+
+H:
+
+```ts
+class RequestLogger {
+  middleware(ctx: RequestContext): StepResult {
+    ctx.onFinish(({ outcome, status, durationMs }) => {
+      ctx.logger.info('HTTP request completed', {
+        method: ctx.method,
+        path: ctx.path,
+        outcome,
+        status,
+        durationMs,
+      });
+    });
+  }
+}
+```
+
+Register the callback before delegating, so an early failure or disconnect is observable. Put the
+logger before Auth; for complete HTTP logging register it at request entry, before routing/parsing,
+so it also covers 404s and parsing failures. Example route order after global setup:
+`GetUserByToken → Auth → UserScope → handler`.
+
+Code after `await next()` sees the returned descriptor, before the writer consumes a lazy body.
+It therefore cannot replace `onFinish` for delivery logging. Completion is server-side finish,
+abort or failure, not proof the client received the response. Never wait for completion inside
+middleware that must first return the descriptor to start the writer.
+
+### API trade-off and recommendation
+
+| Concern                     | Strict onion                     | H                                  |
+| --------------------------- | -------------------------------- | ---------------------------------- |
+| Ordinary check              | Check, then `return next()`      | Check, then finish the method      |
+| Async preparation           | Await work, then `return next()` | Await work, then finish the method |
+| Application ALS             | `middleware(ctx, next)`          | `around(ctx, next)`                |
+| Early response              | Return `HttpResponse`            | Return `HttpResponse`              |
+| Delivery logging            | `ctx.onFinish`                   | `ctx.onFinish`                     |
+| Execution contracts         | One                              | Ordinary step and wrapper          |
+| Continuation misuse surface | Every middleware                 | Wrappers only                      |
+
+**Author recommendation: strict onion.** The extra delegation line keeps one execution contract
+when a simple middleware grows wrapping behavior. Explicit non-void return types help identify
+forgotten returns; they do not replace runtime guards for duplicate/late continuation or
+unawaited downstream work. H remains a valid alternative because ordinary steps do not control
+continuation and can release async frames before a pending handler.
+
+The matched experiment found H saved roughly 0.7 KB per pending request on Node with eight async
+ordinary steps and two ALS wrappers; synchronous pass-through was essentially equal. These are
+research-kernel results, not the cost of guarded production runners. See the full
+[measurement limitations](#measurements-and-decision-gate).
+
+For the Opus review, resolve these points before treating D2.1 as settled:
+
+1. Does one public execution contract justify explicit continuation in Auth/Role/logger, given
+   the measured but workload-dependent retention advantage and smaller misuse surface of H?
+2. Can the v5 bridge honestly represent legacy direct writes without pretending every downstream
+   result is an `HttpResponse`, while preserving existing subclasses?
+3. Are single-use/late-next handling and unawaited-downstream accounting precise enough to prevent
+   competing execution or writes, and what do those guards cost?
+4. Are raw-error unwind, completion outcomes/context, and stream/resource ownership unambiguous?
+5. Does the selected context and extension-hook surface remove Express types without introducing
+   native infrastructure into the present migration?
 
 ## Errors, response hooks, transactions, and streams
 
