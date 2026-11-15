@@ -1,0 +1,401 @@
+{
+  "schemaVersion": 1,
+  "runtime": {
+    "node": "v26.12.1",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "configuration": {
+    "requests": 10000,
+    "independentProcessesPerCell": 5,
+    "middleware": 10,
+    "wrapperPositions": [0, 4],
+    "hooks": 2,
+    "warmupRequestsPerProcess": 2000
+  },
+  "methodology": [
+    "Separate fresh --expose-gc Node process per cell and replicate; medians of process samples.",
+    "Force GC twice at each boundary; heapUsed only. Setup overhead includes contexts, deferred gates and two holding arrays, allocated before dispatch.",
+    "Pending heap includes shared handler/decision/writer harness; handler-only is measured separately for each phase. Subtracted medians are descriptive, not paired estimates.",
+    "The handler-only baseline never enters middleware ALS stores or registers timing hooks; extra-versus-baseline includes those features, not just dispatch continuations. Inspect setup and pending heap separately.",
+    "Sync stages do useful state/ALS reads then return next directly in strict onion; H runs the equivalent stages in compiled flat segments. Async stages first await an already-resolved promise.",
+    "Two distinct middleware-owned ALS stores scope the entire suffix. als-return returns store.run(value, next); als-finally additionally awaits downstream and records commit/rollback/finally.",
+    "Both models register identical optional beforeSend timing hooks, drained and released before the writer phase. Hooks run outside middleware-owned ALS after unwinding.",
+    "handler-pending waits inside the handler. writer-pending returns a constant descriptor, unwinds wrappers/hooks, then waits in a synthetic writer."
+  ],
+  "limitations": [
+    "Research implementations, not a production framework benchmark. Both omit next misuse guards, cancellation, hook failure policies and registry/transport behavior.",
+    "No HTTP, sockets, streams, chunk iteration, backpressure, RSS, native FFI, real I/O or throughput measurement.",
+    "Async prework is a microtask boundary, not a database request. Constant descriptors and small ALS values understate full application memory.",
+    "The synthetic writer validates a lifecycle boundary; it does not measure actual stream delivery or preserve middleware ALS during consumption.",
+    "Results depend on runtime/JIT/GC and implementation details; sample ranges are not statistical confidence intervals."
+  ],
+  "conformance": {
+    "cases": 32,
+    "concurrentRequestsPerPendingCase": 40,
+    "passed": true
+  },
+  "elapsedSeconds": 23.7727065,
+  "rows": [
+    {
+      "model": "handler-only",
+      "phase": "handler-pending",
+      "prework": "sync",
+      "wrapping": "als-return",
+      "hooks": 0,
+      "setupBytesPerRequest": {
+        "median": 368.4576,
+        "min": 368.3688,
+        "max": 368.4576,
+        "samples": [368.4576, 368.3816, 368.4576, 368.3688, 368.4576]
+      },
+      "pendingBytesPerRequest": {
+        "median": 1287.8392,
+        "min": 1287.8392,
+        "max": 1287.8392,
+        "samples": [1287.8392, 1287.8392, 1287.8392, 1287.8392, 1287.8392]
+      },
+      "extraVsHandlerOnlyMedianBytes": 0
+    },
+    {
+      "model": "strict-onion",
+      "phase": "handler-pending",
+      "prework": "sync",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7912,
+        "min": 384.7912,
+        "max": 384.7912,
+        "samples": [384.7912, 384.7912, 384.7912, 384.7912, 384.7912]
+      },
+      "pendingBytesPerRequest": {
+        "median": 2225.6112,
+        "min": 2225.6104,
+        "max": 2225.9864,
+        "samples": [2225.6112, 2225.6112, 2225.6104, 2225.9864, 2225.6112]
+      },
+      "extraVsHandlerOnlyMedianBytes": 937.7719999999999
+    },
+    {
+      "model": "hybrid",
+      "phase": "handler-pending",
+      "prework": "sync",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7912,
+        "min": 384.7912,
+        "max": 386.2624,
+        "samples": [384.7912, 386.2624, 384.7912, 384.7912, 384.7912]
+      },
+      "pendingBytesPerRequest": {
+        "median": 2225.2376,
+        "min": 2223.7744,
+        "max": 2225.2376,
+        "samples": [2225.2376, 2223.7744, 2225.2376, 2225.2376, 2225.2376]
+      },
+      "extraVsHandlerOnlyMedianBytes": 937.3984
+    },
+    {
+      "model": "strict-onion",
+      "phase": "handler-pending",
+      "prework": "async",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.58,
+        "min": 384.58,
+        "max": 384.9704,
+        "samples": [384.58, 384.58, 384.58, 384.9704, 384.58]
+      },
+      "pendingBytesPerRequest": {
+        "median": 3361.3936,
+        "min": 3361.0112,
+        "max": 3361.412,
+        "samples": [3361.4112, 3361.3936, 3361.3936, 3361.0112, 3361.412]
+      },
+      "extraVsHandlerOnlyMedianBytes": 2073.5544
+    },
+    {
+      "model": "hybrid",
+      "phase": "handler-pending",
+      "prework": "async",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.9744,
+        "min": 383.8536,
+        "max": 385.3648,
+        "samples": [383.8536, 385.3648, 384.9744, 384.9744, 385.3648]
+      },
+      "pendingBytesPerRequest": {
+        "median": 2602.2072,
+        "min": 2601.8408,
+        "max": 2602.2328,
+        "samples": [2602.2328, 2601.8424, 2602.2072, 2602.2208, 2601.8408]
+      },
+      "extraVsHandlerOnlyMedianBytes": 1314.368
+    },
+    {
+      "model": "strict-onion",
+      "phase": "handler-pending",
+      "prework": "sync",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7864,
+        "min": 384.7864,
+        "max": 385.1768,
+        "samples": [384.7864, 385.1768, 384.7864, 384.7864, 384.7864]
+      },
+      "pendingBytesPerRequest": {
+        "median": 3818.7536,
+        "min": 3818.3712,
+        "max": 3818.7536,
+        "samples": [3818.7536, 3818.3712, 3818.752, 3818.7536, 3818.7536]
+      },
+      "extraVsHandlerOnlyMedianBytes": 2530.9144
+    },
+    {
+      "model": "hybrid",
+      "phase": "handler-pending",
+      "prework": "sync",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7864,
+        "min": 383.9696,
+        "max": 386.2576,
+        "samples": [384.7864, 386.2576, 384.7864, 384.7864, 383.9696]
+      },
+      "pendingBytesPerRequest": {
+        "median": 3706.744,
+        "min": 3705.2808,
+        "max": 3706.744,
+        "samples": [3706.744, 3705.2808, 3706.744, 3706.744, 3706.744]
+      },
+      "extraVsHandlerOnlyMedianBytes": 2418.9048000000003
+    },
+    {
+      "model": "strict-onion",
+      "phase": "handler-pending",
+      "prework": "async",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.5776,
+        "min": 384.5752,
+        "max": 384.9768,
+        "samples": [384.5776, 384.5776, 384.5776, 384.5752, 384.9768]
+      },
+      "pendingBytesPerRequest": {
+        "median": 4770.2776,
+        "min": 4770.2592,
+        "max": 4770.4928,
+        "samples": [4770.4928, 4770.2776, 4770.2776, 4770.2592, 4770.2776]
+      },
+      "extraVsHandlerOnlyMedianBytes": 3482.4384000000005
+    },
+    {
+      "model": "hybrid",
+      "phase": "handler-pending",
+      "prework": "async",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.9672,
+        "min": 384.9672,
+        "max": 385.3576,
+        "samples": [384.9672, 384.9672, 384.9672, 385.3576, 385.3576]
+      },
+      "pendingBytesPerRequest": {
+        "median": 4084.0128,
+        "min": 4083.6224,
+        "max": 4084.0128,
+        "samples": [4084.0128, 4084.0128, 4084.0128, 4083.6224, 4083.6448]
+      },
+      "extraVsHandlerOnlyMedianBytes": 2796.1736
+    },
+    {
+      "model": "handler-only",
+      "phase": "writer-pending",
+      "prework": "sync",
+      "wrapping": "als-return",
+      "hooks": 0,
+      "setupBytesPerRequest": {
+        "median": 368.4576,
+        "min": 368.3656,
+        "max": 368.4576,
+        "samples": [368.4576, 368.3656, 368.4576, 368.4576, 368.4576]
+      },
+      "pendingBytesPerRequest": {
+        "median": 431.9352,
+        "min": 431.8392,
+        "max": 432.0016,
+        "samples": [432.0016, 431.9352, 431.8392, 431.8392, 431.9352]
+      },
+      "extraVsHandlerOnlyMedianBytes": 0
+    },
+    {
+      "model": "strict-onion",
+      "phase": "writer-pending",
+      "prework": "sync",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7864,
+        "min": 384.7864,
+        "max": 384.7864,
+        "samples": [384.7864, 384.7864, 384.7864, 384.7864, 384.7864]
+      },
+      "pendingBytesPerRequest": {
+        "median": 617.6048,
+        "min": 617.6048,
+        "max": 617.6048,
+        "samples": [617.6048, 617.6048, 617.6048, 617.6048, 617.6048]
+      },
+      "extraVsHandlerOnlyMedianBytes": 185.66959999999995
+    },
+    {
+      "model": "hybrid",
+      "phase": "writer-pending",
+      "prework": "sync",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7864,
+        "min": 384.7864,
+        "max": 385.1616,
+        "samples": [384.7864, 384.7864, 384.7864, 384.7864, 385.1616]
+      },
+      "pendingBytesPerRequest": {
+        "median": 617.2808,
+        "min": 616.9096,
+        "max": 618.084,
+        "samples": [617.2808, 617.2808, 617.2808, 618.084, 616.9096]
+      },
+      "extraVsHandlerOnlyMedianBytes": 185.3456
+    },
+    {
+      "model": "strict-onion",
+      "phase": "writer-pending",
+      "prework": "async",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.592,
+        "min": 384.568,
+        "max": 386.0208,
+        "samples": [386.0208, 384.568, 384.9528, 384.568, 384.592]
+      },
+      "pendingBytesPerRequest": {
+        "median": 618.444,
+        "min": 617.0416,
+        "max": 618.444,
+        "samples": [617.0648, 618.444, 617.0416, 618.444, 618.444]
+      },
+      "extraVsHandlerOnlyMedianBytes": 186.50879999999995
+    },
+    {
+      "model": "hybrid",
+      "phase": "writer-pending",
+      "prework": "async",
+      "wrapping": "als-return",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.9912,
+        "min": 384.9696,
+        "max": 385.3448,
+        "samples": [384.9696, 384.9696, 385.3448, 384.9912, 385.3448]
+      },
+      "pendingBytesPerRequest": {
+        "median": 618.336,
+        "min": 618.324,
+        "max": 618.776,
+        "samples": [618.336, 618.324, 618.776, 618.324, 618.776]
+      },
+      "extraVsHandlerOnlyMedianBytes": 186.4008
+    },
+    {
+      "model": "strict-onion",
+      "phase": "writer-pending",
+      "prework": "sync",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.7816,
+        "min": 384.7816,
+        "max": 384.7816,
+        "samples": [384.7816, 384.7816, 384.7816, 384.7816, 384.7816]
+      },
+      "pendingBytesPerRequest": {
+        "median": 618.2056,
+        "min": 618.2056,
+        "max": 618.2104,
+        "samples": [618.2104, 618.2056, 618.2056, 618.2104, 618.2056]
+      },
+      "extraVsHandlerOnlyMedianBytes": 186.2704
+    },
+    {
+      "model": "hybrid",
+      "phase": "writer-pending",
+      "prework": "sync",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 385.1568,
+        "min": 384.7816,
+        "max": 386.2864,
+        "samples": [384.7816, 385.1568, 386.2672, 386.2864, 384.7816]
+      },
+      "pendingBytesPerRequest": {
+        "median": 618.9304,
+        "min": 617.4536,
+        "max": 619.5104,
+        "samples": [619.5104, 619.1536, 617.4536, 618.024, 618.9304]
+      },
+      "extraVsHandlerOnlyMedianBytes": 186.99519999999995
+    },
+    {
+      "model": "strict-onion",
+      "phase": "writer-pending",
+      "prework": "async",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.5704,
+        "min": 384.5704,
+        "max": 384.5944,
+        "samples": [384.5704, 384.5704, 384.5944, 384.5704, 384.5944]
+      },
+      "pendingBytesPerRequest": {
+        "median": 617.8152,
+        "min": 617.8152,
+        "max": 617.8152,
+        "samples": [617.8152, 617.8152, 617.8152, 617.8152, 617.8152]
+      },
+      "extraVsHandlerOnlyMedianBytes": 185.88
+    },
+    {
+      "model": "hybrid",
+      "phase": "writer-pending",
+      "prework": "async",
+      "wrapping": "als-finally",
+      "hooks": 2,
+      "setupBytesPerRequest": {
+        "median": 384.9624,
+        "min": 384.9624,
+        "max": 385.3376,
+        "samples": [384.9624, 384.9624, 385.3376, 384.9624, 384.984]
+      },
+      "pendingBytesPerRequest": {
+        "median": 619.956,
+        "min": 619.5856,
+        "max": 620.7808,
+        "samples": [619.956, 620.7808, 619.5856, 619.956, 620.7808]
+      },
+      "extraVsHandlerOnlyMedianBytes": 188.0208
+    }
+  ]
+}

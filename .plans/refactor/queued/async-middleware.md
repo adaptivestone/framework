@@ -170,11 +170,14 @@ change.
     (NestJS guards vs interceptors, Spring interceptors vs filters). Both ≈ half of B's memory
     for typical apps. See
     [middleware-flow-models § Is onion the only model](../reference/middleware-flow-models.md#is-onion-the-only-model-that-covers-everything-2026-11-01).
-  - **Outside reviews (2026-11-01):** Astra and Fable, independently, pick **H** (`middleware(ctx)`
-    or `around(ctx, next)`; `next()` rejects with the original error; registry once at the top).
-    Differences to settle: a `beforeSend` hook, strict vs forgiving `around`, framework store on by
-    default. See [middleware-design-proposals §9–10](../reference/middleware-design-proposals.md)
-    and [middleware-review-fable](../reference/middleware-review-fable.md). Awaiting the owner.
+  - **Outside reviews (2026-11-01):** Fable and Sol pick **H** (`middleware(ctx)` or
+    `around(ctx, next)`); Astra, after the owner allowed `return next()`, picks a **strict
+    explicit-next onion** with H as the alternative. All agree: raw errors unwind wrappers, registry
+    once at the top, write after the chain, single-use `next`. Measured gap: H saves ≈ 0.7 KB (Node) /
+    0.2–0.3 KB (Bun) per pending request with async ordinary middleware, none otherwise. See
+    [middleware-design-proposals §9–10](../reference/middleware-design-proposals.md),
+    [middleware-review-fable](../reference/middleware-review-fable.md),
+    [astro-proposal](../reference/astro-proposal.md). Awaiting the owner.
   - **OpenTelemetry (experiments, 2026-11-01):** works with C2 — the server span stays active
     through the runner. The one gap (a middleware span cannot parent the handler's work) closes
     with framework-published `diagnostics_channel` tracing channels around middleware and the

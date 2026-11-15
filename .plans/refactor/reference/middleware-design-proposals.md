@@ -88,7 +88,8 @@ Every option below is shown with the same four middleware:
 
 Helpers used in the sketches: `isAllowed(ctx)`, `User.findByToken(token)`,
 `userStore = new AsyncLocalStorage()`, `connection.transaction(fn)` (commits when `fn` resolves,
-aborts when it throws — Mongoose's API), `ctx.response.setHeader(…)` (headers staged on the
+aborts when it throws; read it as "a single-execution transaction scope" — Mongoose's real
+`connection.transaction` may retry its callback, so it is not safe around `next()`, see Sol in §10), `ctx.response.setHeader(…)` (headers staged on the
 response before it is written), `ctx.onFinish(cb)` (after send). Names are not final.
 
 ## 5. Measured facts (Node 26.12.1; Bun 1.4.4 where stated)
@@ -459,10 +460,38 @@ Rules Fable proposes for H:
 6. 5.x: old `middleware(req, res, next)` classes run through today's bridge as stages; v2 detected
    by `static contractVersion = 2` or by method name (open question).
 
-**Where Fable and Astra agree:** H; keep the name `middleware(ctx)`; `next()` throws the real
-error; one error resolution at the top; resource-lifetime rule for streams; `onFinish` after send.
-**Where they differ:** keep a `beforeSend` hook (Astra yes, Fable no); strict `around` (Astra) vs
-forgiving (Fable); Fable also wants the framework store on by default.
+**Across the three reviews (2026-11-01).** Fable and Sol pick **H**. Astra first picked H, then —
+after the owner allowed `return next()` in simple middleware — switched to a **strict
+explicit-next onion** (one contract, `return next()` everywhere, no auto-continue), keeping H as
+the serious alternative ([Astro Proposal](astro-proposal.md)). Fable's review was written under
+the old "no `next` in simple middleware" requirement and did not measure a strict onion.
+
+All three agree: raw errors unwind wrappers before the registry; one error resolution at the top;
+the response is written after the chain unwinds (so streaming memory is the same in every model);
+`next()` is single-use; a transaction must not outlive its `around`/wrapper while a lazy stream is
+read; `onFinish` means the server finished, not that the client received it; a framework-owned
+request store works with any model.
+
+They differ on: strict onion vs H (the main question); a per-request `beforeSend` hook (Astra and
+Sol yes, Fable no); forgiving `around` (Fable: auto-continue, auto-bubble) vs strict continuation
+(Astra, Sol); framework store on by default (Fable).
+
+Strict onion vs H, pending in the handler, 8 ordinary steps + 2 ALS wrappers + 2 hooks
+([strict-comparison](middleware-experiments/strict-comparison.mjs); macOS run by Astra, Linux
+re-run identical on Node; Bun re-run 2026-11-01):
+
+| Workload                                      | Node strict onion | Node H  | Bun strict onion | Bun H   |
+| --------------------------------------------- | ----------------- | ------- | ---------------- | ------- |
+| sync steps, wrappers `return store.run(…)`    | 2 226 B           | 2 225 B | 1 170 B          | 1 170 B |
+| async steps, same wrappers                    | 3 361 B           | 2 602 B | 1 427 B          | 1 234 B |
+| sync steps, wrappers `await next()` + finally | 3 819 B           | 3 707 B | 1 906 B          | 1 826 B |
+| async steps, wrappers with finally            | 4 770 B           | 4 084 B | 2 115 B          | 1 843 B |
+
+Writer phase (descriptor returned, chain unwound): ≈ 618 B Node / ≈ 226 B Bun in every case. So
+H saves ≈ 0.7 KB (Node) / ≈ 0.2–0.3 KB (Bun) per pending request when ordinary middleware do
+async work, nothing when they are synchronous, and nothing while streaming. The other difference
+is the misuse surface: in strict onion every middleware can call `next()` without `return`; in H
+only `around` middleware can.
 
 ## 10. Reviewer notes
 

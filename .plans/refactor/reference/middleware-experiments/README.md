@@ -43,3 +43,8 @@ The default measurement uses 10,000 pending requests and five fresh processes pe
 `--requests`, `--processes` and `--hooks=0|1|2` arguments change that configuration. The checked-in
 [results](strict-comparison-results.json) contain all samples and method limitations; the
 [proposal](../astro-proposal.md#measurements-and-decision-gate) explains the conclusions.
+
+Re-run 2026-11-01 on Linux x64 (Node 26.12.1, Bun 1.4.4): conformance 32/32 on both; Node medians
+identical to the macOS results; Bun shows the same pattern at smaller sizes. Raw output:
+[Node](strict-comparison-results-linux-node.json), [Bun](strict-comparison-results-linux-bun.json).
+Scripts from the Fable review: [fable/](fable/) (see [middleware-review-fable](../middleware-review-fable.md), Appendix A).
