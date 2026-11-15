@@ -1,5 +1,5 @@
 {
-  "revision": "guards revised after the contract review (2026-11-01)",
+  "revision": "guards revised after the final review (2026-11-01)",
   "conformance": {
     "runtime": "bun 1.4.4",
     "conformance": [
@@ -137,6 +137,24 @@
         "hybrid/raw": "early: next().then is not a function. (In 'next().then((r) => r)', 'next().then' is undefined); error: sync failure",
         "hybrid/safe": true,
         "hybrid/dev": true
+      },
+      {
+        "case": "Guard: a late call after a forwarding middleware finished keeps the chosen response",
+        "onion/raw": "result: 200",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "result: 200",
+        "hybrid/safe": true,
+        "hybrid/dev": true
+      },
+      {
+        "case": "Guard: a delayed outer middleware leaves no unhandledRejection",
+        "onion/raw": "unhandled rejection: true",
+        "onion/safe": true,
+        "onion/dev": true,
+        "hybrid/raw": "unhandled rejection: true",
+        "hybrid/safe": true,
+        "hybrid/dev": true
       }
     ],
     "failures": [],
@@ -149,9 +167,9 @@
     "rows": [
       {
         "scenario": "minimal",
-        "onion/raw": -104,
-        "onion/safe": 188,
-        "onion/dev": 944,
+        "onion/raw": -96,
+        "onion/safe": 880,
+        "onion/dev": 1072,
         "hybrid/raw": -72,
         "hybrid/safe": 92,
         "hybrid/dev": 92
@@ -159,8 +177,8 @@
       {
         "scenario": "typical",
         "onion/raw": -195,
-        "onion/safe": 1808,
-        "onion/dev": 2544,
+        "onion/safe": 2448,
+        "onion/dev": 3024,
         "hybrid/raw": -291,
         "hybrid/safe": 92,
         "hybrid/dev": 92
@@ -168,29 +186,29 @@
       {
         "scenario": "typical+scope",
         "onion/raw": -48,
-        "onion/safe": 1920,
-        "onion/dev": 3008,
+        "onion/safe": 2880,
+        "onion/dev": 3568,
         "hybrid/raw": -112,
-        "hybrid/safe": 288,
-        "hybrid/dev": 784
+        "hybrid/safe": 784,
+        "hybrid/dev": 880
       },
       {
         "scenario": "typical+scope+tx",
         "onion/raw": 416,
-        "onion/safe": 2528,
-        "onion/dev": 3616,
-        "hybrid/raw": 352,
-        "hybrid/safe": 1040,
-        "hybrid/dev": 1377
+        "onion/safe": 3488,
+        "onion/dev": 4288,
+        "hybrid/raw": 353,
+        "hybrid/safe": 1376,
+        "hybrid/dev": 1584
       },
       {
         "scenario": "heavy",
         "onion/raw": 80,
-        "onion/safe": 3536,
-        "onion/dev": 4272,
+        "onion/safe": 4176,
+        "onion/dev": 5280,
         "hybrid/raw": -112,
-        "hybrid/safe": 288,
-        "hybrid/dev": 1120
+        "hybrid/safe": 1088,
+        "hybrid/dev": 1296
       }
     ]
   },
@@ -201,48 +219,48 @@
     "rows": [
       {
         "scenario": "minimal",
-        "onion/raw": 473,
-        "onion/safe": 1791,
-        "onion/dev": 2190,
-        "hybrid/raw": 597,
-        "hybrid/safe": 1400,
-        "hybrid/dev": 1573
+        "onion/raw": 549,
+        "onion/safe": 2455,
+        "onion/dev": 2562,
+        "hybrid/raw": 653,
+        "hybrid/safe": 1105,
+        "hybrid/dev": 1200
       },
       {
         "scenario": "typical",
-        "onion/raw": 2145,
-        "onion/safe": 6539,
-        "onion/dev": 6651,
-        "hybrid/raw": 1966,
-        "hybrid/safe": 3060,
-        "hybrid/dev": 3078
+        "onion/raw": 2120,
+        "onion/safe": 5602,
+        "onion/dev": 6788,
+        "hybrid/raw": 2195,
+        "hybrid/safe": 2770,
+        "hybrid/dev": 2317
       },
       {
         "scenario": "typical+scope",
-        "onion/raw": 2562,
-        "onion/safe": 7056,
-        "onion/dev": 7177,
-        "hybrid/raw": 2803,
-        "hybrid/safe": 4195,
-        "hybrid/dev": 3570
+        "onion/raw": 2565,
+        "onion/safe": 6587,
+        "onion/dev": 7222,
+        "hybrid/raw": 2841,
+        "hybrid/safe": 3826,
+        "hybrid/dev": 3994
       },
       {
         "scenario": "typical+scope+tx",
-        "onion/raw": 3064,
-        "onion/safe": 7624,
-        "onion/dev": 7476,
-        "hybrid/raw": 3152,
-        "hybrid/safe": 4410,
-        "hybrid/dev": 4293
+        "onion/raw": 2593,
+        "onion/safe": 6866,
+        "onion/dev": 8326,
+        "hybrid/raw": 2676,
+        "hybrid/safe": 4347,
+        "hybrid/dev": 4176
       },
       {
         "scenario": "heavy",
-        "onion/raw": 3877,
-        "onion/safe": 10583,
-        "onion/dev": 10025,
-        "hybrid/raw": 4231,
-        "hybrid/safe": 5417,
-        "hybrid/dev": 7011
+        "onion/raw": 3459,
+        "onion/safe": 9978,
+        "onion/dev": 11855,
+        "hybrid/raw": 3878,
+        "hybrid/safe": 5691,
+        "hybrid/dev": 6795
       }
     ]
   }

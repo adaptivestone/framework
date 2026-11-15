@@ -47,8 +47,13 @@ once → global `transformResponse` → writer merges staged headers/cookies →
   `RequestContext`; **v1** entries run through today's Promise bridge inside the chain, as a layer
   that continues when the old middleware calls `next()` and yields the "already sent" kind when it
   ended `res`.
-- **Framework built-ins stay v1 through all of v5.** Flipping a built-in's signature would break
-  every consumer subclass overriding it. Built-ins migrate in v6 with the flip.
+- **Built-ins: unchanged v1 classes plus portable versions in 5.x (final review, 2026-11-01).**
+  The existing v1 classes and their subclass signatures stay unchanged through v5 (flipping them
+  would break every consumer subclass). **Phase 2 of this card** adds the app-wide middleware API
+  and portable `Middleware` implementations of the built-ins (security headers, `RequestParser`,
+  `Cors`, `IpDetector`, `I18n`, `RequestLogger`, and the route built-ins) next to them; the Node.js
+  adapter runs the portable ones, the Express adapter keeps the v1 path. Their names/paths are
+  chosen when Phase 2 starts. In v6 the v1 classes are removed and the portable ones remain.
 - v5 docs mark v1 deprecated with a mechanical migration table; consumers migrate class by class.
 - v6: `AbstractMiddleware`, v1 dispatch and the Promise bridge are deleted, built-ins move to
   `Middleware`, controllers default to v2 and their `contractVersion` becomes vestigial (kept one
@@ -373,6 +378,14 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
   (`finished | aborted | failed`); cancel a replaced stream source.
 - `src/services/http/HttpServer.ts`, `src/services/http/types.ts` — `RequestContext` and `Next`
   types, registry entry for the pipeline.
+- `src/tests/createTestContext.ts` (new) — the public test factory for `RequestContext`, imported as
+  `@adaptivestone/framework/tests/createTestContext.js` (the `./tests/*` export), so apps never
+  hand-build contexts and `RequestContext` can grow in minors.
+- Public response type: a forward-compatible representation so supported narrowing and
+  pass-through code keeps compiling when a kind is added in a minor
+  ([v6-api-stability](v6-api-stability.md) decision 2), plus a consumer type fixture that adds a
+  simulated kind.
+- Phase 2: the app-wide middleware API and the portable built-ins (see the bridge section).
 - `src/services/http/requestContext.ts` (new) — the `requestContext()` accessor, side-effect free,
   imported as `@adaptivestone/framework/services/http/requestContext.js` (the `./services/*`
   export); `src/index.ts` boots a server and is not a package export. Packaging smoke imports it.
@@ -412,9 +425,8 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
 ## Out of scope
 
 - Exact v6 raw-route API — P1q reserves an explicit adapter-specific escape hatch.
-- Global Express middleware mounted via `app.express.use` (security headers, `RequestParser`,
-  global `Cors`) stay Express middleware in v5; their move belongs to the Node adapter / Express
-  removal plans.
+- Removing the Express-mounted v1 globals — they stay for the Express adapter until v6; their
+  portable replacements are Phase 2 above (prerequisite of the [Node adapter](../later/node-adapter.md)).
 - Static metadata getters — [static-middleware-cutover](../later/static-middleware-cutover.md).
 - Native (Rust) validation or paired middleware — later, with their own gates
   ([astro-proposal](../reference/astro-proposal.md)).
@@ -441,13 +453,19 @@ returned `HttpResponse`, and move `res.on('finish')` work to `ctx.onFinish`.
   restored.
 - Extension hooks (`transformResponse`, error handlers) have portable types or explicit legacy
   adapters; the new public imports work from the packed package.
+- Guards also cover the final-review cases: a late call after a forwarding middleware finished
+  keeps the chosen response; development diagnostics never leave an `unhandledRejection`.
+- `createTestContext()` works from the packed package (packaging smoke), and the response-type
+  consumer fixture compiles with a simulated added kind.
+- Phase 2: the app-wide middleware API and the portable built-ins pass the same behaviour tests as
+  their v1 classes, without Express.
 - The real runner is re-measured (heap, RSS, CPU, p95/p99) on Node 24, Node 26 and Bun.
 - Docs and CHANGELOG updated; full suite, `check`, `check:types`, `check:types:tests`, `smoke` green.
 
 ## Trade-offs
 
 - Every middleware writes `return next()`; in exchange there is one contract for every middleware.
-- Complete production guards cost ≈ 1.5–1.8 KB per pending request and ≈ 1.5–3.5 µs per request
-  more than the H alternative on a realistic route (re-measured after the contract review; the
-  owner accepted a memory difference for the simpler contract — the size changed from ≈ 0.8 KB).
+- Complete production guards cost ≈ 2.2 KB per pending request and ≈ 2–4 µs per request more than
+  the H alternative on a realistic route (re-measured after the final review; the owner accepted a
+  memory difference for the simpler contract — ≈ 0.8 KB before the reviews completed the guards).
 - 5.x pays one small `ctx` object per v2 request (80 B); v6 pays nothing extra.

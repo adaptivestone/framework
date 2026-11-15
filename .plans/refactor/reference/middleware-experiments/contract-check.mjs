@@ -125,18 +125,21 @@ function guardedLayer(req, name, fn, ctx, suffix, dev) {
       );
     return result;
   }
+  const expire = () => {
+    state = 2;
+  };
   if (result === downstream && !dev) {
-    // `return next()`: this call settles with its suffix; next() is already spent.
+    // `return next()`: this call settles with its suffix. Expire it then, so a saved next() called
+    // later is refused as "after its middleware finished" instead of failing the request as a
+    // duplicate (final review, 2026-11-01).
+    result.then(expire, expire);
     return result;
   }
   if (!dev) {
-    const expire = () => {
-      state = 2;
-    };
     result.then(expire, expire); // also marks the layer's own result handled
     return result;
   }
-  return result.then(
+  const checked = result.then(
     (r) => {
       state = 2;
       if (!isResponse(r))
@@ -150,6 +153,8 @@ function guardedLayer(req, name, fn, ctx, suffix, dev) {
       throw err;
     },
   );
+  checked.then(undefined, noop); // a diagnostic wrapper must not become an unhandledRejection
+  return checked;
 }
 
 function guardedHandler(ctx, handler) {
@@ -822,6 +827,82 @@ async function conformance() {
       if (mode === 'raw')
         return `early: ${a.value?.status ?? a.error?.message}; error: ${b.error?.message}`;
       return a.value?.status === 403 && b.error?.message === 'sync failure';
+    },
+  );
+
+  // Cases from the final review (2026-11-01).
+  add(
+    'Guard: a late call after a forwarding middleware finished keeps the chosen response',
+    async (model, mode) => {
+      let saved;
+      let release;
+      const gate = new Promise((r) => {
+        release = r;
+      });
+      const outer = async (_ctx, next) => {
+        const v = await next();
+        await gate;
+        return v;
+      };
+      const forward = (_ctx, next) => {
+        saved = next;
+        return next();
+      };
+      const pending = outcome(
+        build(
+          model,
+          [
+            custom('Outer', outer, { around: outer }),
+            custom('Forward', forward, { around: forward }),
+          ],
+          () => OK,
+          mode,
+        )(makeCtx()),
+      );
+      await sleep(5);
+      let lateError;
+      try {
+        await saved();
+      } catch (e) {
+        lateError = e.message;
+      }
+      release();
+      const r = await pending;
+      if (mode === 'raw')
+        return `result: ${r.value?.status ?? r.error?.message}`;
+      return (
+        r.value === OK && /after its middleware finished/.test(lateError ?? '')
+      );
+    },
+  );
+
+  add(
+    'Guard: a delayed outer middleware leaves no unhandledRejection',
+    async (model, mode) => {
+      const before = unhandled.length;
+      const outer = async (_ctx, next) => {
+        next();
+        await sleep(30);
+        return response(202, {});
+      };
+      const forward = async (_ctx, next) => next();
+      const r = await outcome(
+        build(
+          model,
+          [
+            custom('Outer', outer, { around: outer }),
+            custom('Forward', forward, { around: forward }),
+          ],
+          async () => {
+            throw new Error('handler failed early');
+          },
+          mode,
+        )(makeCtx()),
+      );
+      await sleep(20);
+      const none = unhandled.length === before;
+      if (mode === 'raw') return `unhandled rejection: ${!none}`;
+      return none && r.value?.status === 202;
     },
   );
 
