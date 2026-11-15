@@ -16,6 +16,7 @@ import {
   pattern,
 } from '../../../tests/assertions.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
+import { builtInResponse } from '../builtInResponse.ts';
 import { HttpError } from '../httpErrors.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
 import { HttpResponse } from '../responses.ts';
@@ -481,6 +482,61 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     );
 
     assertCalledWith(next, failure);
+  });
+
+  it('sends a framework response an override awaited but dropped, warning once', async () => {
+    const produced = HttpResponse.json(200, { ok: true });
+    // The framework handler an app override calls via `super`.
+    const builtIn = async (req: Request) => builtInResponse(req, produced);
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        await builtIn(req); // forgot `return`
+      },
+      meta: { controllerClass: 'DroppingAuth', methodName: 'postLogin' },
+    });
+    const { writer, write } = stubWriter();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      const adapter = createExpressAdapter(r, fakeApp, writer);
+      for (let i = 0; i < 2; i += 1) {
+        await adapter(
+          makeReq('POST', '/login'),
+          asExpressRes(makeRes()),
+          mock.fn(),
+        );
+      }
+      assertCalledTimes(write, 2);
+      assert.strictEqual(write.mock.calls[0]?.arguments[0], produced);
+      assertCalledTimes(emitWarning, 1);
+      assertCalledWith(
+        emitWarning,
+        pattern.stringContaining('DroppingAuth.postLogin'),
+        pattern.objectContaining({ code: 'ASF_DEP_DROPPED_RESPONSE' }),
+      );
+    } finally {
+      emitWarning.mock.restore();
+    }
+  });
+
+  it('leaves a dropped framework response alone when the override answered itself', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request, res: Response) => {
+        builtInResponse(req, HttpResponse.json(200, { ok: true }));
+        res.json({ own: true });
+        (res as unknown as MockRes).headersSent = true;
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { own: true });
   });
 
   it('renders through the Express writer by default', async () => {
