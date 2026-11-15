@@ -56,6 +56,11 @@ async middleware(req, res, next): Promise<void | Response> {
 uses the returned-response path already exercised in v5.3. Reopen B only with a concrete
 wrap-around middleware use case.
 
+> **Reopen flag (2026-11-01):** concrete wrap-around cases now exist — a middleware's own
+> AsyncLocalStorage store, a DB transaction rolled back on a handler throw, a span that parents the
+> handler's work. D1 is reopened together with D2.1; see
+> [middleware-design-proposals](../reference/middleware-design-proposals.md). Not decided yet.
+
 ## D2 — what `ctx` is (direction C chosen 2026-10-31; final shape after market research)
 
 **User decision 2026-10-31:** option **c** is the priority, but the exact `RequestContext` must
