@@ -189,10 +189,10 @@ change.
     [middleware-design-proposals §9–10](../reference/middleware-design-proposals.md),
     [middleware-review-fable](../reference/middleware-review-fable.md),
     [astro-proposal](../reference/astro-proposal.md). Awaiting the owner.
-  - **Final recommendation (2026-11-01, awaiting the owner):** take the Astro Proposal's
-    pipeline, error, completion and stream rules; public shape H defined as one strict-onion
-    contract with `middleware(ctx)` as stage shorthand. Guarded runners: strict onion ≈ 4.1 KB vs
-    H ≈ 1.1 KB per pending request with async steps (Node). See
+  - **Final recommendation (2026-11-01, awaiting the owner):** strict onion (Astra's contract),
+    per the owner's priority on the simplest contract; production guards + development
+    diagnostics; identical results on Node 24, Node 26 and Bun; H stays the measured alternative
+    (≈ 0.6–0.8 KB and 0.3–1.8 µs cheaper per request). See
     [middleware-final-recommendation](../reference/middleware-final-recommendation.md).
   - **OpenTelemetry (experiments, 2026-11-01):** works with C2 — the server span stays active
     through the runner. The one gap (a middleware span cannot parent the handler's work) closes
