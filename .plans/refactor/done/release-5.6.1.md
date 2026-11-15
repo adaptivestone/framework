@@ -158,3 +158,20 @@ updates and adds `mediaTypes: { 'application/csp-report': 'json' }` to its own
 Follow-ups discussed, not in this release: replace `deepmerge` with an internal
 config merge helper (removes its advisory from consumers' `npm audit`), and make
 Node 26 the floor in v6 (Node 24 is maintenance LTS until 2028-04-30).
+
+## Publication
+
+The user merged #81 and #82 and published 5.6.1 to npm on 2026-11-15
+(`latest`). The publish log's shasum `7de26ee6c481bdd9df145bf0c61a9f5cb7109650`
+matches the dry run recorded in #82. The `5.6.1` tag points at the last release
+commit `346d1fc`, as earlier tags do; the merge commit `a4aa844` has the same
+tree. The GitHub release was cut the same day (Latest). Docs #41 merged the same day and deployed to the site.
+
+The example project moves to framework ^5.6.1 in example PR #72 (stacked on its
+PR #71, module-email ^2.1.2): i18next 27, `oxc-parser` ^0.158.0, Biome 2.6.8
+(Markdown reformat in its own commit), in-range lockfile update. Its
+`config/http.ts` spreads the framework's, so it inherits the
+`application/csp-report` mapping (checked live). Verified in Docker against the
+published package: gen, check, check:types, test:ci 9/9, Bun 9/9, routes,
+openapi, live requests. `npm audit` there: 5 findings left, including the
+framework's `deepmerge`.
