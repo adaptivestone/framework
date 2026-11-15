@@ -297,6 +297,31 @@ describe('ExpressResponseWriter — streams', () => {
     assert.strictEqual(await handled, failure);
   });
 
+  it('an error committing the first chunk stops the source', async () => {
+    let cleanedUp = false;
+    serve(() =>
+      HttpResponse.stream(
+        200,
+        (async function* () {
+          try {
+            yield bytesOf('first');
+            yield bytesOf('second');
+          } finally {
+            cleanedUp = true;
+          }
+        })(),
+        // Rejected by setHeader when the first chunk commits the response.
+        { contentType: 'text/plain\nbroken' },
+      ),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(response.status, 500);
+    assert.deepStrictEqual(await response.json(), { writeFailed: true });
+    assert.ok((await handled) instanceof Error);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(cleanedUp, 'the suspended generator ran its finally block');
+  });
+
   it('an error after the first chunk aborts the response and rejects', async () => {
     const failure = new Error('source failed late');
     serve(() =>

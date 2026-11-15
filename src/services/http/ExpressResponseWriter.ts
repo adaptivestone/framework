@@ -336,8 +336,10 @@ async function writeStream(
     }
     res.end();
   } catch (err) {
+    // Stop the source on any failure: a generator suspended at `yield` keeps
+    // its `finally` (and what it holds) until returned.
+    stop();
     if (res.headersSent) {
-      stop();
       res.destroy();
     }
     throw err;
