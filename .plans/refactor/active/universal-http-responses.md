@@ -94,6 +94,9 @@ an async iterable without making the descriptor depend on Express.
   `HttpResponse` values.
 - SSE is a later specialized stream helper (`HttpResponse.sse`) so its abort/framing rules are not
   hidden inside the generic byte-stream API.
+- **Decided 2026-11-01 ([v6-api-stability](../queued/v6-api-stability.md) decision 2):** `file` and
+  `sse` land before v6, so v6 starts with a complete list of kinds; a kind added later in a 6.x minor
+  must not break apps (docs: pass unknown kinds through).
 
 ## v5.3 compatibility contract
 
