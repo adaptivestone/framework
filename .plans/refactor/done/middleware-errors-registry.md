@@ -1,7 +1,7 @@
 # middleware-errors-registry — the registry finally reaches the middleware layer
 
 **Status**: ✅ implemented 2026-10-03; unreleased (5.5.0), non-breaking on the wire. Origin: a 5.4 source review (2026-09-01); this is "option C" from the i18n-defaults design round, made v5-viable by the byte-identical-body trick.
-**Depends on**: [error-handler-registry](../done/error-handler-registry.md) (P1p) ✅. **Co-design with**: [async-middleware](../queued/async-middleware.md) (P1m — its v2 contract routes throws through the registry at the adapter level; this plan covers the v1/global layer via the sink) and [P1q](../queued/universal-http-responses.md).
+**Depends on**: [error-handler-registry](../done/error-handler-registry.md) (P1p) ✅. **Co-design with**: [async-middleware](../queued/async-middleware.md) (P1m — its v2 contract routes throws through the registry at the adapter level; this plan covers the v1/global layer via the sink) and [P1q](../active/universal-http-responses.md).
 
 ## Problem
 

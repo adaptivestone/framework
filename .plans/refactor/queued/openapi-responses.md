@@ -1,10 +1,10 @@
 # P2a-responses — OpenAPI response contracts (P1q Phase 3)
 
-**Status**: direction settled under [universal HTTP responses](universal-http-responses.md);
+**Status**: direction settled under [universal HTTP responses](../active/universal-http-responses.md);
 implementation not started. This file preserves the detailed OpenAPI questions and is subordinate
 to P1q where the two documents overlap.
 **Depends on**: [openapi-generator](../done/openapi-generator.md) ✅ and
-[universal HTTP responses](universal-http-responses.md) Phases 1–2.
+[universal HTTP responses](../active/universal-http-responses.md) Phases 1–2.
 **Feeds**: a typed client / Swagger "try it"; later reuse by P2c response serialization
 (`fast-json-stringify`) and codegen handler-return typing.
 **Origin**: 2026-06-21 — the shipped generator emits generic `200/400/401/404` response stubs
