@@ -64,14 +64,15 @@ v6   the Express adapter and the `express` dependency are removed (P5's Express 
 | 10  | Lifecycle order             | defined in P1m                                                                                                                          | the `beforeSend` slot reserved in the spec                                                                                                | done in P1m                          |
 | 11  | Logger contract             | `ctx.logger` planned                                                                                                                    | its type is the framework logger interface from P1z, settled before v6                                                                    | before v6 — P1z                      |
 | 12  | Instrumentation names       | none                                                                                                                                    | tracing channel names fixed, or published as experimental until stable                                                                    | before v6 — observability            |
-| 13  | Express-only packages       | apps can mount any Express middleware (passport, multer, template engines) on `app.httpServer.express`                                  | decision 3: what apps use instead after v6                                                                                                | 5.x docs + migration guide           |
+| 13  | Express-only packages       | apps can mount any Express middleware (passport, multer, template engines) on `app.httpServer.express`                                  | decided (A): migration guide lists replacements; no bridge                                                                                | 5.x docs + migration guide           |
 
 ## Can ship after v6 in minors (by design)
 
 Per-request `beforeSend`; signed/encrypted cookies; sessions; a typed-keys state API; new `ctx`
 members; new response kinds when a real need appears (decision 2); Bun, Deno and Fetch-style adapters; HTTP/2
 options; native validation and paired Rust middleware (internal backends behind the same
-contracts); tracing channels (if experimental); new built-in middleware.
+contracts); tracing channels (if experimental); new built-in middleware; possible future features not in the
+framework today: compression, static files, sessions, a Connect-style bridge (only on real demand).
 
 ## Decisions for the owner (one at a time)
 
@@ -82,8 +83,11 @@ contracts); tracing channels (if experimental); new built-in middleware.
    `file`, `sse`, `redirect`, `empty`, `native` (`file` and `sse` land before v6) — and `onFinish`
    outcomes `finished`, `aborted`, `failed`. If a real need appears later, a kind is added in a minor;
    apps pass unknown kinds through, so the addition does not break them.
-3. Express-only packages after v6 (passport, multer, template engines): no bridge (document
-   replacements), or a small Connect-style bridge that runs such middleware on the Node.js adapter.
+3. **Decided 2026-11-01: A, no bridge.** The v6 migration guide lists a replacement for each need:
+   framework features for CORS, body and upload parsing, rate limiting, security headers, request
+   logging, token auth and i18n; a template engine called directly with the HTML returned as a
+   `text` response; `HttpResponse.file` for downloads; compression and static files at a proxy or
+   CDN. If real apps hit a blocker, a Connect-style bridge can still be added in a 6.x minor.
 
 ## Done when
 
