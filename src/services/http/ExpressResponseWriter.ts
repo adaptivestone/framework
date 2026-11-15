@@ -91,12 +91,17 @@ export class ExpressResponseWriter
       if (HttpResponse.is(transformed)) {
         return transformed;
       }
-      const got =
-        typeof (transformed as { then?: unknown } | null)?.then === 'function'
-          ? 'a Promise (it must be synchronous)'
-          : transformed === null
-            ? 'null'
-            : typeof transformed;
+      const isThenable =
+        typeof (transformed as { then?: unknown } | null)?.then === 'function';
+      if (isThenable) {
+        // Reported below; its rejection must not surface as unhandled.
+        Promise.resolve(transformed).catch(() => {});
+      }
+      const got = isThenable
+        ? 'a Promise (it must be synchronous)'
+        : transformed === null
+          ? 'null'
+          : typeof transformed;
       this.#onTransformError(
         `transformResponse returned ${got}, not an HttpResponse; the original response was sent`,
       );
