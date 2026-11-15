@@ -3,6 +3,8 @@ import http, { type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
 import { after, before, beforeEach, describe, it } from 'node:test';
+import { setFlagsFromString } from 'node:v8';
+import { runInNewContext } from 'node:vm';
 import express, { type Request, type Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
@@ -63,6 +65,17 @@ const withTimeout = <T>(promise: Promise<T>, label: string) =>
       setTimeout(() => reject(new Error(`timed out: ${label}`)), 2000),
     ),
   ]);
+
+/** A full garbage collection, where the runtime allows forcing one. */
+const forceGc = (): (() => void) | undefined => {
+  const bun = (globalThis as { Bun?: { gc(force: boolean): void } }).Bun;
+  if (bun) {
+    return () => bun.gc(true);
+  }
+  setFlagsFromString('--expose-gc');
+  const gc = runInNewContext('gc') as (() => void) | undefined;
+  return typeof gc === 'function' ? () => gc() : undefined;
+};
 
 /** Resolve on the first body byte, then drop the connection. */
 const abortAfterFirstChunk = () =>
@@ -422,6 +435,42 @@ describe('ExpressResponseWriter — streams', () => {
     const body = new Uint8Array(await response.arrayBuffer());
     assert.strictEqual(body.byteLength, chunk.byteLength * count);
     assert.strictEqual(await handled, undefined);
+  });
+
+  it('a long open stream does not grow memory per chunk', async () => {
+    const collect = forceGc();
+    if (!collect) {
+      return; // no way to force a collection in this runtime
+    }
+    const chunk = bytesOf('x'.repeat(16));
+    const count = 100_000;
+    const heaps: number[] = [];
+    serve(() =>
+      HttpResponse.stream(
+        200,
+        (async function* () {
+          for (let i = 0; i < count; i += 1) {
+            if (i === 5_000 || i === count - 5_000) {
+              collect();
+              heaps.push(process.memoryUsage().heapUsed);
+            }
+            yield chunk;
+          }
+        })(),
+      ),
+    );
+    const response = await fetch(origin);
+    // Read and drop each chunk: the client runs in this process and must not hold the body.
+    for await (const _ of response.body ?? []) {
+      // discard
+    }
+    await handled;
+    const [early = 0, late = 0] = heaps;
+    // A reaction kept per chunk adds ≈ 30 MB over these 90 000 chunks.
+    assert.ok(
+      late - early < 8 * 1024 * 1024,
+      `heap grew ${((late - early) / 1024 / 1024).toFixed(1)} MB while streaming`,
+    );
   });
 
   it('a source whose return() throws does not break the disconnect', async () => {
