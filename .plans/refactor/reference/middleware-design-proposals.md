@@ -414,7 +414,55 @@ middleware to document; `next` rules apply to `around` only. Precedent: NestJS g
 
 ## 9. Ideas from the independent review (Fable)
 
-Pending — being added.
+Full review: [middleware-review-fable](middleware-review-fable.md) (2026-11-01, written without
+reading this file or Astra's notes; scripts in
+[middleware-experiments/fable](middleware-experiments/fable/)). Summary:
+
+**Pick: H** (Fable calls it G) — `middleware(ctx)` or `around(ctx, next)`, composed once per route
+at startup, plus a framework-owned AsyncLocalStorage store (`requestContext()`) and
+`ctx.onFinish`. No `ctx.onResponse` / `beforeSend`: `around` covers "before the write", `onFinish`
+covers "after the bytes".
+
+Ideas covered, each with the four test middleware, cost and source evidence: request-only, onion
+(also a flat-loop variant), `onRequest`/`onResponse` methods, stages + callbacks, stages +
+`runInside`, h3 hybrid, H. Also considered: framework store (companion, recommended), tracing
+channels (companion, for framework spans only), NestJS's four kinds (more to learn, nothing new),
+Fastify-style app-level hooks (later, as sugar over a global `around`), writing the response inside
+the chain (rejected, see below), wrapping the handler itself (`withTransaction(handler)`, a user
+pattern, not the model), an Express middleware mounted before the router (a working 5.x stopgap).
+
+New measurements (Node 26 / Bun 1.4):
+
+- Pending in the handler, 10 middleware: no wrapping — H ≈ 0, C2 ≈ 0.9 KB (C2 must keep its runner
+  frame to run hooks afterwards; one suspended async frame ≈ 0.9 KB); 2 wrapping — H 1.9 KB
+  (own store 1.0–1.3 KB), onion 3.4 KB.
+- **Streaming: the same ≈ 2.1 KB per in-flight stream in every model** when the response is
+  written after the chain unwinds (our writer does this). Writing inside the chain would add
+  ≈ 1.7 KB (onion) / 0.9 KB (H) per wrapping layer for the whole stream — rejected.
+- C2W's `runInside` store does not reach later middleware; H's `around` store does.
+- With "`next()` never throws", a `try/catch` transaction silently commits on a handler error.
+- Dispatch CPU: H ≈ 1.4 µs per request for 10 middleware vs ≈ 4.7 µs for today's 5.x bridge; any
+  new runner is 3–5× faster than today.
+
+Rules Fable proposes for H:
+
+1. `next()` resolves to the response of the rest of the chain and **rejects with the original
+   error** (Koa); one call only (second call throws); an `around` that never calls `next` and
+   returns nothing continues the chain; a forgotten `return` still answers (forgiving, +0.3 KB) —
+   or strict (the maintainer's choice).
+2. Errors are resolved by the registry **once, at the top**, after every `around` has unwound.
+3. Order: chain unwinds → registry → `transformResponse` → staged headers (errors included) → write
+   → `onFinish` (after `finish`/`close`, with `{ status, aborted, durationMs }`).
+4. A resource held by an `around` (transaction) is not alive while a lazy stream body is read —
+   a documentation rule, no runtime warning.
+5. Client abort: `ctx.signal`; the runner checks it between layers, `onFinish` gets `aborted: true`.
+6. 5.x: old `middleware(req, res, next)` classes run through today's bridge as stages; v2 detected
+   by `static contractVersion = 2` or by method name (open question).
+
+**Where Fable and Astra agree:** H; keep the name `middleware(ctx)`; `next()` throws the real
+error; one error resolution at the top; resource-lifetime rule for streams; `onFinish` after send.
+**Where they differ:** keep a `beforeSend` hook (Astra yes, Fable no); strict `around` (Astra) vs
+forgiving (Fable); Fable also wants the framework store on by default.
 
 ## 10. Reviewer notes
 

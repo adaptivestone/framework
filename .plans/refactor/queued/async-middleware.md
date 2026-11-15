@@ -170,6 +170,11 @@ change.
     (NestJS guards vs interceptors, Spring interceptors vs filters). Both ≈ half of B's memory
     for typical apps. See
     [middleware-flow-models § Is onion the only model](../reference/middleware-flow-models.md#is-onion-the-only-model-that-covers-everything-2026-11-01).
+  - **Outside reviews (2026-11-01):** Astra and Fable, independently, pick **H** (`middleware(ctx)`
+    or `around(ctx, next)`; `next()` rejects with the original error; registry once at the top).
+    Differences to settle: a `beforeSend` hook, strict vs forgiving `around`, framework store on by
+    default. See [middleware-design-proposals §9–10](../reference/middleware-design-proposals.md)
+    and [middleware-review-fable](../reference/middleware-review-fable.md). Awaiting the owner.
   - **OpenTelemetry (experiments, 2026-11-01):** works with C2 — the server span stays active
     through the runner. The one gap (a middleware span cannot parent the handler's work) closes
     with framework-published `diagnostics_channel` tracing channels around middleware and the
