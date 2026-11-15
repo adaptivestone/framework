@@ -410,6 +410,14 @@ describe('errorResultResponse', () => {
       errorResultResponse({ status: 401, body: undefined }).kind,
       'empty',
     );
+    const typed = errorResultResponse({
+      status: 401,
+      body: undefined,
+      headers: { 'Content-Type': 'application/problem+json' },
+    });
+    assert.deepStrictEqual(typed.headers, [
+      ['content-type', 'application/problem+json'],
+    ]);
     const notModified = errorResultResponse({ status: 304, body: { a: 1 } });
     assert.strictEqual(notModified.kind, 'empty');
     assert.strictEqual(notModified.status, 304);
