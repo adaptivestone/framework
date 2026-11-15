@@ -88,4 +88,4 @@ All rungs pass the conformance gate; the four workloads are measured across rung
 ## Open questions
 
 - Where the decision doc lives when done (`.plans/refactor/reference/`?).
-- If rung 1 wins outright: does that pull P3 forward on the roadmap (currently blocked by v6)?
+- P3 (Node adapter) is a 5.x target since 2026-11-01 (owner), independent of this spike's outcome.
