@@ -67,6 +67,12 @@ wrap-around middleware use case.
 > native capabilities. The earlier no-`next` constraint is relaxed for that proposal; D2.1 is still
 > open. Publication of research is not approval to change the runtime contract.
 
+> **Decision (2026-11-01):** D1 is superseded. The owner chose a **strict explicit-next onion**:
+> `middleware(ctx, next)`; `return next()` continues, a returned `HttpResponse` stops, a throw
+> travels up through every middleware and is resolved by the registry once. Production guards and
+> development diagnostics; contract and rules in
+> [middleware-final-recommendation](../reference/middleware-final-recommendation.md).
+
 > **Priority clarification (2026-11-01):** this change completes the portable response/middleware
 > contract needed to remove Express. Rust validation and paired native middleware are future
 > compatibility considerations, not implementation prerequisites. The
@@ -189,7 +195,7 @@ change.
     [middleware-design-proposals §9–10](../reference/middleware-design-proposals.md),
     [middleware-review-fable](../reference/middleware-review-fable.md),
     [astro-proposal](../reference/astro-proposal.md). Awaiting the owner.
-  - **Final recommendation (2026-11-01, awaiting the owner):** strict onion (Astra's contract),
+  - **Final recommendation (2026-11-01, accepted by the owner):** strict onion (Astra's contract),
     per the owner's priority on the simplest contract; production guards + development
     diagnostics; identical results on Node 24, Node 26 and Bun; H stays the measured alternative
     (≈ 0.6–0.8 KB and 0.3–1.8 µs cheaper per request). See
@@ -199,13 +205,19 @@ change.
     with framework-published `diagnostics_channel` tracing channels around middleware and the
     handler (~17 ns per call with no subscriber); no `ctx.scope` needed. See
     [middleware-flow-models § diagnostics_channel](../reference/middleware-flow-models.md#nodes-built-in-tracing-hooks-diagnostics_channel-experiment-2026-11-01).
-- **D2.2 Request representation** — plain portable fields as above. Alternative: a Web `Request`
+  - **Decided 2026-11-01: strict onion** — the owner wants the simplest contract for the future;
+    the measured memory/CPU difference to H is accepted. v5 bridge: the owner accepts any form
+    because v6 removes it; use an explicit "already sent" response kind for legacy direct writes,
+    which keeps the v2 `Next` type `Promise<HttpResponse>` unchanged in v6.
+- **D2.2 Request representation** — **open (2026-11-01):** five planned names clash with the
+  Express request object the v5 runtime reuses (`route`, `url`, `path`, `ip`, `cookies`); explained
+  to the owner with options, awaiting the answer. Original text: plain portable fields as above. Alternative: a Web `Request`
   underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
   as a lazy getter with the Node adapter.
 - **D2.3 State** — keep `appInfo`, typed per route by codegen from each middleware's `provides`
   (the market's weak spot is global augmentation that lies on routes without the middleware).
   Alternative: typed keys (`createContext<T>()`, React Router) for reusable middleware packages.
-- **D2.4 Staged headers on error responses** — apply to every response, errors included (what
+- **D2.4 Staged headers on error responses** — **decided 2026-11-01: yes,** apply to every response, errors included (what
   Express apps rely on today, e.g. CORS). Alternative: h3's rule — drop them on ≥400 except an
   explicit error-headers set.
 - **D2.5 Cookies** — the framework parses no cookies today. Add `ctx.cookies.get` (lazy parse) and
@@ -213,7 +225,8 @@ change.
   `SameSite=Lax`); nearly every surveyed framework has this. Alternative: leave cookies to apps.
 - **D2.6 Identity and lifecycle** — `id`, `logger`, `signal`, `onFinish`, all lazy. Not now:
   `waitUntil` (no platform lifetime on Node; `onFinish` covers after-response work).
-  - **Ambient access through AsyncLocalStorage (experiments, 2026-11-01, awaiting the owner):**
+  - **Ambient access through AsyncLocalStorage — decided 2026-11-01: framework store on by
+    default** (`requestContext()`). Background (experiments):
     a stages middleware cannot wrap the rest of the request, so `als.run(store, next)` cannot work
     by design — and it already silently does nothing inside today's framework middleware. Options:
     A, one framework store per request holding `ctx` (`requestContext()`), filled by middleware —

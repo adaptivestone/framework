@@ -1,7 +1,7 @@
 # Middleware v2 — final recommendation
 
-**Date:** 2026-11-01. **Status:** recommendation for the owner. D2.1 in
-[async-middleware](../queued/async-middleware.md) stays open until the owner decides.
+**Date:** 2026-11-01. **Status:** **decided 2026-11-01 — strict onion** (owner). Outcomes of the other decisions in §9;
+they are recorded in [async-middleware](../queued/async-middleware.md).
 **Inputs:** the [Astro Proposal](astro-proposal.md) (at `0b4f6de`, with its five review
 questions), [design proposals](middleware-design-proposals.md) (Sol and Astra notes),
 [Fable review](middleware-review-fable.md), [experiments](middleware-experiments/README.md).
@@ -235,13 +235,15 @@ From the Astro Proposal and the earlier version of this file:
   needs one more check per middleware; decide whether development diagnostics are enough.
 - Every built-in middleware gains a `return next()` line when it moves to v2.
 
-## 9. Decisions for the owner, one at a time
+## 9. Decisions (owner, 2026-11-01)
 
-1. **D2.1 flow:** strict onion (recommended, §1) or H.
-2. **v5 bridge:** an explicit "already sent" response kind instead of `undefined` (recommended, §6).
-3. **Framework store on by default** (recommended: on) or opt-in.
-4. **D2.4:** staged headers on error responses too (recommended: yes).
-5. **D2.2 names:** `routeTemplate`, and what `url` means.
+1. **D2.1 flow: strict onion.** Decided.
+2. **v5 bridge:** any form is acceptable because v6 removes it. Use the explicit "already sent"
+   response kind (§6): it keeps the v2 `Next` type `Promise<HttpResponse>` the same in v6.
+3. **Framework request store on by default.** Decided: yes.
+4. **D2.4 staged headers on error responses too.** Decided: yes.
+5. **D2.2 names** (`route`, `url`, `path`, `ip`, `cookies` clash with the Express request object):
+   open — explained to the owner, awaiting the answer.
 
 ## 10. After the decision
 

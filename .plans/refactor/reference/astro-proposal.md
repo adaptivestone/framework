@@ -1,6 +1,8 @@
 # Astro Proposal
 
 **Date:** 2026-11-01. **Status:** proposal for review, not an approved runtime contract.
+**Decision (2026-11-01):** the owner chose the strict onion; contract and rules in
+[middleware-final-recommendation](middleware-final-recommendation.md).
 **Baseline:** `ccr-80ccfb40-0qs0lo` at `c18d732d5be812dbb1a6638974147c158b073f09`.
 **Latest scope review:** `bb68b44f9187dd43a0455db1b1dc6afe83e3f96b` (runtime unchanged).
 **Current objective:** finish the portable response/middleware contract so Express becomes an
