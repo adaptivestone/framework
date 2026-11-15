@@ -222,7 +222,12 @@ adapter (P3) the same class reads from Node directly.
   `cookies` reserved for D2.5. Original text: plain portable fields as above. Alternative: a Web `Request`
   underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
   as a lazy getter with the Node adapter.
-- **D2.3 State** — keep `appInfo`, typed per route by codegen from each middleware's `provides`
+- **D2.3 State** — **decided 2026-11-01: A, keep `ctx.appInfo`** (the same object as `req.appInfo`
+  in 5.x), typed per route by codegen; no typed-keys API planned. Codegen already reads `provides`
+  from middleware imported from npm packages that ship `.d.ts`, so packages need no other API. Docs
+  rule: a package puts its data under its own key (`appInfo.myPackage`) to avoid collisions. The
+  name `appInfo` stays; a rename, if wanted, belongs to the post-release cleanup. Original text:
+  keep `appInfo`, typed per route by codegen from each middleware's `provides`
   (the market's weak spot is global augmentation that lies on routes without the middleware).
   Alternative: typed keys (`createContext<T>()`, React Router) for reusable middleware packages.
 - **D2.4 Staged headers on error responses** — **decided 2026-11-01: yes,** apply to every response, errors included (what
