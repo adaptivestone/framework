@@ -7,7 +7,7 @@ import {
   ValidationError,
 } from '../validate/ValidationError.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
-import { HttpError } from './httpErrors.ts';
+import { FRAMEWORK_ERROR_CODES, HttpError } from './httpErrors.ts';
 import { HttpResponse, NO_BODY_STATUSES } from './responses.ts';
 
 /** The `message` of every framework 500 response. */
@@ -88,7 +88,10 @@ export function errorResultResponse({
 
 /** The generic 500 answered for an error nothing in the registry resolved. */
 export const serverErrorResponse = (req: FrameworkRequest) =>
-  HttpResponse.json(500, { message: serverErrorMessage(req) });
+  HttpResponse.json(500, {
+    error: FRAMEWORK_ERROR_CODES.serverError,
+    message: serverErrorMessage(req),
+  });
 
 /**
  * What `registerErrorHandler` accepts: any `Error` subclass, including one that
@@ -439,6 +442,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
           ? {
               status: 400,
               body: {
+                error: FRAMEWORK_ERROR_CODES.validationFailed,
                 message: validationFailedMessage(req),
                 errors: new ValidationError(clientErrors).message,
               },
@@ -458,6 +462,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
           ? {
               status: 400,
               body: {
+                error: FRAMEWORK_ERROR_CODES.validationFailed,
                 message: validationFailedMessage(req),
                 errors: new ValidationError(clientErrors).message,
               },

@@ -884,6 +884,7 @@ describe('ControllerManager — cross-controller middleware', () => {
     }
     assert.strictEqual(invalidResponse.statusCode, 400);
     assert.deepStrictEqual(invalidResponse.body, {
+      error: 'VALIDATION_FAILED',
       message: 'Validation failed',
       errors: { tenant: ['tenant is required'] },
     });
@@ -1262,6 +1263,7 @@ describe('ControllerManager — validated output runtime parity', () => {
     const response = await invoke('/incompatible');
     assert.strictEqual(response.statusCode, 500);
     assert.deepStrictEqual(response.body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -1278,6 +1280,7 @@ describe('ControllerManager — validated output runtime parity', () => {
     const response = await invoke('/content-array');
     assert.strictEqual(response.statusCode, 500);
     assert.deepStrictEqual(response.body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -1600,6 +1603,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
     assertResolved(matched, {
       status: 400,
       body: {
+        error: 'VALIDATION_FAILED',
         message: 'Validation failed',
         errors: { name: ['Must be at most 5 characters'] },
       },
@@ -1809,6 +1813,7 @@ describe('Error-handler registry over HTTP', () => {
     const res = await get('/plain');
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(await res.json(), {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
     assert.deepStrictEqual(
@@ -1892,6 +1897,7 @@ describe('ControllerManager — validation-phase error leak', () => {
     assert.ok(!JSON.stringify(body).includes('s3cret'));
     // Generic 500 body, consistent with the framework's other 500 sink.
     assert.deepStrictEqual(body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
     // The server-side defect IS logged at error, in full, for the developer.
@@ -2001,6 +2007,7 @@ describe('ControllerManager — route `params:` schema', () => {
     // Named by the PARAM (public, in the URL pattern) — never by the internal
     // model path (`ref`), and never echoing the rejected value.
     assert.deepStrictEqual(body, {
+      error: 'VALIDATION_FAILED',
       message: 'Validation failed',
       errors: { id: ['Must be a valid id'] },
     });
@@ -2014,6 +2021,7 @@ describe('ControllerManager — route `params:` schema', () => {
 
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -2158,6 +2166,7 @@ describe('ControllerManager — returned HttpResponse', () => {
     const res = await post('/create', {});
     assert.strictEqual(res.status, 400);
     assert.deepStrictEqual(await res.json(), {
+      error: 'VALIDATION_FAILED',
       message: 'Validation failed',
       errors: { name: ['name is required'] },
     });
@@ -2247,6 +2256,7 @@ describe('Request validation through the error-handler registry', () => {
     const res = await check({});
     assert.strictEqual(res.status, 400);
     assert.deepStrictEqual(await res.json(), {
+      error: 'VALIDATION_FAILED',
       message: 'Validation failed',
       errors: { name: ['name is required'] },
     });

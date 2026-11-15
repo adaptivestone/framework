@@ -22,7 +22,7 @@ describe('HttpServer — 404 fallthrough', () => {
     const res = await fetch(getTestServerURL('/this-path-does-not-exist'));
     assert.strictEqual(res.status, 404);
     const body = await res.json();
-    assert.deepStrictEqual(body, { message: 'Not found' });
+    assert.deepStrictEqual(body, { error: 'NOT_FOUND', message: 'Not found' });
   });
 });
 
@@ -165,14 +165,20 @@ describe('HttpServer — translatable sink messages', () => {
     const captured = await run404(await i18nService.getI18nForLang('en'));
 
     assert.strictEqual(captured.status, 404);
-    assert.deepStrictEqual(captured.payload, { message: 'Not found' });
+    assert.deepStrictEqual(captured.payload, {
+      error: 'NOT_FOUND',
+      message: 'Not found',
+    });
   });
 
   it('404 uses the app translation when the key resolves', async () => {
     const captured = await run404(stubI18n({ 'http.notFound': 'Не найдено' }));
 
     assert.strictEqual(captured.status, 404);
-    assert.deepStrictEqual(captured.payload, { message: 'Не найдено' });
+    assert.deepStrictEqual(captured.payload, {
+      error: 'NOT_FOUND',
+      message: 'Не найдено',
+    });
   });
 
   it('500 keeps the English text when the app locales lack the key', async () => {
@@ -181,6 +187,7 @@ describe('HttpServer — translatable sink messages', () => {
 
     assert.strictEqual(captured.status, 500);
     assert.deepStrictEqual(captured.payload, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -191,12 +198,19 @@ describe('HttpServer — translatable sink messages', () => {
     );
 
     assert.strictEqual(captured.status, 500);
-    assert.deepStrictEqual(captured.payload, { message: 'Что-то сломалось' });
+    assert.deepStrictEqual(captured.payload, {
+      error: 'SERVER_ERROR',
+      message: 'Что-то сломалось',
+    });
   });
 
   it('both sinks fall back to English when the request carries no i18n', async () => {
-    assert.deepStrictEqual((await run404()).payload, { message: 'Not found' });
+    assert.deepStrictEqual((await run404()).payload, {
+      error: 'NOT_FOUND',
+      message: 'Not found',
+    });
     assert.deepStrictEqual((await run500()).payload, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -261,6 +275,7 @@ describe('HttpServer — final sink resolves through the registry', () => {
       const answer = await runSink(new UnauthorizedError());
       assert.strictEqual(answer.status, 500);
       assert.deepStrictEqual(answer.payload, {
+        error: 'SERVER_ERROR',
         message: 'Something went wrong. Please try again later.',
       });
       assert.strictEqual(answer.headers['x-reason'], undefined);

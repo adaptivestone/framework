@@ -10,7 +10,7 @@ import formidable, {
 import type ThttpConfig from '../../../config/http.ts';
 import { normalizeContentType } from '../../validate/contentType.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
-import { HttpError } from '../httpErrors.ts';
+import { FRAMEWORK_ERROR_CODES, HttpError } from '../httpErrors.ts';
 import AbstractMiddleware from './AbstractMiddleware.ts';
 
 /** Built-in body formats that other media types can be parsed as. */
@@ -200,6 +200,7 @@ class RequestParser extends AbstractMiddleware {
       }
       return next(
         new HttpError(400, {
+          code: FRAMEWORK_ERROR_CODES.malformedBody,
           message: this.translate(
             req,
             'middleware.requestParser.parseError',
@@ -242,6 +243,7 @@ class RequestParser extends AbstractMiddleware {
 
   #entityTooLarge(req: FrameworkRequest) {
     return new HttpError(413, {
+      code: FRAMEWORK_ERROR_CODES.payloadTooLarge,
       message: this.translate(
         req,
         'middleware.requestParser.entityTooLarge',
