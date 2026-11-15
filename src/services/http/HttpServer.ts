@@ -19,6 +19,7 @@ import {
   type ErrorHandlerResult,
   type ErrorLogLevel,
   errorResultResponse,
+  markErrorHandlerFailed,
   type RegisteredErrorHandler,
   type RegistrableError,
   type ResolvedError,
@@ -207,8 +208,8 @@ class HttpServer extends Base {
    * Resolve a thrown error through the registry: consumer tier first, then
    * built-ins; first `instanceof` match returning non-null wins. A handler
    * that itself throws, or returns a result that is not a valid response,
-   * aborts the walk (logged here at `error`; the caller falls through to its
-   * 500) — never a crash loop. Returns null when no entry produced a response.
+   * aborts the walk (logged here at `error`; the caller answers its 500, even
+   * where it has a fallback response) — never a crash loop. Returns null when no entry produced a response.
    * `response` is what gets sent; `status`/`body`/`headers` repeat a
    * `{ status, body }` result (for an `HttpResponse` result: its status and
    * JSON body). Called by the route-handler and validation catches and by the
@@ -239,6 +240,7 @@ class HttpServer extends Base {
                 : handlerErr
             }`,
           );
+          markErrorHandlerFailed(err);
           return null;
         }
         if (response) {

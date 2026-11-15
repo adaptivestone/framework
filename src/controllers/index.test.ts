@@ -2300,6 +2300,33 @@ describe('Request validation through the error-handler registry', () => {
     assert.deepStrictEqual(seen, ['ValidationError']);
   });
 
+  it('a ValidationError handler that throws answers 500, not the 400', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, () => {
+        throw new Error('handler broke');
+      }),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual((await res.json()).error, 'SERVER_ERROR');
+  });
+
+  it('a ValidationError handler with an invalid result answers 500, not the 400', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, () => ({
+        status: 206,
+        body: {},
+      })),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual((await res.json()).error, 'SERVER_ERROR');
+  });
+
   it('valid input still reaches the handler', async () => {
     const res = await check({ name: 'Ada' });
     assert.strictEqual(res.status, 200);

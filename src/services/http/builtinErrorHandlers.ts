@@ -86,6 +86,26 @@ export function errorResultResponse({
   return HttpResponse.json(status, body, { headers: rest, contentType });
 }
 
+/** Errors a registry handler failed on (threw, or returned an invalid result). */
+const failedHandlerErrors = new WeakSet<object>();
+
+/** @internal Record that a registry handler failed on `err`. */
+export function markErrorHandlerFailed(err: unknown): void {
+  if (typeof err === 'object' && err !== null) {
+    failedHandlerErrors.add(err);
+  }
+}
+
+/**
+ * @internal Did a registry handler fail on `err`? Such an error answers the
+ * generic 500, never a caller's fallback response.
+ */
+export function errorHandlerFailed(err: unknown): boolean {
+  return (
+    typeof err === 'object' && err !== null && failedHandlerErrors.has(err)
+  );
+}
+
 /** The generic 500 answered for an error nothing in the registry resolved. */
 export const serverErrorResponse = (req: FrameworkRequest) =>
   HttpResponse.json(500, {
