@@ -1,7 +1,20 @@
 import { pipeline } from 'node:stream/promises';
 import type { Request, Response } from 'express';
+import type { TransformResponseHook } from '../../server.ts';
+import type { FrameworkRequest } from './HttpServer.ts';
 import type { ResponseWriter } from './ResponseWriter.ts';
-import type { ByteStream, HttpResponse, ResponseHeaders } from './responses.ts';
+import {
+  type ByteStream,
+  HttpResponse,
+  type ResponseHeaders,
+} from './responses.ts';
+
+export interface ExpressResponseWriterOptions {
+  /** Applied to every response before it is written (`transformResponse`). */
+  transform?: TransformResponseHook;
+  /** Told when `transform` throws or returns no response; the original is sent. */
+  onTransformError?: (message: string) => void;
+}
 
 /** Framing headers Node sets itself; a native response's copies are dropped. */
 const HOP_BY_HOP_HEADERS: ReadonlySet<string> = new Set([
@@ -27,6 +40,15 @@ const HOP_BY_HOP_HEADERS: ReadonlySet<string> = new Set([
 export class ExpressResponseWriter
   implements ResponseWriter<Request, Response>
 {
+  readonly #transform?: TransformResponseHook;
+
+  readonly #onTransformError: (message: string) => void;
+
+  constructor(options: ExpressResponseWriterOptions = {}) {
+    this.#transform = options.transform;
+    this.#onTransformError = options.onTransformError ?? (() => {});
+  }
+
   async write(
     response: HttpResponse,
     req: Request,
@@ -35,7 +57,7 @@ export class ExpressResponseWriter
     const { statusCode, statusMessage } = res;
     const headers = res.getHeaders();
     try {
-      await render(response, req, res);
+      await render(this.#transformed(response, req), req, res);
     } catch (err) {
       if (!res.headersSent) {
         for (const name of res.getHeaderNames()) {
@@ -51,6 +73,38 @@ export class ExpressResponseWriter
       }
       throw err;
     }
+  }
+
+  /** A broken transform must not take the API down: report it, send the original. */
+  #transformed(response: HttpResponse, req: Request): HttpResponse {
+    if (!this.#transform) {
+      return response;
+    }
+    try {
+      // Typed as a response, but it is project code: check what came back.
+      const transformed: unknown = this.#transform(response, {
+        req: req as FrameworkRequest,
+      });
+      if (HttpResponse.is(transformed)) {
+        return transformed;
+      }
+      const got =
+        transformed instanceof Promise
+          ? 'a Promise (it must be synchronous)'
+          : transformed === null
+            ? 'null'
+            : typeof transformed;
+      this.#onTransformError(
+        `transformResponse returned ${got}, not an HttpResponse; the original response was sent`,
+      );
+    } catch (err) {
+      this.#onTransformError(
+        `transformResponse threw; the original response was sent: ${
+          err instanceof Error ? (err.stack ?? err.message) : err
+        }`,
+      );
+    }
+    return response;
   }
 }
 

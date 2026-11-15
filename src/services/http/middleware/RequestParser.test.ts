@@ -14,6 +14,7 @@ import { appInstance } from '../../../helpers/appInstance.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { HttpError } from '../httpErrors.ts';
 
 import RequestParser from './RequestParser.ts';
 
@@ -82,7 +83,14 @@ const postToParser = ({
       await new RequestParser(appInstance, params).middleware(
         frReq,
         resShim as unknown as Response,
-        (() => {
+        ((err?: unknown) => {
+          // Rejections arrive as an `HttpError` for the error sink.
+          if (err) {
+            status = (err as HttpError).status;
+            res.writeHead(status);
+            res.end('{}');
+            return;
+          }
           result = { status: 200, body: frReq.body };
           res.writeHead(200);
           res.end('ok');
@@ -214,7 +222,10 @@ d\r
         await middleware.middleware(
           frReq,
           resp as unknown as Response,
-          (() => {}) as NextFunction,
+          ((err?: unknown) => {
+            // The rejection is passed on for the error sink to answer.
+            status = err instanceof HttpError ? err.status : status;
+          }) as NextFunction,
         );
 
         assert.strictEqual(status, 400);
@@ -385,7 +396,12 @@ const runParser = async (
   await new RequestParser(appInstance, params).middleware(
     req,
     res as unknown as Response,
-    (() => {}) as NextFunction,
+    ((err?: unknown) => {
+      if (err instanceof HttpError) {
+        status = err.status;
+        payload = { message: err.message };
+      }
+    }) as NextFunction,
   );
   return { status, payload };
 };
@@ -606,6 +622,13 @@ describe('request parser media-type isolation', () => {
     app.use((_req, res) => {
       res.json({ ok: true });
     });
+    // Answer at once like the framework's final sink: Express's default
+    // handler would first drain the unread (endless) body.
+    app.use(
+      (err: HttpError, _req: unknown, res: Response, _next: NextFunction) => {
+        res.status(err.status).json({ message: err.message });
+      },
+    );
     const server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const { port } = server.address() as AddressInfo;
