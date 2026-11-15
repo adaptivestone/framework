@@ -8,6 +8,7 @@ import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import {
+  errorHandlerFailed,
   serverErrorResponse,
   toLoggableError,
   validationFailedMessage,
@@ -648,7 +649,8 @@ async function answerError(
     logger?.[resolved.logLevel](toLoggableError(err));
     return resolved.response;
   }
-  if (unresolved) {
+  // A failed handler is a server-side defect: the 500, not the fallback.
+  if (unresolved && !errorHandlerFailed(err)) {
     return unresolved;
   }
   logger?.error(err);
