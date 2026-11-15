@@ -3,6 +3,7 @@ import type { TUser } from '@adaptivestone/framework/models/User.js';
 import type UserOld from '@adaptivestone/framework/models/UserOld.js';
 import type { IApp } from '@adaptivestone/framework/server.js';
 import type { FrameworkRequest } from '@adaptivestone/framework/services/http/HttpServer.js';
+import { HttpResponse } from '@adaptivestone/framework/services/http/responses.js';
 import type { BaseRequestContext } from '@adaptivestone/framework/services/http/types.js';
 import type { TI18n } from '@adaptivestone/framework/services/i18n/I18n.js';
 import ValidateService from '@adaptivestone/framework/services/validate/ValidateService.js';
@@ -60,10 +61,10 @@ const legacyVerification: Parameters<
 void [recovery, verification, legacyRecovery, legacyVerification];
 void [plain, fallback, interpolated, numeric, objectAsString, detailsAsString];
 
-// The validation error and the error registry are public: their declarations
-// must check under `skipLibCheck: false` too.
+// The validation error, the registry and the response factories are public:
+// their declarations must check under `skipLibCheck: false` too.
 const unregister = app.httpServer?.registerErrorHandler(
   ValidationError,
-  (err) => ({ status: 422, body: { errors: err.message } }),
+  (err) => HttpResponse.json(422, { errors: err.message }),
 );
 void unregister;

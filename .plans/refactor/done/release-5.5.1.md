@@ -2,7 +2,7 @@
 
 ## Goal and decisions
 
-Prepare the [consumer review fixes](consumer-review-fixes.md) as **5.5.1**, the patch the user chose on 2026-10-06: the `Auth`/`Role` return-type regression and the `generateToken` stale-password race. Request-validation 400s through the registry is a behavior change, so it was split out to [validation-errors-registry](../queued/validation-errors-registry.md) for 5.6. Also left out: the older `ValidationError` declaration error under `skipLibCheck: false` (never assessed for this patch), now tracked in the same 5.6 plan. Dependencies, by the user's request: the optional `oxc-parser` peer and dev dependency move to `^0.153.0` (codegen output unchanged); `mongoose` 9.11.0 and `lefthook` 2.1.17 are lockfile-only. Preparation does not publish a package, tag or GitHub release.
+Prepare the [consumer review fixes](consumer-review-fixes.md) as **5.5.1**, the patch the user chose on 2026-10-06: the `Auth`/`Role` return-type regression and the `generateToken` stale-password race. Request-validation 400s through the registry is a behavior change, so it was split out to [validation-errors-registry](validation-errors-registry.md) for 5.6. Also left out: the older `ValidationError` declaration error under `skipLibCheck: false` (never assessed for this patch), now tracked in the same 5.6 plan. Dependencies, by the user's request: the optional `oxc-parser` peer and dev dependency move to `^0.153.0` (codegen output unchanged); `mongoose` 9.11.0 and `lefthook` 2.1.17 are lockfile-only. Preparation does not publish a package, tag or GitHub release.
 
 ## Files
 
