@@ -50,7 +50,14 @@ export function sendErrorResult(
   return res.status(status).json(body);
 }
 
-export type ErrorHandlerFn<E extends Error = Error> = (
+/**
+ * What `registerErrorHandler` accepts: any `Error` subclass, including one that
+ * widens `message` (the framework's `ValidationError` carries its field
+ * payload there). Structural, so the core declarations need not import it.
+ */
+export type RegistrableError = Omit<Error, 'message'>;
+
+export type ErrorHandlerFn<E extends RegistrableError = Error> = (
   err: E,
   req: FrameworkRequest,
 ) =>
@@ -61,8 +68,8 @@ export type ErrorHandlerFn<E extends Error = Error> = (
 
 /** A registered (class, handler, level) triple as stored by the registry. */
 export interface RegisteredErrorHandler {
-  errorClass: abstract new (...args: never[]) => Error;
-  handler: ErrorHandlerFn;
+  errorClass: abstract new (...args: never[]) => RegistrableError;
+  handler: ErrorHandlerFn<RegistrableError>;
   logLevel: ErrorLogLevel;
 }
 

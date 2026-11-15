@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-## [5.6.1] - 2026-11-14
+## [5.6.1] - 2026-11-15
 
 ### Changed
 
@@ -33,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Lock waiting recognizes logically expired records**, without requiring MongoDB's TTL cleanup to remove them first.
 - **Test teardown drops its database before closing MongoDB.** The shipped test helpers drain HTTP requests, wait for the models' background collection builds, drop the per-suite database, then emit shutdown and disconnect. A build that finished after the drop used to recreate the database; a failed drop now fails the teardown hook instead of being ignored.
 - **`TranslationFunction` accepts the i18next 27 translator.** i18next 27 types `t(key)` and `t(key, options)` as separate signatures, so assigning an i18next 27 instance or its `t` to `I18nBaseInstance`, `TI18n` or `TranslationFunction` failed to compile (TS2322). `TranslationFunction` makes the same split, which still fits i18next 26. A call that passes an options value that may be `undefined` no longer compiles, as with i18next 27's own types; pass the options only when they are defined.
+- **`ValidationError` compiles under `skipLibCheck: false`.** Importing `ValidationError` (from `services/validate/ValidationError.js`) in an app with `skipLibCheck: false` failed with TS2416 inside the framework's own declaration, because its widened `message` was hidden behind a `@ts-expect-error` that does not reach the `.d.ts`. The class is still an `Error` at runtime. `registerErrorHandler` and `ErrorHandlerFn` now also accept it as an error class.
 - **Dependencies updated within their ranges** (lockfile), including Mongoose 9.12.1, Sentry 11.12.0 and rate-limiter-flexible 11.4.1. The Sentry update removes four moderate audit findings.
 
 ## [5.6.0] - 2026-10-27

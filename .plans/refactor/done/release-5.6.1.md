@@ -8,7 +8,9 @@ Prepare **5.6.1** (the user chose a patch, 2026-11-14) from:
 - a consumer's 5.6.0 issue report (two issues, assessed below);
 - a consumer request to parse `application/csp-report` as JSON, built as the
   [request media-type map](request-media-types.md);
-- every dependency updated, by the user's request.
+- every dependency updated, by the user's request;
+- the `ValidationError` declaration fix, ported by hand from the unreleased 5.7
+  branch (see below).
 
 The working tree carries `### Changed` and `### Added` entries. Earlier releases
 took a minor for those. The user chose 5.6.1 because they are fixes in nature and
@@ -61,6 +63,28 @@ Confirmed: for 0.x, `^0.156.0` is 0.156.x only, and `i18next` 27 was outside
   the error from the framework build while consumers assigning an instance to
   `TI18n` would still fail. Two internal callers pass options conditionally.
 
+### `ValidationError` under `skipLibCheck: false`
+
+Added after the release PR merged (user's choice, 2026-11-14). The 5.7 branch
+(`origin/ccr-80ccfb40-0qs0lo`, commit 896e970) found that an app with
+`skipLibCheck: false` importing `ValidationError` fails with TS2416 inside the
+framework's `.d.ts`: the widened `message` relied on a `@ts-expect-error`, which
+is not emitted. Reproduced against the 5.6.1 build. The commit does not
+cherry-pick (it builds on the branch's `HttpResponse`), so it was ported by hand:
+
+- `ValidationError` extends `Error` through a base typed without `message`
+  (still `Error` at runtime).
+- The registry accepts `RegistrableError` (`Omit<Error, 'message'>`), so
+  `registerErrorHandler(ValidationError, …)` compiles.
+- The packaging smoke consumer imports `ValidationError` and registers a handler
+  for it under `skipLibCheck: false`, returning a `{ status, body }` result.
+  Without the source fix it fails with both errors (TS2416 in the declaration,
+  TS2345 at the registration).
+
+It is the only standalone fix on that branch: its other fix commits repair code
+the branch itself adds (response writer, middleware bridge). The 5.7 replay
+skips 896e970.
+
 ### Dependencies
 
 All packages at the newest version their range allows (lockfile), including
@@ -80,8 +104,11 @@ the format-only files belong in their own commit.
 - Media types: see [request-media-types](request-media-types.md).
 - i18n: `src/services/i18n/types.ts`, `src/services/i18n/I18n.ts`,
   `src/services/validate/ValidationError.ts`.
+- `ValidationError` declaration: `src/services/validate/ValidationError.ts`,
+  `src/services/http/builtinErrorHandlers.ts`, `src/services/http/HttpServer.ts`,
+  `scripts/fixtures/optional-i18n.mts`.
 - Release: `package.json` (version, dev ranges, peer ranges), `package-lock.json`,
-  `biome.json`, `CHANGELOG.md` (dated 5.6.1), `README.md` (5.6.1 upgrade
+  `biome.json`, `CHANGELOG.md` (5.6.1, dated 2026-11-15, the planned release day), `README.md` (5.6.1 upgrade
   notes), this card, `review-5.6-fixes.md`, `.plans/refactor/README.md`.
 - Format-only (Biome 2.6.7): `docs/codegen-ast-approach.md`,
   `.plans/refactor/_archive/REFACTOR_PLAN_v1.md`, `.plans/refactor/active/llm-skills.md`,
@@ -115,6 +142,9 @@ the format-only files belong in their own commit.
 - The teardown regression fails without the model-build wait and passes with it;
   the 5.6.0 teardown order also fails it.
 - Local checks do not replace the remote Node/Bun CI matrix.
+- After the `ValidationError` port (branch `fix/validation-error-types` from
+  main): Node suite 981/981 with Redis, Biome, both type checks and packaging
+  smoke passed; smoke fails without the source change.
 
 ## Completion
 
