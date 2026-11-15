@@ -171,8 +171,14 @@ change.
   `ctx.response.setCookie/deleteCookie` with secure defaults (`HttpOnly`, `Secure`,
   `SameSite=Lax`); nearly every surveyed framework has this. Alternative: leave cookies to apps.
 - **D2.6 Identity and lifecycle** — `id`, `logger`, `signal`, `onFinish`, all lazy. Not now:
-  `waitUntil` (no platform lifetime on Node; `onFinish` covers after-response work) and ambient
-  access through AsyncLocalStorage (`getRequestContext()`), possible later as a complement.
+  `waitUntil` (no platform lifetime on Node; `onFinish` covers after-response work).
+  - **Ambient access through AsyncLocalStorage (experiments, 2026-11-01, awaiting the owner):**
+    a stages middleware cannot wrap the rest of the request, so `als.run(store, next)` cannot work
+    by design — and it already silently does nothing inside today's framework middleware. Options:
+    A, one framework store per request holding `ctx` (`requestContext()`), filled by middleware —
+    what Koa, AdonisJS, SvelteKit, Hono and Fastify offer; B, `ctx.runInside(wrap)` for a
+    middleware's own store; C, tracing-channel `bindStore` for libraries. See
+    [middleware-flow-models § AsyncLocalStorage](../reference/middleware-flow-models.md#asynclocalstorage-from-middleware-experiment-2026-11-01).
 - **D2.7 v6 handlers** — receive the same `ctx` (one object for middleware and handlers, the
   market norm); in 5.x handlers keep `req`, which is the same runtime object.
 
