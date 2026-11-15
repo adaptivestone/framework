@@ -2,8 +2,10 @@
 
 **Date:** 2026-11-01. **Status:** proposal for review, not an approved runtime contract.
 **Baseline:** `ccr-80ccfb40-0qs0lo` at `c18d732d5be812dbb1a6638974147c158b073f09`.
-**Scope:** middleware execution, request context, observability, and a compatible path to native
-transport/validation capabilities. No production implementation is included in this change.
+**Latest scope review:** `bb68b44f9187dd43a0455db1b1dc6afe83e3f96b` (runtime unchanged).
+**Current objective:** finish the portable response/middleware contract so Express becomes an
+adapter and can be removed. Native transport/validation capabilities are future compatibility
+considerations. This document contains research and proposed contracts, not runtime changes.
 
 This revisits [D1/D2.1](../queued/async-middleware.md), the
 [existing options](middleware-design-proposals.md), and the
@@ -20,10 +22,20 @@ too much emphasis on an automatic source-translation scenario that was not being
 ## Recommendation and the remaining disagreement
 
 Astro recommends **one explicit response-returning onion contract**, with a framework request
-context and separate response-preparation/completion lifecycle points. Do not adopt B's
+context and separate response-preparation/completion lifecycle points. Its purpose now is to
+remove Express from the application contract while supporting async short-circuits, ALS and
+wrapping. The `next` here is a framework continuation returning a response; it is not Express's
+`NextFunction`. Do not adopt B's
 auto-continue/forgotten-return rules. Keep **H (explicit stages plus explicit wrappers)** as the
 serious alternative if its memory advantage justifies two execution contracts in representative
 applications. Neither model should dictate whether the transport or selected operations use Rust.
+
+**Scope correction:** the core recommendation still fits the Express-removal goal, but the earlier
+delivery path gave future native capabilities too much weight and omitted the explicit adapter
+cutover. No Rust backend, native capability registry, ABI, execution-plan IR or backend-selection
+API is required to deliver the current middleware change. Keep the existing response descriptors,
+validation-driver boundary and static route metadata; those already provide places for future
+implementations. The native sections below describe later options, not acceptance criteria now.
 
 An independent GPT-6.1 Sol review prefers **H**, because ordinary request stages can finish and
 release their frames before the handler waits. Sol agrees that strict onion is the simpler public
@@ -60,6 +72,51 @@ extra wrapper object, but portability needs executable conformance, not a type a
 example, Express `req.route` is an object, whereas the proposal calls `ctx.route` a string; a new
 portable field such as `routeTemplate` avoids overwriting legacy semantics. Lazy properties must
 also avoid collisions with Express's existing `path`, `url`, `query`, and header APIs.
+
+### Remaining Express boundaries
+
+The source supports the owner's direction: routing and the response value are already owned by
+the framework. The remaining coupling is concentrated, but includes the listener, public request
+types and global middleware as well as registry middleware.
+
+| Boundary                 | Current source                                                                                                                                                                                                                                       | Migration consequence                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Route matching           | [`RouteRegistry.match(method, path)`](../../../src/services/http/routing/RouteRegistry.ts) is independent of Express.                                                                                                                                | Reuse the matcher and route declarations.                                                                      |
+| Response values/writer   | [`responses.ts`](../../../src/services/http/responses.ts) and [`ResponseWriter`](../../../src/services/http/ResponseWriter.ts) are independent; [`HttpServer`](../../../src/services/http/HttpServer.ts) selects `ExpressResponseWriter` concretely. | Preserve response factories; adapter selection supplies its writer.                                            |
+| Server/global chain      | [`HttpServer`](../../../src/services/http/HttpServer.ts) constructs Express, uses `express.use`, and passes Express to `http.createServer`.                                                                                                          | Moving only the route runner is insufficient; adapter/listener ownership must also move.                       |
+| Public types/extensions  | `FrameworkRequest extends express.Request`; [`BaseRequestContext`](../../../src/services/http/types.ts), error handlers and `transformResponse` inherit that surface.                                                                                | Give v2 handlers and their extension hooks a framework-owned context; keep legacy typing inside the bridge.    |
+| Handler execution/errors | [`ControllerManager`](../../../src/controllers/index.ts) invokes `(req, res, next)` and normalizes errors inside its wrapper.                                                                                                                        | Give descriptor execution a portable path; let raw errors unwind wrappers before outer registry resolution.    |
+| Parsing/global effects   | [`RequestParser`](../../../src/services/http/middleware/RequestParser.ts) uses Formidable on the Node request but wraps it in `res`/`next` and finish/close handling; CORS and logging also use response APIs/events.                                | Reuse parsing logic, move transport interaction to the adapter, and expose portable staged headers/completion. |
+
+Parsing independence means Express is not required by the parsing algorithm; it does not mean
+today's `RequestParser.middleware` already has a transport-neutral signature. Similarly, a new
+writer must deliberately preserve or document changes to the serialization, ETag and conditional
+response behavior currently delegated to Express. This is adapter conformance, not a reason to
+redesign the router or require Rust.
+
+### Smallest useful deliverable now
+
+The shared pipeline should be callable with a framework context and return an `HttpResponse`,
+without importing Express or writing to a socket. It composes middleware, validation and the
+handler, then resolves an uncaught error after wrappers unwind. The adapter creates the context,
+enters request ALS, runs response preparation and sends the result with its writer; completion is
+reported separately. Preserve that context in deferred writer/completion callbacks as specified
+below. Keep validation ordering unchanged during extraction.
+
+An async middleware can `return next()` to delegate, return an `HttpResponse` to stop before later
+middleware/handler execution, or throw. The adapter owns send state, transport events and any
+legacy Express bridge. Global short-circuits, 404/405, parsing failures and handler errors must
+still reach the shared response/completion path.
+
+Demonstrate this with a conformance fixture that runs the portable pipeline against a plain
+framework context and captures its returned response without Express. This proves the boundary
+before a full Node adapter is required. Later adapter conformance must cover the same outcomes,
+headers, streaming and disconnect behavior. Retain route-local `appInfo` inference and v5
+subclass compatibility; a `Request` type alias that still extends Express is not the final boundary.
+
+The proposed per-request `beforeSend` facility remains a separate lifecycle choice. Removing
+Express requires preserved response preparation and completion behavior, not necessarily a new
+public hook registry in the same patch. The existing `transformResponse` behavior must survive.
 
 ## Primary-source comparison
 
@@ -218,6 +275,9 @@ for the chosen channel/context APIs. A trace exporter must not control business 
 [Fastify tracing channels](https://fastify.dev/docs/latest/Reference/Hooks/#diagnostics-channel-hooks).
 
 ## One architecture for JS and native capabilities
+
+**Future design constraints only:** none of the native mechanisms in this section need to be
+implemented, exported or selected before the portable middleware contract and Express cutover.
 
 The intended model is **one application declaration, interchangeable execution backends**. The
 application describes its routes and schemas in JS/TS. Boot builds a route/schema plan; a Rust
@@ -426,27 +486,34 @@ control. This proposal claims no Rust speedup and does not make HTTP/2 a Rust-on
 1. Review D2.1 with the relaxed `next` requirement, strict onion/H evidence, and Sol's dissent.
    Decide the bridge outcome, context representation and scope/error/completion semantics before
    implementation. Keep this document proposed until the owner chooses.
-2. Implement the chosen JS contract and executable conformance with the existing response writer.
-   Update the exhaustive files list in P1m before touching runtime code. Retain the v5 compatibility
-   bridge; do not silently change inherited middleware signatures.
-3. Add optional tracing integration against public APIs and one transport-completion seam. Prove
-   concurrent isolation, span parentage, error visibility and log correlation on Node/Bun.
-4. Propose a focused JSON Schema validation experiment and a paired middleware experiment behind
-   the existing transport, with shared conformance fixtures and explicit JS fallback. Independently
-   execute the existing Node/native transport spike; its gates govern a Rust HTTP engine.
-5. After individual operations earn their place, consider fusing contiguous native segments.
-   Applications keep the same context, response and middleware contracts; backend selection is
-   internal and inspectable at boot.
+2. Complete the P1q/P1m portable contract: framework-owned context and extension-hook types, the
+   selected response-returning runner, raw-error unwind, ALS and completion boundaries. Connect it
+   to the existing Express writer. Update P1m's files list before implementation; keep the v5 bridge
+   and inherited signatures compatible. Verify the shared pipeline independently of Express.
+3. Continue the [Node adapter](../later/node-adapter.md), [default adapter](../later/default-node-adapter.md)
+   and [Express removal](../later/drop-express.md) work: migrate listener/global middleware ownership,
+   provide the replacement writer, cut over legacy controller/middleware signatures and remove
+   transitive Express types/dependencies. Preserve route declarations and returned-response APIs.
+   Reconcile the older cards' release-cadence assumptions with the owner's target before shipping;
+   this research document does not silently reschedule their releases.
+4. Optional later work: measure Rust JSON Schema validation or a paired middleware implementation
+   behind the same contracts. A Rust HTTP engine follows the separate transport spike. Native
+   experiments, backend manifests and operation fusion are not prerequisites for steps 1–3.
 
-Required conformance scenarios: nested/async ALS and spans; early responses; thrown primitive and
-Error values; registry and hook failures; duplicate/late/unawaited continuation; callback retries;
-legacy direct response; finish/error/close races; concurrent disconnect; stream replacement and
-resource cleanup; lazy stream context; native/JS validator parity; mixed native/JS ordering; and
-native early responses with custom registry/transform behavior. A fallback must not duplicate a
-side effect or expose data from a rejected validation branch.
+Current middleware conformance: nested/async ALS and spans; early responses; thrown primitive and
+Error values; registry and adopted-hook failures; duplicate/late/unawaited continuation; callback
+retries; legacy direct response; finish/error/close races; concurrent disconnect; stream replacement
+and resource cleanup; lazy stream context; global/error paths and typed request-context portability.
+Include optional tracing integration using public APIs, with concurrent isolation, span parentage
+and log correlation. An exporter must not become a requirement for dispatch.
 
-**Out of scope:** implementing a Rust server or native middleware in this change, moving Express
-removal earlier, deploying a sidecar, changing schema acceptance, or migrating application code.
+Future native conformance, only when implemented: validator parity; paired implementation parity;
+mixed native/JS ordering; native early responses honoring registry/transform behavior; and fallback
+that neither repeats a side effect nor exposes rejected data.
+
+**Out of scope for this research change:** runtime implementation, native infrastructure, changing
+schema acceptance, or migrating application code. The present implementation objective remains
+portable middleware and Express removal; future backends must fit it.
 No client-specific examples, data, paths or identifiers are included.
 
 ## Verification record

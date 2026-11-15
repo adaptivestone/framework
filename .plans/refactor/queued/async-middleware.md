@@ -67,6 +67,12 @@ wrap-around middleware use case.
 > native capabilities. The earlier no-`next` constraint is relaxed for that proposal; D2.1 is still
 > open. Publication of research is not approval to change the runtime contract.
 
+> **Priority clarification (2026-11-01):** this change completes the portable response/middleware
+> contract needed to remove Express. Rust validation and paired native middleware are future
+> compatibility considerations, not implementation prerequisites. The
+> [Astro scope review](../reference/astro-proposal.md#smallest-useful-deliverable-now) identifies the
+> shared pipeline boundary, remaining listener/global/type coupling and the adapter cutover.
+
 ## D2 — what `ctx` is (direction C chosen 2026-10-31; final shape after market research)
 
 **User decision 2026-10-31:** option **c** is the priority, but the exact `RequestContext` must
