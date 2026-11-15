@@ -153,6 +153,12 @@ change.
     one unique capability, AsyncLocalStorage wrapping, can live in the framework). Details and
     guard rails: [middleware-flow-models § Independent review](../reference/middleware-flow-models.md#independent-review-fable-2026-10-31).
     Awaiting the owner's decision.
+  - **Two more options that cover every requirement (2026-11-01, awaiting the owner):**
+    **C2W** = C2 + `ctx.runInside(wrap)`; **H** = hybrid by declaration — a middleware class has
+    `run(ctx)` (stage) or `around(ctx, next)` (wraps the rest), composed once at startup
+    (NestJS guards vs interceptors, Spring interceptors vs filters). Both ≈ half of B's memory
+    for typical apps. See
+    [middleware-flow-models § Is onion the only model](../reference/middleware-flow-models.md#is-onion-the-only-model-that-covers-everything-2026-11-01).
   - **OpenTelemetry (experiments, 2026-11-01):** works with C2 — the server span stays active
     through the runner. The one gap (a middleware span cannot parent the handler's work) closes
     with framework-published `diagnostics_channel` tracing channels around middleware and the
