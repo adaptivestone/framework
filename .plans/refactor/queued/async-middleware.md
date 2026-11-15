@@ -153,6 +153,11 @@ change.
     one unique capability, AsyncLocalStorage wrapping, can live in the framework). Details and
     guard rails: [middleware-flow-models § Independent review](../reference/middleware-flow-models.md#independent-review-fable-2026-10-31).
     Awaiting the owner's decision.
+  - **OpenTelemetry (experiments, 2026-11-01):** works with C2 — the server span stays active
+    through the runner. The one gap (a middleware span cannot parent the handler's work) closes
+    with framework-published `diagnostics_channel` tracing channels around middleware and the
+    handler (~17 ns per call with no subscriber); no `ctx.scope` needed. See
+    [middleware-flow-models § diagnostics_channel](../reference/middleware-flow-models.md#nodes-built-in-tracing-hooks-diagnostics_channel-experiment-2026-11-01).
 - **D2.2 Request representation** — plain portable fields as above. Alternative: a Web `Request`
   underneath (`ctx.request`), which costs a conversion per request on Express; can be added later
   as a lazy getter with the Node adapter.
