@@ -706,4 +706,25 @@ describe('ExpressResponseWriter — transform', () => {
       /returned a Promise \(it must be synchronous\)/,
     );
   });
+
+  it('a rejecting async transform does not leave an unhandled rejection', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      const reported = serveWith(
+        (async () => {
+          throw new Error('async envelope broke');
+        }) as unknown as TransformResponseHook,
+        () => HttpResponse.json(200, { id: 'x' }),
+      );
+      const response = await fetch(origin);
+      assert.deepStrictEqual(await response.json(), { id: 'x' });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      assert.match(reported[0] ?? '', /returned a Promise/);
+      assert.deepStrictEqual(unhandled, []);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+  });
 });
