@@ -23,6 +23,7 @@ import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import AbstractController from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
+import type { ResolvedError } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
@@ -866,7 +867,7 @@ describe('ControllerManager — cross-controller middleware', () => {
     assert.ok(handler);
 
     const invalidResponse = responseForHandler();
-    await handler(
+    const returned = await handler(
       {
         body: {},
         headers: {},
@@ -875,6 +876,11 @@ describe('ControllerManager — cross-controller middleware', () => {
       invalidResponse as unknown as Response,
       () => {},
     );
+    // Error responses come back as values for the adapter to write.
+    if (HttpResponse.is(returned) && returned.kind === 'json') {
+      invalidResponse.statusCode = returned.status;
+      invalidResponse.body = returned.body;
+    }
     assert.strictEqual(invalidResponse.statusCode, 400);
     assert.deepStrictEqual(invalidResponse.body, {
       message: 'Validation failed',
@@ -1198,7 +1204,16 @@ describe('ControllerManager — validated output runtime parity', () => {
       params: {},
       appInfo: { request: {}, query: {}, params: {} },
     } as unknown as FrameworkRequest;
-    await hit.entry.handler(req, response as unknown as Response, () => {});
+    const returned = await hit.entry.handler(
+      req,
+      response as unknown as Response,
+      () => {},
+    );
+    // Error responses come back as values for the adapter to write.
+    if (HttpResponse.is(returned) && returned.kind === 'json') {
+      response.statusCode = returned.status;
+      response.body = returned.body;
+    }
     return response;
   };
 
@@ -1494,6 +1509,22 @@ describe('HttpServer.resolveError — registry resolution', () => {
   const fakeReq = (request: Record<string, unknown> = {}) =>
     ({ appInfo: { request, query: {} } }) as unknown as FrameworkRequest;
 
+  /** The legacy fields as given, plus the JSON `response` that will be sent. */
+  const assertResolved = (
+    resolved: ResolvedError | null,
+    expected: { status: number; body: unknown; logLevel: string },
+  ) => {
+    assert.ok(resolved);
+    const { response, ...legacy } = resolved;
+    assert.deepStrictEqual(legacy, expected);
+    assert.strictEqual(response.kind, 'json');
+    assert.strictEqual(response.status, expected.status);
+    assert.deepStrictEqual(
+      response.kind === 'json' ? response.body : undefined,
+      expected.body,
+    );
+  };
+
   // Silence the console transports: the throwing-handler test drives a real
   // `logger.error(...)` line inside `resolveError`. The capture transport keeps
   // the root logger's `log` contract satisfied while nothing here asserts on it.
@@ -1526,7 +1557,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new NotFoundError('Boat not found'),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 404,
       body: { message: 'Boat not found' },
       logLevel: 'verbose',
@@ -1541,7 +1572,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       }),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 422,
       body: { message: 'Unprocessable', errors: { csv: ['row 17 malformed'] } },
       logLevel: 'verbose',
@@ -1565,7 +1596,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       vErr,
       fakeReq({ name: 'x' }),
     );
-    assert.deepStrictEqual(matched, {
+    assertResolved(matched, {
       status: 400,
       body: {
         message: 'Validation failed',
@@ -1627,7 +1658,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new OrderedError(),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 410,
       body: { message: 'second' },
       logLevel: 'warn',
@@ -1647,7 +1678,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new AsyncMapped(),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 402,
       body: { message: 'later' },
       logLevel: 'info',

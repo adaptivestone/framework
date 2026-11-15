@@ -8,6 +8,7 @@ import {
 } from '../validate/ValidationError.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import { HttpError } from './httpErrors.ts';
+import { HttpResponse } from './responses.ts';
 
 /** The `message` of every framework 500 response. */
 export const serverErrorMessage = (req: FrameworkRequest) =>
@@ -39,7 +40,16 @@ export interface ErrorHandlerResult {
   headers?: Record<string, string>;
 }
 
-/** Answer a resolved error: its headers, status and JSON body. */
+/** A resolved error: the response to send, the entry's log level, and the legacy result fields. */
+export interface ResolvedError extends ErrorHandlerResult {
+  response: HttpResponse;
+  logLevel: ErrorLogLevel;
+}
+
+/**
+ * Answer a resolved error: its headers, status and JSON body.
+ * @deprecated The framework sends `ResolvedError.response` through the response writer now; build one with `errorResultResponse`.
+ */
 export function sendErrorResult(
   res: Response,
   { status, body, headers }: ErrorHandlerResult,
@@ -50,6 +60,37 @@ export function sendErrorResult(
   return res.status(status).json(body);
 }
 
+const NO_BODY_STATUSES: ReadonlySet<number> = new Set([204, 205, 304]);
+
+/**
+ * A `{ status, body, headers }` result as the response `sendErrorResult` sent:
+ * JSON, with a `Content-Type` header kept as the media type, and no body for
+ * an undefined body or a status that never carries one.
+ */
+export function errorResultResponse({
+  status,
+  body,
+  headers,
+}: ErrorHandlerResult): HttpResponse {
+  let contentType: string | undefined;
+  const rest: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (name.toLowerCase() === 'content-type') {
+      contentType = value;
+    } else {
+      rest[name] = value;
+    }
+  }
+  if (body === undefined || NO_BODY_STATUSES.has(status)) {
+    return HttpResponse.empty(status, { headers: rest });
+  }
+  return HttpResponse.json(status, body, { headers: rest, contentType });
+}
+
+/** The generic 500 answered for an error nothing in the registry resolved. */
+export const serverErrorResponse = (req: FrameworkRequest) =>
+  HttpResponse.json(500, { message: serverErrorMessage(req) });
+
 /**
  * What `registerErrorHandler` accepts: any `Error` subclass, including one that
  * widens `message` (the framework's `ValidationError` carries its field
@@ -57,14 +98,20 @@ export function sendErrorResult(
  */
 export type RegistrableError = Omit<Error, 'message'>;
 
+/**
+ * Maps an error to a response: a `{ status, body, headers? }` result, an
+ * `HttpResponse` (for other content or full control), or `null`/`undefined`
+ * to pass to the next entry.
+ */
 export type ErrorHandlerFn<E extends RegistrableError = Error> = (
   err: E,
   req: FrameworkRequest,
 ) =>
   | ErrorHandlerResult
+  | HttpResponse
   | null
   | undefined
-  | Promise<ErrorHandlerResult | null | undefined>;
+  | Promise<ErrorHandlerResult | HttpResponse | null | undefined>;
 
 /** A registered (class, handler, level) triple as stored by the registry. */
 export interface RegisteredErrorHandler {
