@@ -6,6 +6,7 @@ import type { FrameworkRequest } from '@adaptivestone/framework/services/http/Ht
 import type { BaseRequestContext } from '@adaptivestone/framework/services/http/types.js';
 import type { TI18n } from '@adaptivestone/framework/services/i18n/I18n.js';
 import ValidateService from '@adaptivestone/framework/services/validate/ValidateService.js';
+import { ValidationError } from '@adaptivestone/framework/services/validate/ValidationError.js';
 
 // Match the resizer's helper -> IApp -> HTTP/i18n declaration chain, and check
 // the public request, validator and user mail surfaces in the installed dist.
@@ -58,3 +59,11 @@ const legacyVerification: Parameters<
 >[0] = translator;
 void [recovery, verification, legacyRecovery, legacyVerification];
 void [plain, fallback, interpolated, numeric, objectAsString, detailsAsString];
+
+// The validation error and the error registry are public: their declarations
+// must check under `skipLibCheck: false` too.
+const unregister = app.httpServer?.registerErrorHandler(
+  ValidationError,
+  (err) => ({ status: 422, body: { errors: err.message } }),
+);
+void unregister;

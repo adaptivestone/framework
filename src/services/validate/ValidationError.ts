@@ -12,6 +12,15 @@ import type { ValidationIssue } from './types.ts';
 export type ValidationErrorPayload = Record<string, string | string[]>;
 
 /**
+ * `Error` at runtime, typed without `message`, so `ValidationError` can widen
+ * `message` to its payload in a declaration that checks under
+ * `skipLibCheck: false` (a `@ts-expect-error` would not reach the `.d.ts`).
+ */
+const ErrorWithPayloadMessage = Error as unknown as new (
+  message?: string,
+) => Omit<Error, 'message'>;
+
+/**
  * Framework-owned validation error. Replaces yup's `ValidationError` at the
  * framework layer.
  *
@@ -24,13 +33,11 @@ export type ValidationErrorPayload = Record<string, string | string[]>;
  * `.issues` is the canonical list (one entry per field/message pair) that
  * non-wire consumers (logging, observability) should iterate.
  */
-export class ValidationError extends Error {
+export class ValidationError extends ErrorWithPayloadMessage {
   issues: ValidationIssue[];
 
-  // @ts-expect-error — Error.message is typed `string`, but we widen it to
-  // the path-keyed payload object so `res.json({ errors: err.message })`
-  // in AbstractController serializes the object directly. Mirrors yup's
-  // wire-format hack.
+  // The path-keyed payload object, so `{ errors: err.message }` serializes it
+  // directly. Mirrors yup's wire-format hack.
   declare message: ValidationErrorPayload;
 
   constructor(
