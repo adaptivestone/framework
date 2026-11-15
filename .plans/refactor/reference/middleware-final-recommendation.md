@@ -246,6 +246,11 @@ From the Astro Proposal and the earlier version of this file:
 4. **D2.4 staged headers on error responses too.** Decided: yes.
 5. **D2.2 names:** decided — option C: a separate `RequestContext` object in 5.x (80 B per request)
    with the clean names (`route`, `url`, `path`, `ip`, `cookies`).
+6. **D2.3 state:** keep `ctx.appInfo`, typed per route by codegen.
+7. **D2.5 cookies:** helpers on `ctx` with secure defaults.
+8. **D2.7 handlers:** v6 handlers get the same `ctx`; 5.x controllers opt in with `contractVersion = 2`.
+
+All D2 decisions are settled; the plan is [async-middleware](../queued/async-middleware.md).
 
 ## 10. After the decision
 
