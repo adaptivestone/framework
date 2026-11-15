@@ -376,6 +376,7 @@ const runParser = async (
   params?: Record<string, unknown>,
 ) => {
   let status = 0;
+  let code: string | undefined;
   let payload: Record<string, unknown> = {};
   const res = {
     status(statusCode: number) {
@@ -399,11 +400,12 @@ const runParser = async (
     ((err?: unknown) => {
       if (err instanceof HttpError) {
         status = err.status;
+        code = err.code;
         payload = { message: err.message };
       }
     }) as NextFunction,
   );
-  return { status, payload };
+  return { status, code, payload };
 };
 
 /**
@@ -446,11 +448,12 @@ describe('request parser message translation', () => {
 
   it('413 (declared content-length) keeps the English text without the key', async () => {
     const i18nService = await appInstance.getI18nService();
-    const { status, payload } = await runParser(
+    const { status, code, payload } = await runParser(
       oversizedJson(await i18nService.getI18nForLang('en')),
     );
 
     assert.strictEqual(status, 413);
+    assert.strictEqual(code, 'PAYLOAD_TOO_LARGE');
     assert.deepStrictEqual(payload, { message: englishTooLarge });
   });
 
@@ -486,11 +489,12 @@ describe('request parser message translation', () => {
 
   it('400 keeps the English text without the key', async () => {
     const i18nService = await appInstance.getI18nService();
-    const { status, payload } = await runParser(
+    const { status, code, payload } = await runParser(
       unparsable(await i18nService.getI18nForLang('en')),
     );
 
     assert.strictEqual(status, 400);
+    assert.strictEqual(code, 'MALFORMED_BODY');
     assert.deepStrictEqual(payload, { message: englishParseError });
   });
 

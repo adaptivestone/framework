@@ -27,6 +27,7 @@ import {
   toLoggableError,
 } from './builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
+import { FRAMEWORK_ERROR_CODES } from './httpErrors.ts';
 import Cors from './middleware/Cors.ts';
 import I18nMiddleware from './middleware/I18n.ts';
 import IpDetector from './middleware/IpDetector.ts';
@@ -260,6 +261,7 @@ class HttpServer extends Base {
   add404Page() {
     this.express.use((req, res, next) => {
       const notFound = HttpResponse.json(404, {
+        error: FRAMEWORK_ERROR_CODES.notFound,
         message: translateWithDefault(
           req as FrameworkRequest,
           'http.notFound',
@@ -310,7 +312,10 @@ class HttpServer extends Base {
             }`,
           );
           if (!res.headersSent) {
-            res.status(500).json({ message: serverErrorMessage(frameworkReq) });
+            res.status(500).json({
+              error: FRAMEWORK_ERROR_CODES.serverError,
+              message: serverErrorMessage(frameworkReq),
+            });
           }
         }
       },
