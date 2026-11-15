@@ -281,6 +281,10 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
+## 5.6.0 — released 2026-10-27 (npm + GitHub release)
+
+User-selected minor release. See [release preparation](done/release-5.6.0.md) and `CHANGELOG.md`: route validators are built at boot (a schema no driver matches fails `startServer()`), a static route no longer hides a `:param` route that has the method, recovery/verification persist in one write, plus the post-5.5.1 fixes. Codegen requires `oxc-parser` ^0.156.0. The work labelled v5.6 below moves to the next minor. [GitHub release](https://github.com/adaptivestone/framework/releases/tag/5.6.0).
+
 ## 5.5.1 — released 2026-10-06 (npm; GitHub release 2026-10-18)
 
 User-selected patch release. See [release preparation](done/release-5.5.1.md) and `CHANGELOG.md`: `Auth`/`Role` subclasses may return a response again, and a login racing a password change answers the wrong-password 400 from `generateToken` itself. The validation-registry change waits for 5.6 ([validation-errors-registry](queued/validation-errors-registry.md)). [GitHub release](https://github.com/adaptivestone/framework/releases/tag/5.5.1).
