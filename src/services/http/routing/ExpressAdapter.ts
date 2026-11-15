@@ -9,8 +9,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
+import type { ResponseWriter } from '../ResponseWriter.ts';
+import { HttpResponse } from '../responses.ts';
 import { getMatchedNode, MalformedPathError } from './match.ts';
 import type { MatchResult, MiddlewareEntry, RouteNode } from './RouteNode.ts';
 import type { RouteRegistry } from './RouteRegistry.ts';
@@ -26,6 +29,7 @@ export type ExpressAdapter = (
 export function createExpressAdapter(
   registry: RouteRegistry,
   app: IApp,
+  writer: ResponseWriter<Request, Response> = new ExpressResponseWriter(),
 ): ExpressAdapter {
   const routeTemplates = new WeakMap<RouteNode, string>();
   const indexTemplates = () =>
@@ -99,7 +103,19 @@ export function createExpressAdapter(
           return;
         }
       }
-      await Promise.resolve(result.entry.handler(req, res, next));
+      const returned = await Promise.resolve(
+        result.entry.handler(req, res, next),
+      );
+      // Only a branded `HttpResponse` is rendered; any other return value is
+      // the legacy `res` style, which has already answered (or will).
+      if (HttpResponse.is(returned)) {
+        if (res.headersSent) {
+          throw new Error(
+            `${req.method} ${req.route.path}: the handler both wrote to res and returned an HttpResponse. Use one or the other.`,
+          );
+        }
+        await writer.write(returned, req, res);
+      }
     } catch (err) {
       next(err);
     }

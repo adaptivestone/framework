@@ -16,7 +16,7 @@ An app-side review of 5.5.0 raised seven points. Verified against the source; th
 
 ## Not doing
 
-- **2 — export the `HttpError` mapper.** The need is reshaping framework bodies into an app envelope; `transformResponse` in [universal-http-responses](universal-http-responses.md) is the planned answer and covers 404/500/validation too. Revisit if a second app needs it before P1q.
+- **2 — export the `HttpError` mapper.** The need is reshaping framework bodies into an app envelope; `transformResponse` in [universal-http-responses](../active/universal-http-responses.md) is the planned answer and covers 404/500/validation too. Revisit if a second app needs it before P1q.
 - **7 — configurable `Role` field.** An app with a single `role` adds a Mongoose virtual `roles` → `[this.role]`; no framework change.
 
 ## Verification
