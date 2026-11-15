@@ -2,6 +2,8 @@
 
 **Date:** 2026-11-01.
 **Reviewed:** `ccr-80ccfb40-0qs0lo` at `dd6a39a87f1dd73546b9ad26977cf89ccb2f3800`.
+**Responses (2026-11-01):** each finding checked and acted on —
+[final recommendation §11](middleware-final-recommendation.md#11-contract-review-by-astra-2026-11-01--responses).
 **Scope:** [P1m](../queued/async-middleware.md),
 [final recommendation](middleware-final-recommendation.md), the contract checks and their
 integration with the existing runtime. Source line references below refer to this reviewed commit.
