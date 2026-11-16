@@ -70,6 +70,35 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.7.0)
+
+See the [5.7.0 release notes](CHANGELOG.md). Handlers that write to `res` keep
+working. Check these when you upgrade:
+
+- Every error body the framework builds now carries an `error` code
+  (`VALIDATION_FAILED`, `NOT_FOUND`, `SERVER_ERROR` and others, exported as
+  `FRAMEWORK_ERROR_CODES`). Statuses and messages are unchanged. Tests that
+  compare whole error bodies must add the field.
+- A catch-all `registerErrorHandler(Error, …)` now also receives
+  request-validation errors and the body parser's 413 and 400. Return `null`
+  for the errors you do not handle, to keep the default answers.
+- A `{ status, body }` result from an error handler must be a valid response.
+  A 206, or a status outside 200–599, is logged and answered with the 500. The
+  result sets its own `Content-Type`, replacing one set on `res` earlier. A
+  result without a body adds no `Content-Type`, and a 304 result gets no
+  `ETag`.
+- The built-in `Auth`, `Home` and `Health` handlers return their response. An
+  override that calls one should return the result:
+  `return super.postLogin(req, res)`. One that calls it without returning still
+  answers for now, with a one-time `ASF_DEP_DROPPED_RESPONSE` warning; v6
+  removes that. Its response goes out when the override finishes, so code after
+  the call runs first, and if that code throws, the client gets the error
+  response.
+- An override annotated `Promise<Response>` that returns the built-in result no
+  longer compiles. Widen the annotation or drop it.
+- The `Auth` answers without a body (register 201, verify and recover 200) no
+  longer send `Content-Type: application/json`.
+
 ## Upgrade notes (5.6.1)
 
 See the [5.6.1 release notes](CHANGELOG.md). Check these when you upgrade:

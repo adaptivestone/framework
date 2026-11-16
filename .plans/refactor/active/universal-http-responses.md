@@ -1,9 +1,9 @@
 # P1q — Universal typed HTTP responses (v5.x bridge → v6 cutover)
 
-**Status**: 🔄 active · Phases 0–1 implemented 2026-10-31 (unreleased), Phase 2 next · design direction settled 2026-07-18 · `transformResponse` hook folded in 2026-08-10  
-**Target**: the next minor (5.7; 5.6.0 shipped without it), additive; ordinary controller `res` removal is v6
+**Status**: 🔄 active · Phases 0–2 ship in 5.7.0 (prepared 2026-11-16) · Phase 3 (OpenAPI) next, as 5.8 · design direction settled 2026-07-18 · `transformResponse` hook folded in 2026-08-10  
+**Target**: phases 0–2 in 5.7.0, Phase 3 in 5.8; additive; ordinary controller `res` removal is v6
 **Depends on**: [tree-router](../done/tree-router.md) ✅, [error-handler-registry](../done/error-handler-registry.md) ✅  
-**Feeds**: [OpenAPI responses](../queued/openapi-responses.md), [async middleware](../queued/async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) ships in the same v5.6 minor and returns `HttpResponse` through this plan's writer** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
+**Feeds**: [OpenAPI responses](../queued/openapi-responses.md), [async middleware](../queued/async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) returns `HttpResponse` through this plan's writer; it is not part of 5.7.0 and ships later** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
 **Origin**: an authorized file-delivery workaround exposed the immediate stream/file gap. The wider design discussion showed that a file-only helper would preserve the real problem: controllers would still use Express for JSON, statuses, headers, redirects, and errors.
 
 ## Goal
@@ -299,7 +299,7 @@ runs in CI. Docs: written 2026-10-31 on branch `docs/http-responses` of the docu
 `06-Controllers/05-responses.md`; error handling, routes and testing pages updated; site build
 passes), not merged.
 
-### Phase 2 — framework and error migration (implemented 2026-10-31, except `Auth`)
+### Phase 2 — framework and error migration ✅ 2026-10-31 (`Auth` included)
 
 - Route framework-generated responses and error-registry results through the writer.
 - Migrate `Home`/`Auth` framework controllers to returned descriptors as fixtures for consumers.

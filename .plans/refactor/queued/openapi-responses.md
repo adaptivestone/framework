@@ -3,6 +3,8 @@
 **Status**: direction settled under [universal HTTP responses](../active/universal-http-responses.md);
 implementation not started. This file preserves the detailed OpenAPI questions and is subordinate
 to P1q where the two documents overlap.
+**Target**: 5.8, the next release after 5.7.0 (user decision 2026-11-16). It needs P1q phases 0–2
+only, not the middleware rework (P1m).
 **Depends on**: [openapi-generator](../done/openapi-generator.md) ✅ and
 [universal HTTP responses](../active/universal-http-responses.md) Phases 1–2.
 **Feeds**: a typed client / Swagger "try it"; later reuse by P2c response serialization
