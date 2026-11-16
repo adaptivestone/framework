@@ -345,7 +345,9 @@ As built:
   `await` (`super.postLogin(req, res)`) worked in 5.6 and hung, because the response is produced
   after the override finishes. `producedBuiltInResponse` became `claimBuiltInResponse(req, send)`:
   the adapter gets the response at once if there is one, else when it arrives (skipped if the
-  handler answered meanwhile).
+  handler answered meanwhile). Not bridged, disclosed in the changelog: the response of an awaited
+  call is sent when the override finishes, so code after the call delays it, and a throw there
+  answers with the error response.
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).
