@@ -349,6 +349,7 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 - `YupFile.check` single-file semantics
 - Remove the positional `body` argument of `HttpError` and its subclasses (deprecated in 5.5.0 for `{ message, errors }` / `{ message, body }`; see [coded-http-errors](done/coded-http-errors.md))
 - Remove `notVerified: true` from the unverified-login 400 (deprecated in 5.5.0; `error: 'EMAIL_NOT_VERIFIED'` replaces it).
+- Remove the transitional built-in response bridge (`services/http/builtInResponse.ts`, the adapter's `claimBuiltInResponse` branch and the `ASF_DEP_DROPPED_RESPONSE` warning, added in 5.7.0): an override must return the built-in handler's response. See [P1q](active/universal-http-responses.md).
 
 (Async/await middleware contract — formerly a bullet here — now has its own card: [async-middleware](queued/async-middleware.md), P1m: v5.6 opt-in via `contractVersion = 2`, v6 flip.)
 

@@ -9,7 +9,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
-import { producedBuiltInResponse } from '../builtInResponse.ts';
+import { claimBuiltInResponse } from '../builtInResponse.ts';
 import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
@@ -143,13 +143,16 @@ export function createExpressAdapter(
         }
         await writer.write(returned, req, res);
       } else if (!res.headersSent) {
-        // An override that awaited a framework handler without returning its
-        // response would answer nothing (5.x bridge, see `builtInResponse`).
-        const dropped = producedBuiltInResponse(req);
-        if (dropped) {
-          warnDroppedResponse(result.entry);
-          await writer.write(dropped, req, res);
-        }
+        // An override that called a framework handler without returning its
+        // response would answer nothing. Transitional: removed in v6 (see
+        // `builtInResponse`).
+        const { entry } = result;
+        claimBuiltInResponse(req, (dropped) => {
+          if (!res.headersSent) {
+            warnDroppedResponse(entry);
+            writer.write(dropped, req, res).catch(next);
+          }
+        });
       }
     } catch (err) {
       next(err);

@@ -341,6 +341,11 @@ As built:
   handler. `Auth` handlers keep `_res?: Response` and `Promise<HttpResponse | Response>` so
   overrides written against `res` compile (compile-only subclass in `Auth.test.ts`). v6: drop the
   bridge — a response that was not returned is not sent.
+  **Extended 2026-11-16 (pre-release check):** an override that calls the built-in handler without
+  `await` (`super.postLogin(req, res)`) worked in 5.6 and hung, because the response is produced
+  after the override finishes. `producedBuiltInResponse` became `claimBuiltInResponse(req, send)`:
+  the adapter gets the response at once if there is one, else when it arrives (skipped if the
+  handler answered meanwhile).
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).

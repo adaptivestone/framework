@@ -519,6 +519,81 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     }
   });
 
+  it('sends a framework response an override did not await', async () => {
+    const produced = HttpResponse.json(200, { ok: true });
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    // Like the `Auth` handlers: the response comes after an await.
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, produced);
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+      meta: { controllerClass: 'FloatingAuth', methodName: 'postLogin' },
+    });
+    const { writer, write } = stubWriter();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        asExpressRes(makeRes()),
+        mock.fn(),
+      );
+      assertNotCalled(write);
+
+      produce();
+      await flush();
+
+      assertCalledTimes(write, 1);
+      assert.strictEqual(write.mock.calls[0]?.arguments[0], produced);
+      assertCalledWith(
+        emitWarning,
+        pattern.stringContaining('FloatingAuth.postLogin'),
+        pattern.objectContaining({ code: 'ASF_DEP_DROPPED_RESPONSE' }),
+      );
+    } finally {
+      emitWarning.mock.restore();
+    }
+  });
+
+  it('leaves a late framework response alone when the handler answered meanwhile', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    // The handler answers by itself after it returned.
+    res.json({ own: true });
+    res.headersSent = true;
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+  });
+
   it('leaves a dropped framework response alone when the override answered itself', async () => {
     const r = new RouteRegistry();
     r.registerRoute('POST', '/login', {
