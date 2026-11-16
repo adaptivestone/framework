@@ -134,9 +134,10 @@ in the plan index.
 ## Completion
 
 Preparation complete. At the user's request, Claude replayed and committed the
-work on `release/5.7.0`, pushed it and opened release PR #84 (draft during the
-user's review) and the docs PR. No tag, npm publication or GitHub release; the
-user merges and publishes, then the tag and the GitHub release follow.
+work on `release/5.7.0`, pushed it and opened PR #84, which the user reviewed
+and merged on 2026-11-16, and docs PR #42. The release commit follows in its
+own PR. No tag, npm publication or GitHub release yet; the user merges and
+publishes, then the tag and the GitHub release follow.
 
 Next: OpenAPI response contracts as 5.8, then the middleware replay with its
 compatibility decision. Earlier follow-ups stay open: replace `deepmerge` with

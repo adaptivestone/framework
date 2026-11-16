@@ -282,7 +282,7 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
-## 5.7.0 — prepared 2026-11-16 (release PR #84)
+## 5.7.0 — prepared 2026-11-16 (PR #84, then the release commit)
 
 User-selected minor release. See [release preparation](done/release-5.7.0.md) and `CHANGELOG.md`: handlers return typed `HttpResponse` values, every framework response goes through one writer with a `transformResponse` hook, error handlers can return responses, and framework error bodies carry stable `error` codes (P1q phases 0–2). The middleware rework (P1m) and its design documents are not part of it; OpenAPI response contracts follow as 5.8.
 
