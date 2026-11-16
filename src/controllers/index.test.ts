@@ -23,9 +23,11 @@ import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import AbstractController from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
+import type { ResolvedError } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import type { MiddlewareSpec } from '../services/http/routing/middlewareNormalization.ts';
 import type {
   HttpMethod,
@@ -33,6 +35,7 @@ import type {
 } from '../services/http/routing/RouteNode.ts';
 import { RouteRegistry } from '../services/http/routing/RouteRegistry.ts';
 import type { StandardSchemaV1 } from '../services/validate/types.ts';
+import { ValidationError } from '../services/validate/ValidationError.ts';
 import { assertCalledTimes, assertThrowsLike } from '../tests/assertions.ts';
 import ErrorRegistryController, {
   FakeDriverError,
@@ -865,7 +868,7 @@ describe('ControllerManager — cross-controller middleware', () => {
     assert.ok(handler);
 
     const invalidResponse = responseForHandler();
-    await handler(
+    const returned = await handler(
       {
         body: {},
         headers: {},
@@ -874,8 +877,14 @@ describe('ControllerManager — cross-controller middleware', () => {
       invalidResponse as unknown as Response,
       () => {},
     );
+    // Error responses come back as values for the adapter to write.
+    if (HttpResponse.is(returned) && returned.kind === 'json') {
+      invalidResponse.statusCode = returned.status;
+      invalidResponse.body = returned.body;
+    }
     assert.strictEqual(invalidResponse.statusCode, 400);
     assert.deepStrictEqual(invalidResponse.body, {
+      error: 'VALIDATION_FAILED',
       message: 'Validation failed',
       errors: { tenant: ['tenant is required'] },
     });
@@ -1197,7 +1206,16 @@ describe('ControllerManager — validated output runtime parity', () => {
       params: {},
       appInfo: { request: {}, query: {}, params: {} },
     } as unknown as FrameworkRequest;
-    await hit.entry.handler(req, response as unknown as Response, () => {});
+    const returned = await hit.entry.handler(
+      req,
+      response as unknown as Response,
+      () => {},
+    );
+    // Error responses come back as values for the adapter to write.
+    if (HttpResponse.is(returned) && returned.kind === 'json') {
+      response.statusCode = returned.status;
+      response.body = returned.body;
+    }
     return response;
   };
 
@@ -1245,6 +1263,7 @@ describe('ControllerManager — validated output runtime parity', () => {
     const response = await invoke('/incompatible');
     assert.strictEqual(response.statusCode, 500);
     assert.deepStrictEqual(response.body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -1261,6 +1280,7 @@ describe('ControllerManager — validated output runtime parity', () => {
     const response = await invoke('/content-array');
     assert.strictEqual(response.statusCode, 500);
     assert.deepStrictEqual(response.body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -1493,6 +1513,22 @@ describe('HttpServer.resolveError — registry resolution', () => {
   const fakeReq = (request: Record<string, unknown> = {}) =>
     ({ appInfo: { request, query: {} } }) as unknown as FrameworkRequest;
 
+  /** The legacy fields as given, plus the JSON `response` that will be sent. */
+  const assertResolved = (
+    resolved: ResolvedError | null,
+    expected: { status: number; body: unknown; logLevel: string },
+  ) => {
+    assert.ok(resolved);
+    const { response, ...legacy } = resolved;
+    assert.deepStrictEqual(legacy, expected);
+    assert.strictEqual(response.kind, 'json');
+    assert.strictEqual(response.status, expected.status);
+    assert.deepStrictEqual(
+      response.kind === 'json' ? response.body : undefined,
+      expected.body,
+    );
+  };
+
   // Silence the console transports: the throwing-handler test drives a real
   // `logger.error(...)` line inside `resolveError`. The capture transport keeps
   // the root logger's `log` contract satisfied while nothing here asserts on it.
@@ -1525,7 +1561,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new NotFoundError('Boat not found'),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 404,
       body: { message: 'Boat not found' },
       logLevel: 'verbose',
@@ -1540,7 +1576,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       }),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 422,
       body: { message: 'Unprocessable', errors: { csv: ['row 17 malformed'] } },
       logLevel: 'verbose',
@@ -1564,9 +1600,10 @@ describe('HttpServer.resolveError — registry resolution', () => {
       vErr,
       fakeReq({ name: 'x' }),
     );
-    assert.deepStrictEqual(matched, {
+    assertResolved(matched, {
       status: 400,
       body: {
+        error: 'VALIDATION_FAILED',
         message: 'Validation failed',
         errors: { name: ['Must be at most 5 characters'] },
       },
@@ -1626,7 +1663,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new OrderedError(),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 410,
       body: { message: 'second' },
       logLevel: 'warn',
@@ -1646,7 +1683,7 @@ describe('HttpServer.resolveError — registry resolution', () => {
       new AsyncMapped(),
       fakeReq(),
     );
-    assert.deepStrictEqual(resolved, {
+    assertResolved(resolved, {
       status: 402,
       body: { message: 'later' },
       logLevel: 'info',
@@ -1776,6 +1813,7 @@ describe('Error-handler registry over HTTP', () => {
     const res = await get('/plain');
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(await res.json(), {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
     assert.deepStrictEqual(
@@ -1859,6 +1897,7 @@ describe('ControllerManager — validation-phase error leak', () => {
     assert.ok(!JSON.stringify(body).includes('s3cret'));
     // Generic 500 body, consistent with the framework's other 500 sink.
     assert.deepStrictEqual(body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
     // The server-side defect IS logged at error, in full, for the developer.
@@ -1968,6 +2007,7 @@ describe('ControllerManager — route `params:` schema', () => {
     // Named by the PARAM (public, in the URL pattern) — never by the internal
     // model path (`ref`), and never echoing the rejected value.
     assert.deepStrictEqual(body, {
+      error: 'VALIDATION_FAILED',
       message: 'Validation failed',
       errors: { id: ['Must be a valid id'] },
     });
@@ -1981,6 +2021,7 @@ describe('ControllerManager — route `params:` schema', () => {
 
     assert.strictEqual(res.status, 500);
     assert.deepStrictEqual(body, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -2007,5 +2048,288 @@ describe('ControllerManager — route `params:` schema', () => {
 
     assert.strictEqual(res.status, 400);
     assert.deepStrictEqual(Object.keys(body.errors), ['group']);
+  });
+});
+
+// ─── returned HttpResponse (P1q) — over HTTP ─────────────────────────
+//
+// A handler may return an `HttpResponse` instead of writing to `res`. The
+// validation wrapper passes the return value through, and the adapter renders
+// it; thrown errors and validation 400s keep their existing paths.
+
+const requiredName: StandardSchemaV1 = {
+  '~standard': {
+    version: 1,
+    vendor: 'runtime-test',
+    validate: (value) => {
+      const name = (value as { name?: unknown } | null)?.name;
+      return typeof name === 'string'
+        ? { value: { name } }
+        : { issues: [{ message: 'name is required', path: ['name'] }] };
+    },
+  },
+};
+
+class ReturnedResponseController extends AbstractController {
+  get routes() {
+    return {
+      post: {
+        '/create': { handler: this.create, request: requiredName },
+      },
+      get: {
+        '/moved': this.moved,
+        '/missing': this.missing,
+        '/mixed': this.mixed,
+      },
+    };
+  }
+
+  async create(req: FrameworkRequest) {
+    return HttpResponse.json(
+      201,
+      { name: req.appInfo.request.name },
+      { headers: { location: '/test/returnedresponsecontroller/1' } },
+    );
+  }
+
+  async moved() {
+    return HttpResponse.redirect(
+      308,
+      '/test/returnedresponsecontroller/create',
+    );
+  }
+
+  async missing(): Promise<HttpResponse> {
+    throw new NotFoundError('Nothing to return');
+  }
+
+  async mixed(_req: FrameworkRequest, res: Response) {
+    res.status(200).json({ first: true });
+    await new Promise((resolve) => setImmediate(resolve));
+    return HttpResponse.json(200, { second: true });
+  }
+
+  static get middleware() {
+    return new Map();
+  }
+}
+
+describe('ControllerManager — returned HttpResponse', () => {
+  const base = '/test/returnedresponsecontroller';
+  const post = (path: string, body: unknown) =>
+    fetch(getTestServerURL(`${base}${path}`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const get = (path: string) =>
+    fetch(getTestServerURL(`${base}${path}`), { redirect: 'manual' });
+
+  let capture: CaptureTransport;
+  let silenced: Transport[] = [];
+
+  before(() => {
+    appInstance.controllerManager?.registerController(
+      ReturnedResponseController,
+      'test',
+    );
+    capture = new CaptureTransport();
+    appInstance.logger.add(capture);
+    silenced = appInstance.logger.transports.filter((t) => t !== capture);
+    for (const t of silenced) {
+      t.silent = true;
+    }
+  });
+
+  after(() => {
+    for (const t of silenced) {
+      t.silent = false;
+    }
+    appInstance.logger.remove(capture);
+  });
+
+  beforeEach(() => {
+    capture.records.length = 0;
+  });
+
+  it('renders the returned response with the validated input', async () => {
+    const res = await post('/create', { name: 'Ada', extra: 'dropped' });
+    assert.strictEqual(res.status, 201);
+    assert.strictEqual(
+      res.headers.get('location'),
+      '/test/returnedresponsecontroller/1',
+    );
+    assert.deepStrictEqual(await res.json(), { name: 'Ada' });
+  });
+
+  it('keeps the validation 400 for rejected input', async () => {
+    const res = await post('/create', {});
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(await res.json(), {
+      error: 'VALIDATION_FAILED',
+      message: 'Validation failed',
+      errors: { name: ['name is required'] },
+    });
+  });
+
+  it('renders a redirect', async () => {
+    const res = await get('/moved');
+    assert.strictEqual(res.status, 308);
+    assert.strictEqual(
+      res.headers.get('location'),
+      '/test/returnedresponsecontroller/create',
+    );
+  });
+
+  it('keeps thrown errors on the error-handler registry', async () => {
+    const res = await get('/missing');
+    assert.strictEqual(res.status, 404);
+    assert.deepStrictEqual(await res.json(), { message: 'Nothing to return' });
+  });
+
+  it('logs an error when the handler also wrote to res', async () => {
+    const res = await get('/mixed');
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { first: true });
+    const logged = () =>
+      capture.records.filter((r) =>
+        /both wrote to res and returned an HttpResponse/.test(r.message),
+      );
+    // The error is raised after the response went out; give it a moment.
+    for (let i = 0; i < 50 && logged().length === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.deepStrictEqual(
+      logged().map((r) => r.level),
+      ['error'],
+    );
+  });
+});
+
+// ─── request validation through the error-handler registry ───────────
+//
+// The validation catch asks the registry first, so a handler registered for
+// `ValidationError` (or a catch-all `Error`) can reshape the 400; with nothing
+// resolving it, the 400 is unchanged.
+
+class ValidationRegistryController extends AbstractController {
+  get routes() {
+    return {
+      post: {
+        '/check': { handler: this.check, request: requiredName },
+      },
+    };
+  }
+
+  async check(req: FrameworkRequest) {
+    return HttpResponse.json(200, { name: req.appInfo.request.name });
+  }
+
+  static get middleware() {
+    return new Map();
+  }
+}
+
+describe('Request validation through the error-handler registry', () => {
+  const check = (body: unknown) =>
+    fetch(getTestServerURL('/test/validationregistrycontroller/check'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  const unregisters: Array<() => void> = [];
+
+  before(() => {
+    appInstance.controllerManager?.registerController(
+      ValidationRegistryController,
+      'test',
+    );
+  });
+
+  afterEach(() => {
+    for (const unregister of unregisters.splice(0)) {
+      unregister();
+    }
+  });
+
+  it('keeps the 400 when no handler resolves it', async () => {
+    const res = await check({});
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(await res.json(), {
+      error: 'VALIDATION_FAILED',
+      message: 'Validation failed',
+      errors: { name: ['name is required'] },
+    });
+  });
+
+  it('lets a handler registered for ValidationError reshape it', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, (err) =>
+        HttpResponse.json(
+          422,
+          { problems: err.message },
+          { contentType: 'application/problem+json' },
+        ),
+      ),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 422);
+    assert.match(
+      res.headers.get('content-type') ?? '',
+      /^application\/problem\+json/,
+    );
+    assert.deepStrictEqual(await res.json(), {
+      problems: { name: ['name is required'] },
+    });
+  });
+
+  it('a catch-all Error handler sees it and keeps the 400 by returning null', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    const seen: string[] = [];
+    unregisters.push(
+      server.registerErrorHandler(Error, (err) => {
+        seen.push(err.name);
+        return null;
+      }),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 400);
+    assert.deepStrictEqual(seen, ['ValidationError']);
+  });
+
+  it('a ValidationError handler that throws answers 500, not the 400', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, () => {
+        throw new Error('handler broke');
+      }),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual((await res.json()).error, 'SERVER_ERROR');
+  });
+
+  it('a ValidationError handler with an invalid result answers 500, not the 400', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, () => ({
+        status: 206,
+        body: {},
+      })),
+    );
+    const res = await check({});
+    assert.strictEqual(res.status, 500);
+    assert.strictEqual((await res.json()).error, 'SERVER_ERROR');
+  });
+
+  it('valid input still reaches the handler', async () => {
+    const res = await check({ name: 'Ada' });
+    assert.strictEqual(res.status, 200);
+    assert.deepStrictEqual(await res.json(), { name: 'Ada' });
   });
 });

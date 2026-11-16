@@ -7,7 +7,8 @@ import {
   ValidationError,
 } from '../validate/ValidationError.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
-import { HttpError } from './httpErrors.ts';
+import { FRAMEWORK_ERROR_CODES, HttpError } from './httpErrors.ts';
+import { HttpResponse, NO_BODY_STATUSES } from './responses.ts';
 
 /** The `message` of every framework 500 response. */
 export const serverErrorMessage = (req: FrameworkRequest) =>
@@ -39,7 +40,16 @@ export interface ErrorHandlerResult {
   headers?: Record<string, string>;
 }
 
-/** Answer a resolved error: its headers, status and JSON body. */
+/** A resolved error: the response to send, the entry's log level, and the legacy result fields. */
+export interface ResolvedError extends ErrorHandlerResult {
+  response: HttpResponse;
+  logLevel: ErrorLogLevel;
+}
+
+/**
+ * Answer a resolved error: its headers, status and JSON body.
+ * @deprecated The framework sends `ResolvedError.response` through the response writer now; build one with `errorResultResponse`.
+ */
 export function sendErrorResult(
   res: Response,
   { status, body, headers }: ErrorHandlerResult,
@@ -51,20 +61,79 @@ export function sendErrorResult(
 }
 
 /**
+ * A `{ status, body, headers }` result as the response `sendErrorResult` sent:
+ * JSON, with a `Content-Type` header kept as the media type, and no body for
+ * an undefined body or a status that never carries one.
+ */
+export function errorResultResponse({
+  status,
+  body,
+  headers,
+}: ErrorHandlerResult): HttpResponse {
+  let contentType: string | undefined;
+  const rest: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (name.toLowerCase() === 'content-type') {
+      contentType = value;
+    } else {
+      rest[name] = value;
+    }
+  }
+  if (body === undefined || NO_BODY_STATUSES.has(status)) {
+    // `empty` owns no media type, so the header rides along unchanged.
+    return HttpResponse.empty(status, { headers: headers ?? {} });
+  }
+  return HttpResponse.json(status, body, { headers: rest, contentType });
+}
+
+/** Errors a registry handler failed on (threw, or returned an invalid result). */
+const failedHandlerErrors = new WeakSet<object>();
+
+/** @internal Record that a registry handler failed on `err`. */
+export function markErrorHandlerFailed(err: unknown): void {
+  if (typeof err === 'object' && err !== null) {
+    failedHandlerErrors.add(err);
+  }
+}
+
+/**
+ * @internal Did a registry handler fail on `err`? Such an error answers the
+ * generic 500, never a caller's fallback response.
+ */
+export function errorHandlerFailed(err: unknown): boolean {
+  return (
+    typeof err === 'object' && err !== null && failedHandlerErrors.has(err)
+  );
+}
+
+/** The generic 500 answered for an error nothing in the registry resolved. */
+export const serverErrorResponse = (req: FrameworkRequest) =>
+  HttpResponse.json(500, {
+    error: FRAMEWORK_ERROR_CODES.serverError,
+    message: serverErrorMessage(req),
+  });
+
+/**
  * What `registerErrorHandler` accepts: any `Error` subclass, including one that
  * widens `message` (the framework's `ValidationError` carries its field
  * payload there). Structural, so the core declarations need not import it.
  */
 export type RegistrableError = Omit<Error, 'message'>;
 
+/**
+ * Maps an error to a response: a `{ status, body, headers? }` result, an
+ * `HttpResponse` (for other content or full control), or `null`/`undefined`
+ * to pass to the next entry.
+ */
 export type ErrorHandlerFn<E extends RegistrableError = Error> = (
   err: E,
   req: FrameworkRequest,
 ) =>
   | ErrorHandlerResult
+  | HttpResponse
   | null
   | undefined
-  | Promise<ErrorHandlerResult | null | undefined>;
+  | Promise<ErrorHandlerResult | HttpResponse | null | undefined>;
 
 /** A registered (class, handler, level) triple as stored by the registry. */
 export interface RegisteredErrorHandler {
@@ -393,6 +462,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
           ? {
               status: 400,
               body: {
+                error: FRAMEWORK_ERROR_CODES.validationFailed,
                 message: validationFailedMessage(req),
                 errors: new ValidationError(clientErrors).message,
               },
@@ -412,6 +482,7 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
           ? {
               status: 400,
               body: {
+                error: FRAMEWORK_ERROR_CODES.validationFailed,
                 message: validationFailedMessage(req),
                 errors: new ValidationError(clientErrors).message,
               },

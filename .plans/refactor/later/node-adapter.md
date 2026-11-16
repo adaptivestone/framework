@@ -1,7 +1,7 @@
 # P3 — `NodeAdapter` (drop Express router)
 
 **Status**: ⏸ deferred
-**Depends on**: P1b, [P1q universal HTTP responses](../queued/universal-http-responses.md), P2c
+**Depends on**: P1b, [P1q universal HTTP responses](../active/universal-http-responses.md), P2c
 **Unblocks**: P4
 
 ## Goal (one-line)

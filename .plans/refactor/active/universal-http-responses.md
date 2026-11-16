@@ -1,9 +1,9 @@
 # P1q — Universal typed HTTP responses (v5.x bridge → v6 cutover)
 
-**Status**: ✅ design direction settled 2026-07-18 · implementation not started · `transformResponse` hook folded in 2026-08-10  
-**Target**: 5.6 (moved out of 5.5 on 2026-10-03), additive; ordinary controller `res` removal is v6
+**Status**: 🔄 active · Phases 0–1 implemented 2026-10-31 (unreleased), Phase 2 next · design direction settled 2026-07-18 · `transformResponse` hook folded in 2026-08-10  
+**Target**: the next minor (5.7; 5.6.0 shipped without it), additive; ordinary controller `res` removal is v6
 **Depends on**: [tree-router](../done/tree-router.md) ✅, [error-handler-registry](../done/error-handler-registry.md) ✅  
-**Feeds**: [OpenAPI responses](openapi-responses.md), [async middleware](./async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) ships in the same v5.6 minor and returns `HttpResponse` through this plan's writer** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
+**Feeds**: [OpenAPI responses](../queued/openapi-responses.md), [async middleware](../queued/async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) ships in the same v5.6 minor and returns `HttpResponse` through this plan's writer** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
 **Origin**: an authorized file-delivery workaround exposed the immediate stream/file gap. The wider design discussion showed that a file-only helper would preserve the real problem: controllers would still use Express for JSON, statuses, headers, redirects, and errors.
 
 ## Goal
@@ -153,18 +153,19 @@ adapter-neutral and ships with the writer instead of being built twice.
 
 - **Contract**: `transformResponse(response, { req }) => HttpResponse` — synchronous, operates on
   the branded descriptor, never on adapter objects. Projects match on kind: reshape `json`
-  descriptors, pass `stream`/`file`/`redirect`/`empty` through untouched. The registration point
-  (a `Server` option beside `bootHttp` — which would flow through `configureTestServer` for free —
-  vs an `HttpServer` method) is a Phase 0 decision.
+  descriptors, pass `stream`/`file`/`redirect`/`empty` through untouched. **Registration settled
+  2026-10-31 (user): a `Server` option beside `bootHttp`** (`new Server({ …, transformResponse })`),
+  one per app by construction and passed to tests by `configureTestServer`; not an `HttpServer`
+  method.
 - **Guarantee**: every response the framework renders passes through the hook — validation 400s,
   the 404 page, the error sink, error-registry results, built-in controllers. This becomes true at
   Phase 2 (framework responses traverse the writer); the hook must not be advertised before then,
   or it silently covers only descriptor-returning handlers.
 - **Bridge period (v5.x)**: legacy handlers that call `res.json` directly never reach the writer.
-  If the all-JSON guarantee is wanted before v6, the Express-era implementation is a `res.json`
-  wrap owned internally by `ExpressAdapter`, with `ExpressResponseWriter` sending through the same
-  point so the hook applies exactly once; consumers never see Express. In v6 the writer is the
-  only path and the implementation moves there — the consumer contract does not change.
+  **Settled 2026-10-31 (user): no `res.json` bridge.** The hook covers returned responses and every
+  framework-built response; a handler writing `res` itself is documented as not transformed (an
+  always-on wrap would double-envelope apps that already wrap their own bodies). In v6 the writer
+  is the only path, so the gap closes by itself.
 - **Failure**: a throwing transform logs at `error` and renders the original response — a broken
   envelope must not take the API down.
 - **OpenAPI caveat**: a transform makes generated body schemas wrong unless paired with a
@@ -235,7 +236,7 @@ unhandled `500`. The old unconditional `200/400/401/404` stub set is removed.
 
 ## Delivery phases
 
-### Phase 0 — contract tests and API spike
+### Phase 0 — contract tests and API spike ✅ 2026-10-31
 
 - Lock factory names, status restrictions, descriptor branding, header semantics, and public
   exports in type/runtime tests.
@@ -243,20 +244,121 @@ unhandled `500`. The old unconditional `200/400/401/404` stub set is removed.
   its exact signature.
 - Prove Web stream and async-iterable writing through Express with abort propagation.
 - Measure the semantic type-resolution options for OpenAPI; do not block the runtime layer on it.
+  **Deferred to the start of Phase 3** (it does not block Phases 1–2).
 
-### Phase 1 — additive runtime boundary
+Settled (locked by `responses.test.ts`, `ExpressResponseWriter.test.ts`, `ExpressAdapter.test.ts`):
+
+- **Module/export layout.** `services/http/responses.ts` (public; reached through the existing
+  `./services/*` export, so no `package.json` change), `ResponseWriter.ts` (adapter interface),
+  `ExpressResponseWriter.ts`. `HttpServer.responseWriter` is the shared writer instance.
+- **Factories**: `json`, `text`, `bytes`, `stream`, `redirect`, `empty`, `native`, plus
+  `HttpResponse.is`. `file` is **not** added until Phase 4 settles its delivery shape (no stub).
+- **Branding.** `Symbol.for('@adaptivestone/framework/HttpResponse')`: a registered symbol, so two
+  installed framework copies recognize each other's descriptors; a look-alike object without it
+  stays legacy. Descriptors and their header pairs are frozen.
+- **Status rules.** Literal statuses fail to compile and every status is checked at runtime
+  (`RangeError`): 200–599 only; 204/205/304 only via `empty`; 206 nowhere until file responses;
+  `redirect` takes literal 301/302/303/307/308. A runtime `number` compiles for body/empty kinds.
+- **Media type** is `options.contentType` and kept as a literal type parameter (`JsonResponse<S,
+  B, M = 'application/json'>`); a `content-type` header in `headers` is rejected, as is `location`
+  on `redirect`. `json(status, undefined)` is rejected (use `empty`).
+- **Headers** go through Web `Headers` (validation, lower-case names, repeated names combined,
+  one entry per `set-cookie`) and are stored as `ResponseHeaders` pairs, which are themselves a
+  valid `headers` init. Writing: a descriptor header replaces a same-name header set earlier
+  (security headers, CORS), `set-cookie` is appended, `vary` merged.
+- **Express rendering.** JSON/text/bytes go through `res.json`/`res.send`, so ETag, conditional
+  GET, charset and `json spaces/replacer` match legacy output; `redirect` uses `res.redirect`.
+  A write that fails before headers are sent (`JSON.stringify` throws, a bad first chunk)
+  restores the status, status text and headers it found, so the error response carries none of
+  the descriptor's (`set-cookie`, `location`, …).
+- **Streams.** A `ReadableStream` is read through its reader; any other source through its async
+  iterator. Status and headers are committed with the first chunk: an error before it rejects
+  with `res` untouched (→ error registry / 500), an error after it destroys the response and
+  rejects, a client disconnect calls `return()`/`reader.cancel()` and resolves. HEAD cancels the
+  source unread. Verified on Node 26.12.1 and Bun 1.4.4.
+- **Native.** Status, status text, headers (hop-by-hop framing headers dropped) and body. A
+  `fetch()` response keeps the upstream `content-encoding`/`content-length` although its body was
+  decoded: documented, not rewritten.
+- **`transformResponse`**: `Server` option, `(response, { req }) => HttpResponse` (see above);
+  built in Phase 2.
+
+### Phase 1 — additive runtime boundary ✅ 2026-10-31
 
 - Add `HttpResponse` types/factories, `ResponseWriter`, and `ExpressResponseWriter`.
 - Teach controller dispatch to render branded returns and reject mixed legacy/new responses.
 - Preserve every legacy return path byte-for-byte.
 
-### Phase 2 — framework and error migration
+As built: rendering lives in `ExpressAdapter` dispatch (not the controller validation wrapper), so
+controller handlers and ad-hoc `registerRoute` handlers both get it. A handler that already sent
+headers and returns a descriptor raises an error to `next(err)` (the final sink logs it at
+`error`); headers set without sending are merged, because global middleware sets them. Writer
+failures go to `next(err)` and resolve through the error registry. Verification: the new tests
+pass on Node and Bun locally; Biome, both type checks and the packaging smoke test pass. The full
+suite needs MongoDB, which this session's network policy blocked (`fastdl.mongodb.org`), so it
+runs in CI. Docs: written 2026-10-31 on branch `docs/http-responses` of the documentation repo (new
+`06-Controllers/05-responses.md`; error handling, routes and testing pages updated; site build
+passes), not merged.
+
+### Phase 2 — framework and error migration (implemented 2026-10-31, except `Auth`)
 
 - Route framework-generated responses and error-registry results through the writer.
 - Migrate `Home`/`Auth` framework controllers to returned descriptors as fixtures for consumers.
 - Keep legacy `{ status, body }` error-handler results accepted.
 - Expose and document `transformResponse` here — the all-responses guarantee only holds once
   framework responses traverse the writer.
+
+As built:
+
+- **Writer is the single seam.** The controller validation wrapper _returns_ its 415, 400 and
+  error responses (the adapter writes them); the adapter writes its malformed-URL 400 and 405;
+  `add404Page` and the final sink write through `HttpServer.responseWriter`. This is also the P1s
+  metrics hook point: one `write()` sees every framework-rendered response.
+- **Error registry.** `ErrorHandlerFn` may return an `HttpResponse`. A `{ status, body, headers }`
+  result becomes `errorResultResponse()`: JSON, a `Content-Type` header kept as the media type,
+  `empty` for an undefined body or 204/205/304. `resolveError` returns `ResolvedError` = the
+  legacy fields plus `response` (additive). A result that is not a valid response (e.g. status 99)
+  counts as a broken handler → logged, 500. If the error response itself cannot be written (a
+  circular body), the sink falls back to the plain 500 without writer or transform.
+- **`transformResponse`**: `Server` option → `HttpServer` constructor option → the writer. It
+  covers returned responses, validation/415/405/404/malformed-URL, registry results and the
+  500; a handler writing `res` itself bypasses it. Throwing, returning a non-response or a
+  Promise → logged at `error` through `HttpServer`'s logger, original sent.
+- **RequestParser** 413/400 → `next(new HttpError(...))` with the same translated message, so
+  they reach the registry and the transform; `Connection: close` stays on `res`. No error codes
+  were added (bodies unchanged).
+- **Built-ins.** `Home` and `Health` return descriptors, keeping an optional `res` parameter and
+  `| Response` in their return types so overrides written against `res` still compile (pinned
+  by compile-only subclasses in `Home.test.ts`/`Health.test.ts`).
+- **`Auth` — decided 2026-10-31 (user): migrate everything if it can be done safely, else keep
+  it on `res` until v6.** The hazard: an override doing `await super.postLogin(req, res)` without
+  `return` would drop the returned response and hang. Safe route being tried: the built-in
+  handlers mark the response they produce on the request; when a handler finishes having sent
+  nothing and returned no response, the adapter sends the marked one and warns once
+  (`return super.…()`). Fallback if that is not small and clean: keep `Auth` on `res` (v6 list).
+  **Done 2026-10-31:** `services/http/builtInResponse.ts` (`builtInResponse(req, response)` marks,
+  `producedBuiltInResponse(req)` reads); `Auth`, `Home` and `Health` mark every response; the
+  adapter sends a marked-but-dropped response and emits `ASF_DEP_DROPPED_RESPONSE` once per
+  handler. `Auth` handlers keep `_res?: Response` and `Promise<HttpResponse | Response>` so
+  overrides written against `res` compile (compile-only subclass in `Auth.test.ts`). v6: drop the
+  bridge — a response that was not returned is not sent.
+  **Extended 2026-11-16 (pre-release check):** an override that calls the built-in handler without
+  `await` (`super.postLogin(req, res)`) worked in 5.6 and hung, because the response is produced
+  after the override finishes. `producedBuiltInResponse` became `claimBuiltInResponse(req, send)`:
+  the adapter gets the response at once if there is one, else when it arrives (skipped if the
+  handler answered meanwhile). Not bridged, disclosed in the changelog: the response of an awaited
+  call is sent when the override finishes, so code after the call delays it, and a throw there
+  answers with the error response.
+- **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
+  itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
+  "not initialised" 500 (registry middleware — moves with P1m).
+- **Legacy error results — decided 2026-10-31 (user): strict.** A `{ status, body }` result with a
+  status no JSON response may carry (206, outside 200–599) is a broken handler → logged, 500.
+  Before, `res.status(s).json()` sent 206 as given. One changelog line.
+- **Error codes on framework-built errors — decided 2026-10-31 (user, option C).** Every error
+  body the framework builds carries `error`: `VALIDATION_FAILED` (validation 400 and the
+  Mongoose safety nets), `MALFORMED_URL`, `MALFORMED_BODY`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`,
+  `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_CONTENT_TYPE`, `SERVER_ERROR`. Additive for clients;
+  whole-body test assertions in apps change (as with the 5.5 codes).
 
 ### Phase 3 — OpenAPI/type integration
 
@@ -283,13 +385,15 @@ unhandled `500`. The old unconditional `200/400/401/404` stub set is removed.
 - Codegen/OpenAPI: `src/codegen/astExtract.ts`, `src/codegen/astResolve.ts`,
   `src/codegen/astSpec.ts`, `src/codegen/astEmit.ts`, generated-type fixtures/tests,
   `src/services/documentation/OpenApiGenerator.ts` and tests.
-- Public surface: `package.json` exports if a dedicated subpath is chosen; generated declaration
-  packaging smoke test.
+- Public surface: no `package.json` change (the `./services/*` export covers `responses.js`);
+  generated declaration packaging smoke test.
 - Documentation: controller responses, streams/files, error handling, OpenAPI, v5.3 adoption,
   v6 migration, and `CHANGELOG.md`.
 
 The file set is finalized after Phase 0 fixes the module/export layout; later phases must update
-this list before touching additional production files.
+this list before touching additional production files. Phases 0–1 touched: the three new modules
+and their tests, `ExpressAdapter.ts`, `HttpServer.ts`, `ExpressAdapter.test.ts`,
+`controllers/index.test.ts` and `CHANGELOG.md`; `controllers/index.ts` was not needed.
 
 ## Out of scope for v5.3
 

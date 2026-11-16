@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, describe, it, mock } from 'node:test';
+import type { Response } from 'express';
 import mongoose from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
+import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
+import Health from './Health.ts';
 
 const healthConfig = () =>
   appInstance.getConfig('health') as { token?: string };
@@ -90,5 +93,23 @@ describe('health endpoints', () => {
     const res = await fetch(getTestServerURL('/health'));
     assert.strictEqual(res.status, 200);
     assert.deepStrictEqual(await res.json(), { app: true });
+  });
+});
+
+describe('health controller overrides', () => {
+  it('still accept handlers written against res (compile-time check)', () => {
+    class LegacyHealth extends Health {
+      override async live(req: FrameworkRequest, res: Response) {
+        if (!this.isAuthorized(req)) {
+          return this.unauthorized(req, res);
+        }
+        return res.json({ status: 'ok', custom: true });
+      }
+
+      override unauthorized(_req: FrameworkRequest, res: Response) {
+        return res.status(401).json({ message: 'No' });
+      }
+    }
+    assert.strictEqual(typeof LegacyHealth.prototype.live, 'function');
   });
 });

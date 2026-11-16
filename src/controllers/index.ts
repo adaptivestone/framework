@@ -8,13 +8,15 @@ import { controllerOverridePath } from '../modules/AbstractController.ts';
 import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import {
-  sendErrorResult,
-  serverErrorMessage,
+  errorHandlerFailed,
+  serverErrorResponse,
   toLoggableError,
   validationFailedMessage,
 } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import { FRAMEWORK_ERROR_CODES } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import {
   type MiddlewareSpec,
   normalizeMiddlewares,
@@ -484,7 +486,8 @@ class ControllerManager extends Base {
               ? entryRequestMapLookup[contentType]
               : undefined;
           if (!matched) {
-            return res.status(415).json({
+            return HttpResponse.json(415, {
+              error: FRAMEWORK_ERROR_CODES.unsupportedContentType,
               message: translateWithDefault(
                 req,
                 'http.unsupportedContentType',
@@ -529,19 +532,25 @@ class ControllerManager extends Base {
         if (res.headersSent) {
           return next(err);
         }
-        // Only a framework `ValidationError` is a client 400 — its widened
-        // `.message` is the per-field payload. Anything else thrown while
-        // validating is a server-side defect (a validator that threw): route it
-        // through the error-handler registry, same as the handler catch below,
-        // so consumer handlers apply consistently; otherwise a generic 500 with
-        // the detail LOGGED, never echoed.
-        if (ValidationError.isValidationError(err)) {
-          return res.status(400).json({
-            message: validationFailedMessage(req),
-            errors: err.message,
-          });
-        }
-        return answerError(app, logger, err, req, res);
+        // Registry first, as in the handler catch below: a handler registered
+        // for `ValidationError` (or a catch-all `Error`) may reshape it. Left
+        // unresolved, a framework `ValidationError` is the client 400 — its
+        // widened `.message` is the per-field payload. Anything else thrown
+        // while validating is a server-side defect (a validator that threw): a
+        // generic 500 with the detail LOGGED, never echoed.
+        return answerError(
+          app,
+          logger,
+          err,
+          req,
+          ValidationError.isValidationError(err)
+            ? HttpResponse.json(400, {
+                error: FRAMEWORK_ERROR_CODES.validationFailed,
+                message: validationFailedMessage(req),
+                errors: err.message,
+              })
+            : undefined,
+        );
       }
 
       try {
@@ -554,7 +563,7 @@ class ControllerManager extends Base {
           return next(err);
         }
         // Same registry walk as the validation catch above (see `answerError`).
-        return answerError(app, logger, err, req, res);
+        return answerError(app, logger, err, req);
       }
     };
 
@@ -614,34 +623,38 @@ export function buildSubtreeFromSpec(
 }
 
 /**
- * Answer an error thrown while validating or handling a request. Error-handler
- * registry first: consumer-registered handlers, then the built-ins (`HttpError`
- * mapper, mongoose safety nets) — the first `instanceof` match returning
- * non-null wins, logged at the entry's own level (`verbose` for deliberate
- * HttpError control flow, `warn` for the safety nets' schema-gap signal, `warn`
- * default for consumer entries). A handled error's log line rides into log
- * shippers (Sentry, retention), so it is rebuilt value-free by `toLoggableError`
- * first. Anything unresolved is a server-side defect: logged in full, answered
- * with a generic 500.
+ * The response for an error thrown while validating or handling a request
+ * (returned, so the adapter writes it). Error-handler registry first:
+ * consumer-registered handlers, then the built-ins (`HttpError` mapper,
+ * mongoose safety nets) — the first `instanceof` match returning non-null
+ * wins, logged at the entry's own level (`verbose` for deliberate HttpError
+ * control flow, `warn` for the safety nets' schema-gap signal, `warn` default
+ * for consumer entries). A handled error's log line rides into log shippers
+ * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
+ * Anything unresolved is a server-side defect: logged in full, answered with a
+ * generic 500 — unless the caller passes the `unresolved` response (the
+ * validation 400), which is a client error and not logged.
  */
 async function answerError(
   app: IApp,
   logger: ControllerManager['logger'] | undefined,
   err: unknown,
   req: FrameworkRequest,
-  res: Response,
-) {
+  unresolved?: HttpResponse,
+): Promise<HttpResponse> {
   const resolved = app.httpServer
     ? await app.httpServer.resolveError(err, req)
     : null;
   if (resolved) {
     logger?.[resolved.logLevel](toLoggableError(err));
-    return sendErrorResult(res, resolved);
+    return resolved.response;
+  }
+  // A failed handler is a server-side defect: the 500, not the fallback.
+  if (unresolved && !errorHandlerFailed(err)) {
+    return unresolved;
   }
   logger?.error(err);
-  return res.status(500).json({
-    message: serverErrorMessage(req),
-  });
+  return serverErrorResponse(req);
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────

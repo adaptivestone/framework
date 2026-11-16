@@ -11,16 +11,18 @@ import { appInstance } from '../../helpers/appInstance.ts';
 import { stubI18n } from '../../tests/mocks.ts';
 import { getTestServerURL } from '../../tests/testHelpers.ts';
 import type { TI18n } from '../i18n/I18n.ts';
+import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import HttpServer from './HttpServer.ts';
 import { HttpError, UnauthorizedError } from './httpErrors.ts';
+import { HttpResponse } from './responses.ts';
 
 describe('HttpServer — 404 fallthrough', () => {
   it('returns 404 JSON for unmatched paths', async () => {
     const res = await fetch(getTestServerURL('/this-path-does-not-exist'));
     assert.strictEqual(res.status, 404);
     const body = await res.json();
-    assert.deepStrictEqual(body, { message: 'Not found' });
+    assert.deepStrictEqual(body, { error: 'NOT_FOUND', message: 'Not found' });
   });
 });
 
@@ -62,8 +64,20 @@ const recordingResponse = (headersSent = false) => {
     payload: {} as Record<string, unknown>,
     headers: {} as Record<string, string>,
   };
+  // The subset of an Express response the `ExpressResponseWriter` JSON path uses.
   const res = {
     headersSent,
+    statusCode: 200,
+    statusMessage: '',
+    getHeaders() {
+      return { ...captured.headers };
+    },
+    getHeaderNames() {
+      return Object.keys(captured.headers);
+    },
+    removeHeader(name: string) {
+      delete captured.headers[name];
+    },
     setHeader(name: string, value: string) {
       captured.headers[name] = value;
       return this;
@@ -73,6 +87,7 @@ const recordingResponse = (headersSent = false) => {
       return this;
     },
     json(body: Record<string, unknown>) {
+      JSON.stringify(body); // throws like the real one on a circular body
       captured.payload = body;
       return this;
     },
@@ -92,6 +107,7 @@ const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
     // The sink resolves through the registry: delegate to the test server's.
     resolveError: (err: unknown, req: FrameworkRequest) =>
       appInstance.httpServer?.resolveError(err, req) ?? null,
+    responseWriter: new ExpressResponseWriter(),
   };
   HttpServer.prototype[register].call(ctx as unknown as HttpServer);
   assert.ok(handler, `${register} registered no handler`);
@@ -130,11 +146,15 @@ const runSink = async (
  * that does not keeps the exact English text.
  */
 describe('HttpServer — translatable sink messages', () => {
-  const run404 = (i18n?: TI18n) => {
+  const run404 = async (i18n?: TI18n) => {
     const { captured, res } = recordingResponse();
-    captureHandler<(req: FrameworkRequest, res: Response) => void>(
-      'add404Page',
-    )({ appInfo: { i18n } } as unknown as FrameworkRequest, res);
+    await captureHandler<
+      (req: FrameworkRequest, res: Response, next: NextFunction) => unknown
+    >('add404Page')(
+      { appInfo: { i18n } } as unknown as FrameworkRequest,
+      res,
+      () => {},
+    );
     return captured;
   };
 
@@ -142,17 +162,23 @@ describe('HttpServer — translatable sink messages', () => {
 
   it('404 keeps the English text when the app locales lack the key', async () => {
     const i18nService = await appInstance.getI18nService();
-    const captured = run404(await i18nService.getI18nForLang('en'));
+    const captured = await run404(await i18nService.getI18nForLang('en'));
 
     assert.strictEqual(captured.status, 404);
-    assert.deepStrictEqual(captured.payload, { message: 'Not found' });
+    assert.deepStrictEqual(captured.payload, {
+      error: 'NOT_FOUND',
+      message: 'Not found',
+    });
   });
 
-  it('404 uses the app translation when the key resolves', () => {
-    const captured = run404(stubI18n({ 'http.notFound': 'Не найдено' }));
+  it('404 uses the app translation when the key resolves', async () => {
+    const captured = await run404(stubI18n({ 'http.notFound': 'Не найдено' }));
 
     assert.strictEqual(captured.status, 404);
-    assert.deepStrictEqual(captured.payload, { message: 'Не найдено' });
+    assert.deepStrictEqual(captured.payload, {
+      error: 'NOT_FOUND',
+      message: 'Не найдено',
+    });
   });
 
   it('500 keeps the English text when the app locales lack the key', async () => {
@@ -161,6 +187,7 @@ describe('HttpServer — translatable sink messages', () => {
 
     assert.strictEqual(captured.status, 500);
     assert.deepStrictEqual(captured.payload, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -171,12 +198,19 @@ describe('HttpServer — translatable sink messages', () => {
     );
 
     assert.strictEqual(captured.status, 500);
-    assert.deepStrictEqual(captured.payload, { message: 'Что-то сломалось' });
+    assert.deepStrictEqual(captured.payload, {
+      error: 'SERVER_ERROR',
+      message: 'Что-то сломалось',
+    });
   });
 
   it('both sinks fall back to English when the request carries no i18n', async () => {
-    assert.deepStrictEqual(run404().payload, { message: 'Not found' });
+    assert.deepStrictEqual((await run404()).payload, {
+      error: 'NOT_FOUND',
+      message: 'Not found',
+    });
     assert.deepStrictEqual((await run500()).payload, {
+      error: 'SERVER_ERROR',
       message: 'Something went wrong. Please try again later.',
     });
   });
@@ -200,7 +234,54 @@ describe('HttpServer — final sink resolves through the registry', () => {
       error: 'TOO_MANY_REQUESTS',
       message: 'Too Many Requests',
     });
-    assert.deepStrictEqual(answer.headers, { 'Retry-After': '7' });
+    assert.strictEqual(answer.headers['retry-after'], '7');
+  });
+
+  it('sends an HttpResponse an app handler returns', async () => {
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      UnauthorizedError,
+      () =>
+        HttpResponse.json(
+          401,
+          { title: 'Login required' },
+          {
+            contentType: 'application/problem+json',
+            headers: { 'www-authenticate': 'Bearer' },
+          },
+        ),
+    );
+    try {
+      const answer = await runSink(new UnauthorizedError());
+      assert.strictEqual(answer.status, 401);
+      assert.deepStrictEqual(answer.payload, { title: 'Login required' });
+      assert.strictEqual(answer.headers['www-authenticate'], 'Bearer');
+      assert.strictEqual(
+        answer.headers['Content-Type'],
+        'application/problem+json',
+      );
+    } finally {
+      unregister?.();
+    }
+  });
+
+  it('falls back to the plain 500 when the error response cannot be written', async () => {
+    const circular: { self?: unknown } = {};
+    circular.self = circular;
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      UnauthorizedError,
+      () => ({ status: 401, body: circular, headers: { 'x-reason': 'login' } }),
+    );
+    try {
+      const answer = await runSink(new UnauthorizedError());
+      assert.strictEqual(answer.status, 500);
+      assert.deepStrictEqual(answer.payload, {
+        error: 'SERVER_ERROR',
+        message: 'Something went wrong. Please try again later.',
+      });
+      assert.strictEqual(answer.headers['x-reason'], undefined);
+    } finally {
+      unregister?.();
+    }
   });
 
   it('lets an app handler reshape a middleware error', async () => {

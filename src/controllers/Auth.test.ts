@@ -6,6 +6,7 @@ import { appInstance } from '../helpers/appInstance.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken, userHelpers } from '../models/User.ts';
 import type { IApp } from '../server.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import type { ValidationIssue } from '../services/validate/types.ts';
 import {
   assertCalledTimes,
@@ -23,6 +24,7 @@ import {
 } from '../tests/mocks.ts';
 import { testEach } from '../tests/parameterized.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
+import type { PostLoginRequest, PostLogoutRequest } from './Auth.routes.gen.ts';
 import Auth from './Auth.ts';
 
 const userEmail = 'testing@test.com';
@@ -239,6 +241,17 @@ describe('auth controller failure paths', () => {
     return { res: res as unknown as Response, state };
   };
 
+  /** Copy the response a handler returned into a `response()` state. */
+  const record = (
+    state: { status?: number; body?: unknown },
+    returned: unknown,
+  ) => {
+    if (HttpResponse.is(returned)) {
+      state.status = returned.status;
+      state.body = returned.kind === 'json' ? returned.body : undefined;
+    }
+  };
+
   const fakeApp = (
     User: Record<string, unknown>,
     authConfig: Record<string, unknown> = {},
@@ -278,9 +291,12 @@ describe('auth controller failure paths', () => {
         'legacy-two@example.com',
       ]) {
         const { res, state } = response();
-        await auth.postRegister(
-          request(app, { email, password: 'valid123' }),
-          res,
+        record(
+          state,
+          await auth.postRegister(
+            request(app, { email, password: 'valid123' }),
+            res,
+          ),
         );
         assert.strictEqual(state.status, 201);
       }
@@ -312,12 +328,15 @@ describe('auth controller failure paths', () => {
     const auth = new Auth(app, '');
     const { res, state } = response();
 
-    await auth.postRegister(
-      request(app, {
-        email: 'mail-failure@example.com',
-        password: 'valid123',
-      }),
-      res,
+    record(
+      state,
+      await auth.postRegister(
+        request(app, {
+          email: 'mail-failure@example.com',
+          password: 'valid123',
+        }),
+        res,
+      ),
     );
 
     assert.strictEqual(state.status, 201);
@@ -356,14 +375,20 @@ describe('auth controller failure paths', () => {
     const auth = new Auth(app, '');
 
     const recovery = response();
-    await auth.sendPasswordRecoveryEmail(
-      request(app, { email: 'x@example.com' }),
-      recovery.res,
+    record(
+      recovery.state,
+      await auth.sendPasswordRecoveryEmail(
+        request(app, { email: 'x@example.com' }),
+        recovery.res,
+      ),
     );
     const verification = response();
-    await auth.sendVerification(
-      request(app, { email: 'x@example.com' }),
-      verification.res,
+    record(
+      verification.state,
+      await auth.sendVerification(
+        request(app, { email: 'x@example.com' }),
+        verification.res,
+      ),
     );
 
     assert.strictEqual(recovery.state.status, 200);
@@ -408,7 +433,7 @@ describe('auth controller failure paths', () => {
     const auth = new Auth(app, '');
     const { res, state } = response();
 
-    await auth.verifyUser(request(app, {}), res);
+    record(state, await auth.verifyUser(request(app, {}), res));
 
     assert.strictEqual(state.status, 400);
     assert.deepStrictEqual(state.body, {
@@ -435,12 +460,15 @@ describe('auth controller failure paths', () => {
     const auth = new Auth(app, '');
     const { res, state } = response();
 
-    await auth.verifyUser(
-      {
-        appInfo: { app, request: {}, i18n: stubI18n({}) },
-        query: { verification_token: 'raw-verification' },
-      } as never,
-      res,
+    record(
+      state,
+      await auth.verifyUser(
+        {
+          appInfo: { app, request: {}, i18n: stubI18n({}) },
+          query: { verification_token: 'raw-verification' },
+        } as never,
+        res,
+      ),
     );
 
     assert.strictEqual(state.status, 200);
@@ -461,12 +489,15 @@ describe('auth controller failure paths', () => {
     const auth = new Auth(app, '');
     const { res, state } = response();
 
-    await auth.recoverPassword(
-      request(app, {
-        password: 'new recovery passphrase',
-        passwordRecoveryToken: 'raw-recovery',
-      }),
-      res,
+    record(
+      state,
+      await auth.recoverPassword(
+        request(app, {
+          password: 'new recovery passphrase',
+          passwordRecoveryToken: 'raw-recovery',
+        }),
+        res,
+      ),
     );
 
     assert.strictEqual(state.status, 200);
@@ -498,7 +529,7 @@ describe('auth controller failure paths', () => {
     const app = fakeApp(User);
     const auth = new Auth(app, '');
     const { res, state } = response();
-    await handler(auth, enRequest(app, values), res);
+    record(state, await handler(auth, enRequest(app, values), res));
     return state;
   };
 
@@ -638,16 +669,21 @@ describe('auth controller failure paths', () => {
     const auth = new Auth(app, '');
     const { res, state } = response();
 
-    await auth.postLogin(
-      {
-        appInfo: {
-          app,
-          request: {},
-          i18n: stubI18n({ 'auth.errorUPValid': 'Неверный логин или пароль' }),
-        },
-        query: {},
-      } as never,
-      res,
+    record(
+      state,
+      await auth.postLogin(
+        {
+          appInfo: {
+            app,
+            request: {},
+            i18n: stubI18n({
+              'auth.errorUPValid': 'Неверный логин или пароль',
+            }),
+          },
+          query: {},
+        } as never,
+        res,
+      ),
     );
 
     assert.deepStrictEqual(state.body, {
@@ -1648,5 +1684,23 @@ describe('auth', () => {
       assert.strictEqual(wrong.status, 400);
       assert.deepStrictEqual(await raced.json(), await wrong.json());
     });
+  });
+});
+
+describe('Auth controller overrides', () => {
+  it('still accept handlers written against res (compile-time check)', () => {
+    class LegacyAuth extends Auth {
+      override async postLogin(req: PostLoginRequest, res: Response) {
+        if (!req.appInfo.request.email) {
+          return res.status(400).json({ message: 'No' });
+        }
+        return super.postLogin(req, res);
+      }
+
+      override async postLogout(_req: PostLogoutRequest, res: Response) {
+        return res.status(200).json({ message: 'Bye' });
+      }
+    }
+    assert.strictEqual(typeof LegacyAuth.prototype.postLogin, 'function');
   });
 });

@@ -16,7 +16,7 @@ v5 (done/) ──→ ┬──→ codegen track ──[AST front-end SHIPPED]─
                └──→ polish (independent) ───────────→ any order
                     [rate-limiter-lazy ✅] [cache-drivers ✅] [test-helpers ✅]
 
-v5.6 (queued/) ─────→ universal HttpResponse + Express writer
+5.7 (active/) ──────→ universal HttpResponse + Express writer (phases 0–1 ✅)
                       └──→ OpenAPI response contracts ──→ v6 removes ordinary `res`
 
 Bun support (shipped 5.4.0) ──→ ongoing floor/latest CI certification
@@ -41,7 +41,7 @@ v5.2.x · 5.3.0–5.3.3 · 5.4.0 ─→ shipped
                       + ValidationError declaration under skipLibCheck: false
 
 Blocking: docs-sweep re-sweep ✅ done → llm-skills generator now unblocked
-          P1q (v5.6) is unblocked by 5.4.0 shipping and remains queued
+          P1q is active: phases 0–1 done 2026-10-31, Phase 2 next
           Version labels: 5.6.0 took the validators-at-boot change (PR #77), so
             work labelled v5.6 / v5.7 in queued/ lands in the next minors
           OpenAPI response contracts (v5.7) waits on P1q landing + real usage
@@ -65,7 +65,7 @@ flowchart LR
     Minor550 --> Patch551["✅ 5.5.1 shipped: consumer review fixes"]
     Patch551 --> Minor560["✅ 5.6.0 shipped: validators at boot + routing fix"]
     Minor560 --> Patch561["✅ 5.6.1 shipped: review fixes + peer ranges"]
-    Patch561 --> Responses["⏸ v5.6 universal responses"]
+    Patch561 --> Responses["🔄 universal responses (5.7)"]
     Responses --> OpenAPI["⏸ v5.7 OpenAPI response contracts"]
 
     BunRelease["Bun stable release with fix"] --> BunSupport["✅ Bun support — shipped 5.4.0"]
@@ -108,23 +108,22 @@ repository; Markdown remains the reviewed source of truth.
 
 ### active/
 
-| File                               | Ref | Summary                                                                                                                                                                                                                                                                                                                                 |
-| ---------------------------------- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [llm-skills](active/llm-skills.md) | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d. |
+| File                                                           | Ref | Summary                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [llm-skills](active/llm-skills.md)                             | P1h | Doc additions ✅ (15-recipes, 16-anti-patterns). Still TODO: skill generator + `llms.txt` + `npx skills add` publish pipeline (no `skills/` dir or `llms.txt` in docs repo yet). docs-sweep ✅ now unblocks this. Note: docs `npm run build` already regenerates `static/llm-context.md` via `scripts/generate-llm-context.js`. ~1.5 d.                                                                                                               |
+| [universal-http-responses](active/universal-http-responses.md) | P1q | **Typed response bridge — next minor (5.7).** Phases 0–2 ✅ 2026-10-31 (unreleased): `HttpResponse` json/text/bytes/stream/redirect/empty/native descriptors returned by handlers; every framework response and error-registry result written by `ExpressResponseWriter`; `transformResponse` `Server` option; `Home`/`Health` migrated (`Auth` held — question to user). Next: Phase 3 OpenAPI, Phase 4 files. Legacy `res` coexists; removed in v6. |
 
 ### queued/
 
-| File                                                               | Ref      | Summary                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [universal-http-responses](queued/universal-http-responses.md)     | P1q      | **v5.6 typed response bridge.** Returned JSON/text/empty/redirect/stream/file/native-Web response descriptors rendered by Express; thrown errors normalize to the same writer. Legacy `res` coexists in v5.5; ordinary controller `res` is removed in v6. Parent design for OpenAPI responses and the adapter-independent HTTP path.                                                                    |
-| [validation-errors-registry](queued/validation-errors-registry.md) | v5.6     | Request-validation 400s walk the error registry first (400 fallback unchanged); structural `RegistrableError` so `registerErrorHandler(ValidationError, …)` compiles. Implemented and verified, held back from 5.5.1 (catch-all `Error` handlers start seeing validation errors); a local patch is kept. Also fixes the older `ValidationError.d.ts` error under `skipLibCheck: false`. Ships with P1q. |
-| [async-middleware](queued/async-middleware.md)                     | P1m      | **Async middleware contract — v5.6 opt-in, v6 flip.** `static contractVersion = 2` (default 1): v2 = `middleware(ctx)`, return→continue / `HttpResponse`→P1q writer / throw→error registry; v1 keeps the Express bridge. Built-ins stay v1 through v5 (subclass safety); v6 flips default, drops v1, lands with static-middleware-cutover. Co-designed with P1q.                                        |
-| [openapi-responses](queued/openapi-responses.md)                   | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data.                                                                                                                                         |
-| [metrics-seam](queued/metrics-seam.md)                             | P1s      | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout.                                                                                                                                                                                                           |
-| [logging-facade-and-pino](queued/logging-facade-and-pino.md)       | P1z      | **Vendor-neutral logging + Pino.** Lock a framework-owned structured logger/Error contract in v5.x, then cut `IApp.logger`, config, Sentry and tests from Winston to a Pino-backed sink runtime in v6; LogTape remains a conformance-gated future option.                                                                                                                                               |
-| [http-engine-spike](queued/http-engine-spike.md)                   | Spike    | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships.                                                |
-| [email-normalization](queued/email-normalization.md)               | Auth     | **Case-insensitive user email.** Review finding #6: normalize on write and lookup (recommended) or a case-insensitive collation; collision report + migration first. Behavior change — release timing (minor vs v6) to be decided.                                                                                                                                                                      |
-| [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md) | P1y      | **Typed, auditable i18n for framework + projects.** Missing/unused/coverage checks, generated autocomplete, large-catalog selector mode, isolated runtime instance/backend seam; additive v5 foundation and v6 framework-namespace cutover.                                                                                                                                                             |
+| File                                                               | Ref      | Summary                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [async-middleware](queued/async-middleware.md)                     | P1m      | **Async middleware contract — v5.6 opt-in, v6 flip.** `static contractVersion = 2` (default 1): v2 = `middleware(ctx)`, return→continue / `HttpResponse`→P1q writer / throw→error registry; v1 keeps the Express bridge. Built-ins stay v1 through v5 (subclass safety); v6 flips default, drops v1, lands with static-middleware-cutover. Co-designed with P1q. |
+| [openapi-responses](queued/openapi-responses.md)                   | P2a-resp | **Response-contract/OpenAPI phase of P1q.** Merge typed handler outcomes with structural validation/middleware/error responses; optional Standard-Schema `responses:` map is authoritative for body schemas. Never fabricate schemas from syntax-only AST data.                                                                                                  |
+| [metrics-seam](queued/metrics-seam.md)                             | P1s      | **Observability Phase 1 — metrics.** No-op-default metrics API plus automatic HTTP RED/runtime metrics, an optional Prometheus exporter, and `/metrics`; strict cardinality rules throughout.                                                                                                                                                                    |
+| [logging-facade-and-pino](queued/logging-facade-and-pino.md)       | P1z      | **Vendor-neutral logging + Pino.** Lock a framework-owned structured logger/Error contract in v5.x, then cut `IApp.logger`, config, Sentry and tests from Winston to a Pino-backed sink runtime in v6; LogTape remains a conformance-gated future option.                                                                                                        |
+| [http-engine-spike](queued/http-engine-spike.md)                   | Spike    | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships.         |
+| [email-normalization](queued/email-normalization.md)               | Auth     | **Case-insensitive user email.** Review finding #6: normalize on write and lookup (recommended) or a case-insensitive collation; collision report + migration first. Behavior change — release timing (minor vs v6) to be decided.                                                                                                                               |
+| [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md) | P1y      | **Typed, auditable i18n for framework + projects.** Missing/unused/coverage checks, generated autocomplete, large-catalog selector mode, isolated runtime instance/backend seam; additive v5 foundation and v6 framework-namespace cutover.                                                                                                                      |
 
 ### later/
 
@@ -150,6 +149,7 @@ repository; Markdown remains the reviewed source of truth.
 | ---------------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | [release-5.6.1](done/release-5.6.1.md)                                       | Release      | Published to npm 2026-11-15: version 5.6.1 (5.6 review fixes, consumer report: test-database teardown + peer ranges, `requestParser.mediaTypes`); dependencies updated in range, `oxc-parser` `>=0.156.0 <1`, `i18next` `^26.0.1 \|\| ^27.0.0` with the i18next 27 `TranslationFunction` split, Biome 2.6.7 Markdown reformat; `ValidationError` checks under `skipLibCheck: false` (ported from the 5.7 branch).                                                                                                                                                                                                                                                                          |
 | [request-media-types](done/request-media-types.md)                           | 5.6.1        | `http.requestParser.mediaTypes`: config map of media type → `'json' \| 'urlencoded'`; default config maps `application/csp-report`. Config only (an app's own `config/http.ts` must add it); multipart/binary aliases wait for the parser registry.                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| [validation-errors-registry](done/validation-errors-registry.md)             | Next minor   | Implemented 2026-10-31 (unreleased): request-validation 400s ask the error registry first (400 fallback unchanged); `RegistrableError` lets `registerErrorHandler(ValidationError, …)` compile and `ValidationError.d.ts` checks under `skipLibCheck: false` (both shipped early, in 5.6.1).                                                                                                                                                                                                                                                                                                                                                                                               |
 | [release-5.6.0](done/release-5.6.0.md)                                       | Release      | Published to npm and GitHub 2026-10-27: version 5.6.0 (validators at boot, per-method route matching, post-5.5.1 fixes); all dependencies updated in range, `oxc-parser` ^0.156.0, i18next 26.5 `TranslationFunction` fix, Markdown reformat for Biome 2.6 in its own commit; all gates, Bun suite and Bun packed consumer pass.                                                                                                                                                                                                                                                                                                                                                           |
 | [release-5.5.1](done/release-5.5.1.md)                                       | Release      | Published to npm 2026-10-06, GitHub release 2026-10-18: version 5.5.1, dated notes, README upgrade notes; optional `oxc-parser` peer ^0.153.0; all gates, Bun suite and Bun packed consumer pass.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | [consumer-review-fixes](done/consumer-review-fixes.md)                       | Post-5.5     | Ships in 5.5.1: `Auth`/`Role` return type restored for subclasses; `generateToken` stale-password race rejects with the wrong-password `BadRequestError`; 5.5.0 notes amended (Health override, `error` field). The validation-registry change moved to queued/ for 5.6.                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -281,9 +281,13 @@ long-TTL memory cache, streamed 413, pagination overflow, CORS `Vary`,
 requires oxc-parser ^0.152.0. Email case-folding stays queued
 ([email-normalization](queued/email-normalization.md)).
 
+## 5.6.0 — released 2026-10-27 (npm + GitHub release)
+
+User-selected minor release. See [release preparation](done/release-5.6.0.md) and `CHANGELOG.md`: route validators are built at boot (a schema no driver matches fails `startServer()`), a static route no longer hides a `:param` route that has the method, recovery/verification persist in one write, plus the post-5.5.1 fixes. Codegen requires `oxc-parser` ^0.156.0. The work labelled v5.6 below moves to the next minor. [GitHub release](https://github.com/adaptivestone/framework/releases/tag/5.6.0).
+
 ## 5.5.1 — released 2026-10-06 (npm; GitHub release 2026-10-18)
 
-User-selected patch release. See [release preparation](done/release-5.5.1.md) and `CHANGELOG.md`: `Auth`/`Role` subclasses may return a response again, and a login racing a password change answers the wrong-password 400 from `generateToken` itself. The validation-registry change waits for 5.6 ([validation-errors-registry](queued/validation-errors-registry.md)). [GitHub release](https://github.com/adaptivestone/framework/releases/tag/5.5.1).
+User-selected patch release. See [release preparation](done/release-5.5.1.md) and `CHANGELOG.md`: `Auth`/`Role` subclasses may return a response again, and a login racing a password change answers the wrong-password 400 from `generateToken` itself. The validation-registry change waits for 5.6 ([validation-errors-registry](done/validation-errors-registry.md)). [GitHub release](https://github.com/adaptivestone/framework/releases/tag/5.5.1).
 
 ## 5.5.0 — released 2026-10-03 (npm)
 
@@ -301,20 +305,22 @@ User-scoped minor release. See [release preparation](done/release-5.5.0.md) and 
 - ✅ Error-contract follow-ups ([coded-http-errors](done/coded-http-errors.md) audit) — 404/405/415/malformed-URL/500 texts translatable (`http.*` keys), one 500 text, Auth controller on `translateWithDefault`, unverified login answers `error: 'EMAIL_NOT_VERIFIED'` (`notVerified` deprecated). Implemented 2026-10-03.
 - ✅ [Middleware errors through the registry](done/middleware-errors-registry.md) — the final sink resolves middleware errors through the registry; `Auth`/`Role`/`RateLimiter` throw coded errors (`AUTH001`, `NO_ACCESS`, `TOO_MANY_REQUESTS`); `headers` on `HttpError` and handler results carries `Retry-After`. Implemented 2026-10-03.
 
-## v5.6 target — P1q line
+## Next minor (5.7) — P1q line
 
-Moved out of 5.5 on 2026-10-03 so the finished 5.5 batch is not held back by the response bridge.
+Moved out of 5.5 on 2026-10-03 so the finished 5.5 batch is not held back by the response bridge; 5.6.0 then shipped without it.
 
 - [Async middleware v2 opt-in](queued/async-middleware.md) (P1m) — co-designed with P1q: `static contractVersion = 2`, returned `HttpResponse` through P1q's writer, throws through the error registry; v1 default untouched until v6.
 
-- [Universal typed HTTP responses](queued/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists.
+- [Universal typed HTTP responses](active/universal-http-responses.md) — additive returned-response algebra + Express writer; JSON/text/empty/redirect/stream/file/native Web response; throwable errors preserved; legacy `res` coexists. Phases 0–2 ✅ 2026-10-31 (`Auth` migration held); Phase 3 next.
 - **Design the P1s metrics hook point during P1q**, even if the metrics driver ships later — the
   ResponseWriter is the instrumentation seam, and adding it afterwards means reopening the hot path.
+  As of Phase 2 every framework-rendered response passes `ExpressResponseWriter.write()`.
 - Resolve `bodyParsing` — `'raw'`/`'none'` are accepted by the type and do nothing (the JSDoc says
   so, without a version promise since 2026-10-03). Implement (the request-side half of P1q's thesis) or
   remove them from the type.
-- `RequestParser` 413/400 → coded `HttpError`s through the registry (the optional follow-up of
-  [middleware-errors-registry](done/middleware-errors-registry.md)); deferred from 5.5 on 2026-10-03.
+- ✅ `RequestParser` 413/400 → `HttpError`s through the registry (the optional follow-up of
+  [middleware-errors-registry](done/middleware-errors-registry.md)), done with P1q Phase 2 on
+  2026-10-31; error codes not added yet (bodies unchanged).
 
 The former "small independent items" were already done when checked on 2026-10-03: Redis-dependent
 tests skip when Redis is unreachable (`src/tests/redisAvailability.ts`), `OpenApiGenerator.ts` has no
@@ -337,12 +343,13 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
 
 ## v6 breaking defaults (no phase doc — tracked as bullets)
 
-- Ordinary controllers and registry middleware no longer receive `res`; they return `HttpResponse | void`. Native Web response pass-through and explicitly adapter-specific raw routes remain. See [P1q](queued/universal-http-responses.md).
+- Ordinary controllers and registry middleware no longer receive `res`; they return `HttpResponse | void`. Native Web response pass-through and explicitly adapter-specific raw routes remain. See [P1q](active/universal-http-responses.md).
 - Strict Content-Type by default
 - Case-sensitive + strict trailing-slash by default
 - `YupFile.check` single-file semantics
 - Remove the positional `body` argument of `HttpError` and its subclasses (deprecated in 5.5.0 for `{ message, errors }` / `{ message, body }`; see [coded-http-errors](done/coded-http-errors.md))
 - Remove `notVerified: true` from the unverified-login 400 (deprecated in 5.5.0; `error: 'EMAIL_NOT_VERIFIED'` replaces it).
+- Remove the transitional built-in response bridge (`services/http/builtInResponse.ts`, the adapter's `claimBuiltInResponse` branch and the `ASF_DEP_DROPPED_RESPONSE` warning, added in 5.7.0): an override must return the built-in handler's response. See [P1q](active/universal-http-responses.md).
 
 (Async/await middleware contract — formerly a bullet here — now has its own card: [async-middleware](queued/async-middleware.md), P1m: v5.6 opt-in via `contractVersion = 2`, v6 flip.)
 

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, it, mock } from 'node:test';
-import type { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { IApp } from '../../../server.ts';
 import {
@@ -14,8 +16,10 @@ import {
   pattern,
 } from '../../../tests/assertions.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
+import { builtInResponse } from '../builtInResponse.ts';
 import { HttpError } from '../httpErrors.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
+import { HttpResponse } from '../responses.ts';
 import { createExpressAdapter } from './ExpressAdapter.ts';
 import { RouteRegistry } from './RouteRegistry.ts';
 
@@ -34,6 +38,9 @@ interface MockRes extends EventEmitter {
   status(code: number): MockRes;
   setHeader(k: string, v: string): MockRes;
   getHeader(k: string): string | undefined;
+  getHeaders(): Record<string, string>;
+  getHeaderNames(): string[];
+  removeHeader(k: string): void;
   json(obj: unknown): MockRes;
   end(): MockRes;
 }
@@ -54,6 +61,15 @@ const makeRes = (): MockRes => {
   };
   res.getHeader = function (k) {
     return this.headers[k.toLowerCase()];
+  };
+  res.getHeaders = function () {
+    return { ...this.headers };
+  };
+  res.getHeaderNames = function () {
+    return Object.keys(this.headers);
+  };
+  res.removeHeader = function (k) {
+    delete this.headers[k.toLowerCase()];
   };
   res.json = function (obj) {
     this.body = obj;
@@ -124,7 +140,10 @@ describe('createExpressAdapter — 405 with Allow', () => {
     assert.ok(allow);
     assertTextMatch(allow, /GET/);
     assertTextMatch(allow, /POST/);
-    assert.deepStrictEqual(res.body, { message: 'Method not allowed' });
+    assert.deepStrictEqual(res.body, {
+      error: 'METHOD_NOT_ALLOWED',
+      message: 'Method not allowed',
+    });
   });
 
   it('routes to a param sibling when the static route lacks the method', async () => {
@@ -176,7 +195,10 @@ describe('createExpressAdapter — 405 with Allow', () => {
       asExpressRes(methodRes),
       mock.fn(),
     );
-    assert.deepStrictEqual(methodRes.body, { message: 'Метод не разрешён' });
+    assert.deepStrictEqual(methodRes.body, {
+      error: 'METHOD_NOT_ALLOWED',
+      message: 'Метод не разрешён',
+    });
 
     const malformedRes = makeRes();
     await adapter(
@@ -185,7 +207,10 @@ describe('createExpressAdapter — 405 with Allow', () => {
       mock.fn(),
     );
     assert.strictEqual(malformedRes.statusCode, 400);
-    assert.deepStrictEqual(malformedRes.body, { message: 'Неверный URL' });
+    assert.deepStrictEqual(malformedRes.body, {
+      error: 'MALFORMED_URL',
+      message: 'Неверный URL',
+    });
   });
 });
 
@@ -365,6 +390,256 @@ describe('createExpressAdapter — error propagation', () => {
       next.mock.calls[0]?.arguments[0]?.message,
       'mw exploded',
     );
+  });
+});
+
+describe('createExpressAdapter — returned HttpResponse', () => {
+  const stubWriter = () => {
+    const write = mock.fn(
+      async (_response: HttpResponse, _req: Request, _res: Response) => {},
+    );
+    return { writer: { write }, write };
+  };
+
+  it('writes a returned HttpResponse through the writer', async () => {
+    const response = HttpResponse.json(201, { id: 'x' });
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/users', { handler: async () => response });
+    const { writer, write } = stubWriter();
+    const req = makeReq('POST', '/users');
+    const res = asExpressRes(makeRes());
+    const next = mock.fn();
+
+    await createExpressAdapter(r, fakeApp, writer)(req, res, next);
+
+    assertCalledTimes(write, 1);
+    assert.deepStrictEqual(write.mock.calls[0]?.arguments, [
+      response,
+      req,
+      res,
+    ]);
+    assertNotCalled(next);
+  });
+
+  it('leaves legacy return values to the handler', async () => {
+    const legacyReturns = [
+      (_req: Request, res: Response) => res.json({ ok: true }),
+      () => ({ kind: 'json', status: 201, headers: [], body: {} }),
+      () => undefined,
+    ];
+    for (const handler of legacyReturns) {
+      const r = new RouteRegistry();
+      r.registerRoute('GET', '/legacy', { handler });
+      const { writer, write } = stubWriter();
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('GET', '/legacy'),
+        asExpressRes(makeRes()),
+        mock.fn(),
+      );
+      assertNotCalled(write);
+    }
+  });
+
+  it('fails loudly when the handler also wrote to res', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.json(200, { second: true });
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    const next = mock.fn();
+
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(res),
+      next,
+    );
+
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { first: true });
+    assertCalledWith(next, pattern.any(Error));
+    assertTextMatch(
+      next.mock.calls[0]?.arguments[0]?.message,
+      /GET \/mixed: the handler both wrote to res and returned an HttpResponse/,
+    );
+  });
+
+  it('passes a writer failure to next(err)', async () => {
+    const failure = new Error('write failed');
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', { handler: () => HttpResponse.empty(204) });
+    const writer = { write: async () => Promise.reject(failure) };
+    const next = mock.fn();
+
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('GET', '/x'),
+      asExpressRes(makeRes()),
+      next,
+    );
+
+    assertCalledWith(next, failure);
+  });
+
+  it('sends a framework response an override awaited but dropped, warning once', async () => {
+    const produced = HttpResponse.json(200, { ok: true });
+    // The framework handler an app override calls via `super`.
+    const builtIn = async (req: Request) => builtInResponse(req, produced);
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        await builtIn(req); // forgot `return`
+      },
+      meta: { controllerClass: 'DroppingAuth', methodName: 'postLogin' },
+    });
+    const { writer, write } = stubWriter();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      const adapter = createExpressAdapter(r, fakeApp, writer);
+      for (let i = 0; i < 2; i += 1) {
+        await adapter(
+          makeReq('POST', '/login'),
+          asExpressRes(makeRes()),
+          mock.fn(),
+        );
+      }
+      assertCalledTimes(write, 2);
+      assert.strictEqual(write.mock.calls[0]?.arguments[0], produced);
+      assertCalledTimes(emitWarning, 1);
+      assertCalledWith(
+        emitWarning,
+        pattern.stringContaining('DroppingAuth.postLogin'),
+        pattern.objectContaining({ code: 'ASF_DEP_DROPPED_RESPONSE' }),
+      );
+    } finally {
+      emitWarning.mock.restore();
+    }
+  });
+
+  it('sends a framework response an override did not await', async () => {
+    const produced = HttpResponse.json(200, { ok: true });
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    // Like the `Auth` handlers: the response comes after an await.
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, produced);
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+      meta: { controllerClass: 'FloatingAuth', methodName: 'postLogin' },
+    });
+    const { writer, write } = stubWriter();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        asExpressRes(makeRes()),
+        mock.fn(),
+      );
+      assertNotCalled(write);
+
+      produce();
+      await flush();
+
+      assertCalledTimes(write, 1);
+      assert.strictEqual(write.mock.calls[0]?.arguments[0], produced);
+      assertCalledWith(
+        emitWarning,
+        pattern.stringContaining('FloatingAuth.postLogin'),
+        pattern.objectContaining({ code: 'ASF_DEP_DROPPED_RESPONSE' }),
+      );
+    } finally {
+      emitWarning.mock.restore();
+    }
+  });
+
+  it('leaves a late framework response alone when the handler answered meanwhile', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    // The handler answers by itself after it returned.
+    res.json({ own: true });
+    res.headersSent = true;
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+  });
+
+  it('leaves a dropped framework response alone when the override answered itself', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request, res: Response) => {
+        builtInResponse(req, HttpResponse.json(200, { ok: true }));
+        res.json({ own: true });
+        (res as unknown as MockRes).headersSent = true;
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { own: true });
+  });
+
+  it('renders through the Express writer by default', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/users/:id', {
+      handler: (req: Request) =>
+        HttpResponse.json(
+          200,
+          { id: req.params.id },
+          {
+            headers: { 'cache-control': 'no-store' },
+          },
+        ),
+    });
+    const app = express();
+    app.use(createExpressAdapter(r, fakeApp));
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/users/42`);
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(response.headers.get('cache-control'), 'no-store');
+      assert.deepStrictEqual(await response.json(), { id: '42' });
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });
 

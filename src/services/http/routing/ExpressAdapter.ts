@@ -9,13 +9,38 @@
 import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
+import { claimBuiltInResponse } from '../builtInResponse.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
+import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
+import type { ResponseWriter } from '../ResponseWriter.ts';
+import { HttpResponse } from '../responses.ts';
 import { getMatchedNode, MalformedPathError } from './match.ts';
-import type { MatchResult, MiddlewareEntry, RouteNode } from './RouteNode.ts';
+import type {
+  HandlerEntry,
+  MatchResult,
+  MiddlewareEntry,
+  RouteNode,
+} from './RouteNode.ts';
 import type { RouteRegistry } from './RouteRegistry.ts';
 
 const instanceCache = new WeakMap<MiddlewareEntry, AbstractMiddleware>();
+
+const warnedDroppedResponse = new Set<string>();
+
+/** Once per handler: it called a framework handler and dropped its response. */
+function warnDroppedResponse(entry: HandlerEntry): void {
+  const name = `${entry.meta?.controllerClass ?? 'Controller'}.${entry.meta?.methodName ?? 'handler'}`;
+  if (warnedDroppedResponse.has(name)) {
+    return;
+  }
+  warnedDroppedResponse.add(name);
+  process.emitWarning(
+    `${name} called a framework handler without returning its response; the response was sent anyway. Return it (\`return super.${entry.meta?.methodName ?? 'handler'}(req, res)\`): v6 will not send a response that was not returned.`,
+    { type: 'DeprecationWarning', code: 'ASF_DEP_DROPPED_RESPONSE' },
+  );
+}
 
 export type ExpressAdapter = (
   req: Request,
@@ -26,6 +51,7 @@ export type ExpressAdapter = (
 export function createExpressAdapter(
   registry: RouteRegistry,
   app: IApp,
+  writer: ResponseWriter<Request, Response> = new ExpressResponseWriter(),
 ): ExpressAdapter {
   const routeTemplates = new WeakMap<RouteNode, string>();
   const indexTemplates = () =>
@@ -37,14 +63,15 @@ export function createExpressAdapter(
       result = registry.match(req.method, req.path);
     } catch (err) {
       if (err instanceof MalformedPathError) {
-        res.status(400).json({
+        const malformed = HttpResponse.json(400, {
+          error: FRAMEWORK_ERROR_CODES.malformedUrl,
           message: translateWithDefault(
             req as FrameworkRequest,
             'http.malformedUrl',
             'Malformed URL',
           ),
         });
-        return;
+        return writer.write(malformed, req, res).catch(next);
       }
       return next(err);
     }
@@ -56,15 +83,19 @@ export function createExpressAdapter(
 
     if (result.entry === null) {
       // 405 — path matched, method didn't.
-      res.setHeader('Allow', result.allowedMethods.join(', '));
-      res.status(405).json({
-        message: translateWithDefault(
-          req as FrameworkRequest,
-          'http.methodNotAllowed',
-          'Method not allowed',
-        ),
-      });
-      return;
+      const notAllowed = HttpResponse.json(
+        405,
+        {
+          error: FRAMEWORK_ERROR_CODES.methodNotAllowed,
+          message: translateWithDefault(
+            req as FrameworkRequest,
+            'http.methodNotAllowed',
+            'Method not allowed',
+          ),
+        },
+        { headers: { Allow: result.allowedMethods.join(', ') } },
+      );
+      return writer.write(notAllowed, req, res).catch(next);
     }
 
     // Populate request with match metadata before middleware runs.
@@ -99,7 +130,30 @@ export function createExpressAdapter(
           return;
         }
       }
-      await Promise.resolve(result.entry.handler(req, res, next));
+      const returned = await Promise.resolve(
+        result.entry.handler(req, res, next),
+      );
+      // Only a branded `HttpResponse` is rendered; any other return value is
+      // the legacy `res` style, which has already answered (or will).
+      if (HttpResponse.is(returned)) {
+        if (res.headersSent) {
+          throw new Error(
+            `${req.method} ${req.route.path}: the handler both wrote to res and returned an HttpResponse. Use one or the other.`,
+          );
+        }
+        await writer.write(returned, req, res);
+      } else if (!res.headersSent) {
+        // An override that called a framework handler without returning its
+        // response would answer nothing. Transitional: removed in v6 (see
+        // `builtInResponse`).
+        const { entry } = result;
+        claimBuiltInResponse(req, (dropped) => {
+          if (!res.headersSent) {
+            warnDroppedResponse(entry);
+            writer.write(dropped, req, res).catch(next);
+          }
+        });
+      }
     } catch (err) {
       next(err);
     }

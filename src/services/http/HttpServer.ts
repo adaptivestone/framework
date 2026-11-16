@@ -11,25 +11,31 @@ import express from 'express';
 import type ThttpConfig from '../../config/http.ts';
 import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
-import type { IApp } from '../../server.ts';
+import type { IApp, TransformResponseHook } from '../../server.ts';
 import type { TI18n } from '../i18n/types.ts';
 import {
   builtInErrorHandlers,
   type ErrorHandlerFn,
   type ErrorHandlerResult,
   type ErrorLogLevel,
+  errorResultResponse,
+  markErrorHandlerFailed,
   type RegisteredErrorHandler,
   type RegistrableError,
-  sendErrorResult,
+  type ResolvedError,
   serverErrorMessage,
+  serverErrorResponse,
   toLoggableError,
 } from './builtinErrorHandlers.ts';
+import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
+import { FRAMEWORK_ERROR_CODES } from './httpErrors.ts';
 import Cors from './middleware/Cors.ts';
 import I18nMiddleware from './middleware/I18n.ts';
 import IpDetector from './middleware/IpDetector.ts';
 import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
 import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import RequestParserMiddleware from './middleware/RequestParser.ts';
+import { HttpResponse } from './responses.ts';
 import { createExpressAdapter } from './routing/ExpressAdapter.ts';
 import { RouteRegistry } from './routing/RouteRegistry.ts';
 
@@ -54,13 +60,23 @@ class HttpServer extends Base {
 
   routeRegistry: RouteRegistry;
 
+  /** Renders route handlers' `HttpResponse` values and the framework's own responses. */
+  readonly responseWriter: ExpressResponseWriter;
+
   /** Consumer-registered error handlers — checked before the built-ins. */
   #errorHandlers: RegisteredErrorHandler[] = [];
 
   #builtInHandlers: RegisteredErrorHandler[] = builtInErrorHandlers();
 
-  constructor(app: IApp) {
+  constructor(
+    app: IApp,
+    options: { transformResponse?: TransformResponseHook } = {},
+  ) {
     super(app);
+    this.responseWriter = new ExpressResponseWriter({
+      transform: options.transformResponse,
+      onTransformError: (message) => this.logger?.error(message),
+    });
     this.express = express();
     this.express.disable('x-powered-by');
     this.routeRegistry = new RouteRegistry();
@@ -150,7 +166,9 @@ class HttpServer extends Base {
 
   /** Mount the route adapter — single entry to the registry. */
   mountAdapter() {
-    this.express.use(createExpressAdapter(this.routeRegistry, this.app));
+    this.express.use(
+      createExpressAdapter(this.routeRegistry, this.app, this.responseWriter),
+    );
   }
 
   /**
@@ -189,20 +207,29 @@ class HttpServer extends Base {
   /**
    * Resolve a thrown error through the registry: consumer tier first, then
    * built-ins; first `instanceof` match returning non-null wins. A handler
-   * that itself throws aborts the walk (logged here at `error`; the caller
-   * falls through to its 500) — never a crash loop. Returns null when no entry
-   * produced a response. Called by the route-handler and validation catches
-   * and by the final sink, which receives middleware errors.
+   * that itself throws, or returns a result that is not a valid response,
+   * aborts the walk (logged here at `error`; the caller answers its 500, even
+   * where it has a fallback response) — never a crash loop. Returns null when no entry produced a response.
+   * `response` is what gets sent; `status`/`body`/`headers` repeat a
+   * `{ status, body }` result (for an `HttpResponse` result: its status and
+   * JSON body). Called by the route-handler and validation catches and by the
+   * final sink, which receives middleware errors.
    */
   async resolveError(
     err: unknown,
     req: FrameworkRequest,
-  ): Promise<(ErrorHandlerResult & { logLevel: ErrorLogLevel }) | null> {
+  ): Promise<ResolvedError | null> {
     for (const entry of [...this.#errorHandlers, ...this.#builtInHandlers]) {
       if (err instanceof entry.errorClass) {
-        let result: ErrorHandlerResult | null | undefined;
+        let result: ErrorHandlerResult | HttpResponse | null | undefined;
+        let response: HttpResponse | null = null;
         try {
           result = await entry.handler(err, req);
+          if (result != null) {
+            response = HttpResponse.is(result)
+              ? result
+              : errorResultResponse(result);
+          }
         } catch (handlerErr) {
           // Keep the stack — a broken consumer handler is exactly the case
           // where `${err}` (message-only) isn't enough to debug.
@@ -213,10 +240,17 @@ class HttpServer extends Base {
                 : handlerErr
             }`,
           );
+          markErrorHandlerFailed(err);
           return null;
         }
-        if (result != null) {
-          return { ...result, logLevel: entry.logLevel };
+        if (response) {
+          const legacy = HttpResponse.is(result)
+            ? {
+                status: response.status,
+                body: response.kind === 'json' ? response.body : undefined,
+              }
+            : (result as ErrorHandlerResult);
+          return { ...legacy, response, logLevel: entry.logLevel };
         }
       }
     }
@@ -227,15 +261,16 @@ class HttpServer extends Base {
    * Add handle for 404 error
    */
   add404Page() {
-    this.express.use((req, res) => {
-      // error handling
-      res.status(404).json({
+    this.express.use((req, res, next) => {
+      const notFound = HttpResponse.json(404, {
+        error: FRAMEWORK_ERROR_CODES.notFound,
         message: translateWithDefault(
           req as FrameworkRequest,
           'http.notFound',
           'Not found',
         ),
       });
+      return this.responseWriter.write(notFound, req, res).catch(next);
     });
   }
 
@@ -255,15 +290,36 @@ class HttpServer extends Base {
           this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
           return next(err);
         }
-        const resolved = await this.resolveError(err, req as FrameworkRequest);
+        const frameworkReq = req as FrameworkRequest;
+        const resolved = await this.resolveError(err, frameworkReq);
         if (resolved) {
           this.logger?.[resolved.logLevel](toLoggableError(err));
-          return sendErrorResult(res, resolved);
+        } else {
+          this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
         }
-        this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
-        res.status(500).json({
-          message: serverErrorMessage(req as FrameworkRequest),
-        });
+        try {
+          await this.responseWriter.write(
+            resolved?.response ?? serverErrorResponse(frameworkReq),
+            req,
+            res,
+          );
+        } catch (writeErr) {
+          // The error response itself failed (e.g. a body JSON cannot encode):
+          // fall back to the plain 500, without the writer or the transform.
+          this.logger?.error(
+            `Error response could not be written: ${
+              writeErr instanceof Error
+                ? (writeErr.stack ?? writeErr.message)
+                : writeErr
+            }`,
+          );
+          if (!res.headersSent) {
+            res.status(500).json({
+              error: FRAMEWORK_ERROR_CODES.serverError,
+              message: serverErrorMessage(frameworkReq),
+            });
+          }
+        }
       },
     );
   }
