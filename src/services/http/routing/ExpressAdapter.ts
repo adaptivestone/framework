@@ -10,10 +10,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
 import { claimBuiltInResponse } from '../builtInResponse.ts';
-import {
-  discardBody,
-  ExpressResponseWriter,
-} from '../ExpressResponseWriter.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
@@ -140,11 +137,11 @@ export function createExpressAdapter(
       // the legacy `res` style, which has already answered (or will).
       if (HttpResponse.is(returned)) {
         if (res.headersSent) {
-          // The response written to res stands; the returned one is dropped.
+          // The response written to res stands; the returned one is left
+          // alone, since res may be sending the same stream.
           app.logger?.error(
             `${req.method} ${req.route.path}: the handler both wrote to res and returned an HttpResponse. Use one or the other.`,
           );
-          discardBody(returned);
           return;
         }
         await writer.write(returned, req, res);
@@ -156,7 +153,12 @@ export function createExpressAdapter(
         claimBuiltInResponse(req, res, (dropped) => {
           if (!res.headersSent && !res.destroyed) {
             warnDroppedResponse(entry);
-            writer.write(dropped, req, res).catch(next);
+            // A late call runs outside the try below: a throw goes to `next` too.
+            try {
+              writer.write(dropped, req, res).catch(next);
+            } catch (err) {
+              next(err);
+            }
           }
         });
       }

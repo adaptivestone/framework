@@ -471,7 +471,8 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     );
   });
 
-  it('stops a returned stream when the handler also wrote to res', async () => {
+  it('leaves a returned stream alone when the handler also wrote to res', async () => {
+    // The handler may be sending this same stream through res.
     let cancels = 0;
     const r = new RouteRegistry();
     r.registerRoute('GET', '/mixed', {
@@ -501,7 +502,7 @@ describe('createExpressAdapter — returned HttpResponse', () => {
 
     assertNotCalled(write);
     assertNotCalled(next);
-    assert.strictEqual(cancels, 1);
+    assert.strictEqual(cancels, 0);
   });
 
   it('passes a writer failure to next(err)', async () => {
@@ -628,6 +629,74 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     await flush();
 
     assertNotCalled(write);
+  });
+
+  it('leaves a late framework response alone when the client disconnected', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    Object.assign(res, { destroyed: true });
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+  });
+
+  it('passes a late writer failure thrown at once to next(err)', async () => {
+    const failure = new Error('write threw');
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const writer = {
+      write: (): Promise<void> => {
+        throw failure;
+      },
+    };
+    const next = mock.fn();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        asExpressRes(makeRes()),
+        next,
+      );
+      produce();
+      await flush();
+
+      assertCalledWith(next, failure);
+    } finally {
+      emitWarning.mock.restore();
+    }
   });
 
   it('lets an override that chained on the framework handler answer first', async () => {

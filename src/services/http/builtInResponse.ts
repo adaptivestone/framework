@@ -11,9 +11,10 @@ const responses = new WeakMap<object, { response: HttpResponse } | Claim>();
 /**
  * Return `response` from a framework controller handler, remembering it in
  * case an app override drops it (calls `super.x(req, res)` without returning
- * the result); the adapter then sends it and warns once. `res`, when given,
- * identifies the request even if the override passed a copy of `req`. The
- * status is also shown on `res`, where such an override reads it.
+ * the result); the adapter then sends it and warns once. It is kept under
+ * both `req` and `res`, so it is found if either is the request's own (the
+ * override may pass a copy of `req` or a wrapper of `res`). The status is also
+ * shown on `res` and the request's own `res`, where such an override reads it.
  * Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
@@ -21,18 +22,23 @@ export function builtInResponse<T extends HttpResponse>(
   response: T,
   res?: LegacyResponse,
 ): T {
-  const key = res ?? req;
-  const record = responses.get(key);
-  if (record && !('response' in record)) {
-    record.send?.(response);
+  const keys = res ? [res, req] : [req];
+  const claim = keys
+    .map((key) => responses.get(key))
+    .find((record): record is Claim => !!record && !('response' in record));
+  if (claim) {
+    claim.send?.(response);
   } else {
-    responses.set(key, { response });
+    for (const key of keys) {
+      responses.set(key, { response });
+    }
   }
 
   // An override may read the status after awaiting the built-in handler.
-  const transport = res ?? (req as { res?: LegacyResponse }).res;
-  if (transport && !transport.headersSent) {
-    transport.statusCode = response.status;
+  for (const transport of [res, (req as { res?: LegacyResponse }).res]) {
+    if (transport && !transport.headersSent) {
+      transport.statusCode = response.status;
+    }
   }
   return response;
 }

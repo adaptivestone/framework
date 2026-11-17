@@ -123,3 +123,60 @@ it('claims one late response across the res and request keys', async () => {
     HttpResponse.json(401, { message: 'Unauthorized' }),
   ]);
 });
+
+it('claims a late response the handler gets with the request only', async () => {
+  const home = new Home(app, '');
+  const ready = Promise.withResolvers<void>();
+  let work: Promise<unknown> | undefined;
+  const written = await dispatch('GET', (req: FrameworkRequest) => {
+    work = ready.promise.then(() => home.home(req));
+  });
+
+  assert.deepStrictEqual(written, []);
+  ready.resolve();
+  await work;
+  await setImmediate();
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(200, { message: 'Home' }),
+  ]);
+});
+
+it('bridges an awaited response passed a wrapper of res', async () => {
+  const health = new Health(app, '');
+  let status: number | undefined;
+  const written = await dispatch(
+    'GET',
+    async (req: FrameworkRequest, res: Response) => {
+      await health.live(req, Object.create(res));
+      status = res.statusCode;
+    },
+  );
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(401, { message: 'Unauthorized' }),
+  ]);
+  assert.strictEqual(status, 401);
+});
+
+it('claims a late response passed a wrapper of res', async () => {
+  const health = new Health(app, '');
+  const ready = Promise.withResolvers<void>();
+  let work: Promise<number> | undefined;
+  const written = await dispatch(
+    'GET',
+    (req: FrameworkRequest, res: Response) => {
+      work = ready.promise.then(async () => {
+        await health.live(req, Object.create(res));
+        return res.statusCode;
+      });
+    },
+  );
+
+  assert.deepStrictEqual(written, []);
+  ready.resolve();
+  const status = await work;
+  await setImmediate();
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(401, { message: 'Unauthorized' }),
+  ]);
+  assert.strictEqual(status, 401);
+});
