@@ -69,7 +69,7 @@ class Health extends AbstractController {
     if (!this.isAuthorized(req)) {
       return this.unauthorized(req, res);
     }
-    return builtInResponse(req, HttpResponse.json(200, { status: 'ok' }));
+    return builtInResponse(req, HttpResponse.json(200, { status: 'ok' }), res);
   }
 
   async ready(
@@ -93,6 +93,7 @@ class Health extends AbstractController {
         status: mongo,
         checks: { mongo },
       }),
+      res,
     );
   }
 
@@ -107,10 +108,7 @@ class Health extends AbstractController {
     return typeof sent === 'string' && timingSafeEqualStrings(sent, token);
   }
 
-  unauthorized(
-    req: FrameworkRequest,
-    _res?: Response,
-  ): Unauthorized | Response {
+  unauthorized(req: FrameworkRequest, res?: Response): Unauthorized | Response {
     return builtInResponse(
       req,
       HttpResponse.json(401, {
@@ -120,6 +118,7 @@ class Health extends AbstractController {
           'Unauthorized',
         ),
       }),
+      res,
     );
   }
 }

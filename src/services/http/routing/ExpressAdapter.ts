@@ -153,8 +153,8 @@ export function createExpressAdapter(
         // response would answer nothing. Transitional: removed in v6 (see
         // `builtInResponse`).
         const { entry } = result;
-        claimBuiltInResponse(req, (dropped) => {
-          if (!res.headersSent) {
+        claimBuiltInResponse(req, res, (dropped) => {
+          if (!res.headersSent && !res.destroyed) {
             warnDroppedResponse(entry);
             writer.write(dropped, req, res).catch(next);
           }

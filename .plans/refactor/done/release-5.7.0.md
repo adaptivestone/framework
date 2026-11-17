@@ -120,6 +120,31 @@ server errors, not the built-in `Auth` and `Health` controllers' own answers;
 "status and body unchanged" became "status and message unchanged" where the
 body gains its code.
 
+### Stream cancellation and copied-request review (2026-11-17)
+
+Two further release-blocking review findings are fixed on `release/5.7.0`:
+
+- Node `Readable` cancellation explicitly destroys the source, including HEAD,
+  disconnect during a pending read and a discarded transform body. A listener
+  handles asynchronous open/destroy errors until close. Iterator `return()` alone
+  neither closes an unread file nor interrupts a pending read.
+- The built-in response bridge keys responses by the explicitly supplied `res`,
+  retaining a request-only fallback. Overrides may forward a copied request
+  (including one without `req.res`) and still drop the returned descriptor. Both
+  keys share a single claim; the previous status mirroring and next-tick send
+  are preserved. The adapter also skips a late send after client disconnect.
+
+Regression tests cover unread/missing files, disconnect before the first chunk,
+transform replacement, an actual `Auth` override with normalized copied input,
+request-only `Home`, and a late copied `Health` request with exactly one send.
+
+Verification after these fixes (2026-11-17): Node 26.13.1 `npm test` passed
+1083/1083, no skips or cancellations, with a disposable Redis and test concurrency
+limited to two. Biome, both TypeScript checks (one checker, separate incremental
+caches), and `npm run smoke` passed. All seven new regression tests also passed
+on Bun 1.4.4, including an error queued by an already-destroyed Node stream.
+The full Bun matrix is left to the updated PR's CI.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,
@@ -149,7 +174,8 @@ body gains its code.
 
 ## Verification results — 2026-11-17
 
-Final state, after the second review's fixes. Run in a clean copy of the branch
+State after the second review's fixes, before the stream cancellation and
+copied-request fixes above. Run in a clean copy of the branch
 (a separate worktree), so nothing else in the working directory took part.
 
 - npm latest is 5.6.1; 5.7.0 is not published.

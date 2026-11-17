@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cancelled Node response streams release their resources.** A `HEAD` request, a client disconnect while waiting for data, or a response transform that discards a Node `Readable` now destroys the source. An unread file stream no longer leaks its file descriptor or crashes the process if opening the file fails.
+- **Built-in controller overrides may forward a copied request.** An override that calls `super.postLogin(copiedRequest, res)` and returns `res` now sends the built-in response, as it did in 5.6.1. The same compatibility fix applies to `Home` and `Health`, including calls that finish after the override returns.
+
 ## [5.7.0] - 2026-11-17
 
 ### Added

@@ -366,6 +366,15 @@ As built:
   `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_CONTENT_TYPE`, `SERVER_ERROR`. Additive for clients;
   whole-body test assertions in apps change (as with the 5.5 codes).
 
+### Additional release review fixes (2026-11-17)
+
+- Node `Readable` cancellation destroys the source on HEAD, client disconnect,
+  or discarded bodies, handling asynchronous open/destroy errors until close.
+- The transitional built-in bridge uses the explicitly supplied Express response
+  as a stable key when an override forwards a copied request; request-only calls
+  remain supported. Both keys share one claim. Status mirroring and next-tick
+  late sends remain unchanged; a disconnected client receives no late send.
+
 ### Phase 3 — OpenAPI/type integration
 
 - Extend AST extraction with explicit response return types and imports.

@@ -284,6 +284,9 @@ requires oxc-parser ^0.152.0. Email case-folding stays queued
 
 ## 5.7.0 — prepared 2026-11-16 (PR #84, then the release commit)
 
+The 2026-11-17 follow-up review fixes Node stream cancellation and copied-request
+overrides of built-in controllers; see the release card for regression coverage.
+
 User-selected minor release. See [release preparation](done/release-5.7.0.md) and `CHANGELOG.md`: handlers return typed `HttpResponse` values, every framework response goes through one writer with a `transformResponse` hook, error handlers can return responses, and framework error bodies carry stable `error` codes (P1q phases 0–2). The middleware rework (P1m) and its design documents are not part of it; OpenAPI response contracts follow as 5.8.
 
 ## 5.6.1 — released 2026-11-15 (npm + GitHub release)

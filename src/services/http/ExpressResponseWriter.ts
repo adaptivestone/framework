@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+import { finished } from 'node:stream/promises';
 import type { Request, Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
@@ -229,6 +231,10 @@ export function discardBody(response: HttpResponse): void {
 /** Stop a byte source that will not be read. A failure to stop is ignored. */
 function cancelSource(body: ByteStream): void {
   try {
+    if (body instanceof Readable) {
+      destroyNodeSource(body);
+      return;
+    }
     const stopped =
       body instanceof ReadableStream
         ? body.cancel()
@@ -237,6 +243,15 @@ function cancelSource(body: ByteStream): void {
   } catch {
     // A source that throws while stopping is already broken; nothing more to do.
   }
+}
+
+/** Iterator.return() neither closes an unread Node stream nor interrupts a pending read. */
+function destroyNodeSource(body: Readable): void {
+  // An asynchronous open/_destroy can still fail after cancellation. Nothing
+  // consumes those errors once the response is discarded (not even an iterator
+  // for HEAD). Even a closed source may still have an error queued for emission.
+  void finished(body, { cleanup: true }).catch(() => {});
+  body.destroy();
 }
 
 /** A `ReadableStream` read through its reader, so a disconnect cancels a pending read at once. */
@@ -251,7 +266,17 @@ function iterate(body: ByteStream): AsyncIterator<Uint8Array> {
       },
     };
   }
-  return body[Symbol.asyncIterator]();
+  const source = body[Symbol.asyncIterator]();
+  if (body instanceof Readable) {
+    return {
+      next: () => source.next(),
+      return: async () => {
+        destroyNodeSource(body);
+        return source.return?.() ?? { done: true, value: undefined };
+      },
+    };
+  }
+  return source;
 }
 
 const DISCONNECTED = Symbol('disconnected');

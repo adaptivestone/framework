@@ -19,9 +19,13 @@ class Home extends AbstractController {
   // override written against the previous `res.json(...)` version still fits.
   async home(
     req: FrameworkRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<JsonResponse<200, { message: string }> | Response> {
-    return builtInResponse(req, HttpResponse.json(200, { message: 'Home' }));
+    return builtInResponse(
+      req,
+      HttpResponse.json(200, { message: 'Home' }),
+      res,
+    );
   }
 
   getHttpPath() {
