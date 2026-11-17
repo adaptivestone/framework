@@ -7,14 +7,19 @@ const CLAIM = Symbol('builtInResponseClaim');
 
 type Send = (response: HttpResponse) => void;
 
-type Marked = { [PRODUCED]?: HttpResponse; [CLAIM]?: Send };
+type Marked = {
+  [PRODUCED]?: HttpResponse;
+  [CLAIM]?: Send;
+  res?: { statusCode: number; headersSent: boolean };
+};
 
 /**
  * Return `response` from a framework controller handler, remembering it on the
  * request. An app override that calls the handler (`super.x(req, res)`)
  * without returning its result would otherwise answer nothing; the adapter
- * sends the remembered response instead (and warns once). Transitional:
- * removed in v6.
+ * sends the remembered response instead (and warns once). The status is also
+ * shown on `res`, where such an override reads it (`res.statusCode`).
+ * Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
   req: object,
@@ -22,7 +27,14 @@ export function builtInResponse<T extends HttpResponse>(
 ): T {
   const marked = req as Marked;
   marked[PRODUCED] = response;
-  marked[CLAIM]?.(response);
+  if (marked.res && !marked.res.headersSent) {
+    marked.res.statusCode = response.status;
+  }
+  const claim = marked[CLAIM];
+  if (claim) {
+    // Next tick: an override that chained on this handler may answer first.
+    setImmediate(claim, response);
+  }
   return response;
 }
 

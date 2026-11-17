@@ -630,6 +630,52 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     assertNotCalled(write);
   });
 
+  it('lets an override that chained on the framework handler answer first', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request, res: Response) => {
+        // Not returned: the answer comes from the continuation.
+        builtIn(req).then(() => {
+          res.json({ own: true });
+          (res as unknown as MockRes).headersSent = true;
+        });
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { own: true });
+  });
+
+  it("shows a framework response's status on res", () => {
+    const res = { statusCode: 200, headersSent: false };
+    builtInResponse({ res }, HttpResponse.empty(201));
+    assert.strictEqual(res.statusCode, 201);
+  });
+
+  it('leaves the status of a response that was already sent', () => {
+    const res = { statusCode: 200, headersSent: true };
+    builtInResponse({ res }, HttpResponse.empty(404));
+    assert.strictEqual(res.statusCode, 200);
+  });
+
   it('leaves a dropped framework response alone when the override answered itself', async () => {
     const r = new RouteRegistry();
     r.registerRoute('POST', '/login', {
