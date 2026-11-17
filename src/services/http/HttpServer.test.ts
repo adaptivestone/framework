@@ -5,12 +5,13 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, mock } from 'node:test';
 import type { NextFunction, Response } from 'express';
 import { appInstance } from '../../helpers/appInstance.ts';
 import { stubI18n } from '../../tests/mocks.ts';
 import { getTestServerURL } from '../../tests/testHelpers.ts';
 import type { TI18n } from '../i18n/I18n.ts';
+import type { ResolvedError } from './builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import HttpServer from './HttpServer.ts';
@@ -116,9 +117,16 @@ const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
 
 const runSink = async (
   err: Error,
-  { i18n, headersSent }: { i18n?: TI18n; headersSent?: boolean } = {},
+  {
+    i18n,
+    headersSent,
+    contentType,
+  }: { i18n?: TI18n; headersSent?: boolean; contentType?: string } = {},
 ) => {
   const { captured, res } = recordingResponse(headersSent);
+  if (contentType) {
+    res.setHeader('Content-Type', contentType);
+  }
   let passedOn: unknown;
   await captureHandler<
     (
@@ -281,6 +289,49 @@ describe('HttpServer — final sink resolves through the registry', () => {
       assert.strictEqual(answer.headers['x-reason'], undefined);
     } finally {
       unregister?.();
+    }
+  });
+
+  it('labels the plain 500 fallback as JSON', async () => {
+    const circular: { self?: unknown } = {};
+    circular.self = circular;
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      UnauthorizedError,
+      () => ({ status: 401, body: circular }),
+    );
+    try {
+      const answer = await runSink(new UnauthorizedError(), {
+        contentType: 'text/plain; charset=utf-8',
+      });
+      assert.strictEqual(answer.status, 500);
+      assert.strictEqual(answer.headers['Content-Type'], 'application/json');
+    } finally {
+      unregister?.();
+    }
+  });
+
+  it('answers a resolveError result without response from its legacy fields', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    // An app replacement still returning the shape before `response`.
+    const legacy = mock.method(
+      server,
+      'resolveError',
+      async () =>
+        ({
+          status: 418,
+          body: { legacy: true },
+          headers: { 'x-legacy': '1' },
+          logLevel: 'warn',
+        }) as unknown as ResolvedError,
+    );
+    try {
+      const answer = await runSink(new Error('boom'));
+      assert.strictEqual(answer.status, 418);
+      assert.deepStrictEqual(answer.payload, { legacy: true });
+      assert.strictEqual(answer.headers['x-legacy'], '1');
+    } finally {
+      legacy.mock.restore();
     }
   });
 

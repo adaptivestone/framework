@@ -8,7 +8,9 @@ import { ValidationError } from '../validate/ValidationError.ts';
 import {
   builtInErrorHandlers,
   type ErrorHandlerResult,
+  errorHandlerFailed,
   errorResultResponse,
+  markErrorHandlerFailed,
   matchedClientCastError,
   matchedClientValidationErrors,
   toLoggableError,
@@ -243,9 +245,10 @@ describe('toLoggableError', () => {
     );
   });
 
-  it('rebuilds a request ValidationError as field paths only', () => {
+  it('rebuilds a request ValidationError as a field count only', () => {
+    // A path can be a client-supplied key (a record keyed by e-mail).
     const error = new ValidationError({
-      email: ['SECRET_INPUT is not an email'],
+      'SECRET_KEY@example.com': ['SECRET_INPUT is not an email'],
       password: 'Too short',
     });
 
@@ -256,10 +259,32 @@ describe('toLoggableError', () => {
     assert.strictEqual((result as Error).name, 'ValidationError');
     assert.strictEqual(
       (result as Error).message,
-      'Request validation failed: email, password',
+      'Request validation failed (2 fields)',
     );
-    assert.ok(!(result as Error).stack?.includes('SECRET_INPUT'));
-    assert.ok(!(result as Error).stack?.includes('Too short'));
+    for (const secret of ['SECRET_KEY', 'SECRET_INPUT', 'Too short']) {
+      assert.ok(!(result as Error).stack?.includes(secret));
+    }
+    assert.strictEqual(
+      (toLoggableError(new ValidationError({ name: 'Required' })) as Error)
+        .message,
+      'Request validation failed (1 field)',
+    );
+  });
+
+  it('passes an app error with an object message through unchanged', () => {
+    const error = new Error();
+    (error as { message: unknown }).message = { reason: 'quota' };
+    assert.strictEqual(toLoggableError(error), error);
+  });
+});
+
+describe('errorHandlerFailed', () => {
+  it('reads the failure mark once, so a reused error is not marked again', () => {
+    const error = new Error('reused instance');
+    markErrorHandlerFailed(error);
+
+    assert.strictEqual(errorHandlerFailed(error), true);
+    assert.strictEqual(errorHandlerFailed(error), false);
   });
 });
 

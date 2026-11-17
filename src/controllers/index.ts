@@ -9,6 +9,7 @@ import Base from '../modules/Base.ts';
 import type { IApp } from '../server.ts';
 import {
   errorHandlerFailed,
+  resolvedErrorResponse,
   serverErrorResponse,
   toLoggableError,
   validationFailedMessage,
@@ -647,7 +648,7 @@ async function answerError(
     : null;
   if (resolved) {
     logger?.[resolved.logLevel](toLoggableError(err));
-    return resolved.response;
+    return resolvedErrorResponse(resolved);
   }
   // A failed handler is a server-side defect: the 500, not the fallback.
   if (unresolved && !errorHandlerFailed(err)) {

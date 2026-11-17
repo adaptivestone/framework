@@ -23,6 +23,7 @@ import {
   type RegisteredErrorHandler,
   type RegistrableError,
   type ResolvedError,
+  resolvedErrorResponse,
   serverErrorMessage,
   serverErrorResponse,
   toLoggableError,
@@ -237,7 +238,7 @@ class HttpServer extends Base {
             `Error handler for ${entry.errorClass.name} threw: ${
               handlerErr instanceof Error
                 ? (handlerErr.stack ?? handlerErr.message)
-                : handlerErr
+                : String(handlerErr)
             }`,
           );
           markErrorHandlerFailed(err);
@@ -299,7 +300,9 @@ class HttpServer extends Base {
         }
         try {
           await this.responseWriter.write(
-            resolved?.response ?? serverErrorResponse(frameworkReq),
+            resolved
+              ? resolvedErrorResponse(resolved)
+              : serverErrorResponse(frameworkReq),
             req,
             res,
           );
@@ -310,10 +313,12 @@ class HttpServer extends Base {
             `Error response could not be written: ${
               writeErr instanceof Error
                 ? (writeErr.stack ?? writeErr.message)
-                : writeErr
+                : String(writeErr)
             }`,
           );
           if (!res.headersSent) {
+            // A type left on res from before must not label the JSON body.
+            res.setHeader('Content-Type', 'application/json');
             res.status(500).json({
               error: FRAMEWORK_ERROR_CODES.serverError,
               message: serverErrorMessage(frameworkReq),
