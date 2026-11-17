@@ -154,6 +154,76 @@ added under `Unreleased` were removed afterwards: both fixes repair code that
 was never released, and the 5.7.0 section already describes the resulting
 behavior.
 
+### Third review (2026-11-17)
+
+Two more independent model reviews read `5.6.1..cff6929` at their highest
+reasoning setting, and both advised against publishing. One run was stopped by
+its provider's content filter before the report; resumed, it reported what it
+had confirmed. The main findings were reproduced with probe scripts, the rest
+with a test that failed before its fix.
+
+Fixed, each with a regression test:
+
+- A Node stream that `transformResponse` replaced could emit `'error'` before
+  anyone listened (a file that fails to open while the replacement renders):
+  an uncaught exception, so the process exited. A replaced Node source now gets
+  a no-op error listener before rendering.
+- Bridge: an override passing a wrapper of `res` to the built-in handler got no
+  answer. The response is recorded under both `req` and `res`, and the status
+  is shown on both the given and the request's own `res`.
+- The "error handler failed" mark stayed on a reused error object. Reading it
+  now clears it.
+- `toLoggableError` relabelled any error with an object `message`. Only the
+  framework's `ValidationError` is rewritten, and only the number of failing
+  fields is logged: a path can be a client-supplied key.
+- A replaced `resolveError` that returned only the legacy fields left the
+  request open (controller path) or answered 500 (final sink). The response is
+  built from the legacy fields.
+- Mixed write: the second review's fix stopped the returned body, which
+  destroyed a stream the handler was also piping to `res`. The returned
+  response is now left alone; `discardBody` is gone.
+- `HttpResponse.native` also drops the headers its `Connection` header names.
+- A `transformResponse` returning a Promise fulfilled with a response left that
+  response's body open. It is stopped, unless it is the body being sent.
+- A late bridge send that throws synchronously goes to `next(err)`.
+- Hardenings: thrown non-Error values are formatted without throwing; the plain
+  500 fallback is labelled `application/json`.
+- `Home` and `Health` handlers declare `HttpResponse | Response`, like `Auth`:
+  a subclass returning another response kind did not compile.
+- Tests added for two guards that no test covered (a disconnected client gets
+  no late send; a late request-only call is found through the request key).
+
+Disclosed in the changelog and README, not changed:
+
+- The built-in handlers no longer call `res.json` or `res.status`: a wrapper
+  around `res` no longer intercepts their answer, and a status set before the
+  call is replaced.
+- Waiting inside an override for `res` to finish never completes.
+- A built-in handler used directly as an Express route handler does not answer.
+- An `HttpServer.resolveError` override must return `response` (types).
+- Legacy error results: `Set-Cookie` is appended and `Vary` merged; a result
+  without a body no longer answers 304 to a conditional request.
+- A replacement stream that wraps the original owns stopping it; an async
+  generator finishes its current step before it stops.
+- `native` sends any status; the plain 500 fallback is not transformed.
+
+Not taken:
+
+- A 205 error result with an explicit `Content-Length`.
+- A Web stream's reader left locked after a write, and a `drain` listener left
+  after a disconnect during backpressure (both die with the request).
+- Two copies of the framework in one app keep separate bridge state.
+- The status mirrored on `res` is the descriptor's, so a conditional GET shows
+  200 where the wire answer is 304.
+- `JsonResponse<S, B, M>` annotations are not checked against the media type
+  the factory sets. Recorded for the 5.8 OpenAPI work.
+- The long-stream memory test can pass without measuring anything.
+
+Verification after these fixes (2026-11-17), in a clean copy of the branch:
+Node 26.13.1 1100/1100 with Redis and no skips, Bun 1.4.4 1074/1074, Biome,
+both TypeScript checks, packaging smoke, and the Bun packed consumer against a
+disposable `mongo:8`.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,

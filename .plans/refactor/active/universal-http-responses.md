@@ -354,6 +354,9 @@ As built:
   tick, so an override that chained on the handler's promise (`super.x(req, res).then(…res.json…)`)
   answers first. Not bridged, documented as a rule: an override that answers through `res` after it
   has returned gets the built-in response sent first.
+  **Extended 2026-11-17 (third review):** the response is recorded under both `req` and `res`, so it
+  is found when the override passes a copy of `req` or a wrapper of `res`. A wrapper no longer
+  intercepts the answer (the handlers do not call `res.json`); that is disclosed, not bridged.
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).
