@@ -84,6 +84,42 @@ found two gaps:
 The bridge is marked transitional in the source and is on the v6 removal list
 in the plan index.
 
+### Second review (2026-11-17)
+
+After PR #84 merged, an independent Opus review read the release diff
+(`5.6.1..release/5.7.0`), and another checked the documentation branch against
+the source. Every finding was reproduced before it was acted on.
+
+Fixed, each with a regression test:
+
+- A `transformResponse` that returned a stream wrapping the original body got an
+  empty body (status 200, nothing logged): the original source was stopped
+  before the wrapper read it. It is now stopped after rendering.
+- A handler that wrote to `res` and also returned a response had its own large
+  `res` body cut off (the error went to the default finalizer, which destroys
+  the socket). The adapter now logs, stops the returned body and leaves `res`
+  alone.
+- A handled request `ValidationError` was logged as `[object Object]`. The log
+  line now lists the field paths, without values.
+- Bridge: after `await super.x(req, res)` a 5.6 override reads the outcome from
+  `res.statusCode`, which stayed at its default. The bridge now shows the
+  produced status on `res`.
+- Bridge: the late send introduced on 2026-11-16 fired before an override that
+  chained on the handler's promise could answer. It now waits one tick.
+
+Disclosed in the changelog and README, not changed:
+
+- Framework-built JSON responses replace a `Content-Type` set on `res` earlier.
+- An override that answers through `res` after it has returned gets the
+  built-in response sent first.
+- `transformResponse` does not see the CORS preflight 204 and the rate limiter's
+  500 for a broken setup.
+
+Corrected text: the error codes cover validation, routing, body-parsing and
+server errors, not the built-in `Auth` and `Health` controllers' own answers;
+"status and body unchanged" became "status and message unchanged" where the
+body gains its code.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,
@@ -96,7 +132,7 @@ in the plan index.
   `src/services/http/builtInResponse.ts`.
 - Tests and fixtures next to each file; `scripts/fixtures/optional-i18n.mts`.
 - Release: `package.json`, `package-lock.json` (version), `CHANGELOG.md` (5.7.0,
-  dated 2026-11-16, the planned release day), `README.md` (5.7.0 upgrade notes),
+  dated 2026-11-17, the planned release day), `README.md` (5.7.0 upgrade notes),
   this card, `.plans/refactor/README.md`, `active/universal-http-responses.md`,
   `queued/openapi-responses.md`.
 - Documentation repo: worktree `../framework-documenation-github-5.7.0`, local
@@ -111,23 +147,26 @@ in the plan index.
   corrected before the release, and two imprecise changelog sentences (the
   built-in handlers' return types, the bodiless error result), reworded.
 
-## Verification results — 2026-11-16
+## Verification results — 2026-11-17
+
+Final state, after the second review's fixes. Run in a clean copy of the branch
+(a separate worktree), so nothing else in the working directory took part.
 
 - npm latest is 5.6.1; 5.7.0 is not published.
-- Node 26.13.1 suite: 1070/1070 passed, no skips, with `REDIS_URI` set against a
+- Node 26.13.1 suite: 1076/1076 passed, no skips, with `REDIS_URI` set against a
   disposable Redis container.
-- Biome, main and test TypeScript checks (one checker, separate caches,
-  sequential) passed.
+- Biome, main and test TypeScript checks (one checker, cold) passed.
 - Packaging smoke passed.
-- Bun 1.4.4 suite: 1044/1044 passed. The Bun packed consumer passed boot, HTTP,
+- Bun 1.4.4 suite: 1050/1050 passed. The Bun packed consumer passed boot, HTTP,
   real MongoDB CRUD, password hashing and clean shutdown with
   `SMOKE_REQUIRE_MONGO=1` against a disposable `mongo:8` container. Both
   containers were removed afterwards.
-- Replay check: outside `.plans`, the release branch equals the full replay
-  (`plans/middleware-design`) plus the bridge fix and this release commit. The
-  plan documents have no new broken links.
-- Each fix from the review and the bridge check has a test that fails without
-  it.
+- Replay check (2026-11-16, before the second review): outside `.plans`, the
+  release branch equalled the full replay (`plans/middleware-design`) plus the
+  bridge fix and the release commit. The plan documents have no new broken
+  links.
+- Each fix from the reviews and the bridge checks has a test that fails without
+  it; the reviewers' probe scripts were rerun after the fixes.
 - CI on PR #84 passed (34 checks) before the release commit.
 - Local checks do not replace the remote Node/Bun CI matrix.
 

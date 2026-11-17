@@ -40,8 +40,9 @@ export interface HttpErrorBodyDetails {
 export type HttpErrorDetails = HttpErrorContractDetails | HttpErrorBodyDetails;
 
 /**
- * The `error` code of every error response the framework builds itself, so a
- * client can tell them apart without parsing the translated `message`.
+ * The `error` codes of the framework's validation, routing, body-parsing and
+ * server error responses, so a client can tell them apart without parsing the
+ * translated `message`.
  */
 export const FRAMEWORK_ERROR_CODES = {
   /** 400: a `params:`/`request:`/`query:` schema rejected the input (also the Mongoose safety nets). */

@@ -75,10 +75,11 @@ npm install @adaptivestone/framework
 See the [5.7.0 release notes](CHANGELOG.md). Handlers that write to `res` keep
 working. Check these when you upgrade:
 
-- Every error body the framework builds now carries an `error` code
-  (`VALIDATION_FAILED`, `NOT_FOUND`, `SERVER_ERROR` and others, exported as
-  `FRAMEWORK_ERROR_CODES`). Statuses and messages are unchanged. Tests that
-  compare whole error bodies must add the field.
+- Validation, routing, body-parsing and server error bodies now carry an
+  `error` code (`VALIDATION_FAILED`, `NOT_FOUND`, `SERVER_ERROR` and others,
+  exported as `FRAMEWORK_ERROR_CODES`). Statuses and messages are unchanged.
+  Tests that compare whole error bodies must add the field. The built-in
+  `Auth` and `Health` controllers' own answers still carry only `message`.
 - A catch-all `registerErrorHandler(Error, …)` now also receives
   request-validation errors and the body parser's 413 and 400. Return `null`
   for the errors you do not handle, to keep the default answers.
@@ -93,9 +94,18 @@ working. Check these when you upgrade:
   answers for now, with a one-time `ASF_DEP_DROPPED_RESPONSE` warning; v6
   removes that. Its response goes out when the override finishes, so code after
   the call runs first, and if that code throws, the client gets the error
-  response.
+  response. `res.statusCode` shows the built-in status after the call, as
+  before, but `res.headersSent` is still false.
+- An override that calls a built-in handler and then answers through `res`
+  itself must do so before it returns; otherwise the built-in response is sent
+  first.
 - An override annotated `Promise<Response>` that returns the built-in result no
   longer compiles. Widen the annotation or drop it.
+- Framework-built JSON responses (404, 405, 415, validation and body-parser
+  errors, the 500, and the built-in `Auth`, `Home` and `Health` answers) are
+  sent as `application/json`, replacing a `Content-Type` set on `res` earlier,
+  for example by a middleware. To send another media type on every response,
+  set `contentType` in `transformResponse`.
 - The `Auth` answers without a body (register 201, verify and recover 200) no
   longer send `Content-Type: application/json`.
 

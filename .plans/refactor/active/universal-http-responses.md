@@ -348,6 +348,12 @@ As built:
   handler answered meanwhile). Not bridged, disclosed in the changelog: the response of an awaited
   call is sent when the override finishes, so code after the call delays it, and a throw there
   answers with the error response.
+  **Extended 2026-11-17 (Opus review):** the bridge also shows the produced status on `res`
+  (`req.res.statusCode`), because a 5.6 override could only learn the outcome there
+  (`await super.postRegister(req, res); if (res.statusCode === 201) …`); and the late send waits one
+  tick, so an override that chained on the handler's promise (`super.x(req, res).then(…res.json…)`)
+  answers first. Not bridged, documented as a rule: an override that answers through `res` after it
+  has returned gets the built-in response sent first.
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).
