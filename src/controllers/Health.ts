@@ -8,11 +8,9 @@ import AbstractController, {
 } from '../modules/AbstractController.ts';
 import { builtInResponse } from '../services/http/builtInResponse.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
-import { HttpResponse, type JsonResponse } from '../services/http/responses.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 
 const MONGO_PING_TIMEOUT_MS = 1000;
-
-type Unauthorized = JsonResponse<401, { message: string }>;
 
 /** Ping MongoDB; false when disconnected, failing, or slower than the timeout. */
 async function pingMongo(): Promise<boolean> {
@@ -65,7 +63,7 @@ class Health extends AbstractController {
   async live(
     req: FrameworkRequest,
     res?: Response,
-  ): Promise<JsonResponse<200, { status: string }> | Unauthorized | Response> {
+  ): Promise<HttpResponse | Response> {
     if (!this.isAuthorized(req)) {
       return this.unauthorized(req, res);
     }
@@ -75,11 +73,7 @@ class Health extends AbstractController {
   async ready(
     req: FrameworkRequest,
     res?: Response,
-  ): Promise<
-    | JsonResponse<200 | 503, { status: string; checks: { mongo: string } }>
-    | Unauthorized
-    | Response
-  > {
+  ): Promise<HttpResponse | Response> {
     if (!this.isAuthorized(req)) {
       return this.unauthorized(req, res);
     }
@@ -108,7 +102,7 @@ class Health extends AbstractController {
     return typeof sent === 'string' && timingSafeEqualStrings(sent, token);
   }
 
-  unauthorized(req: FrameworkRequest, res?: Response): Unauthorized | Response {
+  unauthorized(req: FrameworkRequest, res?: Response): HttpResponse | Response {
     return builtInResponse(
       req,
       HttpResponse.json(401, {

@@ -4,7 +4,7 @@ import AbstractController, {
 } from '../modules/AbstractController.ts';
 import { builtInResponse } from '../services/http/builtInResponse.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
-import { HttpResponse, type JsonResponse } from '../services/http/responses.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 
 class Home extends AbstractController {
   get routes() {
@@ -20,7 +20,7 @@ class Home extends AbstractController {
   async home(
     req: FrameworkRequest,
     res?: Response,
-  ): Promise<JsonResponse<200, { message: string }> | Response> {
+  ): Promise<HttpResponse | Response> {
     return builtInResponse(
       req,
       HttpResponse.json(200, { message: 'Home' }),

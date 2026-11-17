@@ -4,6 +4,7 @@ import type { Response } from 'express';
 import mongoose from 'mongoose';
 import { appInstance } from '../helpers/appInstance.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
 import Health from './Health.ts';
 
@@ -111,5 +112,22 @@ describe('health controller overrides', () => {
       }
     }
     assert.strictEqual(typeof LegacyHealth.prototype.live, 'function');
+  });
+
+  it('accept handlers returning another response kind (compile-time check)', () => {
+    class TextHealth extends Health {
+      override async live() {
+        return HttpResponse.text(200, 'alive');
+      }
+
+      override async ready() {
+        return HttpResponse.text(200, 'ready');
+      }
+
+      override unauthorized() {
+        return HttpResponse.text(401, 'No');
+      }
+    }
+    assert.strictEqual(typeof TextHealth.prototype.ready, 'function');
   });
 });
