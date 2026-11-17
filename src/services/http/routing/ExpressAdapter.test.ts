@@ -440,7 +440,7 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     }
   });
 
-  it('fails loudly when the handler also wrote to res', async () => {
+  it('logs and drops a returned response when the handler also wrote to res', async () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/mixed', {
       handler: async (_req: Request, res: Response) => {
@@ -450,10 +450,11 @@ describe('createExpressAdapter — returned HttpResponse', () => {
       },
     });
     const { writer, write } = stubWriter();
+    const { app, error } = makeAppWithLogger();
     const res = makeRes();
     const next = mock.fn();
 
-    await createExpressAdapter(r, fakeApp, writer)(
+    await createExpressAdapter(r, app, writer)(
       makeReq('GET', '/mixed'),
       asExpressRes(res),
       next,
@@ -461,11 +462,46 @@ describe('createExpressAdapter — returned HttpResponse', () => {
 
     assertNotCalled(write);
     assert.deepStrictEqual(res.body, { first: true });
-    assertCalledWith(next, pattern.any(Error));
+    // The response written to res stays intact: no error goes downstream.
+    assertNotCalled(next);
+    assertCalledTimes(error, 1);
     assertTextMatch(
-      next.mock.calls[0]?.arguments[0]?.message,
+      error.mock.calls[0]?.arguments[0],
       /GET \/mixed: the handler both wrote to res and returned an HttpResponse/,
     );
+  });
+
+  it('stops a returned stream when the handler also wrote to res', async () => {
+    let cancels = 0;
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(
+          200,
+          new ReadableStream<Uint8Array>({
+            cancel() {
+              cancels += 1;
+            },
+          }),
+        );
+      },
+    });
+    const { writer, write } = stubWriter();
+    const { app } = makeAppWithLogger();
+    const next = mock.fn();
+
+    await createExpressAdapter(r, app, writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(makeRes()),
+      next,
+    );
+    await flush();
+
+    assertNotCalled(write);
+    assertNotCalled(next);
+    assert.strictEqual(cancels, 1);
   });
 
   it('passes a writer failure to next(err)', async () => {

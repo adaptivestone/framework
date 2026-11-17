@@ -218,6 +218,14 @@ function discardReplacedBody(
   }
 }
 
+/** @internal Stop the body of a response that will not be sent, if it has one. */
+export function discardBody(response: HttpResponse): void {
+  const body = bodySource(response);
+  if (body) {
+    cancelSource(body);
+  }
+}
+
 /** Stop a byte source that will not be read. A failure to stop is ignored. */
 function cancelSource(body: ByteStream): void {
   try {
