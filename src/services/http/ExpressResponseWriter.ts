@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+import { finished } from 'node:stream/promises';
 import type { Request, Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
@@ -57,10 +59,19 @@ export class ExpressResponseWriter
     const headers = res.getHeaders();
     try {
       const final = this.#transformed(response, req);
-      if (final !== response) {
-        discardReplacedBody(response, final);
+      const replaced = final === response ? undefined : bodySource(response);
+      if (replaced instanceof Readable) {
+        // The replacement may read it late; an error before then must not crash.
+        absorbErrors(replaced);
       }
-      await render(final, req, res);
+      try {
+        await render(final, req, res);
+      } finally {
+        // After rendering: a replacement may wrap the original and read it.
+        if (final !== response) {
+          discardReplacedBody(response, final);
+        }
+      }
     } catch (err) {
       if (!res.headersSent) {
         for (const name of res.getHeaderNames()) {
@@ -94,8 +105,16 @@ export class ExpressResponseWriter
       const isThenable =
         typeof (transformed as { then?: unknown } | null)?.then === 'function';
       if (isThenable) {
-        // Reported below; its rejection must not surface as unhandled.
-        Promise.resolve(transformed).catch(() => {});
+        // Reported below; its rejection must not surface as unhandled. A late
+        // response is not sent: stop its body, unless it is the one being sent.
+        Promise.resolve(transformed).then(
+          (late) => {
+            if (HttpResponse.is(late)) {
+              discardReplacedBody(late, response);
+            }
+          },
+          () => {},
+        );
       }
       const got = isThenable
         ? 'a Promise (it must be synchronous)'
@@ -108,7 +127,7 @@ export class ExpressResponseWriter
     } catch (err) {
       this.#onTransformError(
         `transformResponse threw; the original response was sent: ${
-          err instanceof Error ? (err.stack ?? err.message) : err
+          err instanceof Error ? (err.stack ?? err.message) : String(err)
         }`,
       );
     }
@@ -155,11 +174,19 @@ async function render(
       });
     case 'native': {
       const native = response.response;
+      // The fields `Connection` names are hop-by-hop too (RFC 9110 7.6.1).
+      const named = new Set(
+        (native.headers.get('connection') ?? '')
+          .split(',')
+          .map((name) => name.trim().toLowerCase()),
+      );
       const commit = () => {
         start(
           res,
           native.status,
-          [...native.headers].filter(([name]) => !HOP_BY_HOP_HEADERS.has(name)),
+          [...native.headers].filter(
+            ([name]) => !HOP_BY_HOP_HEADERS.has(name) && !named.has(name),
+          ),
         );
         if (native.statusText) {
           res.statusMessage = native.statusText;
@@ -217,6 +244,10 @@ function discardReplacedBody(
 /** Stop a byte source that will not be read. A failure to stop is ignored. */
 function cancelSource(body: ByteStream): void {
   try {
+    if (body instanceof Readable) {
+      destroyNodeSource(body);
+      return;
+    }
     const stopped =
       body instanceof ReadableStream
         ? body.cancel()
@@ -225,6 +256,20 @@ function cancelSource(body: ByteStream): void {
   } catch {
     // A source that throws while stopping is already broken; nothing more to do.
   }
+}
+
+/** Iterator.return() neither closes an unread Node stream nor interrupts a pending read. */
+function destroyNodeSource(body: Readable): void {
+  // An asynchronous open/_destroy can still fail after cancellation. Nothing
+  // consumes those errors once the response is discarded (not even an iterator
+  // for HEAD). Even a closed source may still have an error queued for emission.
+  absorbErrors(body);
+  body.destroy();
+}
+
+/** A no-op `'error'` listener, removed once the stream closes; readers still see the error. */
+function absorbErrors(body: Readable): void {
+  void finished(body, { cleanup: true }).catch(() => {});
 }
 
 /** A `ReadableStream` read through its reader, so a disconnect cancels a pending read at once. */
@@ -239,7 +284,17 @@ function iterate(body: ByteStream): AsyncIterator<Uint8Array> {
       },
     };
   }
-  return body[Symbol.asyncIterator]();
+  const source = body[Symbol.asyncIterator]();
+  if (body instanceof Readable) {
+    return {
+      next: () => source.next(),
+      return: async () => {
+        destroyNodeSource(body);
+        return source.return?.() ?? { done: true, value: undefined };
+      },
+    };
+  }
+  return source;
 }
 
 const DISCONNECTED = Symbol('disconnected');

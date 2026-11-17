@@ -1501,6 +1501,60 @@ describe('ControllerManager — Mongoose validation safety net', () => {
   });
 });
 
+describe('ControllerManager — resolveError result without response', () => {
+  it('answers from the legacy status, body and headers', async () => {
+    class LegacyResolve extends AbstractController {
+      get routes() {
+        return { get: { '/fail': this.fail } };
+      }
+
+      async fail(): Promise<never> {
+        throw new Error('boom');
+      }
+
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const registry = new RouteRegistry();
+    const cm = new ControllerManager({
+      httpServer: {
+        routeRegistry: registry,
+        // An app replacement still returning the shape before `response`.
+        resolveError: async () => ({
+          status: 418,
+          body: { legacy: true },
+          headers: { 'x-legacy': '1' },
+          logLevel: 'warn',
+        }),
+      },
+      logger: { child: () => ({ warn() {}, verbose() {}, error() {} }) },
+    } as unknown as IApp);
+    cm.registerController(LegacyResolve);
+    const hit = registry.match('GET', '/legacyresolve/fail');
+    assert.ok(hit?.entry?.handler);
+    const returned = await hit.entry.handler(
+      {
+        body: {},
+        headers: {},
+        query: {},
+        params: {},
+        appInfo: { request: {}, query: {}, params: {} },
+      } as unknown as FrameworkRequest,
+      responseForHandler() as unknown as Response,
+      () => {},
+    );
+    assert.deepStrictEqual(
+      returned,
+      HttpResponse.json(
+        418,
+        { legacy: true },
+        { headers: { 'x-legacy': '1' } },
+      ),
+    );
+  });
+});
+
 // ─── Error-handler registry (P1p) — resolveError unit level ─────────
 
 describe('HttpServer.resolveError — registry resolution', () => {

@@ -86,10 +86,20 @@ export function errorResultResponse({
   return HttpResponse.json(status, body, { headers: rest, contentType });
 }
 
+/**
+ * @internal The response to send for a resolved error. A replaced
+ * `resolveError` may return only the legacy fields; it is built from those.
+ */
+export function resolvedErrorResponse(
+  resolved: ErrorHandlerResult & { response?: HttpResponse },
+): HttpResponse {
+  return resolved.response ?? errorResultResponse(resolved);
+}
+
 /** Errors a registry handler failed on (threw, or returned an invalid result). */
 const failedHandlerErrors = new WeakSet<object>();
 
-/** @internal Record that a registry handler failed on `err`. */
+/** @internal Record that a registry handler failed on `err`, until `errorHandlerFailed` reads it. */
 export function markErrorHandlerFailed(err: unknown): void {
   if (typeof err === 'object' && err !== null) {
     failedHandlerErrors.add(err);
@@ -98,11 +108,12 @@ export function markErrorHandlerFailed(err: unknown): void {
 
 /**
  * @internal Did a registry handler fail on `err`? Such an error answers the
- * generic 500, never a caller's fallback response.
+ * generic 500, never a caller's fallback response. The read clears the mark,
+ * so the same error thrown again later is resolved afresh.
  */
 export function errorHandlerFailed(err: unknown): boolean {
   return (
-    typeof err === 'object' && err !== null && failedHandlerErrors.has(err)
+    typeof err === 'object' && err !== null && failedHandlerErrors.delete(err)
   );
 }
 
@@ -261,6 +272,9 @@ function safeValidationMessage(error: MongooseFieldError): string {
  * body was sanitized. Rebuild a fresh `Error` that reuses the per-path
  * `safeValidationMessage` texts under the safe static prefix
  * (`<ModelName> validation failed`); its stack is minted here, input-free.
+ * A request `ValidationError` (its `message` is the field payload) becomes
+ * `Request validation failed (<n> fields)`: a path can be a client-supplied
+ * key, so neither paths, values nor per-field texts are logged.
  * Anything else passes through untouched. The UNRESOLVED 500 path deliberately
  * keeps logging the original error in full: that branch is a server-side
  * defect, and the developer needs every detail.
@@ -277,6 +291,15 @@ export function toLoggableError(err: unknown): unknown {
       `Cast failed at path "${err.path}" (safety net, sanitized): ${safeValidationMessage(err)}`,
     );
     sanitized.name = 'CastError';
+    return sanitized;
+  }
+  if (err instanceof ValidationError) {
+    // Its `message` is the field payload; only the field count is logged.
+    const count = Object.keys(err.message).length;
+    const sanitized = new Error(
+      `Request validation failed (${count} field${count === 1 ? '' : 's'})`,
+    );
+    sanitized.name = err.name;
     return sanitized;
   }
   if (!(err instanceof mongoose.Error.ValidationError)) {

@@ -2,40 +2,73 @@
 // response is sent only if it is returned.
 import type { HttpResponse } from './responses.ts';
 
-const PRODUCED = Symbol('builtInResponse');
-const CLAIM = Symbol('builtInResponseClaim');
-
 type Send = (response: HttpResponse) => void;
+type Claim = { send?: Send };
+type LegacyResponse = { statusCode: number; headersSent: boolean };
 
-type Marked = { [PRODUCED]?: HttpResponse; [CLAIM]?: Send };
+const responses = new WeakMap<object, { response: HttpResponse } | Claim>();
 
 /**
- * Return `response` from a framework controller handler, remembering it on the
- * request. An app override that calls the handler (`super.x(req, res)`)
- * without returning its result would otherwise answer nothing; the adapter
- * sends the remembered response instead (and warns once). Transitional:
- * removed in v6.
+ * Return `response` from a framework controller handler, remembering it in
+ * case an app override drops it (calls `super.x(req, res)` without returning
+ * the result); the adapter then sends it and warns once. It is kept under
+ * both `req` and `res`, so it is found if either is the request's own (the
+ * override may pass a copy of `req` or a wrapper of `res`). The status is also
+ * shown on `res` and the request's own `res`, where such an override reads it.
+ * Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
   req: object,
   response: T,
+  res?: LegacyResponse,
 ): T {
-  const marked = req as Marked;
-  marked[PRODUCED] = response;
-  marked[CLAIM]?.(response);
+  const keys = res ? [res, req] : [req];
+  const claim = keys
+    .map((key) => responses.get(key))
+    .find((record): record is Claim => !!record && !('response' in record));
+  if (claim) {
+    claim.send?.(response);
+  } else {
+    for (const key of keys) {
+      responses.set(key, { response });
+    }
+  }
+
+  // An override may read the status after awaiting the built-in handler.
+  for (const transport of [res, (req as { res?: LegacyResponse }).res]) {
+    if (transport && !transport.headersSent) {
+      transport.statusCode = response.status;
+    }
+  }
   return response;
 }
 
 /**
- * Pass `send` the response a framework handler produced for `req`: at once if
- * there is one, else when it arrives (the override did not await the handler).
- * Transitional: removed in v6.
+ * Pass `send` the response a framework handler produced and the override
+ * dropped: at once if there is one, else when it arrives. Both `req` and `res`
+ * are claimed, so a handler called without `res` is found too; the response is
+ * delivered once. Transitional: removed in v6.
  */
-export function claimBuiltInResponse(req: object, send: Send): void {
-  const marked = req as Marked;
-  if (marked[PRODUCED]) {
-    send(marked[PRODUCED]);
+export function claimBuiltInResponse(
+  req: object,
+  res: object,
+  send: Send,
+): void {
+  const record = responses.get(res) ?? responses.get(req);
+  if (record && !('response' in record)) {
+    return;
+  }
+
+  const claim: Claim = {};
+  responses.set(req, claim);
+  responses.set(res, claim);
+  if (record) {
+    send(record.response);
   } else {
-    marked[CLAIM] = send;
+    claim.send = (response) => {
+      delete claim.send;
+      // Give the override's continuations a chance to answer first.
+      setImmediate(send, response);
+    };
   }
 }

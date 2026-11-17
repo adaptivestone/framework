@@ -440,7 +440,7 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     }
   });
 
-  it('fails loudly when the handler also wrote to res', async () => {
+  it('logs and drops a returned response when the handler also wrote to res', async () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/mixed', {
       handler: async (_req: Request, res: Response) => {
@@ -450,10 +450,11 @@ describe('createExpressAdapter — returned HttpResponse', () => {
       },
     });
     const { writer, write } = stubWriter();
+    const { app, error } = makeAppWithLogger();
     const res = makeRes();
     const next = mock.fn();
 
-    await createExpressAdapter(r, fakeApp, writer)(
+    await createExpressAdapter(r, app, writer)(
       makeReq('GET', '/mixed'),
       asExpressRes(res),
       next,
@@ -461,11 +462,47 @@ describe('createExpressAdapter — returned HttpResponse', () => {
 
     assertNotCalled(write);
     assert.deepStrictEqual(res.body, { first: true });
-    assertCalledWith(next, pattern.any(Error));
+    // The response written to res stays intact: no error goes downstream.
+    assertNotCalled(next);
+    assertCalledTimes(error, 1);
     assertTextMatch(
-      next.mock.calls[0]?.arguments[0]?.message,
+      error.mock.calls[0]?.arguments[0],
       /GET \/mixed: the handler both wrote to res and returned an HttpResponse/,
     );
+  });
+
+  it('leaves a returned stream alone when the handler also wrote to res', async () => {
+    // The handler may be sending this same stream through res.
+    let cancels = 0;
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(
+          200,
+          new ReadableStream<Uint8Array>({
+            cancel() {
+              cancels += 1;
+            },
+          }),
+        );
+      },
+    });
+    const { writer, write } = stubWriter();
+    const { app } = makeAppWithLogger();
+    const next = mock.fn();
+
+    await createExpressAdapter(r, app, writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(makeRes()),
+      next,
+    );
+    await flush();
+
+    assertNotCalled(write);
+    assertNotCalled(next);
+    assert.strictEqual(cancels, 0);
   });
 
   it('passes a writer failure to next(err)', async () => {
@@ -592,6 +629,120 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     await flush();
 
     assertNotCalled(write);
+  });
+
+  it('leaves a late framework response alone when the client disconnected', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    Object.assign(res, { destroyed: true });
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+  });
+
+  it('passes a late writer failure thrown at once to next(err)', async () => {
+    const failure = new Error('write threw');
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const writer = {
+      write: (): Promise<void> => {
+        throw failure;
+      },
+    };
+    const next = mock.fn();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        asExpressRes(makeRes()),
+        next,
+      );
+      produce();
+      await flush();
+
+      assertCalledWith(next, failure);
+    } finally {
+      emitWarning.mock.restore();
+    }
+  });
+
+  it('lets an override that chained on the framework handler answer first', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request, res: Response) => {
+        // Not returned: the answer comes from the continuation.
+        builtIn(req).then(() => {
+          res.json({ own: true });
+          (res as unknown as MockRes).headersSent = true;
+        });
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { own: true });
+  });
+
+  it("shows a framework response's status on res", () => {
+    const res = { statusCode: 200, headersSent: false };
+    builtInResponse({ res }, HttpResponse.empty(201));
+    assert.strictEqual(res.statusCode, 201);
+  });
+
+  it('leaves the status of a response that was already sent', () => {
+    const res = { statusCode: 200, headersSent: true };
+    builtInResponse({ res }, HttpResponse.empty(404));
+    assert.strictEqual(res.statusCode, 200);
   });
 
   it('leaves a dropped framework response alone when the override answered itself', async () => {

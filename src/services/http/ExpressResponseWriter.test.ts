@@ -585,6 +585,28 @@ describe('ExpressResponseWriter — native Web Response', () => {
     assert.notStrictEqual(response.headers.get('connection'), 'upgrade');
   });
 
+  it('drops the headers its Connection header names', async () => {
+    serve(() =>
+      HttpResponse.native(
+        new Response('x', {
+          headers: {
+            Connection: 'X-Upstream-Trace',
+            'X-Upstream-Trace': 'v',
+            'x-kept': 'yes',
+          },
+        }),
+      ),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(await response.text(), 'x');
+    assert.strictEqual(response.headers.get('x-upstream-trace'), null);
+    assert.doesNotMatch(
+      response.headers.get('connection') ?? '',
+      /x-upstream-trace/i,
+    );
+    assert.strictEqual(response.headers.get('x-kept'), 'yes');
+  });
+
   it('a Response without a body', async () => {
     serve(() => HttpResponse.native(new Response(null, { status: 204 })));
     const response = await fetch(origin);
@@ -680,6 +702,46 @@ describe('ExpressResponseWriter — transform', () => {
     assert.strictEqual(cancels, 1);
   });
 
+  it('a transform that wraps the stream sends the whole wrapped body', async () => {
+    async function* bracketed(source: AsyncIterable<Uint8Array>) {
+      yield bytesOf('[');
+      yield* source;
+      yield bytesOf(']');
+    }
+    const wrap: TransformResponseHook = (response) =>
+      response.kind === 'stream'
+        ? HttpResponse.stream(
+            response.status,
+            bracketed(response.body as AsyncIterable<Uint8Array>),
+          )
+        : response;
+    const sources = {
+      generator: () =>
+        (async function* () {
+          yield bytesOf('a');
+          yield bytesOf('b');
+        })(),
+      readableStream: () =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(bytesOf('a'));
+            controller.enqueue(bytesOf('b'));
+            controller.close();
+          },
+        }),
+    };
+    for (const [kind, source] of Object.entries(sources)) {
+      const reported = serveWith(wrap, () =>
+        HttpResponse.stream(200, source()),
+      );
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 200, kind);
+      assert.strictEqual(await response.text(), '[ab]', kind);
+      assert.strictEqual(await handled, undefined, kind);
+      assert.deepStrictEqual(reported, [], kind);
+    }
+  });
+
   it('sends the original and reports a transform that throws', async () => {
     const reported = serveWith(
       () => {
@@ -691,6 +753,18 @@ describe('ExpressResponseWriter — transform', () => {
     assert.deepStrictEqual(await response.json(), { id: 'x' });
     assert.strictEqual(reported.length, 1);
     assert.match(reported[0] ?? '', /transformResponse threw.*envelope broke/s);
+  });
+
+  it('sends the original and reports a transform that throws a Symbol', async () => {
+    const reported = serveWith(
+      () => {
+        throw Symbol('envelope broke');
+      },
+      () => HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    assert.match(reported[0] ?? '', /threw.*Symbol\(envelope broke\)/);
   });
 
   it('sends the original and reports a transform that returns no response', async () => {
@@ -726,5 +800,38 @@ describe('ExpressResponseWriter — transform', () => {
     } finally {
       process.off('unhandledRejection', onUnhandled);
     }
+  });
+
+  it('stops the body of a response an async transform resolves to', async () => {
+    let cancels = 0;
+    const reported = serveWith(
+      (async () =>
+        HttpResponse.stream(
+          200,
+          new ReadableStream<Uint8Array>({
+            cancel() {
+              cancels += 1;
+            },
+          }),
+        )) as unknown as TransformResponseHook,
+      () => HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    await handled;
+    assert.strictEqual(cancels, 1);
+    assert.match(reported[0] ?? '', /returned a Promise/);
+  });
+
+  it('keeps sending a stream an async transform resolves back to', async () => {
+    serveWith(
+      (async (response: HttpResponse) =>
+        response) as unknown as TransformResponseHook,
+      () =>
+        HttpResponse.stream(200, Readable.from([bytesOf('a'), bytesOf('b')])),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(await response.text(), 'ab');
+    assert.strictEqual(await handled, undefined);
   });
 });

@@ -334,7 +334,7 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(req: PostLoginRequest, _res?: Response): Promise<AuthAnswer> {
+  async postLogin(req: PostLoginRequest, res?: Response): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     const userResult = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
@@ -350,6 +350,7 @@ class Auth extends AbstractController {
             EN['auth.errorUPValid'],
           ),
         }),
+        res,
       );
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
@@ -370,6 +371,7 @@ class Auth extends AbstractController {
           // @deprecated in favor of `error`; removed in v6.
           notVerified: true,
         }),
+        res,
       );
     }
     // A password changed meanwhile rejects with the wrong-password 400.
@@ -378,12 +380,13 @@ class Auth extends AbstractController {
     return builtInResponse(
       req,
       HttpResponse.json(200, { data: { token, user: user.getPublic() } }),
+      res,
     );
   }
 
   async postRegister(
     req: PostRegisterRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     // NOTE: registration intentionally reports when an email or nickname is
@@ -404,6 +407,7 @@ class Auth extends AbstractController {
             EN['email.registered'],
           ),
         }),
+        res,
       );
     }
     if (req.appInfo.request.nickName) {
@@ -420,6 +424,7 @@ class Auth extends AbstractController {
               EN['auth.nicknameExists'],
             ),
           }),
+          res,
         );
       }
     }
@@ -451,6 +456,7 @@ class Auth extends AbstractController {
               EN['email.registered'],
             ),
           }),
+          res,
         );
       }
       if (dupFields?.includes('name.nick')) {
@@ -463,6 +469,7 @@ class Auth extends AbstractController {
               EN['auth.nicknameExists'],
             ),
           }),
+          res,
         );
       }
       throw err;
@@ -478,12 +485,12 @@ class Auth extends AbstractController {
           this.logger?.error(e);
         });
     }
-    return builtInResponse(req, HttpResponse.empty(201));
+    return builtInResponse(req, HttpResponse.empty(201), res);
   }
 
   async postLogout(
     req: PostLogoutRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const user = req.appInfo.user;
     if (user) {
@@ -500,12 +507,12 @@ class Auth extends AbstractController {
         );
       }
     }
-    return builtInResponse(req, HttpResponse.json(200, { message: 'Ok' }));
+    return builtInResponse(req, HttpResponse.json(200, { message: 'Ok' }), res);
   }
 
   async verifyUser(
     req: VerifyUserRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user: UserInstance;
@@ -526,6 +533,7 @@ class Auth extends AbstractController {
             EN['email.alreadyVerifiedOrWrongToken'],
           ),
         }),
+        res,
       );
     }
     this.logger?.debug(`Verify user ${user?.id}`);
@@ -539,6 +547,7 @@ class Auth extends AbstractController {
             EN['email.alreadyVerifiedOrWrongToken'],
           ),
         }),
+        res,
       );
     }
 
@@ -560,16 +569,17 @@ class Auth extends AbstractController {
               EN['email.alreadyVerifiedOrWrongToken'],
             ),
           }),
+          res,
         );
       }
       throw err;
     }
-    return builtInResponse(req, HttpResponse.empty(200));
+    return builtInResponse(req, HttpResponse.empty(200), res);
   }
 
   async sendPasswordRecoveryEmail(
     req: SendPasswordRecoveryEmailRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     // Uniform response whether or not the account exists — the old 400-vs-200
@@ -595,12 +605,13 @@ class Auth extends AbstractController {
           EN['auth.recoveryEmailSent'],
         ),
       }),
+      res,
     );
   }
 
   async recoverPassword(
     req: RecoverPasswordRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     // Consume the token in the same write as the new password, so a failed
@@ -622,6 +633,7 @@ class Auth extends AbstractController {
             EN['password.wrongToken'],
           ),
         }),
+        res,
       );
     }
 
@@ -650,16 +662,17 @@ class Auth extends AbstractController {
               EN['password.wrongToken'],
             ),
           }),
+          res,
         );
       }
       throw err;
     }
-    return builtInResponse(req, HttpResponse.empty(200));
+    return builtInResponse(req, HttpResponse.empty(200), res);
   }
 
   async sendVerification(
     req: SendVerificationRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     // Uniform response + fire-and-forget dispatch — no existence oracle and no
@@ -683,6 +696,7 @@ class Auth extends AbstractController {
           EN['auth.verificationEmailSent'],
         ),
       }),
+      res,
     );
   }
 

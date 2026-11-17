@@ -137,9 +137,12 @@ export function createExpressAdapter(
       // the legacy `res` style, which has already answered (or will).
       if (HttpResponse.is(returned)) {
         if (res.headersSent) {
-          throw new Error(
+          // The response written to res stands; the returned one is left
+          // alone, since res may be sending the same stream.
+          app.logger?.error(
             `${req.method} ${req.route.path}: the handler both wrote to res and returned an HttpResponse. Use one or the other.`,
           );
+          return;
         }
         await writer.write(returned, req, res);
       } else if (!res.headersSent) {
@@ -147,10 +150,15 @@ export function createExpressAdapter(
         // response would answer nothing. Transitional: removed in v6 (see
         // `builtInResponse`).
         const { entry } = result;
-        claimBuiltInResponse(req, (dropped) => {
-          if (!res.headersSent) {
+        claimBuiltInResponse(req, res, (dropped) => {
+          if (!res.headersSent && !res.destroyed) {
             warnDroppedResponse(entry);
-            writer.write(dropped, req, res).catch(next);
+            // A late call runs outside the try below: a throw goes to `next` too.
+            try {
+              writer.write(dropped, req, res).catch(next);
+            } catch (err) {
+              next(err);
+            }
           }
         });
       }
