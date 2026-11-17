@@ -261,6 +261,8 @@ function safeValidationMessage(error: MongooseFieldError): string {
  * body was sanitized. Rebuild a fresh `Error` that reuses the per-path
  * `safeValidationMessage` texts under the safe static prefix
  * (`<ModelName> validation failed`); its stack is minted here, input-free.
+ * A request `ValidationError` (its `message` is the field payload) becomes
+ * `Request validation failed: <paths>`, without values or per-field texts.
  * Anything else passes through untouched. The UNRESOLVED 500 path deliberately
  * keeps logging the original error in full: that branch is a server-side
  * defect, and the developer needs every detail.
@@ -278,6 +280,17 @@ export function toLoggableError(err: unknown): unknown {
     );
     sanitized.name = 'CastError';
     return sanitized;
+  }
+  if (err instanceof Error) {
+    // Structural: a request `ValidationError` carries its field payload here.
+    const payload: unknown = err.message;
+    if (typeof payload === 'object' && payload !== null) {
+      const sanitized = new Error(
+        `Request validation failed: ${Object.keys(payload).join(', ')}`,
+      );
+      sanitized.name = err.name;
+      return sanitized;
+    }
   }
   if (!(err instanceof mongoose.Error.ValidationError)) {
     return err;

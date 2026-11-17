@@ -4,6 +4,7 @@ import i18next from 'i18next';
 import mongoose from 'mongoose';
 import { stubI18n } from '../../tests/mocks.ts';
 import { testEach } from '../../tests/parameterized.ts';
+import { ValidationError } from '../validate/ValidationError.ts';
 import {
   builtInErrorHandlers,
   type ErrorHandlerResult,
@@ -240,6 +241,25 @@ describe('toLoggableError', () => {
       (result as Error).message,
       'Validation failed (safety net, sanitized): field: Required',
     );
+  });
+
+  it('rebuilds a request ValidationError as field paths only', () => {
+    const error = new ValidationError({
+      email: ['SECRET_INPUT is not an email'],
+      password: 'Too short',
+    });
+
+    const result = toLoggableError(error);
+
+    assert.ok(result instanceof Error);
+    assert.notStrictEqual(result, error);
+    assert.strictEqual((result as Error).name, 'ValidationError');
+    assert.strictEqual(
+      (result as Error).message,
+      'Request validation failed: email, password',
+    );
+    assert.ok(!(result as Error).stack?.includes('SECRET_INPUT'));
+    assert.ok(!(result as Error).stack?.includes('Too short'));
   });
 });
 
