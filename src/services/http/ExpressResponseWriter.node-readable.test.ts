@@ -100,3 +100,39 @@ it('a transform replacing a Node file stream closes the unread file', async (t) 
   assert.ok('fd' in source);
   assert.strictEqual(source.fd, null);
 });
+
+it('a replacement that reads a failed Node stream late rejects the write', async () => {
+  const source = createReadStream(
+    new URL('./nonexistent-stream-review-fixture', import.meta.url),
+  );
+  // No test error listener: the open error fires before the wrapper reads.
+  const closed = new Promise<void>((resolve) => source.once('close', resolve));
+  const res = response();
+  Object.assign(res, {
+    write: () => {
+      res.headersSent = true;
+      return true;
+    },
+    destroy: () => {
+      res.destroyed = true;
+    },
+  });
+  const written = new ExpressResponseWriter({
+    transform: () =>
+      HttpResponse.stream(
+        200,
+        (async function* () {
+          yield Buffer.from('[');
+          await closed;
+          yield* source;
+        })(),
+      ),
+  }).write(
+    HttpResponse.stream(200, source),
+    { method: 'GET' } as Request,
+    res as unknown as Response,
+  );
+  await assert.rejects(written, { code: 'ENOENT' });
+  assert.ok(res.destroyed, 'the started response is aborted');
+  assert.ok(source.destroyed);
+});

@@ -59,6 +59,11 @@ export class ExpressResponseWriter
     const headers = res.getHeaders();
     try {
       const final = this.#transformed(response, req);
+      const replaced = final === response ? undefined : bodySource(response);
+      if (replaced instanceof Readable) {
+        // The replacement may read it late; an error before then must not crash.
+        absorbErrors(replaced);
+      }
       try {
         await render(final, req, res);
       } finally {
@@ -100,8 +105,16 @@ export class ExpressResponseWriter
       const isThenable =
         typeof (transformed as { then?: unknown } | null)?.then === 'function';
       if (isThenable) {
-        // Reported below; its rejection must not surface as unhandled.
-        Promise.resolve(transformed).catch(() => {});
+        // Reported below; its rejection must not surface as unhandled. A late
+        // response is not sent: stop its body, unless it is the one being sent.
+        Promise.resolve(transformed).then(
+          (late) => {
+            if (HttpResponse.is(late)) {
+              discardReplacedBody(late, response);
+            }
+          },
+          () => {},
+        );
       }
       const got = isThenable
         ? 'a Promise (it must be synchronous)'
@@ -114,7 +127,7 @@ export class ExpressResponseWriter
     } catch (err) {
       this.#onTransformError(
         `transformResponse threw; the original response was sent: ${
-          err instanceof Error ? (err.stack ?? err.message) : err
+          err instanceof Error ? (err.stack ?? err.message) : String(err)
         }`,
       );
     }
@@ -161,11 +174,19 @@ async function render(
       });
     case 'native': {
       const native = response.response;
+      // The fields `Connection` names are hop-by-hop too (RFC 9110 7.6.1).
+      const named = new Set(
+        (native.headers.get('connection') ?? '')
+          .split(',')
+          .map((name) => name.trim().toLowerCase()),
+      );
       const commit = () => {
         start(
           res,
           native.status,
-          [...native.headers].filter(([name]) => !HOP_BY_HOP_HEADERS.has(name)),
+          [...native.headers].filter(
+            ([name]) => !HOP_BY_HOP_HEADERS.has(name) && !named.has(name),
+          ),
         );
         if (native.statusText) {
           res.statusMessage = native.statusText;
@@ -220,14 +241,6 @@ function discardReplacedBody(
   }
 }
 
-/** @internal Stop the body of a response that will not be sent, if it has one. */
-export function discardBody(response: HttpResponse): void {
-  const body = bodySource(response);
-  if (body) {
-    cancelSource(body);
-  }
-}
-
 /** Stop a byte source that will not be read. A failure to stop is ignored. */
 function cancelSource(body: ByteStream): void {
   try {
@@ -250,8 +263,13 @@ function destroyNodeSource(body: Readable): void {
   // An asynchronous open/_destroy can still fail after cancellation. Nothing
   // consumes those errors once the response is discarded (not even an iterator
   // for HEAD). Even a closed source may still have an error queued for emission.
-  void finished(body, { cleanup: true }).catch(() => {});
+  absorbErrors(body);
   body.destroy();
+}
+
+/** A no-op `'error'` listener, removed once the stream closes; readers still see the error. */
+function absorbErrors(body: Readable): void {
+  void finished(body, { cleanup: true }).catch(() => {});
 }
 
 /** A `ReadableStream` read through its reader, so a disconnect cancels a pending read at once. */
