@@ -82,7 +82,7 @@ it('bridges an Auth override that passes a copied request and returns res', asyn
   ]);
 });
 
-it('still bridges a Home response without an Express response argument', async () => {
+it('still bridges a Home response without a res argument', async () => {
   const home = new Home(app, '');
   const written = await dispatch(
     'GET',
@@ -96,7 +96,7 @@ it('still bridges a Home response without an Express response argument', async (
   ]);
 });
 
-it('claims one late response across the Express response and request keys', async () => {
+it('claims one late response across the res and request keys', async () => {
   const health = new Health(app, '');
   const home = new Home(app, '');
   const ready = Promise.withResolvers<void>();

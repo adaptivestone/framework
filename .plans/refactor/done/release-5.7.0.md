@@ -145,6 +145,15 @@ caches), and `npm run smoke` passed. All seven new regression tests also passed
 on Bun 1.4.4, including an error queued by an already-destroyed Node stream.
 The full Bun matrix is left to the updated PR's CI.
 
+Independent rerun of every gate on that commit (`75f9c55`), the same day: Node
+1083/1083 with Redis and no skips, Bun 1.4.4 1057/1057, Biome, both TypeScript
+checks, packaging smoke, and the Bun packed consumer against a disposable
+`mongo:8`. CI on PR #85 passed (33 checks). The earlier reviews' probe scripts
+give the same results as before these fixes. The changelog entries this commit
+added under `Unreleased` were removed afterwards: both fixes repair code that
+was never released, and the 5.7.0 section already describes the resulting
+behavior.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,

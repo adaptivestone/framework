@@ -9,9 +9,12 @@ type LegacyResponse = { statusCode: number; headersSent: boolean };
 const responses = new WeakMap<object, { response: HttpResponse } | Claim>();
 
 /**
- * Return and remember the descriptor in case an app override drops it.
- * The supplied Express response identifies the request even if the override
- * passed a copy of the request to the built-in handler.
+ * Return `response` from a framework controller handler, remembering it in
+ * case an app override drops it (calls `super.x(req, res)` without returning
+ * the result); the adapter then sends it and warns once. `res`, when given,
+ * identifies the request even if the override passed a copy of `req`. The
+ * status is also shown on `res`, where such an override reads it.
+ * Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
   req: object,
@@ -35,9 +38,10 @@ export function builtInResponse<T extends HttpResponse>(
 }
 
 /**
- * Pass a dropped descriptor to the adapter, now or when the built-in handler
- * completes. Claim both keys so handlers that omit the Express response work
- * too, and either key can deliver only once.
+ * Pass `send` the response a framework handler produced and the override
+ * dropped: at once if there is one, else when it arrives. Both `req` and `res`
+ * are claimed, so a handler called without `res` is found too; the response is
+ * delivered once. Transitional: removed in v6.
  */
 export function claimBuiltInResponse(
   req: object,
