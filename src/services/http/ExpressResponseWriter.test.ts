@@ -680,6 +680,46 @@ describe('ExpressResponseWriter — transform', () => {
     assert.strictEqual(cancels, 1);
   });
 
+  it('a transform that wraps the stream sends the whole wrapped body', async () => {
+    async function* bracketed(source: AsyncIterable<Uint8Array>) {
+      yield bytesOf('[');
+      yield* source;
+      yield bytesOf(']');
+    }
+    const wrap: TransformResponseHook = (response) =>
+      response.kind === 'stream'
+        ? HttpResponse.stream(
+            response.status,
+            bracketed(response.body as AsyncIterable<Uint8Array>),
+          )
+        : response;
+    const sources = {
+      generator: () =>
+        (async function* () {
+          yield bytesOf('a');
+          yield bytesOf('b');
+        })(),
+      readableStream: () =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(bytesOf('a'));
+            controller.enqueue(bytesOf('b'));
+            controller.close();
+          },
+        }),
+    };
+    for (const [kind, source] of Object.entries(sources)) {
+      const reported = serveWith(wrap, () =>
+        HttpResponse.stream(200, source()),
+      );
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 200, kind);
+      assert.strictEqual(await response.text(), '[ab]', kind);
+      assert.strictEqual(await handled, undefined, kind);
+      assert.deepStrictEqual(reported, [], kind);
+    }
+  });
+
   it('sends the original and reports a transform that throws', async () => {
     const reported = serveWith(
       () => {

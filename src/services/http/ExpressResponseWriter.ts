@@ -57,10 +57,14 @@ export class ExpressResponseWriter
     const headers = res.getHeaders();
     try {
       const final = this.#transformed(response, req);
-      if (final !== response) {
-        discardReplacedBody(response, final);
+      try {
+        await render(final, req, res);
+      } finally {
+        // After rendering: a replacement may wrap the original and read it.
+        if (final !== response) {
+          discardReplacedBody(response, final);
+        }
       }
-      await render(final, req, res);
     } catch (err) {
       if (!res.headersSent) {
         for (const name of res.getHeaderNames()) {
