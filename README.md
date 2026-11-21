@@ -87,8 +87,10 @@ working. Check these when you upgrade:
   A 206, or a status outside 200–599, is logged and answered with the 500. The
   result sets its own `Content-Type`, replacing one set on `res` earlier. A
   result without a body adds no `Content-Type` and no longer answers 304 to
-  a conditional request, and a 304 result gets no `ETag`. A `Set-Cookie` in its `headers` is added to the cookies already on
-  the response, and `Vary` is merged; before, both replaced what was there.
+  a conditional request, and a 304 result gets no `ETag`. A `Set-Cookie` in
+  its `headers` is added to the cookies already on the response, and `Vary` is
+  merged; before, both replaced what was there. A result without a body is
+  sent without one, so an Express `json replacer` no longer sees it.
 - The built-in `Auth`, `Home` and `Health` handlers return their response. An
   override that calls one should return the result:
   `return super.postLogin(req, res)`. One that calls it without returning still

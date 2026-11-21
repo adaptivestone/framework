@@ -318,7 +318,7 @@ Fixed, each with a regression test:
   zstd; measured on Node 24, Node 26 and Bun). Another coding is passed on as
   received.
 - A request `ValidationError` is logged as a field count wherever it was
-  thrown, also from inside a handler.
+  thrown, also from inside a handler (reverted in the seventh round).
 - Bridge: the response is also recorded under the given `res`'s `req`.
 - A rejection without a reason (a Web stream erroring with no argument) went to
   `next(undefined)` and fell through to the 404. It now reaches the error path.
@@ -356,7 +356,8 @@ Fixed, each with a regression test:
   `HttpError` got no answer (5.6.1 sent it). Only the sources still piped into
   `res` are tracked, and a mixed write is only the returned stream that is
   itself piped. Any other returned response is written as before.
-- A request `ValidationError` thrown after the response started was logged raw.
+- A request `ValidationError` thrown after the response started was logged raw
+  (reverted in the seventh round).
 - The late response of a Promise-returning `transformResponse` is never
   destroyed: a Node stream body only gets an error listener. Destroying it
   could truncate the original through a wrapper.
@@ -384,6 +385,60 @@ Not taken:
 
 Verification after these fixes (2026-11-21), in a clean copy of the branch:
 Node 26.13.1 1140/1140 with Redis and no skips, Bun 1.4.4 1114/1114, Biome,
+both TypeScript checks, packaging smoke, and the Bun packed consumer against a
+disposable `mongo:8`.
+
+### Seventh review (2026-11-21)
+
+The same two models reviewed `5.6.1..8c7c35c`. Sol had three blockers, Astra
+five. None was a crash or hang in 5.7.0 code that the review rounds had not
+touched: three came from the sixth round's own fixes, three were already in
+5.6.1, the rest were rare bridge and `native` permutations.
+
+Fixed, each with a regression test:
+
+- A legacy override that piped a source into `res`, returned, and detached the
+  source before a late built-in answer (`super.home`, `super.postLogin` not
+  awaited) got no answer: the bridge still counted the pipe. The late answer is
+  sent whenever nothing has been sent yet.
+- Body-less framing follows 5.6.1 exactly. A 204 or 304 drops its content
+  headers; a 205 states a zero length and drops a `Transfer-Encoding`, HEAD
+  included; any other status keeps its `Transfer-Encoding` (a declared trailer
+  needs chunked framing; removing it turned an empty 201 into a 500), and
+  outside HEAD a `Content-Length` becomes 0.
+- `native` with stacked codings follows the runtime's `fetch`: Node decodes
+  every listed coding, so their headers are dropped; Bun decodes only one, so
+  they are kept.
+- The 404 page passed a failure without a reason to `next(undefined)`, which
+  fell through to the default HTML 404. It now reaches the error path.
+- Wording: the changelog's mixed-write and `native` sentences, and the README's
+  note that a body-less error result no longer reaches a `json replacer`.
+
+Reverted to 5.6.1: a request `ValidationError` thrown inside a handler (a 500,
+or after the response started) is logged in full again, because the log is the
+only place with its details. It stays a field count only on the path new in
+5.7.0: a route-validation error whose registered handler failed, answered 500.
+
+Not taken, owner's decision: what 5.6.1 already logged stays. The body-parser
+line quotes `JSON.parse`'s message, which can contain part of the body; the
+Mongoose safety-net warning names the full field path, which for a `Map`
+schema can contain a client key. Both reviewers rate these blockers; they are
+not regressions, and a change to what the framework logs about client errors
+is a separate decision.
+
+Not taken, rare misuse or already recorded:
+
+- A fetched 206 whose body `fetch` decoded (sixth round): its headers are
+  passed on as received.
+- A source piped into `res` twice and unpiped once, or a returned stream that
+  wraps a piped source: the mixed write is not detected.
+- A late `transformResponse` stream that errors before the writer attaches its
+  listener.
+- A copied request and a wrapped response that point only to each other: the
+  bridge cannot reach the real response; the shown status is best effort.
+
+Verification after these fixes (2026-11-21), in a clean copy of the branch:
+Node 26.13.1 1141/1141 with Redis and no skips, Bun 1.4.4 1115/1115, Biome,
 both TypeScript checks, packaging smoke, and the Bun packed consumer against a
 disposable `mongo:8`.
 
