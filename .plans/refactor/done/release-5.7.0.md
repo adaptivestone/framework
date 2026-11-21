@@ -287,10 +287,58 @@ Not taken:
   with a supplied body lose the generated `ETag`; statuses such as 600 fail
   only at run time.
 - A Promise-returning transform's late response body is not stopped (see
-  above).
+  above; the fifth round releases an unread Node stream).
 
 Verification after these fixes (2026-11-21), in a clean copy of the branch:
 Node 26.13.1 1117/1117 with Redis and no skips, Bun 1.4.4 1091/1091, Biome,
+both TypeScript checks, packaging smoke, and the Bun packed consumer against a
+disposable `mongo:8`.
+
+### Fifth review (2026-11-21)
+
+The same two models reviewed `5.6.1..613382a` (the fourth round's fixes, not
+yet in the release PR). Both confirmed the six owner-requested fixes by
+running them. Three of their blockers were the same, and all three were gaps
+in the fourth round's own fixes.
+
+Fixed, each with a regression test:
+
+- A Promise-returning `transformResponse` that fulfils with a stream of a file
+  that fails to open crashed the process once the late body was left alone. An
+  unread Node stream body of a late response is released (destroyed, errors
+  absorbed); other bodies stay untouched, so the original is never aborted.
+- The pipe check counted `'unpipe'` listeners on `res`, so an app middleware
+  with such a listener suppressed every returned response. The adapter now
+  listens for `'pipe'` while the handler runs.
+- Body-less responses are framed as 5.6.1 framed them, also for `native`
+  without a body: HEAD keeps its headers; a 204 or 304 drops its content
+  headers; otherwise a `Content-Length` (stated or already on `res`) becomes 0.
+- `native` drops the encoding, length and digest headers of a fetched response
+  only when `fetch` decoded every listed coding (gzip, x-gzip, deflate, br,
+  zstd; measured on Node 24, Node 26 and Bun). Another coding is passed on as
+  received.
+- A request `ValidationError` is logged as a field count wherever it was
+  thrown, also from inside a handler.
+- Bridge: the response is also recorded under the given `res`'s `req`.
+- A rejection without a reason (a Web stream erroring with no argument) went to
+  `next(undefined)` and fell through to the 404. It now reaches the error path.
+
+Disclosed in the changelog: an Express `json replacer` no longer sees a result
+without a body.
+
+Not taken:
+
+- A source piped into `res` and also returned that fails before its first
+  chunk: its error is absorbed and `res` stays open, as a plain pipe leaves it.
+- A paused, unread stream returned in a mixed write keeps its file descriptor.
+- Middleware that calls `resolveError` itself, whose handler fails, followed by
+  a route-schema failure on the same request: the mark is consumed by the
+  second.
+- A registered handler that rethrows the `ValidationError`: the handler-failure
+  line shows `[object Object]` (no field data).
+
+Verification after these fixes (2026-11-21), in a clean copy of the branch:
+Node 26.13.1 1128/1128 with Redis and no skips, Bun 1.4.4 1102/1102, Biome,
 both TypeScript checks, packaging smoke, and the Bun packed consumer against a
 disposable `mongo:8`.
 

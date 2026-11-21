@@ -358,7 +358,8 @@ As built:
   is found when the override passes a copy of `req` or a wrapper of `res`. A wrapper no longer
   intercepts the answer (the handlers do not call `res.json`); that is disclosed, not bridged.
   **Extended 2026-11-21 (fourth review):** also recorded under `req.res`, so a copy of `req` with a
-  wrapper of `res` is found; the status shown on `res` is best effort.
+  wrapper of `res` is found; the status shown on `res` is best effort. Fifth review: also under the
+  given `res`'s `req`; the records live on `globalThis`, shared between copies of the module.
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).
