@@ -125,15 +125,14 @@ export class ExpressResponseWriter
       const isThenable =
         typeof (transformed as { then?: unknown } | null)?.then === 'function';
       if (isThenable) {
-        // Reported below. The late response is not sent: an unread Node stream
-        // body of its own is released; a rejection must not surface as unhandled.
+        // Reported below. The late response is not sent, nor stopped: its body
+        // may read the original's source. A Node stream body's error cannot
+        // crash; a rejection must not surface as unhandled.
         Promise.resolve(transformed)
           .then((late: unknown) => {
-            if (
-              HttpResponse.is(late) &&
-              bodySource(late) !== bodySource(response)
-            ) {
-              releaseUnsentBody(late);
+            const body = HttpResponse.is(late) ? bodySource(late) : undefined;
+            if (body instanceof Readable) {
+              absorbErrors(body);
             }
           })
           .catch(() => {});
@@ -195,21 +194,21 @@ async function render(
     case 'native': {
       const native = response.response;
       // Dropped too: the fields `Connection` names (RFC 9110 7.6.1), and the
-      // encoding and digest headers of a fetched response (non-empty `url`)
-      // whose every coding `fetch` decoded.
+      // encoding, length and digest headers of a fetched response (non-empty
+      // `url`) whose body `fetch` decoded: it has a body, is not a 206, and
+      // names one coding that `fetch` decodes. Stacked codings are not decoded
+      // by every runtime.
       const dropped = new Set(
         (native.headers.get('connection') ?? '')
           .split(',')
           .map((name) => name.trim().toLowerCase()),
       );
-      const codings = native.headers.get('content-encoding');
+      const coding = native.headers.get('content-encoding') ?? '';
       if (
         native.url &&
-        codings
-          ?.split(',')
-          .every((coding) =>
-            FETCH_DECODED_CODINGS.has(coding.trim().toLowerCase()),
-          )
+        native.body &&
+        native.status !== 206 &&
+        FETCH_DECODED_CODINGS.has(coding.trim().toLowerCase())
       ) {
         for (const name of ENCODED_BODY_HEADERS) {
           dropped.add(name);
@@ -238,17 +237,23 @@ async function render(
 }
 
 /**
- * End a response that has no body. HEAD keeps its headers as given; a 204 or
- * 304 drops its content headers; otherwise a `Content-Length` (stated or
- * already on `res`) becomes 0, so the client does not wait for bytes.
+ * End a response that has no body. A 204 or 304 drops its content headers.
+ * Otherwise HEAD keeps its headers as given; any other method drops a
+ * `Transfer-Encoding` and a `Content-Length` (stated or already on `res`)
+ * becomes 0, so the client does not wait for bytes.
  */
 function endWithoutBody(req: Request, res: Response): void {
-  if (req.method !== 'HEAD') {
-    if (res.statusCode === 204 || res.statusCode === 304) {
-      res.removeHeader('Content-Type');
-      res.removeHeader('Content-Length');
+  if (res.statusCode === 204 || res.statusCode === 304) {
+    res.removeHeader('Content-Type');
+    res.removeHeader('Content-Length');
+    res.removeHeader('Transfer-Encoding');
+  } else if (req.method !== 'HEAD') {
+    // Only when set: removing an absent one stops some runtimes adding the
+    // zero length themselves.
+    if (res.getHeader('Transfer-Encoding') !== undefined) {
       res.removeHeader('Transfer-Encoding');
-    } else if (res.getHeader('Content-Length') !== undefined) {
+    }
+    if (res.getHeader('Content-Length') !== undefined) {
       res.setHeader('Content-Length', '0');
     }
   }

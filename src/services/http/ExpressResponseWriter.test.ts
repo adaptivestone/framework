@@ -263,6 +263,20 @@ describe('ExpressResponseWriter — empty and redirect', () => {
     assert.strictEqual(response.headers['content-length'], '0');
   });
 
+  it('empty: drops a Transfer-Encoding already on the response', async () => {
+    serve(
+      () => HttpResponse.empty(205),
+      (res) => {
+        res.setHeader('Transfer-Encoding', 'chunked');
+        res.setHeader('Content-Length', '17');
+      },
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 205);
+    assert.strictEqual(response.headers['transfer-encoding'], undefined);
+    assert.strictEqual(response.headers['content-length'], '0');
+  });
+
   it('empty: HEAD keeps a stated Content-Length', async () => {
     serve(() =>
       HttpResponse.empty(200, { headers: { 'content-length': '17' } }),
@@ -270,6 +284,31 @@ describe('ExpressResponseWriter — empty and redirect', () => {
     const response = await requestRaw('HEAD');
     assert.strictEqual(response.status, 200);
     assert.strictEqual(response.headers['content-length'], '17');
+  });
+
+  it('empty: a 204 or 304 to HEAD drops its content headers too', async () => {
+    for (const status of [204, 304]) {
+      serve(
+        () =>
+          HttpResponse.empty(status, {
+            headers: { 'content-type': 'text/plain', 'content-length': '17' },
+          }),
+        (res) => res.setHeader('Transfer-Encoding', 'chunked'),
+      );
+      const response = await requestRaw('HEAD');
+      assert.strictEqual(response.status, status);
+      for (const name of [
+        'content-type',
+        'content-length',
+        'transfer-encoding',
+      ]) {
+        assert.strictEqual(
+          response.headers[name],
+          undefined,
+          `${status} ${name}`,
+        );
+      }
+    }
   });
 
   it('empty: 204 drops Content-Type', async () => {
@@ -728,12 +767,19 @@ describe('ExpressResponseWriter — native Web Response', () => {
   });
 
   const body = 'x'.repeat(44);
-  const upstream = (url: string, encoding: string) => {
-    const response = new Response(body, {
+  const upstream = (
+    url: string,
+    encoding: string,
+    init: { status?: number; headers?: Record<string, string> } = {},
+    content: string | null = body,
+  ) => {
+    const response = new Response(content, {
+      ...init,
       headers: {
         'content-encoding': encoding,
         'content-length': '44',
         'content-digest': 'sha-256=:AAAA:',
+        ...init.headers,
       },
     });
     Object.defineProperty(response, 'url', { value: url });
@@ -766,6 +812,39 @@ describe('ExpressResponseWriter — native Web Response', () => {
       assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
       assert.strictEqual(fetched.text, body);
     }
+  });
+
+  it('keeps the encoding headers of a fetched Response with stacked codings', async () => {
+    serve(() => upstream('https://upstream.test/data', 'gzip, br'));
+    const fetched = await requestRaw();
+    assert.strictEqual(fetched.headers['content-encoding'], 'gzip, br');
+    assert.strictEqual(fetched.headers['content-length'], '44');
+    assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+    assert.strictEqual(fetched.text, body);
+  });
+
+  it('keeps the encoding headers of a fetched Response without a body', async () => {
+    serve(() => upstream('https://upstream.test/data', 'gzip', {}, null));
+    const fetched = await requestRaw('HEAD');
+    assert.strictEqual(fetched.headers['content-encoding'], 'gzip');
+    assert.strictEqual(fetched.headers['content-length'], '44');
+    assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+  });
+
+  it('keeps the encoding headers of a fetched 206 Response', async () => {
+    serve(() =>
+      upstream('https://upstream.test/data', 'gzip', {
+        status: 206,
+        headers: { 'content-range': 'bytes 0-43/100' },
+      }),
+    );
+    const fetched = await requestRaw();
+    assert.strictEqual(fetched.status, 206);
+    assert.strictEqual(fetched.headers['content-encoding'], 'gzip');
+    assert.strictEqual(fetched.headers['content-length'], '44');
+    assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+    assert.strictEqual(fetched.headers['content-range'], 'bytes 0-43/100');
+    assert.strictEqual(fetched.text, body);
   });
 
   it('a Response without a body', async () => {
@@ -1015,7 +1094,34 @@ describe('ExpressResponseWriter — transform', () => {
     assert.match(reported[0] ?? '', /returned a Promise/);
   });
 
-  it('destroys the unread stream of a late response', async () => {
+  it('delivers the original in full when a late Node stream wraps its source', async () => {
+    const reported = serveWith(
+      (async (response: HttpResponse) =>
+        response.kind === 'stream'
+          ? HttpResponse.stream(
+              200,
+              Readable.fromWeb(Readable.toWeb(response.body as Readable)),
+            )
+          : response) as unknown as TransformResponseHook,
+      () =>
+        HttpResponse.stream(
+          200,
+          Readable.from(
+            (async function* () {
+              yield bytesOf('a');
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              yield bytesOf('b');
+            })(),
+          ),
+        ),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(await response.text(), 'ab');
+    assert.strictEqual(await handled, undefined);
+    assert.match(reported[0] ?? '', /returned a Promise/);
+  });
+
+  it('a failing late stream does not crash the process', async () => {
     const uncaught: unknown[] = [];
     const onUncaught = (err: unknown) => uncaught.push(err);
     process.on('uncaughtExceptionMonitor', onUncaught);
@@ -1037,7 +1143,6 @@ describe('ExpressResponseWriter — transform', () => {
       assert.deepStrictEqual(await response.json(), { id: 'x' });
       assert.strictEqual(await handled, undefined);
       await withTimeout(Promise.resolve(closed), 'late source closed');
-      assert.ok(late?.destroyed, 'the late source is destroyed');
       assert.deepStrictEqual(uncaught, []);
       assert.match(reported[0] ?? '', /returned a Promise/);
     } finally {
