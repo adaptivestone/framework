@@ -256,6 +256,22 @@ Fixed, each with a regression test:
   Promise-returning `transformResponse`. It could abort the original response
   when the late one wrapped the same source.
 
+After the owner asked why some findings were left alone, six more were fixed
+(four of them from the "not taken" lists):
+
+- A stream piped into `res` and also returned, before its first chunk: the
+  pipe is visible on `res` at that moment, so it counts as a mixed write and
+  the piped response is delivered in full.
+- The "error handler failed" mark is kept per request, not per error object,
+  so requests that throw the same error instance do not interfere.
+- A legacy error result with header names that differ only by case: the last
+  one wins, as before; cookies add up.
+- A thrown value that cannot be converted to a string no longer breaks the log
+  line that reports it (one shared formatter at the five places).
+- A response without a body never carries a stated `Content-Length` (a 205
+  result with one left the client waiting).
+- The bridge state is shared between copies of the framework module.
+
 Disclosed in the changelog and README, not changed:
 
 - An Express error middleware the app mounts itself sees the body parser's 413
@@ -265,19 +281,16 @@ Disclosed in the changelog and README, not changed:
 
 Not taken:
 
-- A handler that pipes a stream to `res` and returns the same stream before the
-  first chunk: both consume it. Double use of the new API, not detectable.
-- The handler-failure mark with one error instance thrown by concurrent
-  requests.
-- An Express JSON replacer no longer sees a body-less result; header names that
-  differ only by case in one legacy result; thrown values that cannot be
-  converted to a string; 204/205 results with a supplied body; statuses such
-  as 600 that fail only at run time.
+- A handler that returns a response and writes to `res` later, from a timer or
+  a callback: nothing shows it when the handler returns.
+- An Express JSON replacer no longer sees a body-less result; 204/205 results
+  with a supplied body lose the generated `ETag`; statuses such as 600 fail
+  only at run time.
 - A Promise-returning transform's late response body is not stopped (see
   above).
 
 Verification after these fixes (2026-11-21), in a clean copy of the branch:
-Node 26.13.1 1110/1110 with Redis and no skips, Bun 1.4.4 1084/1084, Biome,
+Node 26.13.1 1117/1117 with Redis and no skips, Bun 1.4.4 1091/1091, Biome,
 both TypeScript checks, packaging smoke, and the Bun packed consumer against a
 disposable `mongo:8`.
 
