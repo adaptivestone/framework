@@ -180,3 +180,53 @@ it('claims a late response passed a wrapper of res', async () => {
   ]);
   assert.strictEqual(status, 401);
 });
+
+it('bridges a response passed a copied request and a wrapper of res', async () => {
+  const home = new Home(app, '');
+  const written = await dispatch(
+    'GET',
+    async (req: FrameworkRequest, res: Response) => {
+      await home.home(Object.assign({}, req), Object.create(res));
+    },
+  );
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(200, { message: 'Home' }),
+  ]);
+});
+
+it('claims a late response passed a copied request and a wrapper of res', async () => {
+  const home = new Home(app, '');
+  const ready = Promise.withResolvers<void>();
+  let work: Promise<unknown> | undefined;
+  const written = await dispatch(
+    'GET',
+    (req: FrameworkRequest, res: Response) => {
+      work = ready.promise.then(() =>
+        home.home(Object.assign({}, req), Object.create(res)),
+      );
+    },
+  );
+
+  assert.deepStrictEqual(written, []);
+  ready.resolve();
+  await work;
+  await setImmediate();
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(200, { message: 'Home' }),
+  ]);
+});
+
+it('delivers the response when the wrapper of res has a read-only status', async () => {
+  const home = new Home(app, '');
+  const written = await dispatch(
+    'GET',
+    (req: FrameworkRequest, res: Response) =>
+      home.home(
+        req,
+        Object.create(res, { statusCode: { get: () => res.statusCode } }),
+      ),
+  );
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(200, { message: 'Home' }),
+  ]);
+});

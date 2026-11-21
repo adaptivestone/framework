@@ -12,9 +12,9 @@ const responses = new WeakMap<object, { response: HttpResponse } | Claim>();
  * Return `response` from a framework controller handler, remembering it in
  * case an app override drops it (calls `super.x(req, res)` without returning
  * the result); the adapter then sends it and warns once. It is kept under
- * both `req` and `res`, so it is found if either is the request's own (the
- * override may pass a copy of `req` or a wrapper of `res`). The status is also
- * shown on `res` and the request's own `res`, where such an override reads it.
+ * `req`, `res` and `req.res`, so it is found if any is the request's own (the
+ * override may pass a copy of `req`, a wrapper of `res`, or both). The status
+ * is also shown on `res` and `req.res`, where such an override reads it.
  * Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
@@ -22,7 +22,10 @@ export function builtInResponse<T extends HttpResponse>(
   response: T,
   res?: LegacyResponse,
 ): T {
-  const keys = res ? [res, req] : [req];
+  const own = (req as { res?: LegacyResponse }).res;
+  const keys = [res, req, own].filter(
+    (key): key is object => typeof key === 'object' && key !== null,
+  );
   const claim = keys
     .map((key) => responses.get(key))
     .find((record): record is Claim => !!record && !('response' in record));
@@ -34,10 +37,15 @@ export function builtInResponse<T extends HttpResponse>(
     }
   }
 
-  // An override may read the status after awaiting the built-in handler.
-  for (const transport of [res, (req as { res?: LegacyResponse }).res]) {
+  // An override may read the status after awaiting the built-in handler. Best
+  // effort: a wrapper may expose a read-only status.
+  for (const transport of [res, own]) {
     if (transport && !transport.headersSent) {
-      transport.statusCode = response.status;
+      try {
+        transport.statusCode = response.status;
+      } catch {
+        // The response is still returned and delivered.
+      }
     }
   }
   return response;
