@@ -174,18 +174,22 @@ async function render(
       });
     case 'native': {
       const native = response.response;
-      // The fields `Connection` names are hop-by-hop too (RFC 9110 7.6.1).
-      const named = new Set(
+      // Dropped too: the fields `Connection` names (RFC 9110 7.6.1), and the
+      // encoding of a fetched response (non-empty `url`), whose body is decoded.
+      const dropped = new Set(
         (native.headers.get('connection') ?? '')
           .split(',')
           .map((name) => name.trim().toLowerCase()),
       );
+      if (native.url && native.headers.has('content-encoding')) {
+        dropped.add('content-encoding').add('content-length');
+      }
       const commit = () => {
         start(
           res,
           native.status,
           [...native.headers].filter(
-            ([name]) => !HOP_BY_HOP_HEADERS.has(name) && !named.has(name),
+            ([name]) => !HOP_BY_HOP_HEADERS.has(name) && !dropped.has(name),
           ),
         );
         if (native.statusText) {

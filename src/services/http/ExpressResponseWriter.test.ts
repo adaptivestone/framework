@@ -607,6 +607,47 @@ describe('ExpressResponseWriter — native Web Response', () => {
     assert.strictEqual(response.headers.get('x-kept'), 'yes');
   });
 
+  it('drops the encoding headers of a fetched Response, whose body is decoded', async () => {
+    const body = 'x'.repeat(44);
+    const make = (url: string) => {
+      const upstream = new Response(body, {
+        headers: { 'content-encoding': 'gzip', 'content-length': '44' },
+      });
+      Object.defineProperty(upstream, 'url', { value: url });
+      return HttpResponse.native(upstream);
+    };
+    // Read without decoding, to see the headers as sent.
+    const get = () =>
+      new Promise<{ headers: http.IncomingHttpHeaders; text: string }>(
+        (resolve, reject) => {
+          http
+            .get(origin, (response) => {
+              let text = '';
+              response.setEncoding('utf8');
+              response.on('data', (chunk) => {
+                text += chunk;
+              });
+              response.on('end', () =>
+                resolve({ headers: response.headers, text }),
+              );
+            })
+            .on('error', reject);
+        },
+      );
+
+    serve(() => make('https://upstream.test/data'));
+    const fetched = await get();
+    assert.strictEqual(fetched.headers['content-encoding'], undefined);
+    assert.strictEqual(fetched.headers['content-length'], undefined);
+    assert.strictEqual(fetched.text, body);
+
+    serve(() => make(''));
+    const constructed = await get();
+    assert.strictEqual(constructed.headers['content-encoding'], 'gzip');
+    assert.strictEqual(constructed.headers['content-length'], '44');
+    assert.strictEqual(constructed.text, body);
+  });
+
   it('a Response without a body', async () => {
     serve(() => HttpResponse.native(new Response(null, { status: 204 })));
     const response = await fetch(origin);
