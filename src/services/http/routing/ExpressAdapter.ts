@@ -139,7 +139,8 @@ export function createExpressAdapter(
       // Only a branded `HttpResponse` is rendered; any other return value is
       // the legacy `res` style, which has already answered (or will).
       if (HttpResponse.is(returned)) {
-        if (res.headersSent) {
+        // A stream piped into res may not have sent its headers yet.
+        if (res.headersSent || res.listenerCount('unpipe') > 0) {
           // The response written to res stands. A returned stream that res may
           // be sending keeps running; one nobody reads is destroyed.
           app.logger?.error(

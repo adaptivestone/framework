@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { createReadStream } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Readable } from 'node:stream';
+import { PassThrough, Readable } from 'node:stream';
 import { describe, it, mock } from 'node:test';
 import express, { type Request, type Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
@@ -19,6 +19,7 @@ import {
 } from '../../../tests/assertions.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import { builtInResponse } from '../builtInResponse.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import { HttpError } from '../httpErrors.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
 import { HttpResponse } from '../responses.ts';
@@ -565,6 +566,42 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     );
     source.destroy(new Error('source failed'));
     await closed;
+  });
+
+  it('treats a stream piped into res and also returned as written to res', async () => {
+    const source = new PassThrough();
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/piped', {
+      handler: (_req: Request, res: Response) => {
+        source.pipe(res);
+        setImmediate(() => {
+          source.write('first,');
+          source.end('second');
+        });
+        return HttpResponse.stream(200, source);
+      },
+    });
+    const writer = new ExpressResponseWriter();
+    const write = mock.fn(writer.write.bind(writer));
+    const { app, error } = makeAppWithLogger();
+    const server = http.createServer(
+      express().use(createExpressAdapter(r, app, { write })),
+    );
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/piped`);
+      assert.strictEqual(await response.text(), 'first,second');
+      assertNotCalled(write);
+      assertCalledTimes(error, 1);
+      assertTextMatch(
+        error.mock.calls[0]?.arguments[0],
+        /both wrote to res and returned an HttpResponse/,
+      );
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
   it('passes a writer failure to next(err)', async () => {
