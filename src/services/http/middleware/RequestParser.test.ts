@@ -671,3 +671,25 @@ describe('request parser media-type isolation', () => {
     }
   });
 });
+
+// A subclass answering with `res.json(...)` must keep compiling
+// (`check:types:tests`).
+describe('request parser subclasses', () => {
+  it('may answer with a response instead of calling next()', async () => {
+    const answered = { answered: true } as unknown as Response;
+    class MyRequestParser extends RequestParser {
+      async middleware(_req: FrameworkRequest, res: Response) {
+        return res.status(400).json({});
+      }
+    }
+    const res = {
+      status: () => res,
+      json: () => answered,
+    } as unknown as Response;
+    const result = await new MyRequestParser(appInstance).middleware(
+      {} as FrameworkRequest,
+      res,
+    );
+    assert.strictEqual(result, answered);
+  });
+});

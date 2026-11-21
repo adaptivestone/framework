@@ -81,7 +81,13 @@ class RequestParser extends AbstractMiddleware {
     return 'Parses incoming request. Based on Formidable library';
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(
+    req: FrameworkRequest,
+    res: Response,
+    next: NextFunction,
+  ): // Base return type, so a subclass may still answer with a response.
+  // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
+  Promise<void | Response> {
     const time = Date.now();
     this.logger?.verbose(`Parsing request`);
 
