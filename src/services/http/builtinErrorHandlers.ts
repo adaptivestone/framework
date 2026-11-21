@@ -71,17 +71,26 @@ export function errorResultResponse({
   headers,
 }: ErrorHandlerResult): HttpResponse {
   let contentType: string | undefined;
-  const rest: Record<string, string> = {};
+  const all: [string, string][] = [];
+  const rest: [string, string][] = [];
   for (const [name, value] of Object.entries(headers ?? {})) {
+    // Typed as a string, but a JavaScript app may pass an array: each cookie
+    // stays its own field, other values are joined.
+    const fields: [string, string][] = !Array.isArray(value)
+      ? [[name, value]]
+      : name.toLowerCase() === 'set-cookie'
+        ? value.map((cookie) => [name, String(cookie)])
+        : [[name, value.join(', ')]];
+    all.push(...fields);
     if (name.toLowerCase() === 'content-type') {
-      contentType = value;
+      contentType = fields[0]?.[1];
     } else {
-      rest[name] = value;
+      rest.push(...fields);
     }
   }
   if (body === undefined || NO_BODY_STATUSES.has(status)) {
     // `empty` owns no media type, so the header rides along unchanged.
-    return HttpResponse.empty(status, { headers: headers ?? {} });
+    return HttpResponse.empty(status, { headers: all });
   }
   return HttpResponse.json(status, body, { headers: rest, contentType });
 }
@@ -276,8 +285,8 @@ function safeValidationMessage(error: MongooseFieldError): string {
  * `Request validation failed (<n> fields)`: a path can be a client-supplied
  * key, so neither paths, values nor per-field texts are logged.
  * Anything else passes through untouched. The UNRESOLVED 500 path deliberately
- * keeps logging the original error in full: that branch is a server-side
- * defect, and the developer needs every detail.
+ * keeps logging the original error in full (a request `ValidationError` aside):
+ * that branch is a server-side defect, and the developer needs every detail.
  */
 export function toLoggableError(err: unknown): unknown {
   // A standalone `CastError` ("Cast to ObjectId failed for value \"<input>\"")
@@ -293,7 +302,7 @@ export function toLoggableError(err: unknown): unknown {
     sanitized.name = 'CastError';
     return sanitized;
   }
-  if (err instanceof ValidationError) {
+  if (ValidationError.isValidationError(err)) {
     // Its `message` is the field payload; only the field count is logged.
     const count = Object.keys(err.message).length;
     const sanitized = new Error(

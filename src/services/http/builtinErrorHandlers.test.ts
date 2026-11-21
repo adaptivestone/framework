@@ -271,6 +271,23 @@ describe('toLoggableError', () => {
     );
   });
 
+  it('rebuilds a request ValidationError from another copy of the framework', () => {
+    const error = Object.assign(new Error(), {
+      name: 'ValidationError',
+      message: { 'SECRET_KEY@example.com': ['SECRET_INPUT is not an email'] },
+      issues: [{ message: 'SECRET_INPUT is not an email' }],
+    });
+    assert.ok(!(error instanceof ValidationError));
+
+    const result = toLoggableError(error);
+
+    assert.notStrictEqual(result, error);
+    assert.strictEqual(
+      (result as Error).message,
+      'Request validation failed (1 field)',
+    );
+  });
+
   it('passes an app error with an object message through unchanged', () => {
     const error = new Error();
     (error as { message: unknown }).message = { reason: 'quota' };

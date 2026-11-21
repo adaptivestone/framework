@@ -634,7 +634,8 @@ export function buildSubtreeFromSpec(
  * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
  * Anything unresolved is a server-side defect: logged in full, answered with a
  * generic 500 — unless the caller passes the `unresolved` response (the
- * validation 400), which is a client error and not logged.
+ * validation 400), which is a client error and not logged (value-free if a
+ * failed handler turns it into the 500).
  */
 async function answerError(
   app: IApp,
@@ -654,7 +655,9 @@ async function answerError(
   if (unresolved && !errorHandlerFailed(err)) {
     return unresolved;
   }
-  logger?.error(err);
+  // A client error a handler failed on (that failure is logged with its
+  // stack): its payload can carry client keys, so it is logged value-free.
+  logger?.error(unresolved ? toLoggableError(err) : err);
   return serverErrorResponse(req);
 }
 

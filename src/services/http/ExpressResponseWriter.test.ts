@@ -7,6 +7,7 @@ import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import express, { type Request, type Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
+import { errorResultResponse } from './builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import { HttpResponse } from './responses.ts';
 
@@ -241,6 +242,43 @@ describe('ExpressResponseWriter — headers already on the response', () => {
       'c=3',
     ]);
     assert.strictEqual(response.headers.get('vary'), 'Origin, Accept');
+  });
+
+  it('merges the valid names of a Vary value without failing the response', async () => {
+    for (const [vary, expected] of [
+      ['', null],
+      ['Accept,\tOrigin', 'Accept, Origin'],
+      // Not a list of field names: sent as given.
+      ['Accept Origin', 'Accept Origin'],
+    ] as const) {
+      serve(() => HttpResponse.json(200, { ok: true }, { headers: { vary } }));
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 200, JSON.stringify(vary));
+      assert.strictEqual(response.headers.get('vary'), expected);
+      assert.deepStrictEqual(await response.json(), { ok: true });
+    }
+  });
+
+  it('sends each cookie of a legacy error result whose header is an array', async () => {
+    const cookies = ['a=; Max-Age=0', 'b=; Max-Age=0'];
+    for (const body of [{ message: 'Login required' }, undefined]) {
+      serve(() =>
+        errorResultResponse({
+          status: 401,
+          body,
+          // Typed as a string, but a JavaScript app may pass an array.
+          headers: {
+            'Set-Cookie': cookies,
+            'X-Reasons': ['token', 'expired'],
+          } as unknown as Record<string, string>,
+        }),
+      );
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 401);
+      assert.deepStrictEqual(response.headers.getSetCookie(), cookies);
+      assert.strictEqual(response.headers.get('x-reasons'), 'token, expired');
+      await response.arrayBuffer();
+    }
   });
 });
 
@@ -843,36 +881,32 @@ describe('ExpressResponseWriter — transform', () => {
     }
   });
 
-  it('stops the body of a response an async transform resolves to', async () => {
-    let cancels = 0;
+  it('delivers the original in full when a late response wraps its source', async () => {
     const reported = serveWith(
-      (async () =>
+      (async (response: HttpResponse) =>
+        response.kind === 'stream'
+          ? HttpResponse.stream(
+              200,
+              Readable.toWeb(
+                response.body as Readable,
+              ) as ReadableStream<Uint8Array>,
+            )
+          : response) as unknown as TransformResponseHook,
+      () =>
         HttpResponse.stream(
           200,
-          new ReadableStream<Uint8Array>({
-            cancel() {
-              cancels += 1;
-            },
-          }),
-        )) as unknown as TransformResponseHook,
-      () => HttpResponse.json(200, { id: 'x' }),
-    );
-    const response = await fetch(origin);
-    assert.deepStrictEqual(await response.json(), { id: 'x' });
-    await handled;
-    assert.strictEqual(cancels, 1);
-    assert.match(reported[0] ?? '', /returned a Promise/);
-  });
-
-  it('keeps sending a stream an async transform resolves back to', async () => {
-    serveWith(
-      (async (response: HttpResponse) =>
-        response) as unknown as TransformResponseHook,
-      () =>
-        HttpResponse.stream(200, Readable.from([bytesOf('a'), bytesOf('b')])),
+          Readable.from(
+            (async function* () {
+              yield bytesOf('a');
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              yield bytesOf('b');
+            })(),
+          ),
+        ),
     );
     const response = await fetch(origin);
     assert.strictEqual(await response.text(), 'ab');
     assert.strictEqual(await handled, undefined);
+    assert.match(reported[0] ?? '', /returned a Promise/);
   });
 });

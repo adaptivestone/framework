@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { createReadStream } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { Readable } from 'node:stream';
 import { describe, it, mock } from 'node:test';
 import express, { type Request, type Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
@@ -503,6 +505,66 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     assertNotCalled(write);
     assertNotCalled(next);
     assert.strictEqual(cancels, 0);
+  });
+
+  it('destroys an unread returned Node stream when the handler also wrote to res', async (t) => {
+    const source = createReadStream(
+      new URL('./nonexistent-stream-review-fixture', import.meta.url),
+    );
+    // No test error listener: an unhandled open error must fail this test.
+    const closed = new Promise<void>((resolve) =>
+      source.once('close', resolve),
+    );
+    t.after(() => source.destroy());
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(200, source);
+      },
+    });
+    const { app } = makeAppWithLogger();
+
+    await createExpressAdapter(r, app, stubWriter().writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(makeRes()),
+      mock.fn(),
+    );
+    await closed;
+
+    assert.ok(source.destroyed, 'the unread source is destroyed');
+  });
+
+  it('leaves a Node stream the handler pipes to res running, without crashing on its error', async (t) => {
+    const source = new Readable({ read() {} });
+    t.after(() => source.destroy());
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        source.pipe(res);
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(200, source);
+      },
+    });
+    const { app } = makeAppWithLogger();
+    const res = Object.assign(makeRes(), { write: () => true });
+
+    await createExpressAdapter(r, app, stubWriter().writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    await flush();
+
+    assert.ok(!source.destroyed, 'the piped source keeps running');
+    assert.strictEqual(source.readableFlowing, true);
+    // No test error listener: an unhandled error must fail this test.
+    const closed = new Promise<void>((resolve) =>
+      source.once('close', resolve),
+    );
+    source.destroy(new Error('source failed'));
+    await closed;
   });
 
   it('passes a writer failure to next(err)', async () => {

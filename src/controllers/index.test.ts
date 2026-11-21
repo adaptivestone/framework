@@ -17,6 +17,7 @@ import {
   it,
   mock,
 } from 'node:test';
+import { inspect } from 'node:util';
 import type { Response } from 'express';
 import mongoose from 'mongoose';
 import Transport from 'winston-transport';
@@ -2365,6 +2366,68 @@ describe('Request validation through the error-handler registry', () => {
     const res = await check({});
     assert.strictEqual(res.status, 500);
     assert.strictEqual((await res.json()).error, 'SERVER_ERROR');
+  });
+
+  it('a failed Error handler logs the ValidationError without its fields', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    unregisters.push(
+      server.registerErrorHandler(Error, () => {
+        throw new Error('handler broke');
+      }),
+    );
+    const clientKeys: StandardSchemaV1 = {
+      '~standard': {
+        version: 1,
+        vendor: 'runtime-test',
+        validate: () => ({
+          issues: [{ message: 'per-field text', path: ['client-key'] }],
+        }),
+      },
+    };
+    class ClientKeys extends AbstractController {
+      get routes() {
+        return {
+          post: { '/check': { handler: this.check, request: clientKeys } },
+        };
+      }
+      async check() {
+        return HttpResponse.empty(204);
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const error = mock.fn();
+    const registry = new RouteRegistry();
+    new ControllerManager({
+      httpServer: {
+        routeRegistry: registry,
+        resolveError: (err: unknown, req: FrameworkRequest) =>
+          server.resolveError(err, req),
+      },
+      logger: { child: () => ({ warn() {}, verbose() {}, error }) },
+    } as unknown as IApp).registerController(ClientKeys);
+    const handler = registry.match('POST', '/clientkeys/check')?.entry?.handler;
+    assert.ok(handler);
+
+    const returned = await handler(
+      {
+        body: {},
+        headers: {},
+        appInfo: { request: {}, query: {}, params: {} },
+      } as unknown as FrameworkRequest,
+      responseForHandler() as unknown as Response,
+      () => {},
+    );
+
+    assert.ok(HttpResponse.is(returned));
+    assert.strictEqual(returned.status, 500);
+    assertCalledTimes(error, 1);
+    const logged = inspect(error.mock.calls[0]?.arguments[0], { depth: 10 });
+    for (const text of ['client-key', 'per-field text', 'issues']) {
+      assert.ok(!logged.includes(text), `"${text}" is logged: ${logged}`);
+    }
   });
 
   it('a ValidationError handler with an invalid result answers 500, not the 400', async () => {

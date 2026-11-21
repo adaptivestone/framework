@@ -10,7 +10,10 @@ import type { NextFunction, Request, Response } from 'express';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
 import { claimBuiltInResponse } from '../builtInResponse.ts';
-import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
+import {
+  ExpressResponseWriter,
+  releaseUnsentBody,
+} from '../ExpressResponseWriter.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
 import { FRAMEWORK_ERROR_CODES } from '../httpErrors.ts';
 import type AbstractMiddleware from '../middleware/AbstractMiddleware.ts';
@@ -137,11 +140,12 @@ export function createExpressAdapter(
       // the legacy `res` style, which has already answered (or will).
       if (HttpResponse.is(returned)) {
         if (res.headersSent) {
-          // The response written to res stands; the returned one is left
-          // alone, since res may be sending the same stream.
+          // The response written to res stands. A returned stream that res may
+          // be sending keeps running; one nobody reads is destroyed.
           app.logger?.error(
             `${req.method} ${req.route.path}: the handler both wrote to res and returned an HttpResponse. Use one or the other.`,
           );
+          releaseUnsentBody(returned);
           return;
         }
         await writer.write(returned, req, res);

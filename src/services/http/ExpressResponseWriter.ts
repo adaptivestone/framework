@@ -105,16 +105,8 @@ export class ExpressResponseWriter
       const isThenable =
         typeof (transformed as { then?: unknown } | null)?.then === 'function';
       if (isThenable) {
-        // Reported below; its rejection must not surface as unhandled. A late
-        // response is not sent: stop its body, unless it is the one being sent.
-        Promise.resolve(transformed).then(
-          (late) => {
-            if (HttpResponse.is(late)) {
-              discardReplacedBody(late, response);
-            }
-          },
-          () => {},
-        );
+        // Reported below; its rejection must not surface as unhandled.
+        Promise.resolve(transformed).catch(() => {});
       }
       const got = isThenable
         ? 'a Promise (it must be synchronous)'
@@ -216,7 +208,19 @@ function applyHeaders(res: Response, headers: ResponseHeaders): void {
     if (name === 'set-cookie') {
       res.append('Set-Cookie', value);
     } else if (name === 'vary') {
-      res.vary(value);
+      // Name by name: an empty or loosely spaced list must not fail the response.
+      const names = value
+        .split(',')
+        .map((field) => field.trim())
+        .filter(Boolean);
+      if (names.length > 0) {
+        try {
+          res.vary(names.join(', '));
+        } catch {
+          // Not a list of field names: sent as given, replacing an earlier one.
+          res.setHeader('Vary', value);
+        }
+      }
     } else {
       res.setHeader(name, value);
     }
@@ -269,6 +273,21 @@ function destroyNodeSource(body: Readable): void {
   // for HEAD). Even a closed source may still have an error queued for emission.
   absorbErrors(body);
   body.destroy();
+}
+
+/**
+ * @internal A response that will not be sent: an unread Node stream body is
+ * destroyed; one being read keeps running, but its error cannot crash.
+ */
+export function releaseUnsentBody(response: HttpResponse): void {
+  const body = bodySource(response);
+  if (body instanceof Readable) {
+    if (body.readableFlowing === null) {
+      destroyNodeSource(body);
+    } else {
+      absorbErrors(body);
+    }
+  }
 }
 
 /** A no-op `'error'` listener, removed once the stream closes; readers still see the error. */
