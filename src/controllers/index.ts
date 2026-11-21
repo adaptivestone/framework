@@ -560,7 +560,7 @@ class ControllerManager extends Base {
         // A handler that already streamed can't be sent anything — hand off to
         // the error finalizer instead of crashing with ERR_HTTP_HEADERS_SENT.
         if (res.headersSent) {
-          logger?.error(loggable(err));
+          logger?.error(err);
           return next(err);
         }
         // Same registry walk as the validation catch above (see `answerError`).
@@ -632,10 +632,10 @@ export function buildSubtreeFromSpec(
  * control flow, `warn` for the safety nets' schema-gap signal, `warn` default
  * for consumer entries). A handled error's log line rides into log shippers
  * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
- * Anything unresolved is a server-side defect: logged in full (a request
- * `ValidationError` value-free, wherever it was thrown), answered with a
+ * Anything unresolved is a server-side defect: logged in full, answered with a
  * generic 500 — unless the caller passes the `unresolved` response (the
- * validation 400), which is a client error and not logged.
+ * validation 400), which is a client error and not logged (value-free if a
+ * failed handler turns it into the 500).
  */
 async function answerError(
   app: IApp,
@@ -655,16 +655,10 @@ async function answerError(
   if (unresolved && !errorHandlerFailed(req)) {
     return unresolved;
   }
-  logger?.error(loggable(err));
+  // A client error a handler failed on (that failure is logged with its
+  // stack): its payload can carry client keys, so it is logged value-free.
+  logger?.error(unresolved ? toLoggableError(err) : err);
   return serverErrorResponse(req);
-}
-
-/**
- * A caught request error as it is logged: a request `ValidationError`, whose
- * payload can carry client keys and values, value-free; anything else in full.
- */
-function loggable(err: unknown): unknown {
-  return ValidationError.isValidationError(err) ? toLoggableError(err) : err;
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────
