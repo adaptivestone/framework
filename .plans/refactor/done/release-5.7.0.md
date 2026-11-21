@@ -224,6 +224,63 @@ Node 26.13.1 1100/1100 with Redis and no skips, Bun 1.4.4 1074/1074, Biome,
 both TypeScript checks, packaging smoke, and the Bun packed consumer against a
 disposable `mongo:8`.
 
+### Fourth review (2026-11-21)
+
+The same two models reviewed `5.6.1..c3c508a` again, asked to separate release
+blockers from follow-ups. Both confirmed the third round's fixes by running
+them, and both still advised against publishing. Their blocker lists overlapped
+on three points.
+
+Fixed, each with a regression test:
+
+- Mixed write: a returned Node stream that nobody reads (a file that fails to
+  open) crashed the process once the third round stopped touching returned
+  bodies. Such a stream is now destroyed; one that is being read (piped to
+  `res`) keeps running, with its errors absorbed.
+- A request `ValidationError` reached the log raw when a registered handler
+  failed on it, and when it came from a second copy of the framework. Both
+  paths now log the field count only (the class's cross-copy check is used).
+- Bridge: a copy of `req` together with a wrapper of `res` found nothing. The
+  response is also recorded under `req.res`. Showing the status on `res` is
+  best effort: a read-only `statusCode` no longer throws.
+- `HttpResponse.native` of a fetched response (non-empty `url`) forwarded the
+  upstream `content-encoding` and `content-length` although `fetch` had decoded
+  the body. Both are dropped for such a response.
+- A legacy error result with an array header value (JavaScript apps): each
+  `Set-Cookie` element stays its own field, as in 5.6.1.
+- Merging `Vary` no longer fails the response on an empty or loosely spaced
+  value; a value that is not a list of field names is sent as given.
+- `RequestParser.middleware` declares `Promise<void | Response>` again, so a
+  subclass that answers itself compiles.
+- Taken back: the third round's cleanup of a late response from a
+  Promise-returning `transformResponse`. It could abort the original response
+  when the late one wrapped the same source.
+
+Disclosed in the changelog and README, not changed:
+
+- An Express error middleware the app mounts itself sees the body parser's 413
+  and 400 before the framework answers them.
+- A `resolveError` override must change `response` itself; the legacy fields no
+  longer decide what is sent when it is present.
+
+Not taken:
+
+- A handler that pipes a stream to `res` and returns the same stream before the
+  first chunk: both consume it. Double use of the new API, not detectable.
+- The handler-failure mark with one error instance thrown by concurrent
+  requests.
+- An Express JSON replacer no longer sees a body-less result; header names that
+  differ only by case in one legacy result; thrown values that cannot be
+  converted to a string; 204/205 results with a supplied body; statuses such
+  as 600 that fail only at run time.
+- A Promise-returning transform's late response body is not stopped (see
+  above).
+
+Verification after these fixes (2026-11-21), in a clean copy of the branch:
+Node 26.13.1 1110/1110 with Redis and no skips, Bun 1.4.4 1084/1084, Biome,
+both TypeScript checks, packaging smoke, and the Bun packed consumer against a
+disposable `mongo:8`.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,

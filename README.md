@@ -86,8 +86,8 @@ working. Check these when you upgrade:
 - A `{ status, body }` result from an error handler must be a valid response.
   A 206, or a status outside 200–599, is logged and answered with the 500. The
   result sets its own `Content-Type`, replacing one set on `res` earlier. A
-  result without a body adds no `Content-Type`, and a 304 result gets no
-  `ETag`. A `Set-Cookie` in its `headers` is added to the cookies already on
+  result without a body adds no `Content-Type` and no longer answers 304 to
+  a conditional request, and a 304 result gets no `ETag`. A `Set-Cookie` in its `headers` is added to the cookies already on
   the response, and `Vary` is merged; before, both replaced what was there.
 - The built-in `Auth`, `Home` and `Health` handlers return their response. An
   override that calls one should return the result:
@@ -106,15 +106,18 @@ working. Check these when you upgrade:
   status set on `res` before the call is replaced by the built-in status.
   Change the returned response instead. A built-in handler used directly as
   an Express route handler no longer answers by itself.
-- An override of `HttpServer.resolveError` must also return the `response`
-  to send.
+- An override of `HttpServer.resolveError` should also return the `response`
+  to send, and must change `response` itself to change the answer.
+- An Express error middleware that your app mounts itself (for example in
+  `bootHttp`) now receives the body parser's 413 and 400 before the framework
+  answers them.
 - An override annotated `Promise<Response>` that returns the built-in result no
   longer compiles. Widen the annotation or drop it.
 - Framework-built JSON responses (404, 405, 415, validation and body-parser
   errors, the 500, and the built-in `Auth`, `Home` and `Health` answers) are
   sent as `application/json`, replacing a `Content-Type` set on `res` earlier,
-  for example by a middleware. To send another media type on every response,
-  set `contentType` in `transformResponse`.
+  for example by a middleware. To send another media type on the responses it
+  sees, set `contentType` in `transformResponse`.
 - The `Auth` answers without a body (register 201, verify and recover 200) no
   longer send `Content-Type: application/json`.
 
