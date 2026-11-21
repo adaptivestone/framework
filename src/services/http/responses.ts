@@ -300,9 +300,10 @@ function empty<S extends number>(
 /**
  * Pass a Web `Response` through: its status, status text, headers and body
  * are sent as they are, except the framing headers the server sets itself
- * (`connection`, `transfer-encoding`, …). A `fetch()` response's body is
- * already decoded, so its upstream `content-encoding` and `content-length`
- * are dropped too.
+ * (`connection`, `transfer-encoding`, …). A `fetch()` response whose codings
+ * `fetch` all decoded (`gzip`, `deflate`, `br`, `zstd`) also loses its
+ * upstream `content-encoding`, `content-length` and digest headers; a body in
+ * any other coding is passed on as received, headers intact.
  */
 function native(response: Response): NativeResponse {
   if (!(response instanceof Response)) {

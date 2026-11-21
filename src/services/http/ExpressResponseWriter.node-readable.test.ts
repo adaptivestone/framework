@@ -19,6 +19,7 @@ function response() {
       return this;
     },
     setHeader() {},
+    removeHeader() {},
     end() {},
   });
 }

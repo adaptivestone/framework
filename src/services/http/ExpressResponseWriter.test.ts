@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createReadStream } from 'node:fs';
 import http, { type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
@@ -66,6 +67,35 @@ const withTimeout = <T>(promise: Promise<T>, label: string) =>
       setTimeout(() => reject(new Error(`timed out: ${label}`)), 2000),
     ),
   ]);
+
+/** Read one response to its end, undecoded, as a client that trusts its framing. */
+const requestRaw = (method = 'GET') =>
+  withTimeout(
+    new Promise<{
+      status?: number;
+      headers: http.IncomingHttpHeaders;
+      text: string;
+    }>((resolve, reject) => {
+      http
+        .request(origin, { method }, (response) => {
+          let text = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => {
+            text += chunk;
+          });
+          response.on('end', () =>
+            resolve({
+              status: response.statusCode,
+              headers: response.headers,
+              text,
+            }),
+          );
+        })
+        .on('error', reject)
+        .end();
+    }),
+    `${method} response complete`,
+  );
 
 /** A full garbage collection, where the runtime allows forcing one. */
 const forceGc = (): (() => void) | undefined => {
@@ -221,6 +251,34 @@ describe('ExpressResponseWriter — empty and redirect', () => {
     );
     assert.strictEqual(response.statusCode, 205);
     assert.notStrictEqual(response.headers['content-length'], '17');
+  });
+
+  it('empty: zeroes a Content-Length already on the response', async () => {
+    serve(
+      () => HttpResponse.empty(205),
+      (res) => res.setHeader('Content-Length', '17'),
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 205);
+    assert.strictEqual(response.headers['content-length'], '0');
+  });
+
+  it('empty: HEAD keeps a stated Content-Length', async () => {
+    serve(() =>
+      HttpResponse.empty(200, { headers: { 'content-length': '17' } }),
+    );
+    const response = await requestRaw('HEAD');
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers['content-length'], '17');
+  });
+
+  it('empty: 204 drops Content-Type', async () => {
+    serve(() =>
+      HttpResponse.empty(204, { headers: { 'content-type': 'text/plain' } }),
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 204);
+    assert.strictEqual(response.headers['content-type'], undefined);
   });
 
   it('redirect: status and location', async () => {
@@ -669,45 +727,45 @@ describe('ExpressResponseWriter — native Web Response', () => {
     assert.strictEqual(response.headers.get('x-kept'), 'yes');
   });
 
-  it('drops the encoding headers of a fetched Response, whose body is decoded', async () => {
-    const body = 'x'.repeat(44);
-    const make = (url: string) => {
-      const upstream = new Response(body, {
-        headers: { 'content-encoding': 'gzip', 'content-length': '44' },
-      });
-      Object.defineProperty(upstream, 'url', { value: url });
-      return HttpResponse.native(upstream);
-    };
-    // Read without decoding, to see the headers as sent.
-    const get = () =>
-      new Promise<{ headers: http.IncomingHttpHeaders; text: string }>(
-        (resolve, reject) => {
-          http
-            .get(origin, (response) => {
-              let text = '';
-              response.setEncoding('utf8');
-              response.on('data', (chunk) => {
-                text += chunk;
-              });
-              response.on('end', () =>
-                resolve({ headers: response.headers, text }),
-              );
-            })
-            .on('error', reject);
-        },
-      );
+  const body = 'x'.repeat(44);
+  const upstream = (url: string, encoding: string) => {
+    const response = new Response(body, {
+      headers: {
+        'content-encoding': encoding,
+        'content-length': '44',
+        'content-digest': 'sha-256=:AAAA:',
+      },
+    });
+    Object.defineProperty(response, 'url', { value: url });
+    return HttpResponse.native(response);
+  };
 
-    serve(() => make('https://upstream.test/data'));
-    const fetched = await get();
+  it('drops the encoding and digest headers of a fetched Response, whose body is decoded', async () => {
+    serve(() => upstream('https://upstream.test/data', 'gzip'));
+    // Read without decoding, to see the headers as sent.
+    const fetched = await requestRaw();
     assert.strictEqual(fetched.headers['content-encoding'], undefined);
     assert.strictEqual(fetched.headers['content-length'], undefined);
+    assert.strictEqual(fetched.headers['content-digest'], undefined);
     assert.strictEqual(fetched.text, body);
 
-    serve(() => make(''));
-    const constructed = await get();
+    serve(() => upstream('', 'gzip'));
+    const constructed = await requestRaw();
     assert.strictEqual(constructed.headers['content-encoding'], 'gzip');
     assert.strictEqual(constructed.headers['content-length'], '44');
+    assert.strictEqual(constructed.headers['content-digest'], 'sha-256=:AAAA:');
     assert.strictEqual(constructed.text, body);
+  });
+
+  it('keeps the encoding headers of a fetched Response with a coding fetch does not decode', async () => {
+    for (const encoding of ['compress', 'GZIP, compress']) {
+      serve(() => upstream('https://upstream.test/data', encoding));
+      const fetched = await requestRaw();
+      assert.strictEqual(fetched.headers['content-encoding'], encoding);
+      assert.strictEqual(fetched.headers['content-length'], '44');
+      assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+      assert.strictEqual(fetched.text, body);
+    }
   });
 
   it('a Response without a body', async () => {
@@ -715,6 +773,17 @@ describe('ExpressResponseWriter — native Web Response', () => {
     const response = await fetch(origin);
     assert.strictEqual(response.status, 204);
     assert.strictEqual(await response.text(), '');
+  });
+
+  it('a Response without a body completes despite its Content-Length', async () => {
+    serve(() =>
+      HttpResponse.native(
+        new Response(null, { headers: { 'content-length': '1234' } }),
+      ),
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers['content-length'], '0');
   });
 });
 
@@ -944,5 +1013,35 @@ describe('ExpressResponseWriter — transform', () => {
     assert.strictEqual(await response.text(), 'ab');
     assert.strictEqual(await handled, undefined);
     assert.match(reported[0] ?? '', /returned a Promise/);
+  });
+
+  it('destroys the unread stream of a late response', async () => {
+    const uncaught: unknown[] = [];
+    const onUncaught = (err: unknown) => uncaught.push(err);
+    process.on('uncaughtExceptionMonitor', onUncaught);
+    try {
+      let late: Readable | undefined;
+      let closed: Promise<unknown> | undefined;
+      const reported = serveWith(
+        (async () => {
+          late = createReadStream(
+            new URL('./nonexistent-late-response-fixture', import.meta.url),
+          );
+          // No test error listener: its failed open must not crash the process.
+          closed = new Promise((resolve) => late?.once('close', resolve));
+          return HttpResponse.stream(200, late);
+        }) as unknown as TransformResponseHook,
+        () => HttpResponse.json(200, { id: 'x' }),
+      );
+      const response = await fetch(origin);
+      assert.deepStrictEqual(await response.json(), { id: 'x' });
+      assert.strictEqual(await handled, undefined);
+      await withTimeout(Promise.resolve(closed), 'late source closed');
+      assert.ok(late?.destroyed, 'the late source is destroyed');
+      assert.deepStrictEqual(uncaught, []);
+      assert.match(reported[0] ?? '', /returned a Promise/);
+    } finally {
+      process.off('uncaughtExceptionMonitor', onUncaught);
+    }
   });
 });

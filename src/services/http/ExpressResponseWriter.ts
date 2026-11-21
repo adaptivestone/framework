@@ -29,6 +29,25 @@ const HOP_BY_HOP_HEADERS: ReadonlySet<string> = new Set([
   'upgrade',
 ]);
 
+/** The codings `fetch` decodes; a body in any other is passed on still encoded. */
+const FETCH_DECODED_CODINGS: ReadonlySet<string> = new Set([
+  'gzip',
+  'x-gzip',
+  'deflate',
+  'br',
+  'zstd',
+]);
+
+/** Headers that describe the encoded bytes, wrong once `fetch` decoded them. */
+const ENCODED_BODY_HEADERS = [
+  'content-encoding',
+  'content-length',
+  'content-digest',
+  'repr-digest',
+  'digest',
+  'content-md5',
+];
+
 /**
  * Renders `HttpResponse` values through Express, so JSON, text and bytes get
  * the same serialization, `ETag` and conditional-GET handling as `res.json` /
@@ -106,8 +125,18 @@ export class ExpressResponseWriter
       const isThenable =
         typeof (transformed as { then?: unknown } | null)?.then === 'function';
       if (isThenable) {
-        // Reported below; its rejection must not surface as unhandled.
-        Promise.resolve(transformed).catch(() => {});
+        // Reported below. The late response is not sent: an unread Node stream
+        // body of its own is released; a rejection must not surface as unhandled.
+        Promise.resolve(transformed)
+          .then((late: unknown) => {
+            if (
+              HttpResponse.is(late) &&
+              bodySource(late) !== bodySource(response)
+            ) {
+              releaseUnsentBody(late);
+            }
+          })
+          .catch(() => {});
       }
       const got = isThenable
         ? 'a Promise (it must be synchronous)'
@@ -151,13 +180,8 @@ async function render(
       return;
     }
     case 'empty':
-      // No body: the server frames it, not a length the caller stated.
-      start(
-        res,
-        response.status,
-        response.headers.filter(([name]) => name !== 'content-length'),
-      );
-      res.end();
+      start(res, response.status, response.headers);
+      endWithoutBody(req, res);
       return;
     case 'redirect':
       applyHeaders(res, response.headers);
@@ -171,14 +195,25 @@ async function render(
     case 'native': {
       const native = response.response;
       // Dropped too: the fields `Connection` names (RFC 9110 7.6.1), and the
-      // encoding of a fetched response (non-empty `url`), whose body is decoded.
+      // encoding and digest headers of a fetched response (non-empty `url`)
+      // whose every coding `fetch` decoded.
       const dropped = new Set(
         (native.headers.get('connection') ?? '')
           .split(',')
           .map((name) => name.trim().toLowerCase()),
       );
-      if (native.url && native.headers.has('content-encoding')) {
-        dropped.add('content-encoding').add('content-length');
+      const codings = native.headers.get('content-encoding');
+      if (
+        native.url &&
+        codings
+          ?.split(',')
+          .every((coding) =>
+            FETCH_DECODED_CODINGS.has(coding.trim().toLowerCase()),
+          )
+      ) {
+        for (const name of ENCODED_BODY_HEADERS) {
+          dropped.add(name);
+        }
       }
       const commit = () => {
         start(
@@ -194,12 +229,30 @@ async function render(
       };
       if (!native.body) {
         commit();
-        res.end();
+        endWithoutBody(req, res);
         return;
       }
       return writeStream(req, res, native.body, commit);
     }
   }
+}
+
+/**
+ * End a response that has no body. HEAD keeps its headers as given; a 204 or
+ * 304 drops its content headers; otherwise a `Content-Length` (stated or
+ * already on `res`) becomes 0, so the client does not wait for bytes.
+ */
+function endWithoutBody(req: Request, res: Response): void {
+  if (req.method !== 'HEAD') {
+    if (res.statusCode === 204 || res.statusCode === 304) {
+      res.removeHeader('Content-Type');
+      res.removeHeader('Content-Length');
+      res.removeHeader('Transfer-Encoding');
+    } else if (res.getHeader('Content-Length') !== undefined) {
+      res.setHeader('Content-Length', '0');
+    }
+  }
+  res.end();
 }
 
 function start(res: Response, status: number, headers: ResponseHeaders): void {
