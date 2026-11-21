@@ -119,7 +119,8 @@ working. Check these when you upgrade:
   for example by a middleware. To send another media type on the responses it
   sees, set `contentType` in `transformResponse`.
 - The `Auth` answers without a body (register 201, verify and recover 200) no
-  longer send `Content-Type: application/json`.
+  longer send `Content-Type: application/json`, and an Express `json replacer`
+  no longer sees them.
 
 ## Upgrade notes (5.6.1)
 

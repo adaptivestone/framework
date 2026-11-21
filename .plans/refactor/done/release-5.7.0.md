@@ -342,6 +342,51 @@ Node 26.13.1 1128/1128 with Redis and no skips, Bun 1.4.4 1102/1102, Biome,
 both TypeScript checks, packaging smoke, and the Bun packed consumer against a
 disposable `mongo:8`.
 
+### Sixth review (2026-11-21)
+
+The same two models reviewed `5.6.1..f5b63e5`. Half of their blockers were
+again consequences of the previous round's fixes, so this round follows one
+rule: the framework does not destroy a stream it does not own, and does not
+change headers unless it is certain they are wrong.
+
+Fixed, each with a regression test:
+
+- The fifth round's pipe flag was sticky: a legacy streaming controller that
+  piped an upstream into `res`, detached it after a failure and threw an
+  `HttpError` got no answer (5.6.1 sent it). Only the sources still piped into
+  `res` are tracked, and a mixed write is only the returned stream that is
+  itself piped. Any other returned response is written as before.
+- A request `ValidationError` thrown after the response started was logged raw.
+- The late response of a Promise-returning `transformResponse` is never
+  destroyed: a Node stream body only gets an error listener. Destroying it
+  could truncate the original through a wrapper.
+- Body-less framing: an inherited `Transfer-Encoding` is removed, and a 204 or
+  304 drops its content headers for HEAD too.
+- `native` drops the encoding headers of a fetched response only when it has a
+  body, is not a 206 and names one coding. Stacked codings are not decoded by
+  every runtime; a fetched HEAD keeps its metadata. To forward bytes exactly as
+  received, the caller passes a constructed `Response`.
+- A falsy rejection reason reaches the error path at every place the adapter
+  passes a failure on (it fell through to the 404).
+- Bridge: the status is shown on the request's own `res` reached through the
+  given `res`.
+
+Disclosed: a stream source yields a new chunk each time (chunks are not
+copied, as with `res.write`); an Express `json replacer` no longer sees the
+body-less `Auth` answers.
+
+Not taken:
+
+- Stacked codings that a runtime's `fetch` did decode keep their headers.
+- A coding the app asked for explicitly on a runtime whose `fetch` does not
+  decode it, for example `zstd` on an early Node 24.
+- A fetched 206 whose body `fetch` decoded.
+
+Verification after these fixes (2026-11-21), in a clean copy of the branch:
+Node 26.13.1 1140/1140 with Redis and no skips, Bun 1.4.4 1114/1114, Biome,
+both TypeScript checks, packaging smoke, and the Bun packed consumer against a
+disposable `mongo:8`.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,
