@@ -5,7 +5,11 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { PassThrough, Readable } from 'node:stream';
 import { describe, it, mock } from 'node:test';
-import express, { type Request, type Response } from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { IApp } from '../../../server.ts';
 import {
@@ -394,6 +398,43 @@ describe('createExpressAdapter — error propagation', () => {
       'mw exploded',
     );
   });
+
+  it('answers a returned stream that fails without a reason through the error path', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/failing', {
+      handler: () =>
+        HttpResponse.stream(
+          200,
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error();
+            },
+          }),
+        ),
+    });
+    const errors: unknown[] = [];
+    const server = http.createServer(
+      express()
+        .use(createExpressAdapter(r, fakeApp))
+        .use(
+          (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+            errors.push(err);
+            res.status(500).end();
+          },
+        ),
+    );
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/failing`);
+      assert.strictEqual(response.status, 500);
+      assert.strictEqual(errors.length, 1);
+      assert.ok(errors[0] instanceof Error);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
 });
 
 describe('createExpressAdapter — returned HttpResponse', () => {
@@ -602,6 +643,28 @@ describe('createExpressAdapter — returned HttpResponse', () => {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+
+  it('writes a returned response when res has an unpipe listener of its own', async () => {
+    const response = HttpResponse.json(200, { ok: true });
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', { handler: async () => response });
+    const { writer, write } = stubWriter();
+    const { app, error } = makeAppWithLogger();
+    const res = makeRes();
+    // Set by an app middleware: not a stream piped into res.
+    res.on('unpipe', () => {});
+
+    await createExpressAdapter(r, app, writer)(
+      makeReq('GET', '/x'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+
+    assertCalledTimes(write, 1);
+    assert.strictEqual(write.mock.calls[0]?.arguments[0], response);
+    assertNotCalled(error);
+    assert.strictEqual(res.listenerCount('pipe'), 0);
   });
 
   it('passes a writer failure to next(err)', async () => {

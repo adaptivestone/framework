@@ -133,14 +133,23 @@ export function createExpressAdapter(
           return;
         }
       }
-      const returned = await Promise.resolve(
-        result.entry.handler(req, res, next),
-      );
+      // A stream piped into res (`pipe`, `pipeline`) may not have sent its
+      // headers yet; res is told of it by a `'pipe'` event.
+      let piped = false;
+      const onPipe = () => {
+        piped = true;
+      };
+      res.on('pipe', onPipe);
+      let returned: unknown;
+      try {
+        returned = await Promise.resolve(result.entry.handler(req, res, next));
+      } finally {
+        res.off('pipe', onPipe);
+      }
       // Only a branded `HttpResponse` is rendered; any other return value is
       // the legacy `res` style, which has already answered (or will).
       if (HttpResponse.is(returned)) {
-        // A stream piped into res may not have sent its headers yet.
-        if (res.headersSent || res.listenerCount('unpipe') > 0) {
+        if (res.headersSent || piped) {
           // The response written to res stands. A returned stream that res may
           // be sending keeps running; one nobody reads is destroyed.
           app.logger?.error(
@@ -168,7 +177,13 @@ export function createExpressAdapter(
         });
       }
     } catch (err) {
-      next(err);
+      // `next()` without an error would fall through to the 404.
+      next(
+        err ??
+          new Error(
+            `The handler or its response failed without a reason (${err})`,
+          ),
+      );
     }
   };
 }

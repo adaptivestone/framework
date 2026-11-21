@@ -40,7 +40,8 @@ async function dispatch(method: HttpMethod, handler: HandlerEntry['handler']) {
   const res = {
     statusCode: 200,
     headersSent: false,
-    listenerCount: () => 0,
+    on() {},
+    off() {},
   } as unknown as Response;
   const req = {
     method,
@@ -50,6 +51,7 @@ async function dispatch(method: HttpMethod, handler: HandlerEntry['handler']) {
     query: {},
     appInfo: { request: { email: 'PERSON@example.com', password: 'stub' } },
   } as unknown as FrameworkRequest;
+  Object.assign(res, { req });
   const written: HttpResponse[] = [];
   const adapter = createExpressAdapter(registry, app, {
     async write(response) {
@@ -213,6 +215,43 @@ it('claims a late response passed a copied request and a wrapper of res', async 
       work = ready.promise.then(() =>
         home.home(Object.assign({}, req), Object.create(res)),
       );
+    },
+  );
+
+  assert.deepStrictEqual(written, []);
+  ready.resolve();
+  await work;
+  await setImmediate();
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(200, { message: 'Home' }),
+  ]);
+});
+
+it('bridges a response passed a copied request without res and a wrapper of res', async () => {
+  const home = new Home(app, '');
+  const written = await dispatch(
+    'GET',
+    async (req: FrameworkRequest, res: Response) => {
+      const forwarded = Object.assign({}, req);
+      delete forwarded.res;
+      await home.home(forwarded, Object.create(res));
+    },
+  );
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(200, { message: 'Home' }),
+  ]);
+});
+
+it('claims a late response passed a copied request without res and a wrapper of res', async () => {
+  const home = new Home(app, '');
+  const ready = Promise.withResolvers<void>();
+  let work: Promise<unknown> | undefined;
+  const written = await dispatch(
+    'GET',
+    (req: FrameworkRequest, res: Response) => {
+      const forwarded = Object.assign({}, req);
+      delete forwarded.res;
+      work = ready.promise.then(() => home.home(forwarded, Object.create(res)));
     },
   );
 

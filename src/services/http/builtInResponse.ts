@@ -4,7 +4,11 @@ import type { HttpResponse } from './responses.ts';
 
 type Send = (response: HttpResponse) => void;
 type Claim = { send?: Send };
-type LegacyResponse = { statusCode: number; headersSent: boolean };
+type LegacyResponse = {
+  statusCode: number;
+  headersSent: boolean;
+  req?: unknown;
+};
 
 type Records = WeakMap<object, { response: HttpResponse } | Claim>;
 
@@ -18,10 +22,10 @@ const responses: Records = shared[RECORDS];
  * Return `response` from a framework controller handler, remembering it in
  * case an app override drops it (calls `super.x(req, res)` without returning
  * the result); the adapter then sends it and warns once. It is kept under
- * `req`, `res` and `req.res`, so it is found if any is the request's own (the
- * override may pass a copy of `req`, a wrapper of `res`, or both). The status
- * is also shown on `res` and `req.res`, where such an override reads it.
- * Transitional: removed in v6.
+ * `req`, `res`, `req.res` and `res.req`, so it is found if any is the
+ * request's own (the override may pass a copy of `req`, a wrapper of `res`, or
+ * both). The status is also shown on `res` and `req.res`, where such an
+ * override reads it. Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
   req: object,
@@ -29,7 +33,7 @@ export function builtInResponse<T extends HttpResponse>(
   res?: LegacyResponse,
 ): T {
   const own = (req as { res?: LegacyResponse }).res;
-  const keys = [res, req, own].filter(
+  const keys = [res, req, own, res?.req].filter(
     (key): key is object => typeof key === 'object' && key !== null,
   );
   const claim = keys
