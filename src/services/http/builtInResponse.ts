@@ -6,7 +6,13 @@ type Send = (response: HttpResponse) => void;
 type Claim = { send?: Send };
 type LegacyResponse = { statusCode: number; headersSent: boolean };
 
-const responses = new WeakMap<object, { response: HttpResponse } | Claim>();
+type Records = WeakMap<object, { response: HttpResponse } | Claim>;
+
+// On `globalThis`, so every copy of this module (one bundled by a package) shares it.
+const RECORDS = Symbol.for('@adaptivestone/framework/builtInResponse');
+const shared = globalThis as { [RECORDS]?: Records };
+shared[RECORDS] ??= new WeakMap();
+const responses: Records = shared[RECORDS];
 
 /**
  * Return `response` from a framework controller handler, remembering it in

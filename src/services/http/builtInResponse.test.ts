@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { it } from 'node:test';
 import { setImmediate } from 'node:timers/promises';
+import { pathToFileURL } from 'node:url';
 import type { Response } from 'express';
 import type { PostLoginRequest } from '../../controllers/Auth.routes.gen.ts';
 import Auth from '../../controllers/Auth.ts';
 import Health from '../../controllers/Health.ts';
 import Home from '../../controllers/Home.ts';
 import type { IApp } from '../../server.ts';
+import { builtInResponse } from './builtInResponse.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import { HttpResponse } from './responses.ts';
 import { createExpressAdapter } from './routing/ExpressAdapter.ts';
@@ -32,7 +37,11 @@ async function dispatch(method: HttpMethod, handler: HandlerEntry['handler']) {
   const path = '/';
   const registry = new RouteRegistry();
   registry.registerRoute(method, path, { handler });
-  const res = { statusCode: 200, headersSent: false } as Response;
+  const res = {
+    statusCode: 200,
+    headersSent: false,
+    listenerCount: () => 0,
+  } as unknown as Response;
   const req = {
     method,
     path,
@@ -229,4 +238,26 @@ it('delivers the response when the wrapper of res has a read-only status', async
   assert.deepStrictEqual(written, [
     HttpResponse.json(200, { message: 'Home' }),
   ]);
+});
+
+it('shares a recorded response between copies of the module', async () => {
+  // A real second copy of the module file, as a package bundling its own has.
+  const dir = await mkdtemp(join(tmpdir(), 'bridge-copy-'));
+  try {
+    const copy = join(dir, 'builtInResponse.ts');
+    await copyFile(new URL('./builtInResponse.ts', import.meta.url), copy);
+    const second = (await import(
+      pathToFileURL(copy).href
+    )) as typeof import('./builtInResponse.ts');
+    assert.notStrictEqual(second.builtInResponse, builtInResponse);
+    const req = {};
+    const res = { statusCode: 200, headersSent: false };
+    const response = HttpResponse.json(200, { message: 'Home' });
+    builtInResponse(req, response, res);
+    const sent: HttpResponse[] = [];
+    second.claimBuiltInResponse(req, res, (dropped) => sent.push(dropped));
+    assert.deepStrictEqual(sent, [response]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
