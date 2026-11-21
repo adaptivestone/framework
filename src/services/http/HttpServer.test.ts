@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import type { NextFunction, Response } from 'express';
 import { appInstance } from '../../helpers/appInstance.ts';
+import { noopLogger } from '../../helpers/logger.ts';
 import { stubI18n } from '../../tests/mocks.ts';
 import { getTestServerURL } from '../../tests/testHelpers.ts';
 import type { TI18n } from '../i18n/I18n.ts';
@@ -109,6 +110,8 @@ const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
     resolveError: (err: unknown, req: FrameworkRequest) =>
       appInstance.httpServer?.resolveError(err, req) ?? null,
     responseWriter: new ExpressResponseWriter(),
+    // A logger, so the sink's log lines are built.
+    logger: noopLogger,
   };
   HttpServer.prototype[register].call(ctx as unknown as HttpServer);
   assert.ok(handler, `${register} registered no handler`);
@@ -347,6 +350,12 @@ describe('HttpServer — final sink resolves through the registry', () => {
     } finally {
       unregister?.();
     }
+  });
+
+  it('answers the 500 for a thrown Symbol', async () => {
+    const answer = await runSink(Symbol('boom') as unknown as Error);
+    assert.strictEqual(answer.status, 500);
+    assert.strictEqual(answer.payload.error, 'SERVER_ERROR');
   });
 
   it('passes the error on when the response already started', async () => {

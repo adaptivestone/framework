@@ -1,6 +1,7 @@
 import { Readable } from 'node:stream';
 import { finished } from 'node:stream/promises';
 import type { Request, Response } from 'express';
+import { describeThrown } from '../../helpers/logger.ts';
 import type { TransformResponseHook } from '../../server.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import type { ResponseWriter } from './ResponseWriter.ts';
@@ -118,9 +119,7 @@ export class ExpressResponseWriter
       );
     } catch (err) {
       this.#onTransformError(
-        `transformResponse threw; the original response was sent: ${
-          err instanceof Error ? (err.stack ?? err.message) : String(err)
-        }`,
+        `transformResponse threw; the original response was sent: ${describeThrown(err)}`,
       );
     }
     return response;
@@ -152,7 +151,12 @@ async function render(
       return;
     }
     case 'empty':
-      start(res, response.status, response.headers);
+      // No body: the server frames it, not a length the caller stated.
+      start(
+        res,
+        response.status,
+        response.headers.filter(([name]) => name !== 'content-length'),
+      );
       res.end();
       return;
     case 'redirect':

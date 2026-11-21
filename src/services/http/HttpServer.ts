@@ -9,6 +9,7 @@ import type {
 } from 'express';
 import express from 'express';
 import type ThttpConfig from '../../config/http.ts';
+import { describeThrown } from '../../helpers/logger.ts';
 import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp, TransformResponseHook } from '../../server.ts';
@@ -235,13 +236,9 @@ class HttpServer extends Base {
           // Keep the stack — a broken consumer handler is exactly the case
           // where `${err}` (message-only) isn't enough to debug.
           this.logger?.error(
-            `Error handler for ${entry.errorClass.name} threw: ${
-              handlerErr instanceof Error
-                ? (handlerErr.stack ?? handlerErr.message)
-                : String(handlerErr)
-            }`,
+            `Error handler for ${entry.errorClass.name} threw: ${describeThrown(handlerErr)}`,
           );
-          markErrorHandlerFailed(err);
+          markErrorHandlerFailed(req);
           return null;
         }
         if (response) {
@@ -288,7 +285,7 @@ class HttpServer extends Base {
         // nothing can be sent — hand off to the default finalizer instead of
         // crashing with ERR_HTTP_HEADERS_SENT.
         if (res.headersSent) {
-          this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
+          this.logger?.error(`Unhandled request error: ${describeThrown(err)}`);
           return next(err);
         }
         const frameworkReq = req as FrameworkRequest;
@@ -296,7 +293,7 @@ class HttpServer extends Base {
         if (resolved) {
           this.logger?.[resolved.logLevel](toLoggableError(err));
         } else {
-          this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
+          this.logger?.error(`Unhandled request error: ${describeThrown(err)}`);
         }
         try {
           await this.responseWriter.write(
@@ -310,11 +307,7 @@ class HttpServer extends Base {
           // The error response itself failed (e.g. a body JSON cannot encode):
           // fall back to the plain 500, without the writer or the transform.
           this.logger?.error(
-            `Error response could not be written: ${
-              writeErr instanceof Error
-                ? (writeErr.stack ?? writeErr.message)
-                : String(writeErr)
-            }`,
+            `Error response could not be written: ${describeThrown(writeErr)}`,
           );
           if (!res.headersSent) {
             // A type left on res from before must not label the JSON body.

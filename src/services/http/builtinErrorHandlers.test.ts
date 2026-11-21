@@ -296,12 +296,13 @@ describe('toLoggableError', () => {
 });
 
 describe('errorHandlerFailed', () => {
-  it('reads the failure mark once, so a reused error is not marked again', () => {
-    const error = new Error('reused instance');
-    markErrorHandlerFailed(error);
+  it('reads the failure mark of a request once', () => {
+    const req = request();
+    markErrorHandlerFailed(req);
 
-    assert.strictEqual(errorHandlerFailed(error), true);
-    assert.strictEqual(errorHandlerFailed(error), false);
+    assert.strictEqual(errorHandlerFailed(request()), false);
+    assert.strictEqual(errorHandlerFailed(req), true);
+    assert.strictEqual(errorHandlerFailed(req), false);
   });
 });
 
@@ -483,6 +484,25 @@ describe('errorResultResponse', () => {
     const notModified = errorResultResponse({ status: 304, body: { a: 1 } });
     assert.strictEqual(notModified.kind, 'empty');
     assert.strictEqual(notModified.status, 304);
+  });
+
+  it('lets a later header replace one whose name differs only by case', () => {
+    const headers = {
+      'Retry-After': '120',
+      'retry-after': '30',
+      'Set-Cookie': 'a=1',
+      'set-cookie': 'b=2',
+    };
+    for (const body of [{ message: 'Slow down' }, undefined]) {
+      assert.deepStrictEqual(
+        errorResultResponse({ status: 429, body, headers }).headers,
+        [
+          ['retry-after', '30'],
+          ['set-cookie', 'a=1'],
+          ['set-cookie', 'b=2'],
+        ],
+      );
+    }
   });
 
   it('throws on a status no response can carry', () => {

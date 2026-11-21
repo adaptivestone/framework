@@ -199,6 +199,30 @@ describe('ExpressResponseWriter — empty and redirect', () => {
     assert.strictEqual(response.headers.get('content-length'), '0');
   });
 
+  it('empty: drops a stated Content-Length, so the response completes', async () => {
+    serve(() =>
+      errorResultResponse({
+        status: 205,
+        body: { reset: true },
+        headers: { 'Content-Length': '17' },
+      }),
+    );
+    // A kept-alive client reads to the stated length before the response ends.
+    const response = await withTimeout(
+      new Promise<http.IncomingMessage>((resolve, reject) => {
+        http
+          .get(origin, (incoming) => {
+            incoming.resume();
+            incoming.on('end', () => resolve(incoming));
+          })
+          .on('error', reject);
+      }),
+      '205 response complete',
+    );
+    assert.strictEqual(response.statusCode, 205);
+    assert.notStrictEqual(response.headers['content-length'], '17');
+  });
+
   it('redirect: status and location', async () => {
     serve(() => HttpResponse.redirect(303, '/next?a=1'));
     const response = await fetch(origin, { redirect: 'manual' });
@@ -844,6 +868,18 @@ describe('ExpressResponseWriter — transform', () => {
     const response = await fetch(origin);
     assert.deepStrictEqual(await response.json(), { id: 'x' });
     assert.match(reported[0] ?? '', /threw.*Symbol\(envelope broke\)/);
+  });
+
+  it('sends the original and reports a transform that throws an unprintable value', async () => {
+    const reported = serveWith(
+      () => {
+        throw Object.create(null);
+      },
+      () => HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    assert.match(reported[0] ?? '', /threw.*\[unprintable value\]/);
   });
 
   it('sends the original and reports a transform that returns no response', async () => {

@@ -24,7 +24,10 @@ import Transport from 'winston-transport';
 import { appInstance } from '../helpers/appInstance.ts';
 import AbstractController from '../modules/AbstractController.ts';
 import type { IApp } from '../server.ts';
-import type { ResolvedError } from '../services/http/builtinErrorHandlers.ts';
+import {
+  errorHandlerFailed,
+  type ResolvedError,
+} from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
 import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
@@ -1761,6 +1764,26 @@ describe('HttpServer.resolveError — registry resolution', () => {
       await httpServer().resolveError(new Crashy(), fakeReq()),
       null,
     );
+  });
+
+  it('marks the failed handler on the request, not on the shared error', async () => {
+    class Shared extends Error {}
+    const shared = new Shared();
+    const first = fakeReq();
+    const second = fakeReq();
+    unregisters.push(
+      httpServer().registerErrorHandler(Shared, (_err, req) => {
+        if (req === first) {
+          throw new Error('handler exploded');
+        }
+        return null;
+      }),
+    );
+    await httpServer().resolveError(shared, first);
+    await httpServer().resolveError(shared, second);
+
+    assert.strictEqual(errorHandlerFailed(second), false);
+    assert.strictEqual(errorHandlerFailed(first), true);
   });
 });
 

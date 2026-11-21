@@ -652,7 +652,7 @@ async function answerError(
     return resolvedErrorResponse(resolved);
   }
   // A failed handler is a server-side defect: the 500, not the fallback.
-  if (unresolved && !errorHandlerFailed(err)) {
+  if (unresolved && !errorHandlerFailed(req)) {
     return unresolved;
   }
   // A client error a handler failed on (that failure is logged with its

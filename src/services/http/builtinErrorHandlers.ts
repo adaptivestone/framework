@@ -70,29 +70,34 @@ export function errorResultResponse({
   body,
   headers,
 }: ErrorHandlerResult): HttpResponse {
-  let contentType: string | undefined;
-  const all: [string, string][] = [];
-  const rest: [string, string][] = [];
+  // By lower-case name: a later header replaces an earlier one, as `setHeader`
+  // did, but cookies add up. Typed as a string, but a JavaScript app may pass
+  // an array: each cookie stays its own field, other values are joined.
+  const fields = new Map<string, [string, string][]>();
   for (const [name, value] of Object.entries(headers ?? {})) {
-    // Typed as a string, but a JavaScript app may pass an array: each cookie
-    // stays its own field, other values are joined.
-    const fields: [string, string][] = !Array.isArray(value)
-      ? [[name, value]]
-      : name.toLowerCase() === 'set-cookie'
-        ? value.map((cookie) => [name, String(cookie)])
-        : [[name, value.join(', ')]];
-    all.push(...fields);
-    if (name.toLowerCase() === 'content-type') {
-      contentType = fields[0]?.[1];
+    const key = name.toLowerCase();
+    if (key === 'set-cookie') {
+      const cookies: unknown[] = Array.isArray(value) ? value : [value];
+      fields.set(key, [
+        ...(fields.get(key) ?? []),
+        ...cookies.map((cookie): [string, string] => [name, String(cookie)]),
+      ]);
     } else {
-      rest.push(...fields);
+      fields.set(key, [
+        [name, Array.isArray(value) ? value.join(', ') : value],
+      ]);
     }
   }
   if (body === undefined || NO_BODY_STATUSES.has(status)) {
     // `empty` owns no media type, so the header rides along unchanged.
-    return HttpResponse.empty(status, { headers: all });
+    return HttpResponse.empty(status, { headers: [...fields.values()].flat() });
   }
-  return HttpResponse.json(status, body, { headers: rest, contentType });
+  const contentType = fields.get('content-type')?.[0]?.[1];
+  fields.delete('content-type');
+  return HttpResponse.json(status, body, {
+    headers: [...fields.values()].flat(),
+    contentType,
+  });
 }
 
 /**
@@ -105,25 +110,22 @@ export function resolvedErrorResponse(
   return resolved.response ?? errorResultResponse(resolved);
 }
 
-/** Errors a registry handler failed on (threw, or returned an invalid result). */
-const failedHandlerErrors = new WeakSet<object>();
+/** Requests a registry handler failed for (threw, or returned an invalid result). */
+const failedHandlerRequests = new WeakSet<object>();
 
-/** @internal Record that a registry handler failed on `err`, until `errorHandlerFailed` reads it. */
-export function markErrorHandlerFailed(err: unknown): void {
-  if (typeof err === 'object' && err !== null) {
-    failedHandlerErrors.add(err);
-  }
+/** @internal Record that a registry handler failed for `req`, until `errorHandlerFailed` reads it. */
+export function markErrorHandlerFailed(req: object): void {
+  failedHandlerRequests.add(req);
 }
 
 /**
- * @internal Did a registry handler fail on `err`? Such an error answers the
- * generic 500, never a caller's fallback response. The read clears the mark,
- * so the same error thrown again later is resolved afresh.
+ * @internal Did a registry handler fail for `req`? Its error answers the
+ * generic 500, never a caller's fallback response. Kept per request, so
+ * requests that throw the same error instance do not interfere. The read
+ * clears the mark.
  */
-export function errorHandlerFailed(err: unknown): boolean {
-  return (
-    typeof err === 'object' && err !== null && failedHandlerErrors.delete(err)
-  );
+export function errorHandlerFailed(req: object): boolean {
+  return failedHandlerRequests.delete(req);
 }
 
 /** The generic 500 answered for an error nothing in the registry resolved. */
