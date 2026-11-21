@@ -632,10 +632,10 @@ export function buildSubtreeFromSpec(
  * control flow, `warn` for the safety nets' schema-gap signal, `warn` default
  * for consumer entries). A handled error's log line rides into log shippers
  * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
- * Anything unresolved is a server-side defect: logged in full, answered with a
+ * Anything unresolved is a server-side defect: logged in full (a request
+ * `ValidationError` value-free, wherever it was thrown), answered with a
  * generic 500 — unless the caller passes the `unresolved` response (the
- * validation 400), which is a client error and not logged (value-free if a
- * failed handler turns it into the 500).
+ * validation 400), which is a client error and not logged.
  */
 async function answerError(
   app: IApp,
@@ -655,9 +655,11 @@ async function answerError(
   if (unresolved && !errorHandlerFailed(req)) {
     return unresolved;
   }
-  // A client error a handler failed on (that failure is logged with its
-  // stack): its payload can carry client keys, so it is logged value-free.
-  logger?.error(unresolved ? toLoggableError(err) : err);
+  // A request `ValidationError`'s payload can carry client keys and values, so
+  // it is logged value-free; anything else is logged in full.
+  logger?.error(
+    ValidationError.isValidationError(err) ? toLoggableError(err) : err,
+  );
   return serverErrorResponse(req);
 }
 
