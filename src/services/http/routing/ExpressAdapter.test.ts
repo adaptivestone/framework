@@ -727,26 +727,45 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     assert.strictEqual(res.listenerCount('pipe'), 0);
   });
 
-  it('leaves a dropped framework response alone while a stream is piped into res', async () => {
+  it('sends a late framework response after a stream piped into res was detached', async () => {
+    const produced = HttpResponse.json(200, { ok: true });
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, produced);
+    };
     const source = new PassThrough();
     const r = new RouteRegistry();
-    r.registerRoute('GET', '/x', {
+    r.registerRoute('POST', '/login', {
       handler: async (req: Request, res: Response) => {
         source.pipe(res);
-        builtInResponse(req, HttpResponse.json(200, { ok: true }));
+        builtIn(req); // neither awaited nor returned
       },
     });
     const { writer, write } = stubWriter();
+    const res = asExpressRes(makeRes());
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        res,
+        mock.fn(),
+      );
+      // Detached before it sent anything.
+      source.unpipe(res);
 
-    await createExpressAdapter(r, fakeApp, writer)(
-      makeReq('GET', '/x'),
-      asExpressRes(makeRes()),
-      mock.fn(),
-    );
-    await flush();
+      produce();
+      await flush();
 
-    assertNotCalled(write);
-    source.destroy();
+      assertCalledTimes(write, 1);
+      assert.strictEqual(write.mock.calls[0]?.arguments[0], produced);
+    } finally {
+      emitWarning.mock.restore();
+      source.destroy();
+    }
   });
 
   it('passes a writer failure to next(err)', async () => {

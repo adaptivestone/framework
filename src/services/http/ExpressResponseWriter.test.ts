@@ -277,6 +277,28 @@ describe('ExpressResponseWriter — empty and redirect', () => {
     assert.strictEqual(response.headers['content-length'], '0');
   });
 
+  it('empty: keeps the chunked framing a declared Trailer needs', async () => {
+    serve(
+      () => HttpResponse.empty(201),
+      (res) => {
+        res.setHeader('Trailer', 'x-checksum');
+        res.setHeader('Transfer-Encoding', 'chunked');
+      },
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 201);
+    assert.strictEqual(await handled, undefined);
+  });
+
+  it('empty: a 205 to HEAD states a zero length', async () => {
+    serve(() =>
+      HttpResponse.empty(205, { headers: { 'content-length': '17' } }),
+    );
+    const response = await requestRaw('HEAD');
+    assert.strictEqual(response.status, 205);
+    assert.strictEqual(response.headers['content-length'], '0');
+  });
+
   it('empty: HEAD keeps a stated Content-Length', async () => {
     serve(() =>
       HttpResponse.empty(200, { headers: { 'content-length': '17' } }),
@@ -814,12 +836,23 @@ describe('ExpressResponseWriter — native Web Response', () => {
     }
   });
 
-  it('keeps the encoding headers of a fetched Response with stacked codings', async () => {
+  it("treats a fetched Response's stacked codings as the runtime's fetch does", async () => {
     serve(() => upstream('https://upstream.test/data', 'gzip, br'));
     const fetched = await requestRaw();
-    assert.strictEqual(fetched.headers['content-encoding'], 'gzip, br');
-    assert.strictEqual(fetched.headers['content-length'], '44');
-    assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+    // Node's fetch decodes stacked codings; Bun's passes them on still encoded.
+    const kept = process.versions.bun !== undefined;
+    assert.strictEqual(
+      fetched.headers['content-encoding'],
+      kept ? 'gzip, br' : undefined,
+    );
+    assert.strictEqual(
+      fetched.headers['content-length'],
+      kept ? '44' : undefined,
+    );
+    assert.strictEqual(
+      fetched.headers['content-digest'],
+      kept ? 'sha-256=:AAAA:' : undefined,
+    );
     assert.strictEqual(fetched.text, body);
   });
 

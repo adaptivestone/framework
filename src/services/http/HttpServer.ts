@@ -38,7 +38,7 @@ import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
 import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import RequestParserMiddleware from './middleware/RequestParser.ts';
 import { HttpResponse } from './responses.ts';
-import { createExpressAdapter } from './routing/ExpressAdapter.ts';
+import { createExpressAdapter, failure } from './routing/ExpressAdapter.ts';
 import { RouteRegistry } from './routing/RouteRegistry.ts';
 
 export interface FrameworkRequest extends Request {
@@ -268,7 +268,9 @@ class HttpServer extends Base {
           'Not found',
         ),
       });
-      return this.responseWriter.write(notFound, req, res).catch(next);
+      return this.responseWriter
+        .write(notFound, req, res)
+        .catch((err) => next(failure(err)));
     });
   }
 

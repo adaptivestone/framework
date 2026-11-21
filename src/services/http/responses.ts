@@ -301,10 +301,11 @@ function empty<S extends number>(
  * Pass a Web `Response` through: its status, status text, headers and body
  * are sent as they are, except the framing headers the server sets itself
  * (`connection`, `transfer-encoding`, …). A `fetch()` response (non-empty
- * `url`) with a body, a status other than 206 and one coding `fetch` decodes
- * (`gzip`, `deflate`, `br`, `zstd`) also loses its upstream
- * `content-encoding`, `content-length` and digest headers, which describe the
- * encoded bytes; any other response is passed on as received, headers intact.
+ * `url`) with a body, a status other than 206 and only codings `fetch` decodes
+ * (`gzip`, `deflate`, `br`, `zstd`; under Bun a single one) also loses its
+ * upstream `content-encoding`, `content-length` and digest headers, which
+ * describe the encoded bytes; any other response is passed on as received,
+ * headers intact.
  * To forward the upstream bytes exactly as received (for example fetched with
  * decoding turned off), pass `new Response(upstream.body, upstream)`, which
  * has no `url`.

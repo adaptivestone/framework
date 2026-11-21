@@ -46,8 +46,8 @@ function warnDroppedResponse(entry: HandlerEntry): void {
   );
 }
 
-/** A failure for `next`: a falsy one would fall through to the 404. */
-function failure(reason: unknown): unknown {
+/** @internal A failure for `next`: a falsy one would fall through to the 404. */
+export function failure(reason: unknown): unknown {
   return (
     reason ||
     new Error(
@@ -184,7 +184,7 @@ export function createExpressAdapter(
         // `builtInResponse`).
         const { entry } = result;
         claimBuiltInResponse(req, res, (dropped) => {
-          if (!res.headersSent && !res.destroyed && piped.size === 0) {
+          if (!res.headersSent && !res.destroyed) {
             warnDroppedResponse(entry);
             // A late call runs outside the try below: a throw goes to `next` too.
             try {

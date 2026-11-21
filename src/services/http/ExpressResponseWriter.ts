@@ -196,19 +196,22 @@ async function render(
       // Dropped too: the fields `Connection` names (RFC 9110 7.6.1), and the
       // encoding, length and digest headers of a fetched response (non-empty
       // `url`) whose body `fetch` decoded: it has a body, is not a 206, and
-      // names one coding that `fetch` decodes. Stacked codings are not decoded
-      // by every runtime.
+      // every coding it names is one that `fetch` decodes. Bun's `fetch`
+      // decodes a single coding only; it passes stacked codings on encoded.
       const dropped = new Set(
         (native.headers.get('connection') ?? '')
           .split(',')
           .map((name) => name.trim().toLowerCase()),
       );
-      const coding = native.headers.get('content-encoding') ?? '';
+      const codings = (native.headers.get('content-encoding') ?? '')
+        .split(',')
+        .map((coding) => coding.trim().toLowerCase());
       if (
         native.url &&
         native.body &&
         native.status !== 206 &&
-        FETCH_DECODED_CODINGS.has(coding.trim().toLowerCase())
+        (codings.length === 1 || process.versions.bun === undefined) &&
+        codings.every((coding) => FETCH_DECODED_CODINGS.has(coding))
       ) {
         for (const name of ENCODED_BODY_HEADERS) {
           dropped.add(name);
@@ -237,25 +240,28 @@ async function render(
 }
 
 /**
- * End a response that has no body. A 204 or 304 drops its content headers.
- * Otherwise HEAD keeps its headers as given; any other method drops a
- * `Transfer-Encoding` and a `Content-Length` (stated or already on `res`)
- * becomes 0, so the client does not wait for bytes.
+ * End a response that has no body. A 204 or 304 drops its content headers; a
+ * 205 states a zero length and drops a `Transfer-Encoding`. Any other status
+ * keeps its `Transfer-Encoding`; outside HEAD a `Content-Length` (stated or
+ * already on `res`) becomes 0, so the client does not wait for bytes, and
+ * HEAD keeps its headers as given.
  */
 function endWithoutBody(req: Request, res: Response): void {
   if (res.statusCode === 204 || res.statusCode === 304) {
     res.removeHeader('Content-Type');
     res.removeHeader('Content-Length');
     res.removeHeader('Transfer-Encoding');
-  } else if (req.method !== 'HEAD') {
-    // Only when set: removing an absent one stops some runtimes adding the
-    // zero length themselves.
+  } else if (res.statusCode === 205) {
+    res.setHeader('Content-Length', '0');
+    // Only when set: removing an absent one changes the framing on some runtimes.
     if (res.getHeader('Transfer-Encoding') !== undefined) {
       res.removeHeader('Transfer-Encoding');
     }
-    if (res.getHeader('Content-Length') !== undefined) {
-      res.setHeader('Content-Length', '0');
-    }
+  } else if (
+    req.method !== 'HEAD' &&
+    res.getHeader('Content-Length') !== undefined
+  ) {
+    res.setHeader('Content-Length', '0');
   }
   res.end();
 }

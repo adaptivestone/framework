@@ -5,8 +5,14 @@
  */
 
 import assert from 'node:assert/strict';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, it, mock } from 'node:test';
-import type { NextFunction, Response } from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import { appInstance } from '../../helpers/appInstance.ts';
 import { noopLogger } from '../../helpers/logger.ts';
 import { stubI18n } from '../../tests/mocks.ts';
@@ -25,6 +31,45 @@ describe('HttpServer — 404 fallthrough', () => {
     assert.strictEqual(res.status, 404);
     const body = await res.json();
     assert.deepStrictEqual(body, { error: 'NOT_FOUND', message: 'Not found' });
+  });
+
+  it('passes a 404 write failure without a reason to the error sink', async () => {
+    const app = express();
+    const ctx = {
+      express: app,
+      // Replaces the 404 with a stream that fails without a reason.
+      responseWriter: new ExpressResponseWriter({
+        transform: () =>
+          HttpResponse.stream(
+            404,
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.error();
+              },
+            }),
+          ),
+      }),
+    };
+    HttpServer.prototype.add404Page.call(ctx as unknown as HttpServer);
+    const errors: unknown[] = [];
+    app.use(
+      (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+        errors.push(err);
+        res.status(500).end();
+      },
+    );
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/missing`);
+      assert.strictEqual(response.status, 500);
+      assert.strictEqual(errors.length, 1);
+      assert.ok(errors[0] instanceof Error);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });
 
