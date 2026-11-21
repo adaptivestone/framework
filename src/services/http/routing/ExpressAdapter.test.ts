@@ -435,6 +435,66 @@ describe('createExpressAdapter — error propagation', () => {
       await new Promise((resolve) => server.close(resolve));
     }
   });
+
+  /** Request `method /x` through an app whose error sink answers 500; the errors it saw. */
+  const requestWithErrorSink = async (
+    r: RouteRegistry,
+    method: string,
+    writer?: ExpressResponseWriter,
+  ) => {
+    const errors: unknown[] = [];
+    const server = http.createServer(
+      express()
+        .use(createExpressAdapter(r, fakeApp, writer))
+        .use(
+          (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+            errors.push(err);
+            res.status(500).end();
+          },
+        ),
+    );
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/x`, { method });
+      return { status: response.status, errors };
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  };
+  const failingStream = (reason?: unknown) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(reason);
+      },
+    });
+
+  it('answers a returned stream that fails with a falsy reason through the error path', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', {
+      handler: () => HttpResponse.stream(200, failingStream(false)),
+    });
+    const { status, errors } = await requestWithErrorSink(r, 'GET');
+    assert.strictEqual(status, 500);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0] instanceof Error);
+  });
+
+  it('answers a failed 405 write without a reason through the error path', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', { handler: () => HttpResponse.empty(204) });
+    const writer = new ExpressResponseWriter({
+      transform: (response) =>
+        response.status === 405
+          ? HttpResponse.stream(405, failingStream())
+          : response,
+    });
+    const { status, errors } = await requestWithErrorSink(r, 'POST', writer);
+    assert.strictEqual(status, 500);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0] instanceof Error);
+  });
 });
 
 describe('createExpressAdapter — returned HttpResponse', () => {
@@ -665,6 +725,28 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     assert.strictEqual(write.mock.calls[0]?.arguments[0], response);
     assertNotCalled(error);
     assert.strictEqual(res.listenerCount('pipe'), 0);
+  });
+
+  it('leaves a dropped framework response alone while a stream is piped into res', async () => {
+    const source = new PassThrough();
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', {
+      handler: async (req: Request, res: Response) => {
+        source.pipe(res);
+        builtInResponse(req, HttpResponse.json(200, { ok: true }));
+      },
+    });
+    const { writer, write } = stubWriter();
+
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('GET', '/x'),
+      asExpressRes(makeRes()),
+      mock.fn(),
+    );
+    await flush();
+
+    assertNotCalled(write);
+    source.destroy();
   });
 
   it('passes a writer failure to next(err)', async () => {

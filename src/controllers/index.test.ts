@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import {
   after,
   afterEach,
@@ -2158,6 +2159,7 @@ class ReturnedResponseController extends AbstractController {
         '/moved': this.moved,
         '/missing': this.missing,
         '/mixed': this.mixed,
+        '/unpiped': this.unpiped,
       },
     };
   }
@@ -2185,6 +2187,14 @@ class ReturnedResponseController extends AbstractController {
     res.status(200).json({ first: true });
     await new Promise((resolve) => setImmediate(resolve));
     return HttpResponse.json(200, { second: true });
+  }
+
+  async unpiped(_req: FrameworkRequest, res: Response): Promise<HttpResponse> {
+    // A proxy whose upstream failed before its first byte.
+    const upstream = new PassThrough();
+    upstream.pipe(res);
+    upstream.unpipe(res);
+    throw new HttpError(502, 'Upstream failed');
   }
 
   static get middleware() {
@@ -2280,6 +2290,17 @@ describe('ControllerManager — returned HttpResponse', () => {
     assert.deepStrictEqual(
       logged().map((r) => r.level),
       ['error'],
+    );
+  });
+
+  it('answers an error thrown after the handler unpiped its upstream', async () => {
+    const res = await fetch(getTestServerURL(`${base}/unpiped`), {
+      signal: AbortSignal.timeout(2000),
+    });
+    assert.strictEqual(res.status, 502);
+    assert.deepStrictEqual(await res.json(), { message: 'Upstream failed' });
+    assert.ok(
+      !capture.records.some((r) => /both wrote to res/.test(r.message)),
     );
   });
 });
@@ -2487,6 +2508,55 @@ describe('Request validation through the error-handler registry', () => {
 
     assert.ok(HttpResponse.is(returned));
     assert.strictEqual(returned.status, 500);
+    assertCalledTimes(error, 1);
+    const logged = inspect(error.mock.calls[0]?.arguments[0], { depth: 10 });
+    for (const text of ['client-key', 'per-field text', 'issues']) {
+      assert.ok(!logged.includes(text), `"${text}" is logged: ${logged}`);
+    }
+  });
+
+  it('logs a ValidationError thrown after the response started without its fields', async () => {
+    class ThrowsAfterSend extends AbstractController {
+      get routes() {
+        return { post: { '/check': { handler: this.check } } };
+      }
+      async check(
+        _req: FrameworkRequest,
+        res: Response,
+      ): Promise<HttpResponse> {
+        res.status(200).json({ started: true });
+        Object.assign(res, { headersSent: true });
+        throw new ValidationError({ 'client-key': 'per-field text' });
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const error = mock.fn();
+    const registry = new RouteRegistry();
+    new ControllerManager({
+      httpServer: { routeRegistry: registry, resolveError: async () => null },
+      logger: { child: () => ({ warn() {}, verbose() {}, error }) },
+    } as unknown as IApp).registerController(ThrowsAfterSend);
+    const handler = registry.match('POST', '/throwsaftersend/check')?.entry
+      ?.handler;
+    assert.ok(handler);
+    const next = mock.fn();
+
+    await handler(
+      {
+        body: {},
+        headers: {},
+        appInfo: { request: {}, query: {}, params: {} },
+      } as unknown as FrameworkRequest,
+      responseForHandler() as unknown as Response,
+      next,
+    );
+
+    assertCalledTimes(next, 1);
+    assert.ok(
+      ValidationError.isValidationError(next.mock.calls[0]?.arguments[0]),
+    );
     assertCalledTimes(error, 1);
     const logged = inspect(error.mock.calls[0]?.arguments[0], { depth: 10 });
     for (const text of ['client-key', 'per-field text', 'issues']) {

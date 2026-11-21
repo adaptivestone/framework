@@ -24,8 +24,9 @@ const responses: Records = shared[RECORDS];
  * the result); the adapter then sends it and warns once. It is kept under
  * `req`, `res`, `req.res` and `res.req`, so it is found if any is the
  * request's own (the override may pass a copy of `req`, a wrapper of `res`, or
- * both). The status is also shown on `res` and `req.res`, where such an
- * override reads it. Transitional: removed in v6.
+ * both). The status is also shown on `res` and `req.res` (`res.req.res` for
+ * a copy of `req` without one), where such an override reads it.
+ * Transitional: removed in v6.
  */
 export function builtInResponse<T extends HttpResponse>(
   req: object,
@@ -49,7 +50,8 @@ export function builtInResponse<T extends HttpResponse>(
 
   // An override may read the status after awaiting the built-in handler. Best
   // effort: a wrapper may expose a read-only status.
-  for (const transport of [res, own]) {
+  const ownRes = own ?? (res?.req as { res?: LegacyResponse } | undefined)?.res;
+  for (const transport of [res, ownRes]) {
     if (transport && !transport.headersSent) {
       try {
         transport.statusCode = response.status;

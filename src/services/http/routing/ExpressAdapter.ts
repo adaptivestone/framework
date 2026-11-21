@@ -7,6 +7,7 @@
  */
 
 import type { NextFunction, Request, Response } from 'express';
+import { describeThrown } from '../../../helpers/logger.ts';
 import { translateWithDefault } from '../../../helpers/translate.ts';
 import type { IApp } from '../../../server.ts';
 import { claimBuiltInResponse } from '../builtInResponse.ts';
@@ -45,6 +46,16 @@ function warnDroppedResponse(entry: HandlerEntry): void {
   );
 }
 
+/** A failure for `next`: a falsy one would fall through to the 404. */
+function failure(reason: unknown): unknown {
+  return (
+    reason ||
+    new Error(
+      `A handler or response write failed without a reason (${describeThrown(reason)})`,
+    )
+  );
+}
+
 export type ExpressAdapter = (
   req: Request,
   res: Response,
@@ -74,7 +85,9 @@ export function createExpressAdapter(
             'Malformed URL',
           ),
         });
-        return writer.write(malformed, req, res).catch(next);
+        return writer
+          .write(malformed, req, res)
+          .catch((err) => next(failure(err)));
       }
       return next(err);
     }
@@ -98,7 +111,9 @@ export function createExpressAdapter(
         },
         { headers: { Allow: result.allowedMethods.join(', ') } },
       );
-      return writer.write(notAllowed, req, res).catch(next);
+      return writer
+        .write(notAllowed, req, res)
+        .catch((err) => next(failure(err)));
     }
 
     // Populate request with match metadata before middleware runs.
@@ -133,23 +148,27 @@ export function createExpressAdapter(
           return;
         }
       }
-      // A stream piped into res (`pipe`, `pipeline`) may not have sent its
-      // headers yet; res is told of it by a `'pipe'` event.
-      let piped = false;
-      const onPipe = () => {
-        piped = true;
-      };
+      // The streams still piped into res (`pipe`, `pipeline`) when the handler
+      // returns. One may not have sent its headers yet: returning it as the
+      // response body is a write to res too.
+      const piped = new Set<unknown>();
+      const onPipe = (source: unknown) => piped.add(source);
+      const onUnpipe = (source: unknown) => piped.delete(source);
       res.on('pipe', onPipe);
+      res.on('unpipe', onUnpipe);
       let returned: unknown;
       try {
         returned = await Promise.resolve(result.entry.handler(req, res, next));
       } finally {
         res.off('pipe', onPipe);
+        res.off('unpipe', onUnpipe);
       }
       // Only a branded `HttpResponse` is rendered; any other return value is
       // the legacy `res` style, which has already answered (or will).
       if (HttpResponse.is(returned)) {
-        if (res.headersSent || piped) {
+        const pipedBody =
+          returned.kind === 'stream' && piped.has(returned.body);
+        if (res.headersSent || pipedBody) {
           // The response written to res stands. A returned stream that res may
           // be sending keeps running; one nobody reads is destroyed.
           app.logger?.error(
@@ -165,25 +184,21 @@ export function createExpressAdapter(
         // `builtInResponse`).
         const { entry } = result;
         claimBuiltInResponse(req, res, (dropped) => {
-          if (!res.headersSent && !res.destroyed) {
+          if (!res.headersSent && !res.destroyed && piped.size === 0) {
             warnDroppedResponse(entry);
             // A late call runs outside the try below: a throw goes to `next` too.
             try {
-              writer.write(dropped, req, res).catch(next);
+              writer
+                .write(dropped, req, res)
+                .catch((err) => next(failure(err)));
             } catch (err) {
-              next(err);
+              next(failure(err));
             }
           }
         });
       }
     } catch (err) {
-      // `next()` without an error would fall through to the 404.
-      next(
-        err ??
-          new Error(
-            `The handler or its response failed without a reason (${err})`,
-          ),
-      );
+      next(failure(err));
     }
   };
 }

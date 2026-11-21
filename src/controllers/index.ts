@@ -560,7 +560,7 @@ class ControllerManager extends Base {
         // A handler that already streamed can't be sent anything — hand off to
         // the error finalizer instead of crashing with ERR_HTTP_HEADERS_SENT.
         if (res.headersSent) {
-          logger?.error(err);
+          logger?.error(loggable(err));
           return next(err);
         }
         // Same registry walk as the validation catch above (see `answerError`).
@@ -655,12 +655,16 @@ async function answerError(
   if (unresolved && !errorHandlerFailed(req)) {
     return unresolved;
   }
-  // A request `ValidationError`'s payload can carry client keys and values, so
-  // it is logged value-free; anything else is logged in full.
-  logger?.error(
-    ValidationError.isValidationError(err) ? toLoggableError(err) : err,
-  );
+  logger?.error(loggable(err));
   return serverErrorResponse(req);
+}
+
+/**
+ * A caught request error as it is logged: a request `ValidationError`, whose
+ * payload can carry client keys and values, value-free; anything else in full.
+ */
+function loggable(err: unknown): unknown {
+  return ValidationError.isValidationError(err) ? toLoggableError(err) : err;
 }
 
 // ─── translation helpers (file-local) ────────────────────────────────

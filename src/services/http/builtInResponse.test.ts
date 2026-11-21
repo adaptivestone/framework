@@ -242,6 +242,24 @@ it('bridges a response passed a copied request without res and a wrapper of res'
   ]);
 });
 
+it('shows the status on res when passed a copied request without res and a wrapper of res', async () => {
+  const health = new Health(app, '');
+  let status: number | undefined;
+  const written = await dispatch(
+    'GET',
+    async (req: FrameworkRequest, res: Response) => {
+      const forwarded = Object.assign({}, req);
+      delete forwarded.res;
+      await health.live(forwarded, Object.create(res));
+      status = res.statusCode;
+    },
+  );
+  assert.deepStrictEqual(written, [
+    HttpResponse.json(401, { message: 'Unauthorized' }),
+  ]);
+  assert.strictEqual(status, 401);
+});
+
 it('claims a late response passed a copied request without res and a wrapper of res', async () => {
   const home = new Home(app, '');
   const ready = Promise.withResolvers<void>();
