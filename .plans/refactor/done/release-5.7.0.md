@@ -531,6 +531,50 @@ test (the `ExpressResponseWriter` memory test, timed out at load average 17)
 passed twice in isolation. Bun 1.4.4 1149/1149, Biome, both TypeScript checks,
 packaging smoke, and the Bun packed consumer against a disposable `mongo:8`.
 
+### Second app report (2026-11-22)
+
+A second app moving onto 5.6.1 and 5.7.0 reported seven more problems
+(TH1–TH7), all present in 5.6.1. FW28, added to the first report after its
+triage, was checked with them.
+
+Fixed, each with a test that fails without it:
+
+- TH1: after the HTTP drain a cluster worker closed IPC with
+  `process.disconnect()`, and Node exits a worker at once on that, because
+  only `cluster.worker.disconnect()` marks the exit as voluntary. The async
+  `'shutdown'` listeners (redis quit, mongoose close, logger flush) were cut
+  off while the exit reported 0. A cluster worker now calls
+  `cluster.worker.disconnect()`; `emit('shutdown')` is unchanged. Same on Bun
+  1.4.4. A worker now drains like a single process: a SIGTERM right after
+  boot waits for the timing-equalizer hash, and a leaked handle exits 1 after
+  the 10 s force timer instead of 0 at once (upgrade note in the README).
+- TH2: a malformed `redis.url` makes the Redis client throw when built. The
+  limiter keeps the misconfiguration 500 (as for a missing `@redis/client`);
+  its error now names `redis.url`. Failing fast at boot or failing open is an
+  open decision in the backlog card.
+- TH5: a worker that exits with code 0 outside a shutdown is logged at `warn`
+  with the number left (was `info`). A restart option is in the backlog card.
+- FW28: the files of one multipart field keep the send order; Formidable
+  listed them as their writes finished.
+
+Not taken, now in
+[app-upgrade-findings](../queued/app-upgrade-findings.md) with the items the
+first report left open: TH3 (per-request rate limits), TH4 (duplicate-key
+409), TH6 (process info in readiness), TH7 (exported password policy).
+
+Review: an Opus reviewer checked that each new test fails on the old code
+and passes with the fix, probed `cluster.worker.disconnect()` on Node 26 and
+Bun 1.4.4 (no hang when the primary is gone; pm2 7 never reads
+`exitedAfterDisconnect`), and found no blocker. Its text note (pm2's
+`kill_timeout` or a short `shutdownTimeoutMs` kills a worker before the
+10 s timer) is in the CHANGELOG and README.
+
+Verification (2026-11-22), in a clean copy of the branch: Node 26.13.1
+1178/1178 with Redis and no skips, Biome, both TypeScript checks, packaging
+smoke, and the Bun packed consumer against a disposable `mongo:8`. Bun 1.4.4:
+1145 of 1146; the one failure was a setup-hook timeout in
+`I18n.test.ts` at load average 64, and the file passed twice in isolation.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,

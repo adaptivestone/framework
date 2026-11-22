@@ -125,6 +125,12 @@ working. Check these when you upgrade:
   no longer sees them.
 - A thrown `HttpError` with a 5xx status is logged at `error` (other statuses
   stay at `verbose`), so it now reaches Sentry at the default level.
+- Cluster workers (`runCluster`, pm2 cluster mode) finish their `'shutdown'`
+  teardown before they exit, as a single process does. A worker that keeps a
+  handle open (a timer or a socket that is never closed) now exits with code 1
+  after 10 seconds instead of at once with 0, unless the process manager kills
+  it first (pm2's `kill_timeout`, or a `shutdownTimeoutMs` below 10 seconds);
+  close such handles in a `'shutdown'` listener.
 - An `application/octet-stream` body above `http.requestParser.maxFileSize`
   (20 MB by default) is answered with 413; 5.6.1 accepted any size. To accept
   larger bodies, raise `maxFileSize` and `maxTotalFileSize` in your app's
