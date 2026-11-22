@@ -171,6 +171,16 @@ class RequestParser extends AbstractMiddleware {
     const openedFiles: Array<{ filepath: string }> = [];
     form.on('fileBegin', (_name, file) => {
       openedFiles.push(file as unknown as { filepath: string });
+      // Formidable handles a temp-file write error (disk full, missing
+      // uploadDir) for multipart parts only; for an octet-stream body it was
+      // an uncaught error that crashed the process. Fail the parse instead.
+      if (isOctetStream) {
+        (
+          file as unknown as {
+            on(event: 'error', listener: (err: Error) => void): void;
+          }
+        ).on('error', (err) => form.emit('error', err));
+      }
     });
     let cleaned = false;
     const cleanup = () => {

@@ -329,6 +329,17 @@ d\r
       }
     });
 
+    it('answers an octet-stream temp-file write error with 400 instead of crashing', async () => {
+      const { status } = await postToParser({
+        body: 'binary',
+        contentType: 'application/octet-stream',
+        params: {
+          uploadDir: path.join(os.tmpdir(), `rp-missing-${Date.now()}`, 'x'),
+        },
+      });
+      assert.strictEqual(status, 400);
+    });
+
     it('bounds an octet-stream body by maxTotalFileSize when it is lower', async () => {
       const { status } = await postToParser({
         body: 'x'.repeat(4096),
