@@ -11,14 +11,19 @@ let deprecationWarned = false;
  * Validator for an uploaded file (yup-specific).
  *
  * @deprecated Since 5.0.0-beta.51 — `YupFile` will be removed in v6. Validate
- * files with the framework's vendor-neutral `File` type and your validator's
- * `instanceof` idiom instead (no yup required). A file field always arrives as
- * an array, so validate an array of `File`:
+ * files with the framework's vendor-neutral `File` type and an `instanceof`
+ * check instead (no yup required). A file field always arrives as an array;
+ * check the array as a whole, as `YupFile` does, so an error stays under the
+ * field name (a per-element check reports `avatar[0]`, not `avatar`):
  *
  *   import { File } from '@adaptivestone/framework/types.js';
- *   // zod:     z.array(z.instanceof(File))
- *   // valibot: v.array(v.instance(File))
- *   // yup:     array().of(mixed().test('file', 'not a file', (v) => v instanceof File))
+ *   const files = (v: unknown) => Array.isArray(v) && v.every((f) => f instanceof File);
+ *   // zod:     z.custom<File[]>(files, 'not a file')
+ *   // valibot: v.custom<File[]>(files, 'not a file')
+ *   // yup:     mixed<File[]>().test('file', 'not a file', files)
+ *
+ * A missing field fails these checks; for an optional one, let `files` also
+ * accept `undefined`.
  *
  * @example
  * request: yup.object().shape({
@@ -36,7 +41,7 @@ class YupFile extends Schema {
     if (!deprecationWarned) {
       deprecationWarned = true;
       process.emitWarning(
-        'YupFile is deprecated and will be removed in v6. Validate uploaded files with the `File` export from "@adaptivestone/framework/types.js" and your validator\'s instanceof idiom. A file field arrives as an array, so validate an array of `File` (e.g. z.array(z.instanceof(File))).',
+        "YupFile is deprecated and will be removed in v6. Validate uploaded files with the `File` export from \"@adaptivestone/framework/types.js\" and an instanceof check. A file field arrives as an array; check the array as a whole so errors stay under the field name (e.g. mixed().test('file', 'not a file', (v) => Array.isArray(v) && v.every((f) => f instanceof File))).",
         { type: 'DeprecationWarning', code: 'ASF_DEP_YUPFILE' },
       );
     }
