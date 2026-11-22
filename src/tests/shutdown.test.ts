@@ -377,6 +377,27 @@ describe('graceful shutdown + listen failure (doc 12)', () => {
     assertTextMatch(getOutput(), /PRIMARY_FINISHED/);
   });
 
+  it('lets a clustered worker finish its async shutdown teardown', {
+    timeout: 40000,
+  }, async () => {
+    const port = await getFreePort();
+    const { child, getOutput } = spawnClusterFixture(port);
+    running.push(child);
+
+    await waitForMarker(child, getOutput, /SERVER_LISTENING:/);
+    child.kill('SIGTERM');
+
+    const { code, signal } = await waitForExit(child, getOutput);
+    assert.strictEqual(code, 0, getOutput());
+    assert.strictEqual(signal, null);
+    // Closing the IPC channel must not exit the worker before its teardown
+    // ends, and the primary sees a voluntary exit.
+    assertTextMatch(
+      getOutput(),
+      /SHUTDOWN_TEARDOWN_DONE:\d+\n[\s\S]*WORKER_EXITED:0:null:true\n[\s\S]*PRIMARY_FINISHED/,
+    );
+  });
+
   it('a second server on a taken port exits non-zero (no zombie)', {
     timeout: 40000,
   }, async () => {

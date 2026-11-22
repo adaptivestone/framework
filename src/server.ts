@@ -1,3 +1,4 @@
+import cluster from 'node:cluster';
 import EventEmitter from 'node:events';
 import path from 'node:path';
 import { hrtime, loadEnvFile } from 'node:process';
@@ -385,11 +386,18 @@ class Server {
         // leaked handle is force-killed (code 1) by the timer above.
         this.app.events.emit('shutdown');
         process.exitCode = 0;
-        // A cluster worker's IPC channel is itself a live handle. Close it
-        // after HTTP has drained and teardown has started so the primary can
-        // observe the worker's clean exit without waiting for the force timer.
+        // An IPC channel (cluster worker, forked child) is itself a live
+        // handle. Close it after HTTP has drained and teardown has started so
+        // the parent can observe the clean exit without waiting for the force
+        // timer. A cluster worker goes through `cluster.worker.disconnect()`:
+        // on a bare `process.disconnect()` Node exits the worker at once,
+        // cutting the teardown off.
         if (process.connected) {
-          process.disconnect?.();
+          if (cluster.worker) {
+            cluster.worker.disconnect();
+          } else {
+            process.disconnect?.();
+          }
         }
       });
     }
