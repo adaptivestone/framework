@@ -437,9 +437,6 @@ class User extends BaseModel {
       ) {
         const timestamp = new Date();
         timestamp.setDate(timestamp.getDate() + 30);
-        if (!this.email) {
-          throw new Error('Email is required');
-        }
         const token = createRandomToken();
         if (!this.sessionTokens) {
           clearHydratedArray(this, 'sessionTokens');
