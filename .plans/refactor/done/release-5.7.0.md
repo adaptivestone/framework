@@ -442,6 +442,95 @@ Node 26.13.1 1141/1141 with Redis and no skips, Bun 1.4.4 1115/1115, Biome,
 both TypeScript checks, packaging smoke, and the Bun packed consumer against a
 disposable `mongo:8`.
 
+### Older issues fixed before release (2026-11-22)
+
+An app moving onto 5.6.1 reported 25 framework problems (FW1–FW25), all
+present in 5.6.1 and unchanged by 5.7.0. The owner chose to fix the real,
+small ones in 5.7.0, a minor release, rather than wait. Each fix has a test
+that fails without it.
+
+Fixed:
+
+- FW2: with `ip` disabled, a request lacking every enabled identity shares the
+  route's bucket (the docs' login example did this for logged-out callers).
+  Owner's decision: warn once per mount, do not change the key; the docs
+  example is corrected. A mount with every identity disabled does not warn.
+- FW5: a 5xx `HttpError` logs at `error` (was `verbose` for every status).
+- FW6: a `'beforeShutdown'` event before the HTTP drain: the server stops
+  accepting first (a reconnecting client cannot hold the drain), listeners
+  are called as `emit` calls them and awaited for at most 3 s; open
+  WebSockets no longer hold the drain until the forced exit.
+- FW9: codegen warns about an annotated `get routes()` with schemas and
+  suggests `satisfies RouteParams` (a golden fixture covers it).
+- FW15: `User.generateToken` no longer requires an email.
+- FW17: `ASF_DEP_USEROLD` only when the app uses `UserOld`.
+- FW23: the `ru` locale has every framework key; a test checks every
+  non-English locale against the keys the source uses. `en` stays
+  `defaultValue`-only (see `i18n-default-values.md`).
+- FW25: the timing-equalizer hash is computed when the HTTP server starts.
+- FW26: a list or object sent to a yup `string().trim()` field answers the
+  validation 400 (a `TypeError` is re-checked without transforms; other
+  errors stay 500, so an outage inside a `.test()` is not re-run).
+- FW27: yup issue params drop `resolved` (a `ref()`'s values, such as the
+  password a `repeatPassword` must match), `spec` and `disableStackTrace`.
+- FW10: the exported `File` type has the upload fields (it resolved to the
+  global web `File`); the advice checks the file array as a whole, so errors
+  stay under the field name.
+- Found while checking this batch: an `application/octet-stream` body had no
+  size limit. 5.6.1 excluded it from `maxFieldsSize` so that `maxFileSize`
+  would apply, but Formidable checks file limits only on multipart parts.
+  `RequestParser` now bounds it by `maxFileSize` (or `maxTotalFileSize`, if
+  lower), for a declared length and for a streamed body.
+- Text: `YupFile`'s replacement advice (FW10), the parser-limits note (FW4),
+  the codegen command in the generated header (FW9).
+
+Review of this batch: Astra 6.2 and Sol 6.2 (max effort) and an Opus reviewer
+read `b7f0591..70d50b2` and the triage. Fixed from their findings, each with
+a test: `beforeShutdown` called listeners without the emitter as `this` and
+left `once` listeners registered, and accepted new connections while
+listeners ran (a reconnecting SSE client held the drain); the exported
+`RegisteredErrorHandler.logLevel` had become a union with a function (now a
+plain level plus an internal `logLevelFor`); the limiter warning missed a
+user without an `id`; the codegen warning now says an annotation _can_
+widen. FW3 was reverted (below). The release text was corrected: the `ru`
+catalog is not loaded for apps (copy its keys), the warm-up costs one hash
+per process and an early login can wait for it, and committed generated
+files need regenerating once.
+
+Not taken:
+
+- FW3: a framework `ValidationError` thrown from a handler stays a 500, as in
+  5.6.1. It was briefly a 400, but the third review of this batch showed a
+  handler that validates server-side data (an upstream reply, a stored
+  record) would then send those values to the client, unlogged; translation,
+  route middleware and directly registered routes also differed. Client field
+  errors from a handler use `BadRequestError` with `errors`; the docs say so.
+- FW19: `TLogConfig.redact` stays optional. An app's `config/log.ts` replaces
+  the framework file, so `redact` can be absent; `appInfo.i18n` stays optional
+  on `FrameworkRequest`, which types the request before the I18n middleware.
+- Features or policy, for 5.8 or later: FW1 (rewriting error messages and
+  stacks in logs, with the body-parser and Mongoose log lines above), FW7
+  (crash on unhandled rejection), FW8 (log fields on the console), FW11
+  (limiter normalizers, failure-only counting, backoff), FW12 (`i18nParams`),
+  FW13 (an `HttpError` as a handler result), FW14 (Health `checks()`), FW15's
+  TTL and metadata, FW16's test options, FW20 (more `HttpError` subclasses),
+  FW21 (codes on the built-in `Auth` answers), FW22 (OpenAPI responses,
+  planned for 5.8), and one list for the middleware codes `AUTH001` and
+  `NO_ACCESS`.
+- With the middleware rework: FW4 (per-route body limits, parsing after
+  routing and auth).
+- Later: FW18 (importable commands, required indexes).
+- Docs only: FW13's recipe import, FW16's test-harness differences, FW24.
+- From the review, for 5.8: config types taken from runtime values (FW9's
+  second half), an `HttpError` returned from a registry handler, an opt-out
+  for the warm-up hash; a locale test for stale extra keys.
+
+Verification after these fixes (2026-11-22), in a clean copy of the branch:
+Node 26.13.1 with Redis and no skips, 1174 of 1175 passed; the one cancelled
+test (the `ExpressResponseWriter` memory test, timed out at load average 17)
+passed twice in isolation. Bun 1.4.4 1149/1149, Biome, both TypeScript checks,
+packaging smoke, and the Bun packed consumer against a disposable `mongo:8`.
+
 ## Files
 
 - Responses: `src/services/http/responses.ts`, `ResponseWriter.ts`,

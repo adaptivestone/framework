@@ -123,6 +123,21 @@ working. Check these when you upgrade:
 - The `Auth` answers without a body (register 201, verify and recover 200) no
   longer send `Content-Type: application/json`, and an Express `json replacer`
   no longer sees them.
+- A thrown `HttpError` with a 5xx status is logged at `error` (other statuses
+  stay at `verbose`), so it now reaches Sentry at the default level.
+- An `application/octet-stream` body above `http.requestParser.maxFileSize`
+  (20 MB by default) is answered with 413; 5.6.1 accepted any size. To accept
+  larger bodies, raise `maxFileSize` and `maxTotalFileSize` in your app's
+  `config/http.ts`.
+- A rate limiter with `ip` disabled warns once when a request without any
+  enabled identity shares the route's bucket. If you see it, enable `ip` in
+  `consumeKeyComponents`.
+- `File` from `types.js` now types an upload (`filepath`, `mimetype`,
+  `originalFilename`, `size`). Code that read web `File` members from it, which
+  were never there at runtime, no longer compiles.
+- Generated `*.routes.gen.ts` files have a new header line. If you commit
+  them and run `node src/cli.ts generatetypes --check` in CI, regenerate them
+  once after upgrading.
 
 ## Upgrade notes (5.6.1)
 
