@@ -251,7 +251,8 @@ class HttpServer extends Base {
                 body: response.kind === 'json' ? response.body : undefined,
               }
             : (result as ErrorHandlerResult);
-          return { ...legacy, response, logLevel: entry.logLevel };
+          const logLevel = entry.logLevelFor?.(err) ?? entry.logLevel;
+          return { ...legacy, response, logLevel };
         }
       }
     }

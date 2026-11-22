@@ -85,7 +85,7 @@ const warnBodyArgument = makeOncePerClassWarner(
  * (`HttpServer.registerErrorHandler`) via a built-in mapper:
  * `status` + `{ error?: code, message, errors? }` (message translated via
  * `i18nKey`, field errors like request validation) or a custom `body`, logged
- * at `verbose` (control flow, not a defect).
+ * at `verbose` (control flow, not a defect), or `error` for a 5xx.
  * Subclass for other statuses, or construct the base directly:
  * `new HttpError(422, 'Unprocessable')`.
  */

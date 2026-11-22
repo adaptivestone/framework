@@ -162,6 +162,8 @@ export interface RegisteredErrorHandler {
   errorClass: abstract new (...args: never[]) => RegistrableError;
   handler: ErrorHandlerFn<RegistrableError>;
   logLevel: ErrorLogLevel;
+  /** @internal Picks the level per error; wins over `logLevel`. */
+  logLevelFor?: (err: RegistrableError) => ErrorLogLevel;
 }
 
 type MongooseFieldError =
@@ -437,7 +439,8 @@ export function matchedClientCastError(
  * handlers ("yours win"):
  *   1. `HttpError` → its own status, headers and
  *      `body ?? { error?: code, message }`, message translated via `i18nKey`;
- *      `verbose` (deliberate control flow, not a defect).
+ *      `verbose` (deliberate control flow, not a defect), `error` for a 5xx
+ *      (a server failure).
  *   2. Escaped Mongoose `ValidationError` → the safety net above; `warn`
  *      (signals a route schema missing a constraint the model enforces).
  *   3. Standalone Mongoose `CastError` → {@link matchedClientCastError}; `warn`
@@ -484,6 +487,8 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
         return { status, body, ...headers };
       },
       logLevel: 'verbose',
+      logLevelFor: (err) =>
+        (err as HttpError).status >= 500 ? 'error' : 'verbose',
     },
     {
       errorClass: mongoose.Error.ValidationError,

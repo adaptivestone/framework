@@ -8,6 +8,7 @@ import { ValidationError } from '../validate/ValidationError.ts';
 import {
   builtInErrorHandlers,
   type ErrorHandlerResult,
+  type ErrorLogLevel,
   errorHandlerFailed,
   errorResultResponse,
   markErrorHandlerFailed,
@@ -314,6 +315,13 @@ describe('builtInErrorHandlers', () => {
       await httpHandler?.handler(new HttpError(418, 'Teapot'), request()),
       { status: 418, body: { message: 'Teapot' } },
     );
+  });
+
+  it('keeps logLevel a plain ErrorLogLevel', () => {
+    // Also a compile-time check (`npm run check:types:tests`).
+    const level: ErrorLogLevel | undefined =
+      builtInErrorHandlers()[0]?.logLevel;
+    assert.strictEqual(level, 'verbose');
   });
 
   describe('coded HttpError', () => {

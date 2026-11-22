@@ -1642,6 +1642,63 @@ describe('HttpServer.resolveError — registry resolution', () => {
     });
   });
 
+  it('built-in HttpError mapper: a 5xx logs at error', async () => {
+    const resolved = await httpServer().resolveError(
+      new HttpError(502, { message: 'Upstream failed', code: 'UPSTREAM_DOWN' }),
+      fakeReq(),
+    );
+    assertResolved(resolved, {
+      status: 502,
+      body: { error: 'UPSTREAM_DOWN', message: 'Upstream failed' },
+      logLevel: 'error',
+    });
+  });
+
+  it('a 5xx HttpError a handler threw is logged at error with its code and message', async () => {
+    class ThrowsUpstream extends AbstractController {
+      get routes() {
+        return { get: { '/check': { handler: this.check } } };
+      }
+      async check(): Promise<HttpResponse> {
+        throw new HttpError(502, {
+          message: 'Upstream failed',
+          code: 'UPSTREAM_DOWN',
+        });
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const error = mock.fn();
+    const verbose = mock.fn();
+    const registry = new RouteRegistry();
+    new ControllerManager({
+      httpServer: {
+        routeRegistry: registry,
+        resolveError: (err: unknown, req: FrameworkRequest) =>
+          httpServer().resolveError(err, req),
+      },
+      logger: { child: () => ({ warn() {}, verbose, error }) },
+    } as unknown as IApp).registerController(ThrowsUpstream);
+    const handler = registry.match('GET', '/throwsupstream/check')?.entry
+      ?.handler;
+    assert.ok(handler);
+
+    const returned = await handler(
+      fakeReq(),
+      responseForHandler() as unknown as Response,
+      () => {},
+    );
+
+    assert.ok(HttpResponse.is(returned));
+    assert.strictEqual(returned.status, 502);
+    assertCalledTimes(verbose, 0);
+    assertCalledTimes(error, 1);
+    const logged = error.mock.calls[0]?.arguments[0] as HttpError;
+    assert.strictEqual(logged.message, 'Upstream failed');
+    assert.strictEqual(logged.code, 'UPSTREAM_DOWN');
+  });
+
   it('built-in mongoose entry delegates to the safety-net matching (warn level)', async () => {
     const vErr = new mongoose.Error.ValidationError();
     // A raw maxlength template that echoes the value — the safety net must
@@ -2492,5 +2549,71 @@ describe('Request validation through the error-handler registry', () => {
     const res = await check({ name: 'Ada' });
     assert.strictEqual(res.status, 200);
     assert.deepStrictEqual(await res.json(), { name: 'Ada' });
+  });
+
+  it('a ValidationError the handler threw answers 500 unless a registered handler resolves it', async () => {
+    // The handler may have validated server-side data, so its fields are
+    // never echoed as a client 400.
+    class ThrowsValidation extends AbstractController {
+      get routes() {
+        return { post: { '/check': { handler: this.check } } };
+      }
+      async check(): Promise<HttpResponse> {
+        throw new ValidationError({ name: 'name is taken' });
+      }
+      static get middleware() {
+        return new Map();
+      }
+    }
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    const error = mock.fn();
+    const registry = new RouteRegistry();
+    new ControllerManager({
+      httpServer: {
+        routeRegistry: registry,
+        resolveError: (err: unknown, req: FrameworkRequest) =>
+          server.resolveError(err, req),
+      },
+      logger: { child: () => ({ warn() {}, verbose() {}, error }) },
+    } as unknown as IApp).registerController(ThrowsValidation);
+    const handler = registry.match('POST', '/throwsvalidation/check')?.entry
+      ?.handler;
+    assert.ok(handler);
+    const call = () =>
+      handler(
+        {
+          body: {},
+          headers: {},
+          appInfo: { request: {}, query: {}, params: {} },
+        } as unknown as FrameworkRequest,
+        responseForHandler() as unknown as Response,
+        () => {},
+      );
+
+    const unresolved = await call();
+    assert.ok(HttpResponse.is(unresolved) && unresolved.kind === 'json');
+    assert.strictEqual(unresolved.status, 500);
+    assert.strictEqual(
+      (unresolved.body as { error?: string }).error,
+      'SERVER_ERROR',
+    );
+    // Logged in full, as any unresolved handler error.
+    assertCalledTimes(error, 1);
+    assert.ok(
+      ValidationError.isValidationError(error.mock.calls[0]?.arguments[0]),
+    );
+
+    unregisters.push(
+      server.registerErrorHandler(ValidationError, (err) =>
+        HttpResponse.json(422, { problems: err.message }),
+      ),
+    );
+    const resolved = await call();
+    assert.ok(HttpResponse.is(resolved) && resolved.kind === 'json');
+    assert.strictEqual(resolved.status, 422);
+    assert.deepStrictEqual(resolved.body, {
+      problems: { name: ['name is taken'] },
+    });
   });
 });

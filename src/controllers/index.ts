@@ -629,13 +629,13 @@ export function buildSubtreeFromSpec(
  * consumer-registered handlers, then the built-ins (`HttpError` mapper,
  * mongoose safety nets) — the first `instanceof` match returning non-null
  * wins, logged at the entry's own level (`verbose` for deliberate HttpError
- * control flow, `warn` for the safety nets' schema-gap signal, `warn` default
- * for consumer entries). A handled error's log line rides into log shippers
- * (Sentry, retention), so it is rebuilt value-free by `toLoggableError` first.
- * Anything unresolved is a server-side defect: logged in full, answered with a
- * generic 500 — unless the caller passes the `unresolved` response (the
- * validation 400), which is a client error and not logged (value-free if a
- * failed handler turns it into the 500).
+ * control flow, `error` for a 5xx one, `warn` for the safety nets' schema-gap
+ * signal, `warn` default for consumer entries). A handled error's log line
+ * rides into log shippers (Sentry, retention), so it is rebuilt value-free by
+ * `toLoggableError` first. Anything unresolved is a server-side defect: logged
+ * in full, answered with a generic 500 — unless the caller passes the
+ * `unresolved` response (the validation 400), which is a client error and not
+ * logged (value-free if a failed handler turns it into the 500).
  */
 async function answerError(
   app: IApp,
