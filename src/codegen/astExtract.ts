@@ -75,6 +75,9 @@ export interface ExtractResult {
   extendsName?: string | null;
   imports: Record<string, ImportInfo>;
   routes: RouteInfo[];
+  /** `get routes()` has a return type annotation, which widens the literal
+   * shape the generated request types navigate. */
+  routesAnnotated?: boolean;
   /** `undefined` = no own middleware (inherits); `[]` is a real empty map. */
   middleware?: MiddlewareScope[];
   /** A `static get middleware()` is defined here but isn't a literal `new Map([…])`
@@ -187,6 +190,8 @@ export function extractController(
     extendsName,
     imports,
     routes,
+    routesAnnotated:
+      routesNode?.kind === 'get' && !!routesNode.value.returnType,
     middleware,
     middlewareDynamic: !!mwFailed,
     httpPath,
