@@ -133,10 +133,11 @@ const clearHydratedArray = <T extends object>(
 
 /**
  * Augmentation point so `req.appInfo.user` follows a project's OWN `User` model
- * when it replaces the framework's. `npm run gen` emits this automatically into
- * `genTypes.d.ts` (mirroring how it types `app.getModel('User')`); declare it by
- * hand only if you don't run codegen. `User` must be the hydrated DOCUMENT type,
- * so wrap the model class in `InstanceType<GetModelTypeFromClass<…>>`:
+ * when it replaces the framework's. `node src/cli.ts generatetypes` emits this
+ * automatically into `genTypes.d.ts` (mirroring how it types
+ * `app.getModel('User')`); declare it by hand only if you don't run codegen.
+ * `User` must be the hydrated DOCUMENT type, so wrap the model class in
+ * `InstanceType<GetModelTypeFromClass<…>>`:
  *
  *   import type { GetModelTypeFromClass } from '@adaptivestone/framework/modules/BaseModel.js';
  *   declare module '@adaptivestone/framework/models/User.js' {

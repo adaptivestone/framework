@@ -4,13 +4,14 @@
  * `File`. Import this instead of the concrete parser class so your file
  * validation survives that swap untouched.
  *
- * Validate uploads with your validator's idiomatic `instanceof` check:
+ * Validate uploads with your validator's idiomatic `instanceof` check. A file
+ * field always arrives as an array, so validate an array of `File`:
  *
  *   import { File } from '@adaptivestone/framework/types.js';
- *   // zod:     z.instanceof(File)
- *   // valibot: v.instance(File)
- *   // arktype: type.instanceOf(File)
- *   // yup:     mixed().test('file', 'not a file', (v) => v instanceof File)
+ *   // zod:     z.array(z.instanceof(File))
+ *   // valibot: v.array(v.instance(File))
+ *   // arktype: type.instanceOf(File).array()
+ *   // yup:     array().of(mixed().test('file', 'not a file', (v) => v instanceof File))
  *
  * `File` is both a value (for `instanceof`) and a type (for annotations),
  * because it is a class.

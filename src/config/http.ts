@@ -28,8 +28,9 @@ export default {
   },
   // Limits for request parsing (formidable). Conservative defaults bound
   // unauthenticated requests (formidable's own defaults allow ~200 MB/file with
-  // no cap). Copy this file into your app to raise them, or pass per-mount
-  // params to the RequestParser middleware.
+  // no cap). To change them, copy this file into your app: the global parser
+  // runs before any route and answers 413 first, so per-mount RequestParser
+  // params cannot raise them.
   // NOTE: `maxFieldsSize` doubles as the total body ceiling for JSON and
   // urlencoded requests — formidable only enforces it on multipart field data,
   // so RequestParser applies it to the whole body for those content types.

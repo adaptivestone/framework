@@ -12,12 +12,13 @@ let deprecationWarned = false;
  *
  * @deprecated Since 5.0.0-beta.51 — `YupFile` will be removed in v6. Validate
  * files with the framework's vendor-neutral `File` type and your validator's
- * `instanceof` idiom instead (no yup required):
+ * `instanceof` idiom instead (no yup required). A file field always arrives as
+ * an array, so validate an array of `File`:
  *
  *   import { File } from '@adaptivestone/framework/types.js';
- *   // zod:     z.instanceof(File)
- *   // valibot: v.instance(File)
- *   // yup:     mixed().test('file', 'not a file', (v) => v instanceof File)
+ *   // zod:     z.array(z.instanceof(File))
+ *   // valibot: v.array(v.instance(File))
+ *   // yup:     array().of(mixed().test('file', 'not a file', (v) => v instanceof File))
  *
  * @example
  * request: yup.object().shape({
@@ -35,7 +36,7 @@ class YupFile extends Schema {
     if (!deprecationWarned) {
       deprecationWarned = true;
       process.emitWarning(
-        'YupFile is deprecated and will be removed in v6. Validate uploaded files with the `File` export from "@adaptivestone/framework/types.js" and your validator\'s instanceof idiom (e.g. z.instanceof(File)).',
+        'YupFile is deprecated and will be removed in v6. Validate uploaded files with the `File` export from "@adaptivestone/framework/types.js" and your validator\'s instanceof idiom. A file field arrives as an array, so validate an array of `File` (e.g. z.array(z.instanceof(File))).',
         { type: 'DeprecationWarning', code: 'ASF_DEP_YUPFILE' },
       );
     }

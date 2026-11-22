@@ -100,7 +100,7 @@ export async function generateAll(
     const drift = await collectDrift(outputs, plan.orphans);
     if (drift.length > 0) {
       throw new Error(
-        `generatetypes --check: ${drift.length} generated file(s) out of date — run \`npm run gen\`:\n${drift.join('\n')}`,
+        `generatetypes --check: ${drift.length} generated file(s) out of date — run \`node src/cli.ts generatetypes\`:\n${drift.join('\n')}`,
       );
     }
     logger?.info?.('generatetypes --check: all generated files up to date');
