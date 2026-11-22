@@ -314,6 +314,30 @@ d\r
       }
     });
 
+    it('returns 413 and leaves no temp file when an octet-stream body exceeds maxFileSize', async () => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'rp-octet-413-'));
+      try {
+        const { status } = await postToParser({
+          body: 'x'.repeat(4096),
+          contentType: 'application/octet-stream',
+          params: { maxFileSize: 1024, uploadDir: dir },
+        });
+        assert.strictEqual(status, 413);
+        await waitFor(() => readdirSync(dir).length === 0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('bounds an octet-stream body by maxTotalFileSize when it is lower', async () => {
+      const { status } = await postToParser({
+        body: 'x'.repeat(4096),
+        contentType: 'application/octet-stream',
+        params: { maxFileSize: 8192, maxTotalFileSize: 1024 },
+      });
+      assert.strictEqual(status, 413);
+    });
+
     it('normalizes a single urlencoded field to a scalar (fixes GetUserByToken)', async () => {
       const { body } = await postToParser({
         body: 'token=abc',
@@ -605,6 +629,25 @@ describe('request parser media-type isolation', () => {
     const result = await runParser(req, { maxFieldsSize: 32 });
     assert.strictEqual(result.status, 413);
     assert.deepStrictEqual(req.body, {});
+  });
+
+  it('bounds a streamed octet-stream body even without a declared length', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'rp-octet-stream-'));
+    try {
+      const req = makeRequest({
+        body: 'x'.repeat(4096),
+        contentType: 'application/octet-stream',
+      });
+      delete req.headers['content-length'];
+      req.headers['transfer-encoding'] = 'chunked';
+      const result = await runParser(req, {
+        maxFileSize: 1024,
+        uploadDir: dir,
+      });
+      assert.strictEqual(result.status, 413);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('answers an oversized streamed body with 413, not a connection reset', async () => {

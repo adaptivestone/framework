@@ -34,6 +34,8 @@ export default {
   // NOTE: `maxFieldsSize` doubles as the total body ceiling for JSON and
   // urlencoded requests — formidable only enforces it on multipart field data,
   // so RequestParser applies it to the whole body for those content types.
+  // An `application/octet-stream` body is one file: RequestParser bounds it by
+  // `maxFileSize` (or `maxTotalFileSize`, if lower).
   requestParser: {
     maxFileSize: 20 * 1024 * 1024, // 20 MB per file
     maxTotalFileSize: 50 * 1024 * 1024, // 50 MB across all files
