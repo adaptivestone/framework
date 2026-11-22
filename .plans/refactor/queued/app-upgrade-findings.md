@@ -2,9 +2,10 @@
 
 **Source**: two reports from moving production apps onto 5.6.1 and 5.7.0
 (2026-11-22, kept outside the repository): items `FW1`–`FW28` and `TH1`–`TH7`.
-**Status**: queued. The real, small items shipped in 5.7.0 (see
-[release-5.7.0](../done/release-5.7.0.md)); this card keeps the rest, so they
-are planned rather than lost in the release card.
+**Status**: queued. The real, small items shipped in 5.7.0, and so did two
+small additions from this card, FW20 (more `HttpError` subclasses) and TH7
+(`passwordPolicyIssues`); see [release-5.7.0](../done/release-5.7.0.md). This
+card keeps the rest, so they are planned rather than lost in the release card.
 
 Each item says what is wrong, the direction agreed so far, and what still
 needs a decision. Versions are targets, not promises.
@@ -49,7 +50,6 @@ needs a decision. Versions are targets, not promises.
 - **An `HttpError` from a registry handler (FW13).** A handler can return an
   `HttpResponse` or `{ status, body }`, but not an `HttpError` for the contract
   mapper. Direction: accept a returned `HttpError` and map it as if thrown.
-- **More `HttpError` subclasses (FW20)**: 422, 429, 500, 502, 503. Additive.
 - **Temp-file write errors answer 400.** A failed temp-file write during
   upload parsing (disk full, a missing `uploadDir`) answers the parser's
   `400 MALFORMED_BODY`, for multipart and octet-stream alike; it is a server
@@ -81,11 +81,8 @@ needs a decision. Versions are targets, not promises.
 
 ## Auth
 
-- **Password policy outside the `Auth` controller (TH7).** The
-  `auth.passwordPolicy` check is module-private, so apps with their own
-  password endpoints copy it. Direction: export
-  `checkPasswordPolicy(password)` from `helpers/`, returning the same i18n keys
-  and `{ min, max }` params; optionally a ready-made schema.
+- **A ready-made password schema.** 5.7.0 exports `passwordPolicyIssues`
+  (TH7); a schema helper carrying the same keys is optional.
 - **Session tokens (FW15 remainder).** Per-token TTL, metadata, a revocation
   helper and "log out everywhere".
 - **Timing-equalizer hash.** An opt-out for processes that never verify

@@ -125,7 +125,7 @@ repository; Markdown remains the reviewed source of truth.
 | [http-engine-spike](queued/http-engine-spike.md)                   | Spike    | **Native HTTP engine go/no-go.** Benchmark ladder in `benchmark/engines/`: Express baseline → `NodeAdapter` prototype (= P3 preview) → uWS → minimal Rust engine (napi vs UDS child-process, gated on uWS numbers). Pre-agreed thresholds; informs keep/skip P2c, P3 timing, and whether a native adapter joins the P3/P5 adapter family. Nothing ships.         |
 | [email-normalization](queued/email-normalization.md)               | Auth     | **Case-insensitive user email.** Review finding #6: normalize on write and lookup (recommended) or a case-insensitive collation; collision report + migration first. Behavior change — release timing (minor vs v6) to be decided.                                                                                                                               |
 | [i18n-contracts-and-tooling](queued/i18n-contracts-and-tooling.md) | P1y      | **Typed, auditable i18n for framework + projects.** Missing/unused/coverage checks, generated autocomplete, large-catalog selector mode, isolated runtime instance/backend seam; additive v5 foundation and v6 framework-namespace cutover.                                                                                                                      |
-| [app-upgrade-findings](queued/app-upgrade-findings.md)             | Backlog  | **Findings from app upgrades after 5.7.0.** What two app-upgrade reports raised and 5.7.0 did not fix: per-request rate limits, duplicate-key 409, Health `checks()` and instance info, exported password policy, more `HttpError` subclasses, one error-code list, logging redaction, test-harness options. Grouped by area, with the decisions still open.     |
+| [app-upgrade-findings](queued/app-upgrade-findings.md)             | Backlog  | **Findings from app upgrades after 5.7.0.** What two app-upgrade reports raised and 5.7.0 did not fix: per-request rate limits, duplicate-key 409, Health `checks()` and instance info, one error-code list, logging redaction, test-harness options. Grouped by area, with the decisions still open.                                                            |
 
 ### later/
 
@@ -345,7 +345,7 @@ NUL byte, and the deploy docs carry the "HTTP/1.1 only — terminate TLS and HTT
   **Deliberately split from the P1q release**: it documents the descriptors P1q invents, and stabilizing a new
   authoring surface _and_ a contract derived from it in one release is too much at once.
   **Decided 2026-11-16 (user):** it is the next release after 5.7.0, built from main. It needs only P1q phases 0–2, not the middleware rework.
-- Candidates from [app-upgrade-findings](queued/app-upgrade-findings.md): per-request rate limits, the duplicate-key 409 (needs a decision on default vs flag), Health `checks()` with instance info, the exported password-policy check, and the small additive error items.
+- Candidates from [app-upgrade-findings](queued/app-upgrade-findings.md): per-request rate limits, the duplicate-key 409 (needs a decision on default vs flag), Health `checks()` with instance info, and the small additive error items (more `HttpError` subclasses and `passwordPolicyIssues` already shipped in 5.7.0).
 
 ## Unscheduled
 

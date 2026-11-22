@@ -568,7 +568,22 @@ Fixed, each with a test that fails without it:
 Not taken, now in
 [app-upgrade-findings](../queued/app-upgrade-findings.md) with the items the
 first report left open: TH3 (per-request rate limits), TH4 (duplicate-key
-409), TH6 (process info in readiness), TH7 (exported password policy).
+409), TH6 (process info in readiness).
+
+Added before release at the owner's request (2026-11-22), both additive:
+
+- FW20: `UnprocessableEntityError` (422), `TooManyRequestsError` (429),
+  `InternalServerError` (500), `BadGatewayError` (502) and
+  `ServiceUnavailableError` (503). Only the details-object constructor: new
+  classes get no deprecated positional `body`. Tests cover status, default
+  message, details, a 429 with `Retry-After` over the registry, and the 5xx
+  log level.
+- TH7: `passwordPolicyIssues(password, field)` in `helpers/passwordPolicy.ts`,
+  reading `auth.passwordPolicy` from the app; the `Auth` controller uses the
+  same code through the `@internal` `passwordPolicyIssuesFor(authConfig, …)`
+  (its tests build controllers with their own config). An HTTP test proves
+  the documented use, `BadRequestError({ errors: issues })`, answers 400 with
+  the key translated and `{{min}}`/`{{max}}` filled in, in English and `ru`.
 
 Review: an Opus reviewer checked that each new test fails on the old code
 and passes with the fix, probed `cluster.worker.disconnect()` on Node 26 and
