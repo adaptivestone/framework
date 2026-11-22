@@ -233,10 +233,11 @@ function supervisePrimary(
       }
 
       if (code === 0 && !signal) {
+        // Not restarted, so the cluster runs with less capacity: say so.
         report(
           'worker:exit',
-          'info',
-          `Worker ${worker.process.pid ?? worker.id} exited cleanly; it will not be restarted.`,
+          'warn',
+          `Worker ${worker.process.pid ?? worker.id} exited cleanly outside a shutdown; it will not be restarted, ${activeWorkers.size} worker(s) left.`,
         );
         finishIfIdle();
         return;

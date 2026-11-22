@@ -5,6 +5,7 @@ import {
   assertCalledTimes,
   assertMatchObject,
   assertRejectsLike,
+  pattern,
 } from './tests/assertions.ts';
 
 interface FakeWorker {
@@ -164,10 +165,16 @@ describe('runCluster', () => {
     assert.strictEqual(process.exitCode, 0);
   });
 
-  it('does not restart a worker that exits cleanly', async () => {
-    const done = runCluster(mock.fn(), { workers: 1, ...events() });
+  it('does not restart a worker that exits cleanly, and warns', async () => {
+    const received: ClusterEvent[] = [];
+    const done = runCluster(mock.fn(), { workers: 1, ...events(received) });
 
     emitExit(worker(1), 0);
+    assertMatchObject(received.at(-1), {
+      type: 'worker:exit',
+      level: 'warn',
+      message: pattern.stringContaining('0 worker(s) left'),
+    });
     await done;
 
     assert.strictEqual(clusterState.nextWorkerId, 2);
