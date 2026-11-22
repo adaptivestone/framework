@@ -454,7 +454,7 @@ disposable `mongo:8`.
   `src/services/http/builtInResponse.ts`.
 - Tests and fixtures next to each file; `scripts/fixtures/optional-i18n.mts`.
 - Release: `package.json`, `package-lock.json` (version), `CHANGELOG.md` (5.7.0,
-  dated 2026-11-17, the planned release day), `README.md` (5.7.0 upgrade notes),
+  dated 2026-11-22, the planned release day), `README.md` (5.7.0 upgrade notes),
   this card, `.plans/refactor/README.md`, `active/universal-http-responses.md`,
   `queued/openapi-responses.md`.
 - Documentation repo: worktree `../framework-documenation-github-5.7.0`, local
