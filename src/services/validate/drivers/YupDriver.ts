@@ -36,12 +36,6 @@ export const yupDriver: ValidatorDriver = {
   },
 
   async validate(body: unknown, data: unknown): Promise<unknown> {
-    type YupSchemaLike = {
-      validate: (
-        data: unknown,
-        opts: { stripUnknown: boolean; abortEarly: boolean },
-      ) => Promise<unknown>;
-    };
     try {
       return await (body as YupSchemaLike).validate(data, {
         stripUnknown: true,
@@ -50,6 +44,9 @@ export const yupDriver: ValidatorDriver = {
     } catch (e: unknown) {
       if (isYupValidationError(e)) {
         throw fromYupError(e);
+      }
+      if (e instanceof TypeError) {
+        throw (await shapeTypeErrors(body as YupSchemaLike, data)) ?? e;
       }
       throw e;
     }
@@ -70,13 +67,63 @@ export const yupDriver: ValidatorDriver = {
   },
 };
 
+type YupSchemaLike = {
+  validate: (
+    data: unknown,
+    opts: { stripUnknown?: boolean; abortEarly: boolean; strict?: boolean },
+  ) => Promise<unknown>;
+};
+
 interface YupValidationErrorShape {
   name: string;
   message: string;
   path?: string;
+  type?: string;
+  value?: unknown;
   errors?: string[];
   inner?: YupValidationErrorShape[];
   params?: Record<string, unknown>;
+}
+
+/**
+ * A transform that assumes its type (`string().trim()`, `.lowercase()`) throws
+ * a `TypeError` when a client sends an array or object. Re-check without
+ * transforms: type errors on such values become a `ValidationError`. Anything
+ * else (e.g. a `.test()` that throws again) yields `undefined`, so the caller
+ * rethrows its original error.
+ */
+async function shapeTypeErrors(
+  schema: YupSchemaLike,
+  data: unknown,
+): Promise<ValidationError | undefined> {
+  try {
+    await schema.validate(data, { strict: true, abortEarly: false });
+  } catch (e: unknown) {
+    if (!isYupValidationError(e)) {
+      return undefined;
+    }
+    // Strict mode also rejects castable input (`'42'` for `number()`), so keep
+    // only the values no cast accepts.
+    const inner = (e.inner ?? []).filter(
+      (issue) =>
+        issue.type === 'typeError' && isArrayOrPlainObject(issue.value),
+    );
+    if (inner.length > 0) {
+      return fromYupError({ ...e, inner });
+    }
+  }
+  return undefined;
+}
+
+function isArrayOrPlainObject(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return true;
+  }
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 function isYupValidationError(e: unknown): e is YupValidationErrorShape {
@@ -107,11 +154,12 @@ function fromYupError(e: YupValidationErrorShape): ValidationError {
 }
 
 /**
- * Drop the raw submitted input from yup's `params`. Yup echoes the offending
- * value back in `value`/`originalValue`; surfacing it on `.issues` would leak
- * the rejected input (e.g. a password) into anything that iterates issues for
- * logging/observability. The interpolation params (`min`, `max`, `length`, …)
- * are kept so i18n placeholders still resolve.
+ * Drop submitted input from yup's `params`. Yup echoes the offending value in
+ * `value`/`originalValue`, and `oneOf`/`notOneOf` put the values a `ref()`
+ * resolves to (e.g. the password a `repeatPassword` must match) in `resolved`;
+ * surfacing them on `.issues` would leak input into anything that logs issues.
+ * `spec`/`disableStackTrace` are schema internals. The interpolation params
+ * (`min`, `max`, `length`, `values`, …) are kept so i18n placeholders resolve.
  */
 function sanitizeParams(
   params?: Record<string, unknown>,
@@ -119,7 +167,8 @@ function sanitizeParams(
   if (!params) {
     return undefined;
   }
-  const { value, originalValue, ...safe } = params;
+  const { value, originalValue, resolved, spec, disableStackTrace, ...safe } =
+    params;
   return safe;
 }
 
