@@ -1,5 +1,9 @@
 import type { Response } from 'express';
 import mongoose from 'mongoose';
+import {
+  PASSWORD_EN,
+  passwordPolicyIssuesFor,
+} from '../helpers/passwordPolicy.ts';
 import { translateWithDefault } from '../helpers/translate.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken } from '../models/User.ts';
@@ -41,9 +45,7 @@ type AuthAnswer = HttpResponse | Response;
 const EN = {
   'auth.emailProvided': 'Email must be provided',
   'auth.emailValid': 'Email is not valid',
-  'auth.passwordProvided': 'Password must be provided',
-  'auth.passwordTooShort': 'Password must be at least {{min}} characters',
-  'auth.passwordTooLong': 'Password must be at most {{max}} characters',
+  ...PASSWORD_EN,
   'auth.passwordRecoveryTokenProvided':
     'Password recovery token must be provided',
   'auth.nickNameValid': 'Nick name is not valid,only a-z,A-Z,0-9',
@@ -108,54 +110,6 @@ const pushEmailIssues = (email: unknown, issues: ValidationIssue[]) => {
   }
 };
 
-/** Shared registration/reset policy; login intentionally keeps legacy compatibility. */
-const pushPasswordIssues = (
-  password: unknown,
-  issues: ValidationIssue[],
-  authConfig: Record<string, unknown>,
-) => {
-  if (isMissing(password) || typeof password !== 'string') {
-    issues.push({
-      message: 'auth.passwordProvided',
-      path: ['password'],
-      params: { defaultValue: EN['auth.passwordProvided'] },
-    });
-    return;
-  }
-  const policy = authConfig.passwordPolicy as
-    | { minLength?: number; maxLength?: number }
-    | undefined;
-  const min = policy?.minLength ?? 15;
-  const max = policy?.maxLength ?? 128;
-  if (
-    !Number.isInteger(min) ||
-    min < 1 ||
-    !Number.isInteger(max) ||
-    max < min
-  ) {
-    throw new Error(
-      'Invalid auth.passwordPolicy: require 1 <= minLength <= maxLength',
-    );
-  }
-  // Count Unicode code points, without normalizing or truncating the secret.
-  const length = Array.from(password).length;
-  if (length < min || length > max) {
-    const message =
-      length < min ? 'auth.passwordTooShort' : 'auth.passwordTooLong';
-    issues.push({
-      message,
-      path: ['password'],
-      params: {
-        min,
-        max,
-        defaultValue: EN[message]
-          .replace('{{min}}', String(min))
-          .replace('{{max}}', String(max)),
-      },
-    });
-  }
-};
-
 // Back-compat: the auth config key was misspelled `isAuthWithVefificationFlow`
 // through 5.0.0-rc. The corrected key is `isAuthWithVerificationFlow`. The
 // default config now ships only the corrected key; an explicit old-spelling
@@ -191,6 +145,7 @@ class Auth extends AbstractController {
               const password = coerceStr(v.password);
               const issues: ValidationIssue[] = [];
               pushEmailIssues(email, issues);
+              // No password policy here: existing passwords stay valid at login.
               if (isMissing(password) || typeof password !== 'string') {
                 issues.push({
                   message: 'auth.passwordProvided',
@@ -227,7 +182,9 @@ class Auth extends AbstractController {
             const lastName = coerceStr(v.lastName);
             const issues: ValidationIssue[] = [];
             pushEmailIssues(email, issues);
-            pushPasswordIssues(password, issues, this.app.getConfig('auth'));
+            issues.push(
+              ...passwordPolicyIssuesFor(this.app.getConfig('auth'), password),
+            );
             // nickName is optional, but an empty string is invalid (matches the
             // old yup `.matches()` behavior — only `null`/`undefined` skip).
             if (
@@ -296,7 +253,9 @@ class Auth extends AbstractController {
             const password = coerceStr(v.password);
             const passwordRecoveryToken = coerceStr(v.passwordRecoveryToken);
             const issues: ValidationIssue[] = [];
-            pushPasswordIssues(password, issues, this.app.getConfig('auth'));
+            issues.push(
+              ...passwordPolicyIssuesFor(this.app.getConfig('auth'), password),
+            );
             if (isMissing(passwordRecoveryToken)) {
               issues.push({
                 message: 'auth.passwordRecoveryTokenProvided',
