@@ -152,6 +152,9 @@ try {
 // signals and each test file gets an isolated module graph.
 let signalHandlersRegistered = false;
 const CRASH_SENTRY_FLUSH_TIMEOUT_MS = 2_000;
+// Closing sockets takes a round trip, so 3s is generous, and it leaves most of
+// the 10s force-exit budget to the HTTP drain and the 'shutdown' teardown.
+const BEFORE_SHUTDOWN_TIMEOUT_MS = 3_000;
 
 /**
  * Main framework class.
@@ -324,9 +327,10 @@ class Server {
 
   /**
    * Wire SIGTERM/SIGINT to a graceful shutdown: stop accepting connections,
-   * drain in-flight requests, then tear down mongo/redis/logger via the
-   * `'shutdown'` event. A single unref'd force-exit timer is the safety net —
-   * the process dies even if draining or a teardown hook hangs.
+   * let `'beforeShutdown'` listeners close long-lived ones, drain in-flight
+   * requests, then tear down mongo/redis/logger via the `'shutdown'` event. A
+   * single unref'd force-exit timer is the safety net — the process dies even
+   * if draining or a teardown hook hangs.
    *
    * Registered here (after HTTP is up), never at import time, so importing the
    * framework for tests/codegen has no process-level side effects. Skipped in
@@ -357,11 +361,15 @@ class Server {
           process.exit(1);
         }, 10_000);
         forceExit.unref();
-        try {
-          await this.app.httpServer?.shutdown();
-        } catch (e) {
+        // Stop accepting first, so a client that reconnects while a listener
+        // closes its stream cannot hold the drain open. Upgraded (WebSocket)
+        // sockets and long-lived requests such as SSE are not idle, so they
+        // stay open, holding the drain until the timer: listeners close them.
+        const drained = this.app.httpServer?.shutdown().catch((e) => {
           this.app.logger.error('Error closing HTTP server on shutdown', e);
-        }
+        });
+        await this.#emitBeforeShutdown();
+        await drained;
         // Tear down mongo/redis/logger. The listeners' async halves (redis
         // quit(), winston flush) outlive the synchronous `emit`, so set the exit
         // code and let the event loop drain naturally rather than `process.exit(0)`
@@ -377,6 +385,42 @@ class Server {
           process.disconnect?.();
         }
       });
+    }
+  }
+
+  /**
+   * Call the `'beforeShutdown'` listeners as `emit` does (the emitter as
+   * `this`, no arguments, a `once` listener removed) and await them all, for
+   * at most {@link BEFORE_SHUTDOWN_TIMEOUT_MS}. A listener that throws or
+   * rejects is logged; neither it nor one that never settles stops the shutdown.
+   */
+  async #emitBeforeShutdown(): Promise<void> {
+    const { events } = this.app;
+    // Raw: a `once` wrapper removes itself and returns the listener's result.
+    const listeners = events.rawListeners('beforeShutdown');
+    if (listeners.length === 0) {
+      return;
+    }
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = await Promise.race([
+      Promise.all(
+        listeners.map(async (listener) => {
+          try {
+            await listener.call(events);
+          } catch (e) {
+            this.app.logger.error("Error in a 'beforeShutdown' listener", e);
+          }
+        }),
+      ).then(() => false),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(true), BEFORE_SHUTDOWN_TIMEOUT_MS);
+      }),
+    ]);
+    clearTimeout(timer);
+    if (timedOut) {
+      this.app.logger.warn(
+        `'beforeShutdown' listeners did not finish within ${BEFORE_SHUTDOWN_TIMEOUT_MS}ms, continuing shutdown`,
+      );
     }
   }
 
