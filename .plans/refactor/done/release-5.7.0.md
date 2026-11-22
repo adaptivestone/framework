@@ -653,10 +653,42 @@ copied-request fixes above. Run in a clean copy of the branch
 
 Preparation complete. At the user's request, Claude replayed and committed the
 work on `release/5.7.0`, pushed it and opened PR #84, which the user reviewed
-and merged on 2026-11-16, and docs PR #42. The release commit follows in its
-own PR. No tag, npm publication or GitHub release yet; the user merges and
-publishes, then the tag and the GitHub release follow.
+and merged on 2026-11-16, and docs PR #42. The release commit, the review
+fixes and both app reports followed in PR #85, merged on 2026-11-22; 5.7.0 was
+published the same day (see Publication).
 
 Next: OpenAPI response contracts as 5.8, then the middleware replay with its
 compatibility decision. Earlier follow-ups stay open: replace `deepmerge` with
 an internal config merge helper, and make Node 26 the floor in v6.
+
+## Publication
+
+The user merged #85 on 2026-11-22. The push run on `main` then failed once on
+Node 24: `bounds a streamed octet-stream body even without a declared length`
+removed its temp directory while formidable was still creating the file
+(`ENOTEMPTY`). The test uses a stub response, so the middleware's cleanup never
+runs there; with a real response it runs on `finish`. #86 makes the test retry
+the removal and updates dependencies within their ranges (Mongoose 9.12.3,
+Sentry 11.16.0, rate-limiter-flexible 11.5.0, i18next 27.2.4, Biome 2.6.8),
+with `oxc-parser` ^0.159.0 as the dev dependency (generated types unchanged).
+Full gates passed locally and in CI on #86 and on `main`.
+
+The user published 5.7.0 to npm the same day (`latest`). npm records `gitHead`
+`2540972`, the #86 merge commit; its tree equals the last commit `0012b97`. The
+published tarball's shasum `08114ef53186903407dbd4491419eec31f216a32` matches
+a local `npm pack` of that tree, and the contents are identical. The `5.7.0`
+tag points at `2540972` (earlier tags point at the last release commit; same
+tree). The GitHub release was cut the same day (Latest).
+
+Docs #42 merged the same day. Docs #44 updates the documentation site's
+dependencies (Dependabot alerts: lockfile update plus overrides for
+`serialize-javascript`, `tinypool` and `uuid`, which Docusaurus 3.10.2 pins
+below their fixes).
+
+The example project moves to framework ^5.7.0 in example PR #73, with its
+other dependencies updated in range. No code changes; its docs drop the
+`z.instanceof(File)` advice and show the `error` code on the validation 400.
+Verified in Docker against the published package: gen, check, check:types,
+test:ci 9/9, Bun 9/9, routes, openapi, live requests (including the 413 for a
+22 MB octet-stream body) and a cluster SIGTERM with every worker finishing its
+teardown.
