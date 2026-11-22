@@ -59,8 +59,9 @@ export type FrameworkModelName =
 export type AppModel = TBaseModel;
 
 /**
- * Generated application model-name map. `npm run gen` augments this interface
- * in `genTypes.d.ts`; it is empty before code generation by design.
+ * Generated application model-name map. `node src/cli.ts generatetypes`
+ * augments this interface in `genTypes.d.ts`; it is empty before code
+ * generation by design.
  */
 // biome-ignore lint/suspicious/noEmptyInterface: codegen augmentation target
 export interface AppModelTypes {}
@@ -182,6 +183,12 @@ class Server {
 
   /** Model names already nudged about a plural spelling (warned once each). */
   #pluralWarned = new Set<string>();
+
+  /**
+   * Set while the framework's auto-loaded `UserOld` is unused: the first
+   * `getModel('UserOld')` calls it to emit the deprecation warning.
+   */
+  #warnUserOldOnUse?: () => void;
 
   cli: null | BaseCli = null;
 
@@ -584,9 +591,15 @@ class Server {
                 'reinstall, and check your lockfile).',
             );
           } else {
-            this.app.logger.warn(
-              `Model ${modelName} is old type model. Please update it to BaseModel`,
-            );
+            const userOld = await import('./models/UserOld.ts');
+            if (ModelConstructor === userOld.default) {
+              // Loaded for every app: warn when the app asks for it, not here.
+              this.#warnUserOldOnUse = userOld.warnUserOldDeprecated;
+            } else {
+              this.app.logger.warn(
+                `Model ${modelName} is old type model. Please update it to BaseModel`,
+              );
+            }
             const model = new ModelConstructor(this.app) as AbstractModel;
             // Legacy model shape, removed in v6: stored under the BaseModel
             // type — no structural overlap, hence the double cast.
@@ -1034,6 +1047,10 @@ class Server {
         `You asked for model ${modelName} that not exists. Please check you codebase `,
       );
       return false;
+    }
+    if (modelName === 'UserOld' && this.#warnUserOldOnUse) {
+      this.#warnUserOldOnUse();
+      this.#warnUserOldOnUse = undefined;
     }
     return model;
   }

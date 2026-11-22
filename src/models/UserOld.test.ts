@@ -54,11 +54,12 @@ const userEmail = 'userold@test.com';
 const userPassword = 'OldSuperSecret123$';
 
 describe('UserOld model (deprecated)', () => {
-  it('emits a DeprecationWarning (code ASF_DEP_USEROLD) with a security note on construction', () => {
+  it('emits a DeprecationWarning (code ASF_DEP_USEROLD) with a security note when an app model extending it is constructed', () => {
     const spy = mock.method(process, 'emitWarning', () => {});
     try {
-      // Construction alone must be audible — the model is instantiated at boot.
-      // A subclass probe avoids re-registering the 'UserOld' mongoose model.
+      // An app model extending UserOld is a use, so its construction at boot
+      // warns. The framework's own auto-loaded class warns on first
+      // `getModel('UserOld')` instead (see server.test.ts).
       class UserOldDeprecationProbe extends UserOld {}
       const probe = new UserOldDeprecationProbe(appInstance);
 

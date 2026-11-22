@@ -63,6 +63,15 @@ interface IStatic extends IAbstractModel<IUser, IAbstractModelMethods<IUser>> {
   ): Promise<{ token: string; until: Date }>;
 }
 
+/** @internal Emit the `UserOld` deprecation warning (code `ASF_DEP_USEROLD`). */
+export const warnUserOldDeprecated = () =>
+  process.emitWarning(
+    'UserOld is deprecated and will be removed in v6 — migrate to the User model. ' +
+      'SECURITY: UserOld implements known-weak legacy auth (timing-unsafe password ' +
+      'compare, no per-user salt, plaintext non-expiring session tokens).',
+    { type: 'DeprecationWarning', code: 'ASF_DEP_USEROLD' },
+  );
+
 /**
  * @deprecated Use the `User` model instead. `UserOld` is kept for v5 and will be
  * **removed in v6**.
@@ -73,12 +82,11 @@ class UserOld extends AbstractModel<
   IStatic
 > {
   constructor(app: IApp) {
-    process.emitWarning(
-      'UserOld is deprecated and will be removed in v6 — migrate to the User model. ' +
-        'SECURITY: UserOld implements known-weak legacy auth (timing-unsafe password ' +
-        'compare, no per-user salt, plaintext non-expiring session tokens).',
-      { type: 'DeprecationWarning', code: 'ASF_DEP_USEROLD' },
-    );
+    // Every app auto-loads this class, so only a subclass is a use here;
+    // `getModel('UserOld')` warns on its first call.
+    if (new.target !== UserOld) {
+      warnUserOldDeprecated();
+    }
     super(app);
   }
   initHooks() {
