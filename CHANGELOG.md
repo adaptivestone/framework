@@ -35,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **A 5xx `HttpError` is logged at `error`.** A thrown `HttpError` with a status of 500 or above (for example a 502 for a failed upstream) is logged at `error`, so it reaches production log levels and Sentry. Other `HttpError`s stay at `verbose`.
 - **A cluster worker that exits cleanly outside a shutdown is logged as a warning**, with the number of workers left. `runCluster` does not restart it, so the cluster runs with less capacity; it was logged at `info`.
 - **`ASF_DEP_USEROLD` fires only when the app uses `UserOld`**: on the first `getModel('UserOld')`, or when an app model extends it. Before, every app got it at boot, because the framework loads its own models, along with the "old type model" log line.
+- **Dependencies updated within their ranges** (lockfile), including Mongoose 9.12.3, Sentry 11.16.0, rate-limiter-flexible 11.5.0, i18next 27.2.4 and Biome 2.6.8. The `oxc-parser` dev dependency moves to 0.159; the optional peer range (`>=0.156.0 <1`) already allows it, and the generated types are unchanged.
 
 ### Fixed
 

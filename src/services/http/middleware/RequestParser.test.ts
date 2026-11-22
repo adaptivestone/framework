@@ -686,7 +686,14 @@ describe('request parser media-type isolation', () => {
       });
       assert.strictEqual(result.status, 413);
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      // No response finishes here, so the temp file is not cleaned up and
+      // formidable may still be creating it: retry while the dir is not empty.
+      rmSync(dir, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 10,
+      });
     }
   });
 
