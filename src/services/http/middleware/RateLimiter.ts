@@ -112,9 +112,10 @@ class RateLimiter extends AbstractMiddleware {
       });
     } catch (e) {
       // Leave `this.limiter` undefined so `middleware()` returns 500 (same as an
-      // unknown driver) rather than crashing — e.g. `@redis/client` not installed.
+      // unknown driver) rather than crashing — e.g. `@redis/client` not
+      // installed, or a malformed `redis.url` the client cannot parse.
       this.logger?.error(
-        `RateLimiter redis init failed (is '@redis/client' installed?): ${e}`,
+        `RateLimiter redis init failed, so its routes answer 500: ${e}. Check that redis.url (REDIS_URI) is a valid redis:// or rediss:// URL and that '@redis/client' is installed.`,
       );
     }
   }

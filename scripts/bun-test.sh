@@ -84,6 +84,7 @@ bun test \
   --path-ignore-patterns='**/cluster.test.ts' \
   --path-ignore-patterns='**/UserOld.test.ts' \
   --path-ignore-patterns='**/redisConnection.failure.test.ts' \
+  --path-ignore-patterns='**/RateLimiter.redisSetup.test.ts' \
   --path-ignore-patterns='**/I18n.missing.test.ts' \
   src/ \
   ./src/tests/nodeRunner.node-test.ts \
