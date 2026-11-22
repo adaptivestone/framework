@@ -7,6 +7,7 @@
     "passwordRecoveryTokenProvided": "Нужно указать токен восстановления пароля",
     "passwordValid": "Неверный формат пароля,только a-z,A-Z,0-9,!,@,#,$,%,ˆ,&,*,(,),_,+,{,},[,],<,>",
     "passwordTooShort": "Пароль должен быть не менее {{min}} символов",
+    "passwordTooLong": "Пароль должен быть не более {{max}} символов",
     "emailValid": "Неверный формат Email-а",
     "errorUPValid": "Не правильно указаны емэйл или пароль",
     "messageSome": "Проблемы с сервером. Пожалуйста попробуйте позже",
@@ -24,5 +25,35 @@
     "passwordChanged": "Пароль был изменен",
     "passwordRecovery": "Восстановление пароля",
     "emailConfirm": "Подтверждение Email"
+  },
+  "password": {
+    "wrongToken": "Неверный токен восстановления пароля"
+  },
+  "http": {
+    "notFound": "Не найдено",
+    "methodNotAllowed": "Метод не поддерживается",
+    "unsupportedContentType": "Неподдерживаемый Content-Type. Ожидается один из: {{types}}",
+    "malformedUrl": "Некорректный URL",
+    "serverError": "Что-то пошло не так. Пожалуйста, попробуйте позже.",
+    "validationFailed": "Ошибка проверки данных"
+  },
+  "middleware": {
+    "auth": {
+      "notLoggedIn": "Пожалуйста, войдите в приложение"
+    },
+    "role": {
+      "userRequired": "Требуется авторизованный пользователь",
+      "noAccess": "У вас нет доступа"
+    },
+    "rateLimiter": {
+      "tooManyRequests": "Слишком много запросов"
+    },
+    "requestParser": {
+      "entityTooLarge": "Слишком большой запрос. Загрузка превышает допустимые ограничения по размеру или количеству.",
+      "parseError": "Не удалось разобрать запрос. Указан неверный Content-Type или Content-Length. Пожалуйста, проверьте заголовки и тип содержимого запроса."
+    }
+  },
+  "health": {
+    "unauthorized": "Требуется авторизация"
   }
 }
