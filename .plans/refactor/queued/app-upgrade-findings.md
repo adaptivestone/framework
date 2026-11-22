@@ -50,6 +50,10 @@ needs a decision. Versions are targets, not promises.
   `HttpResponse` or `{ status, body }`, but not an `HttpError` for the contract
   mapper. Direction: accept a returned `HttpError` and map it as if thrown.
 - **More `HttpError` subclasses (FW20)**: 422, 429, 500, 502, 503. Additive.
+- **Temp-file write errors answer 400.** A failed temp-file write during
+  upload parsing (disk full, a missing `uploadDir`) answers the parser's
+  `400 MALFORMED_BODY`, for multipart and octet-stream alike; it is a server
+  failure and should be a 500.
 - **Interpolation in `i18nKey` (FW12).** `HttpError` messages are translated
   with interpolation off. Direction: an `i18nParams` field, keeping the safe
   fallback when a key is missing.

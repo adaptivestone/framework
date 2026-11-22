@@ -556,6 +556,14 @@ Fixed, each with a test that fails without it:
   with the number left (was `info`). A restart option is in the backlog card.
 - FW28: the files of one multipart field keep the send order; Formidable
   listed them as their writes finished.
+- Found by CI on this batch (Node 24, one of two runs): the streamed
+  octet-stream test removed its upload directory while Formidable was still
+  opening the temp file, and the ENOENT was uncaught. Formidable attaches no
+  error listener to an octet-stream file, so any temp-file write error (disk
+  full, a missing `uploadDir`) crashed the process; present since the
+  octet-stream plugin was enabled. `RequestParser` now fails the parse with
+  it (the parser's 400, as for multipart), with a deterministic test (a
+  missing `uploadDir`).
 
 Not taken, now in
 [app-upgrade-findings](../queued/app-upgrade-findings.md) with the items the
