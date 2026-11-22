@@ -30,7 +30,12 @@ import {
   type ResolvedError,
 } from '../services/http/builtinErrorHandlers.ts';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
-import { HttpError, NotFoundError } from '../services/http/httpErrors.ts';
+import {
+  HttpError,
+  NotFoundError,
+  ServiceUnavailableError,
+  UnprocessableEntityError,
+} from '../services/http/httpErrors.ts';
 import AbstractMiddleware from '../services/http/middleware/AbstractMiddleware.ts';
 import { HttpResponse } from '../services/http/responses.ts';
 import type { MiddlewareSpec } from '../services/http/routing/middlewareNormalization.ts';
@@ -1652,6 +1657,28 @@ describe('HttpServer.resolveError — registry resolution', () => {
       body: { error: 'UPSTREAM_DOWN', message: 'Upstream failed' },
       logLevel: 'error',
     });
+  });
+
+  it('built-in HttpError mapper: a 5xx subclass logs at error, a 422 at verbose', async () => {
+    assertResolved(
+      await httpServer().resolveError(new ServiceUnavailableError(), fakeReq()),
+      {
+        status: 503,
+        body: { message: 'Service unavailable' },
+        logLevel: 'error',
+      },
+    );
+    assertResolved(
+      await httpServer().resolveError(
+        new UnprocessableEntityError(),
+        fakeReq(),
+      ),
+      {
+        status: 422,
+        body: { message: 'Unprocessable entity' },
+        logLevel: 'verbose',
+      },
+    );
   });
 
   it('a 5xx HttpError a handler threw is logged at error with its code and message', async () => {

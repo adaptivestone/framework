@@ -87,7 +87,7 @@ const warnBodyArgument = makeOncePerClassWarner(
  * `i18nKey`, field errors like request validation) or a custom `body`, logged
  * at `verbose` (control flow, not a defect), or `error` for a 5xx.
  * Subclass for other statuses, or construct the base directly:
- * `new HttpError(422, 'Unprocessable')`.
+ * `new HttpError(402, 'Payment required')`.
  */
 export class HttpError extends Error {
   readonly status: number;
@@ -201,5 +201,35 @@ export class ConflictError extends HttpError {
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(message: string | HttpErrorDetails = 'Conflict', body?: unknown) {
     super(409, message, body);
+  }
+}
+
+export class UnprocessableEntityError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Unprocessable entity') {
+    super(422, message);
+  }
+}
+
+export class TooManyRequestsError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Too many requests') {
+    super(429, message);
+  }
+}
+
+export class InternalServerError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Internal server error') {
+    super(500, message);
+  }
+}
+
+export class BadGatewayError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Bad gateway') {
+    super(502, message);
+  }
+}
+
+export class ServiceUnavailableError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Service unavailable') {
+    super(503, message);
   }
 }

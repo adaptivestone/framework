@@ -22,7 +22,11 @@ import type { ResolvedError } from './builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import HttpServer from './HttpServer.ts';
-import { HttpError, UnauthorizedError } from './httpErrors.ts';
+import {
+  HttpError,
+  TooManyRequestsError,
+  UnauthorizedError,
+} from './httpErrors.ts';
 import { HttpResponse } from './responses.ts';
 
 describe('HttpServer — 404 fallthrough', () => {
@@ -291,6 +295,18 @@ describe('HttpServer — final sink resolves through the registry', () => {
       message: 'Too Many Requests',
     });
     assert.strictEqual(answer.headers['retry-after'], '7');
+  });
+
+  it('answers a TooManyRequestsError with 429 and its Retry-After', async () => {
+    const answer = await runSink(
+      new TooManyRequestsError({
+        message: 'Slow down',
+        headers: { 'Retry-After': '30' },
+      }),
+    );
+    assert.strictEqual(answer.status, 429);
+    assert.deepStrictEqual(answer.payload, { message: 'Slow down' });
+    assert.strictEqual(answer.headers['retry-after'], '30');
   });
 
   it('sends an HttpResponse an app handler returns', async () => {
