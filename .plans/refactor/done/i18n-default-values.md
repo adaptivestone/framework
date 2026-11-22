@@ -21,7 +21,7 @@ Framework middleware returns hardcoded English (`Please login to application`) �
 ## Design invariants
 
 - Keys are framework-authored constants; **no user input ever reaches `t()`** (no ValidateService-style injection surface).
-- `defaultValue` in code is the **single English source of truth**. No new entries in `src/locales/*` (avoids drift + fallbackLng-beats-defaultValue double-source).
+- `defaultValue` in code is the **single English source of truth**. No new entries in `src/locales/en` (avoids drift + fallbackLng-beats-defaultValue double-source). `ru` is a translation, not a second English source: 5.7.0 added every framework key to it, and a test checks that each non-English locale has every key the source uses.
 - A present key always beats `defaultValue` → existing app translations keep working unchanged; the miss case upgrades raw-key → English.
 - Status codes and machine codes (`error: 'AUTH001'`) never change; translated text is never used programmatically.
 - Key namespace stays bare (`middleware.*`), consistent with existing `auth.*`/`email.*`; P1y Phase 4 renames all of them to `framework:*` together.

@@ -5,7 +5,7 @@ import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { Readable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { describe, it } from 'node:test';
 import type { Handler, NextFunction, Response } from 'express';
 import express from 'express';
@@ -314,6 +314,70 @@ d\r
       }
     });
 
+    it('returns 413 and leaves no temp file when an octet-stream body exceeds maxFileSize', async () => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), 'rp-octet-413-'));
+      try {
+        const { status } = await postToParser({
+          body: 'x'.repeat(4096),
+          contentType: 'application/octet-stream',
+          params: { maxFileSize: 1024, uploadDir: dir },
+        });
+        assert.strictEqual(status, 413);
+        await waitFor(() => readdirSync(dir).length === 0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('answers an octet-stream temp-file write error with 400 instead of crashing', async () => {
+      const { status } = await postToParser({
+        body: 'binary',
+        contentType: 'application/octet-stream',
+        params: {
+          uploadDir: path.join(os.tmpdir(), `rp-missing-${Date.now()}`, 'x'),
+        },
+      });
+      assert.strictEqual(status, 400);
+    });
+
+    it('bounds an octet-stream body by maxTotalFileSize when it is lower', async () => {
+      const { status } = await postToParser({
+        body: 'x'.repeat(4096),
+        contentType: 'application/octet-stream',
+        params: { maxFileSize: 8192, maxTotalFileSize: 1024 },
+      });
+      assert.strictEqual(status, 413);
+    });
+
+    it('keeps the files of one field in the order they were sent', async () => {
+      const part = (name: string) =>
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="media"; filename="${name}"\r\n` +
+        `Content-Type: text/plain\r\n\r\n` +
+        `${name}\r\n`;
+      // The first file's write finishes last, so formidable reports it last.
+      const fileWriteStreamHandler = (file: { originalFilename?: string }) =>
+        new Writable({
+          write(_chunk, _encoding, callback) {
+            callback();
+          },
+          final(callback) {
+            setTimeout(callback, file.originalFilename === 'a.txt' ? 50 : 0);
+          },
+        });
+      const { status, body } = await postToParser({
+        body: `${part('a.txt')}${part('b.txt')}--${boundary}--\r\n`,
+        contentType: multipartCT,
+        params: { fileWriteStreamHandler },
+      });
+      assert.strictEqual(status, 200);
+      const media = body.media as { originalFilename: string }[];
+      assert.deepStrictEqual(
+        media.map((f) => f.originalFilename),
+        ['a.txt', 'b.txt'],
+      );
+    });
+
     it('normalizes a single urlencoded field to a scalar (fixes GetUserByToken)', async () => {
       const { body } = await postToParser({
         body: 'token=abc',
@@ -607,6 +671,25 @@ describe('request parser media-type isolation', () => {
     assert.deepStrictEqual(req.body, {});
   });
 
+  it('bounds a streamed octet-stream body even without a declared length', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'rp-octet-stream-'));
+    try {
+      const req = makeRequest({
+        body: 'x'.repeat(4096),
+        contentType: 'application/octet-stream',
+      });
+      delete req.headers['content-length'];
+      req.headers['transfer-encoding'] = 'chunked';
+      const result = await runParser(req, {
+        maxFileSize: 1024,
+        uploadDir: dir,
+      });
+      assert.strictEqual(result.status, 413);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('answers an oversized streamed body with 413, not a connection reset', async () => {
     const app = express();
     app.use((req, _res, next) => {
@@ -669,5 +752,27 @@ describe('request parser media-type isolation', () => {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
+  });
+});
+
+// A subclass answering with `res.json(...)` must keep compiling
+// (`check:types:tests`).
+describe('request parser subclasses', () => {
+  it('may answer with a response instead of calling next()', async () => {
+    const answered = { answered: true } as unknown as Response;
+    class MyRequestParser extends RequestParser {
+      async middleware(_req: FrameworkRequest, res: Response) {
+        return res.status(400).json({});
+      }
+    }
+    const res = {
+      status: () => res,
+      json: () => answered,
+    } as unknown as Response;
+    const result = await new MyRequestParser(appInstance).middleware(
+      {} as FrameworkRequest,
+      res,
+    );
+    assert.strictEqual(result, answered);
   });
 });

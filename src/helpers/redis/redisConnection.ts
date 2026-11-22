@@ -29,6 +29,7 @@ export const getRedisClient = (): Promise<RedisClientType> => {
  * Synchronous way to get redis client. Make sure to call connect on it before usage.
  * Connection failure is logged (not an unhandled rejection), and concurrent async
  * callers all await the same connect via {@link getRedisClient}.
+ * Throws when `redis.url` is malformed: the client parses it when built.
  */
 export const getRedisClientSync = (): RedisClientType => {
   if (!redisClient) {

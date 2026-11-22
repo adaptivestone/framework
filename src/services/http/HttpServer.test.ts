@@ -5,16 +5,28 @@
  */
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import type { NextFunction, Response } from 'express';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { describe, it, mock } from 'node:test';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import { appInstance } from '../../helpers/appInstance.ts';
+import { noopLogger } from '../../helpers/logger.ts';
 import { stubI18n } from '../../tests/mocks.ts';
 import { getTestServerURL } from '../../tests/testHelpers.ts';
 import type { TI18n } from '../i18n/I18n.ts';
+import type { ResolvedError } from './builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import HttpServer from './HttpServer.ts';
-import { HttpError, UnauthorizedError } from './httpErrors.ts';
+import {
+  HttpError,
+  TooManyRequestsError,
+  UnauthorizedError,
+} from './httpErrors.ts';
 import { HttpResponse } from './responses.ts';
 
 describe('HttpServer — 404 fallthrough', () => {
@@ -23,6 +35,45 @@ describe('HttpServer — 404 fallthrough', () => {
     assert.strictEqual(res.status, 404);
     const body = await res.json();
     assert.deepStrictEqual(body, { error: 'NOT_FOUND', message: 'Not found' });
+  });
+
+  it('passes a 404 write failure without a reason to the error sink', async () => {
+    const app = express();
+    const ctx = {
+      express: app,
+      // Replaces the 404 with a stream that fails without a reason.
+      responseWriter: new ExpressResponseWriter({
+        transform: () =>
+          HttpResponse.stream(
+            404,
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.error();
+              },
+            }),
+          ),
+      }),
+    };
+    HttpServer.prototype.add404Page.call(ctx as unknown as HttpServer);
+    const errors: unknown[] = [];
+    app.use(
+      (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+        errors.push(err);
+        res.status(500).end();
+      },
+    );
+    const server = http.createServer(app);
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/missing`);
+      assert.strictEqual(response.status, 500);
+      assert.strictEqual(errors.length, 1);
+      assert.ok(errors[0] instanceof Error);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 });
 
@@ -108,6 +159,8 @@ const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
     resolveError: (err: unknown, req: FrameworkRequest) =>
       appInstance.httpServer?.resolveError(err, req) ?? null,
     responseWriter: new ExpressResponseWriter(),
+    // A logger, so the sink's log lines are built.
+    logger: noopLogger,
   };
   HttpServer.prototype[register].call(ctx as unknown as HttpServer);
   assert.ok(handler, `${register} registered no handler`);
@@ -116,9 +169,16 @@ const captureHandler = <T>(register: 'add404Page' | 'addErrorHandler'): T => {
 
 const runSink = async (
   err: Error,
-  { i18n, headersSent }: { i18n?: TI18n; headersSent?: boolean } = {},
+  {
+    i18n,
+    headersSent,
+    contentType,
+  }: { i18n?: TI18n; headersSent?: boolean; contentType?: string } = {},
 ) => {
   const { captured, res } = recordingResponse(headersSent);
+  if (contentType) {
+    res.setHeader('Content-Type', contentType);
+  }
   let passedOn: unknown;
   await captureHandler<
     (
@@ -237,6 +297,18 @@ describe('HttpServer — final sink resolves through the registry', () => {
     assert.strictEqual(answer.headers['retry-after'], '7');
   });
 
+  it('answers a TooManyRequestsError with 429 and its Retry-After', async () => {
+    const answer = await runSink(
+      new TooManyRequestsError({
+        message: 'Slow down',
+        headers: { 'Retry-After': '30' },
+      }),
+    );
+    assert.strictEqual(answer.status, 429);
+    assert.deepStrictEqual(answer.payload, { message: 'Slow down' });
+    assert.strictEqual(answer.headers['retry-after'], '30');
+  });
+
   it('sends an HttpResponse an app handler returns', async () => {
     const unregister = appInstance.httpServer?.registerErrorHandler(
       UnauthorizedError,
@@ -284,6 +356,49 @@ describe('HttpServer — final sink resolves through the registry', () => {
     }
   });
 
+  it('labels the plain 500 fallback as JSON', async () => {
+    const circular: { self?: unknown } = {};
+    circular.self = circular;
+    const unregister = appInstance.httpServer?.registerErrorHandler(
+      UnauthorizedError,
+      () => ({ status: 401, body: circular }),
+    );
+    try {
+      const answer = await runSink(new UnauthorizedError(), {
+        contentType: 'text/plain; charset=utf-8',
+      });
+      assert.strictEqual(answer.status, 500);
+      assert.strictEqual(answer.headers['Content-Type'], 'application/json');
+    } finally {
+      unregister?.();
+    }
+  });
+
+  it('answers a resolveError result without response from its legacy fields', async () => {
+    const server = appInstance.httpServer;
+    assert.ok(server);
+    // An app replacement still returning the shape before `response`.
+    const legacy = mock.method(
+      server,
+      'resolveError',
+      async () =>
+        ({
+          status: 418,
+          body: { legacy: true },
+          headers: { 'x-legacy': '1' },
+          logLevel: 'warn',
+        }) as unknown as ResolvedError,
+    );
+    try {
+      const answer = await runSink(new Error('boom'));
+      assert.strictEqual(answer.status, 418);
+      assert.deepStrictEqual(answer.payload, { legacy: true });
+      assert.strictEqual(answer.headers['x-legacy'], '1');
+    } finally {
+      legacy.mock.restore();
+    }
+  });
+
   it('lets an app handler reshape a middleware error', async () => {
     const unregister = appInstance.httpServer?.registerErrorHandler(
       UnauthorizedError,
@@ -296,6 +411,12 @@ describe('HttpServer — final sink resolves through the registry', () => {
     } finally {
       unregister?.();
     }
+  });
+
+  it('answers the 500 for a thrown Symbol', async () => {
+    const answer = await runSink(Symbol('boom') as unknown as Error);
+    assert.strictEqual(answer.status, 500);
+    assert.strictEqual(answer.payload.error, 'SERVER_ERROR');
   });
 
   it('passes the error on when the response already started', async () => {

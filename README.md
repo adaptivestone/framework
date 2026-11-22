@@ -70,6 +70,81 @@ To add the framework to an existing project instead:
 npm install @adaptivestone/framework
 ```
 
+## Upgrade notes (5.7.0)
+
+See the [5.7.0 release notes](CHANGELOG.md). Handlers that write to `res` keep
+working. Check these when you upgrade:
+
+- Validation, routing, body-parsing and server error bodies now carry an
+  `error` code (`VALIDATION_FAILED`, `NOT_FOUND`, `SERVER_ERROR` and others,
+  exported as `FRAMEWORK_ERROR_CODES`). Statuses and messages are unchanged.
+  Tests that compare whole error bodies must add the field. The built-in
+  `Auth` and `Health` controllers' own answers are unchanged.
+- A catch-all `registerErrorHandler(Error, …)` now also receives
+  request-validation errors and the body parser's 413 and 400. Return `null`
+  for the errors you do not handle, to keep the default answers.
+- A `{ status, body }` result from an error handler must be a valid response.
+  A 206, or a status outside 200–599, is logged and answered with the 500. The
+  result sets its own `Content-Type`, replacing one set on `res` earlier. A
+  result without a body adds no `Content-Type` and no longer answers 304 to
+  a conditional request, and a 304 result gets no `ETag`. A `Set-Cookie` in
+  its `headers` is added to the cookies already on the response, and `Vary` is
+  merged; before, both replaced what was there. A result without a body is
+  sent without one, so an Express `json replacer` no longer sees it.
+- The built-in `Auth`, `Home` and `Health` handlers return their response. An
+  override that calls one should return the result:
+  `return super.postLogin(req, res)`. One that calls it without returning still
+  answers for now, with a one-time `ASF_DEP_DROPPED_RESPONSE` warning; v6
+  removes that. Its response goes out when the override finishes, so code after
+  the call runs first, and if that code throws, the client gets the error
+  response. `res.statusCode` shows the built-in status after the call, as
+  before, but `res.headersSent` is still false, and waiting for `res` to
+  finish inside the override never completes.
+- An override that calls a built-in handler and then answers through `res`
+  itself should do so before it returns; otherwise the built-in response can
+  be sent first.
+- The built-in handlers no longer call `res.json` or `res.status`. A wrapper
+  around `res` that changed what they send no longer has an effect, and a
+  status set on `res` before the call is replaced by the built-in status.
+  Change the returned response instead. A built-in handler used directly as
+  an Express route handler no longer answers by itself.
+- An override of `HttpServer.resolveError` should also return the `response`
+  to send, and must change `response` itself to change the answer.
+- An Express error middleware that your app mounts itself (for example in
+  `bootHttp`) now receives the body parser's 413 and 400 before the framework
+  answers them.
+- An override annotated `Promise<Response>` that returns the built-in result no
+  longer compiles. Widen the annotation or drop it.
+- Framework-built JSON responses (404, 405, 415, validation and body-parser
+  errors, the 500, and the built-in `Auth`, `Home` and `Health` answers) are
+  sent as `application/json`, replacing a `Content-Type` set on `res` earlier,
+  for example by a middleware. To send another media type on the responses it
+  sees, set `contentType` in `transformResponse`.
+- The `Auth` answers without a body (register 201, verify and recover 200) no
+  longer send `Content-Type: application/json`, and an Express `json replacer`
+  no longer sees them.
+- A thrown `HttpError` with a 5xx status is logged at `error` (other statuses
+  stay at `verbose`), so it now reaches Sentry at the default level.
+- Cluster workers (`runCluster`, pm2 cluster mode) finish their `'shutdown'`
+  teardown before they exit, as a single process does. A worker that keeps a
+  handle open (a timer or a socket that is never closed) now exits with code 1
+  after 10 seconds instead of at once with 0, unless the process manager kills
+  it first (pm2's `kill_timeout`, or a `shutdownTimeoutMs` below 10 seconds);
+  close such handles in a `'shutdown'` listener.
+- An `application/octet-stream` body above `http.requestParser.maxFileSize`
+  (20 MB by default) is answered with 413; 5.6.1 accepted any size. To accept
+  larger bodies, raise `maxFileSize` and `maxTotalFileSize` in your app's
+  `config/http.ts`.
+- A rate limiter with `ip` disabled warns once when a request without any
+  enabled identity shares the route's bucket. If you see it, enable `ip` in
+  `consumeKeyComponents`.
+- `File` from `types.js` now types an upload (`filepath`, `mimetype`,
+  `originalFilename`, `size`). Code that read web `File` members from it, which
+  were never there at runtime, no longer compiles.
+- Generated `*.routes.gen.ts` files have a new header line. If you commit
+  them and run `node src/cli.ts generatetypes --check` in CI, regenerate them
+  once after upgrading.
+
 ## Upgrade notes (5.6.1)
 
 See the [5.6.1 release notes](CHANGELOG.md). Check these when you upgrade:

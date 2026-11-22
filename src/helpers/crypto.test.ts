@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { assertRejectsLike } from '../tests/assertions.ts';
+import { assertRejectsLike, assertTextMatch } from '../tests/assertions.ts';
 import { appInstance } from './appInstance.ts';
 import {
   hashPassword,
@@ -146,5 +146,43 @@ describe('timingSafeEqualStrings', () => {
       false,
     );
     assert.strictEqual(timingSafeEqualStrings('', ''), true);
+  });
+});
+
+describe('warmPasswordVerify', () => {
+  // A fresh module per test: the shared one was already warmed at boot.
+  let importSequence = 0;
+  const freshCrypto = async (): Promise<typeof import('./crypto.ts')> => {
+    importSequence += 1;
+    return import(`./crypto.ts?warm=${importSequence}`);
+  };
+
+  it('starts the dummy hash that the first burnPasswordVerify reuses', async () => {
+    const crypto = await freshCrypto();
+    const warmed = crypto.warmPasswordVerify();
+
+    assert.strictEqual(crypto.warmPasswordVerify(), warmed);
+    await crypto.burnPasswordVerify('not the password');
+    assert.strictEqual(crypto.warmPasswordVerify(), warmed);
+    assertTextMatch(await warmed, /^v2:scrypt:/);
+  });
+
+  it('lets burnPasswordVerify recompute the hash after a failed warm-up', async () => {
+    const crypto = await freshCrypto();
+    const auth = appInstance.getConfig('auth') as { saltSecret?: string };
+    const original = auth.saltSecret;
+    auth.saltSecret = '';
+    let failed: Promise<string>;
+    try {
+      failed = crypto.warmPasswordVerify();
+    } finally {
+      auth.saltSecret = original;
+    }
+    await assertRejectsLike(failed, 'AUTH_SALT is not defined');
+
+    await crypto.burnPasswordVerify('not the password');
+    const recomputed = crypto.warmPasswordVerify();
+    assert.notStrictEqual(recomputed, failed);
+    assertTextMatch(await recomputed, /^v2:scrypt:/);
   });
 });

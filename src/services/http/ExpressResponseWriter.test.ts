@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createReadStream } from 'node:fs';
 import http, { type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Readable } from 'node:stream';
@@ -7,6 +8,7 @@ import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import express, { type Request, type Response } from 'express';
 import type { TransformResponseHook } from '../../server.ts';
+import { errorResultResponse } from './builtinErrorHandlers.ts';
 import { ExpressResponseWriter } from './ExpressResponseWriter.ts';
 import { HttpResponse } from './responses.ts';
 
@@ -65,6 +67,35 @@ const withTimeout = <T>(promise: Promise<T>, label: string) =>
       setTimeout(() => reject(new Error(`timed out: ${label}`)), 2000),
     ),
   ]);
+
+/** Read one response to its end, undecoded, as a client that trusts its framing. */
+const requestRaw = (method = 'GET') =>
+  withTimeout(
+    new Promise<{
+      status?: number;
+      headers: http.IncomingHttpHeaders;
+      text: string;
+    }>((resolve, reject) => {
+      http
+        .request(origin, { method }, (response) => {
+          let text = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => {
+            text += chunk;
+          });
+          response.on('end', () =>
+            resolve({
+              status: response.statusCode,
+              headers: response.headers,
+              text,
+            }),
+          );
+        })
+        .on('error', reject)
+        .end();
+    }),
+    `${method} response complete`,
+  );
 
 /** A full garbage collection, where the runtime allows forcing one. */
 const forceGc = (): (() => void) | undefined => {
@@ -198,6 +229,119 @@ describe('ExpressResponseWriter — empty and redirect', () => {
     assert.strictEqual(response.headers.get('content-length'), '0');
   });
 
+  it('empty: drops a stated Content-Length, so the response completes', async () => {
+    serve(() =>
+      errorResultResponse({
+        status: 205,
+        body: { reset: true },
+        headers: { 'Content-Length': '17' },
+      }),
+    );
+    // A kept-alive client reads to the stated length before the response ends.
+    const response = await withTimeout(
+      new Promise<http.IncomingMessage>((resolve, reject) => {
+        http
+          .get(origin, (incoming) => {
+            incoming.resume();
+            incoming.on('end', () => resolve(incoming));
+          })
+          .on('error', reject);
+      }),
+      '205 response complete',
+    );
+    assert.strictEqual(response.statusCode, 205);
+    assert.notStrictEqual(response.headers['content-length'], '17');
+  });
+
+  it('empty: zeroes a Content-Length already on the response', async () => {
+    serve(
+      () => HttpResponse.empty(205),
+      (res) => res.setHeader('Content-Length', '17'),
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 205);
+    assert.strictEqual(response.headers['content-length'], '0');
+  });
+
+  it('empty: drops a Transfer-Encoding already on the response', async () => {
+    serve(
+      () => HttpResponse.empty(205),
+      (res) => {
+        res.setHeader('Transfer-Encoding', 'chunked');
+        res.setHeader('Content-Length', '17');
+      },
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 205);
+    assert.strictEqual(response.headers['transfer-encoding'], undefined);
+    assert.strictEqual(response.headers['content-length'], '0');
+  });
+
+  it('empty: keeps the chunked framing a declared Trailer needs', async () => {
+    serve(
+      () => HttpResponse.empty(201),
+      (res) => {
+        res.setHeader('Trailer', 'x-checksum');
+        res.setHeader('Transfer-Encoding', 'chunked');
+      },
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 201);
+    assert.strictEqual(await handled, undefined);
+  });
+
+  it('empty: a 205 to HEAD states a zero length', async () => {
+    serve(() =>
+      HttpResponse.empty(205, { headers: { 'content-length': '17' } }),
+    );
+    const response = await requestRaw('HEAD');
+    assert.strictEqual(response.status, 205);
+    assert.strictEqual(response.headers['content-length'], '0');
+  });
+
+  it('empty: HEAD keeps a stated Content-Length', async () => {
+    serve(() =>
+      HttpResponse.empty(200, { headers: { 'content-length': '17' } }),
+    );
+    const response = await requestRaw('HEAD');
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers['content-length'], '17');
+  });
+
+  it('empty: a 204 or 304 to HEAD drops its content headers too', async () => {
+    for (const status of [204, 304]) {
+      serve(
+        () =>
+          HttpResponse.empty(status, {
+            headers: { 'content-type': 'text/plain', 'content-length': '17' },
+          }),
+        (res) => res.setHeader('Transfer-Encoding', 'chunked'),
+      );
+      const response = await requestRaw('HEAD');
+      assert.strictEqual(response.status, status);
+      for (const name of [
+        'content-type',
+        'content-length',
+        'transfer-encoding',
+      ]) {
+        assert.strictEqual(
+          response.headers[name],
+          undefined,
+          `${status} ${name}`,
+        );
+      }
+    }
+  });
+
+  it('empty: 204 drops Content-Type', async () => {
+    serve(() =>
+      HttpResponse.empty(204, { headers: { 'content-type': 'text/plain' } }),
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 204);
+    assert.strictEqual(response.headers['content-type'], undefined);
+  });
+
   it('redirect: status and location', async () => {
     serve(() => HttpResponse.redirect(303, '/next?a=1'));
     const response = await fetch(origin, { redirect: 'manual' });
@@ -241,6 +385,43 @@ describe('ExpressResponseWriter — headers already on the response', () => {
       'c=3',
     ]);
     assert.strictEqual(response.headers.get('vary'), 'Origin, Accept');
+  });
+
+  it('merges the valid names of a Vary value without failing the response', async () => {
+    for (const [vary, expected] of [
+      ['', null],
+      ['Accept,\tOrigin', 'Accept, Origin'],
+      // Not a list of field names: sent as given.
+      ['Accept Origin', 'Accept Origin'],
+    ] as const) {
+      serve(() => HttpResponse.json(200, { ok: true }, { headers: { vary } }));
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 200, JSON.stringify(vary));
+      assert.strictEqual(response.headers.get('vary'), expected);
+      assert.deepStrictEqual(await response.json(), { ok: true });
+    }
+  });
+
+  it('sends each cookie of a legacy error result whose header is an array', async () => {
+    const cookies = ['a=; Max-Age=0', 'b=; Max-Age=0'];
+    for (const body of [{ message: 'Login required' }, undefined]) {
+      serve(() =>
+        errorResultResponse({
+          status: 401,
+          body,
+          // Typed as a string, but a JavaScript app may pass an array.
+          headers: {
+            'Set-Cookie': cookies,
+            'X-Reasons': ['token', 'expired'],
+          } as unknown as Record<string, string>,
+        }),
+      );
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 401);
+      assert.deepStrictEqual(response.headers.getSetCookie(), cookies);
+      assert.strictEqual(response.headers.get('x-reasons'), 'token, expired');
+      await response.arrayBuffer();
+    }
   });
 });
 
@@ -585,11 +766,136 @@ describe('ExpressResponseWriter — native Web Response', () => {
     assert.notStrictEqual(response.headers.get('connection'), 'upgrade');
   });
 
+  it('drops the headers its Connection header names', async () => {
+    serve(() =>
+      HttpResponse.native(
+        new Response('x', {
+          headers: {
+            Connection: 'X-Upstream-Trace',
+            'X-Upstream-Trace': 'v',
+            'x-kept': 'yes',
+          },
+        }),
+      ),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(await response.text(), 'x');
+    assert.strictEqual(response.headers.get('x-upstream-trace'), null);
+    assert.doesNotMatch(
+      response.headers.get('connection') ?? '',
+      /x-upstream-trace/i,
+    );
+    assert.strictEqual(response.headers.get('x-kept'), 'yes');
+  });
+
+  const body = 'x'.repeat(44);
+  const upstream = (
+    url: string,
+    encoding: string,
+    init: { status?: number; headers?: Record<string, string> } = {},
+    content: string | null = body,
+  ) => {
+    const response = new Response(content, {
+      ...init,
+      headers: {
+        'content-encoding': encoding,
+        'content-length': '44',
+        'content-digest': 'sha-256=:AAAA:',
+        ...init.headers,
+      },
+    });
+    Object.defineProperty(response, 'url', { value: url });
+    return HttpResponse.native(response);
+  };
+
+  it('drops the encoding and digest headers of a fetched Response, whose body is decoded', async () => {
+    serve(() => upstream('https://upstream.test/data', 'gzip'));
+    // Read without decoding, to see the headers as sent.
+    const fetched = await requestRaw();
+    assert.strictEqual(fetched.headers['content-encoding'], undefined);
+    assert.strictEqual(fetched.headers['content-length'], undefined);
+    assert.strictEqual(fetched.headers['content-digest'], undefined);
+    assert.strictEqual(fetched.text, body);
+
+    serve(() => upstream('', 'gzip'));
+    const constructed = await requestRaw();
+    assert.strictEqual(constructed.headers['content-encoding'], 'gzip');
+    assert.strictEqual(constructed.headers['content-length'], '44');
+    assert.strictEqual(constructed.headers['content-digest'], 'sha-256=:AAAA:');
+    assert.strictEqual(constructed.text, body);
+  });
+
+  it('keeps the encoding headers of a fetched Response with a coding fetch does not decode', async () => {
+    for (const encoding of ['compress', 'GZIP, compress']) {
+      serve(() => upstream('https://upstream.test/data', encoding));
+      const fetched = await requestRaw();
+      assert.strictEqual(fetched.headers['content-encoding'], encoding);
+      assert.strictEqual(fetched.headers['content-length'], '44');
+      assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+      assert.strictEqual(fetched.text, body);
+    }
+  });
+
+  it("treats a fetched Response's stacked codings as the runtime's fetch does", async () => {
+    serve(() => upstream('https://upstream.test/data', 'gzip, br'));
+    const fetched = await requestRaw();
+    // Node's fetch decodes stacked codings; Bun's passes them on still encoded.
+    const kept = process.versions.bun !== undefined;
+    assert.strictEqual(
+      fetched.headers['content-encoding'],
+      kept ? 'gzip, br' : undefined,
+    );
+    assert.strictEqual(
+      fetched.headers['content-length'],
+      kept ? '44' : undefined,
+    );
+    assert.strictEqual(
+      fetched.headers['content-digest'],
+      kept ? 'sha-256=:AAAA:' : undefined,
+    );
+    assert.strictEqual(fetched.text, body);
+  });
+
+  it('keeps the encoding headers of a fetched Response without a body', async () => {
+    serve(() => upstream('https://upstream.test/data', 'gzip', {}, null));
+    const fetched = await requestRaw('HEAD');
+    assert.strictEqual(fetched.headers['content-encoding'], 'gzip');
+    assert.strictEqual(fetched.headers['content-length'], '44');
+    assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+  });
+
+  it('keeps the encoding headers of a fetched 206 Response', async () => {
+    serve(() =>
+      upstream('https://upstream.test/data', 'gzip', {
+        status: 206,
+        headers: { 'content-range': 'bytes 0-43/100' },
+      }),
+    );
+    const fetched = await requestRaw();
+    assert.strictEqual(fetched.status, 206);
+    assert.strictEqual(fetched.headers['content-encoding'], 'gzip');
+    assert.strictEqual(fetched.headers['content-length'], '44');
+    assert.strictEqual(fetched.headers['content-digest'], 'sha-256=:AAAA:');
+    assert.strictEqual(fetched.headers['content-range'], 'bytes 0-43/100');
+    assert.strictEqual(fetched.text, body);
+  });
+
   it('a Response without a body', async () => {
     serve(() => HttpResponse.native(new Response(null, { status: 204 })));
     const response = await fetch(origin);
     assert.strictEqual(response.status, 204);
     assert.strictEqual(await response.text(), '');
+  });
+
+  it('a Response without a body completes despite its Content-Length', async () => {
+    serve(() =>
+      HttpResponse.native(
+        new Response(null, { headers: { 'content-length': '1234' } }),
+      ),
+    );
+    const response = await requestRaw();
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.headers['content-length'], '0');
   });
 });
 
@@ -680,6 +986,46 @@ describe('ExpressResponseWriter — transform', () => {
     assert.strictEqual(cancels, 1);
   });
 
+  it('a transform that wraps the stream sends the whole wrapped body', async () => {
+    async function* bracketed(source: AsyncIterable<Uint8Array>) {
+      yield bytesOf('[');
+      yield* source;
+      yield bytesOf(']');
+    }
+    const wrap: TransformResponseHook = (response) =>
+      response.kind === 'stream'
+        ? HttpResponse.stream(
+            response.status,
+            bracketed(response.body as AsyncIterable<Uint8Array>),
+          )
+        : response;
+    const sources = {
+      generator: () =>
+        (async function* () {
+          yield bytesOf('a');
+          yield bytesOf('b');
+        })(),
+      readableStream: () =>
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(bytesOf('a'));
+            controller.enqueue(bytesOf('b'));
+            controller.close();
+          },
+        }),
+    };
+    for (const [kind, source] of Object.entries(sources)) {
+      const reported = serveWith(wrap, () =>
+        HttpResponse.stream(200, source()),
+      );
+      const response = await fetch(origin);
+      assert.strictEqual(response.status, 200, kind);
+      assert.strictEqual(await response.text(), '[ab]', kind);
+      assert.strictEqual(await handled, undefined, kind);
+      assert.deepStrictEqual(reported, [], kind);
+    }
+  });
+
   it('sends the original and reports a transform that throws', async () => {
     const reported = serveWith(
       () => {
@@ -691,6 +1037,30 @@ describe('ExpressResponseWriter — transform', () => {
     assert.deepStrictEqual(await response.json(), { id: 'x' });
     assert.strictEqual(reported.length, 1);
     assert.match(reported[0] ?? '', /transformResponse threw.*envelope broke/s);
+  });
+
+  it('sends the original and reports a transform that throws a Symbol', async () => {
+    const reported = serveWith(
+      () => {
+        throw Symbol('envelope broke');
+      },
+      () => HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    assert.match(reported[0] ?? '', /threw.*Symbol\(envelope broke\)/);
+  });
+
+  it('sends the original and reports a transform that throws an unprintable value', async () => {
+    const reported = serveWith(
+      () => {
+        throw Object.create(null);
+      },
+      () => HttpResponse.json(200, { id: 'x' }),
+    );
+    const response = await fetch(origin);
+    assert.deepStrictEqual(await response.json(), { id: 'x' });
+    assert.match(reported[0] ?? '', /threw.*\[unprintable value\]/);
   });
 
   it('sends the original and reports a transform that returns no response', async () => {
@@ -725,6 +1095,91 @@ describe('ExpressResponseWriter — transform', () => {
       assert.deepStrictEqual(unhandled, []);
     } finally {
       process.off('unhandledRejection', onUnhandled);
+    }
+  });
+
+  it('delivers the original in full when a late response wraps its source', async () => {
+    const reported = serveWith(
+      (async (response: HttpResponse) =>
+        response.kind === 'stream'
+          ? HttpResponse.stream(
+              200,
+              Readable.toWeb(
+                response.body as Readable,
+              ) as ReadableStream<Uint8Array>,
+            )
+          : response) as unknown as TransformResponseHook,
+      () =>
+        HttpResponse.stream(
+          200,
+          Readable.from(
+            (async function* () {
+              yield bytesOf('a');
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              yield bytesOf('b');
+            })(),
+          ),
+        ),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(await response.text(), 'ab');
+    assert.strictEqual(await handled, undefined);
+    assert.match(reported[0] ?? '', /returned a Promise/);
+  });
+
+  it('delivers the original in full when a late Node stream wraps its source', async () => {
+    const reported = serveWith(
+      (async (response: HttpResponse) =>
+        response.kind === 'stream'
+          ? HttpResponse.stream(
+              200,
+              Readable.fromWeb(Readable.toWeb(response.body as Readable)),
+            )
+          : response) as unknown as TransformResponseHook,
+      () =>
+        HttpResponse.stream(
+          200,
+          Readable.from(
+            (async function* () {
+              yield bytesOf('a');
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              yield bytesOf('b');
+            })(),
+          ),
+        ),
+    );
+    const response = await fetch(origin);
+    assert.strictEqual(await response.text(), 'ab');
+    assert.strictEqual(await handled, undefined);
+    assert.match(reported[0] ?? '', /returned a Promise/);
+  });
+
+  it('a failing late stream does not crash the process', async () => {
+    const uncaught: unknown[] = [];
+    const onUncaught = (err: unknown) => uncaught.push(err);
+    process.on('uncaughtExceptionMonitor', onUncaught);
+    try {
+      let late: Readable | undefined;
+      let closed: Promise<unknown> | undefined;
+      const reported = serveWith(
+        (async () => {
+          late = createReadStream(
+            new URL('./nonexistent-late-response-fixture', import.meta.url),
+          );
+          // No test error listener: its failed open must not crash the process.
+          closed = new Promise((resolve) => late?.once('close', resolve));
+          return HttpResponse.stream(200, late);
+        }) as unknown as TransformResponseHook,
+        () => HttpResponse.json(200, { id: 'x' }),
+      );
+      const response = await fetch(origin);
+      assert.deepStrictEqual(await response.json(), { id: 'x' });
+      assert.strictEqual(await handled, undefined);
+      await withTimeout(Promise.resolve(closed), 'late source closed');
+      assert.deepStrictEqual(uncaught, []);
+      assert.match(reported[0] ?? '', /returned a Promise/);
+    } finally {
+      process.off('uncaughtExceptionMonitor', onUncaught);
     }
   });
 });

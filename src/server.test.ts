@@ -56,6 +56,26 @@ describe('Server lookups — DX guards', () => {
     assert.ok(appInstance.getModel('User'));
   });
 
+  // Must stay the first `getModel('UserOld')` call in this file.
+  it('getModel warns once that UserOld is deprecated, at its first use', async () => {
+    const codes: Array<string | undefined> = [];
+    const handler = (warning: Error & { code?: string }) =>
+      codes.push(warning.code);
+    process.on('warning', handler);
+    try {
+      assert.ok(appInstance.getModel('UserOld'));
+      assert.ok(appInstance.getModel('UserOld'));
+      // process.emitWarning fires on the next tick — let it flush.
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('warning', handler);
+    }
+    assert.strictEqual(
+      codes.filter((code) => code === 'ASF_DEP_USEROLD').length,
+      1,
+    );
+  });
+
   it('getModelOrThrow returns a real model for a known name', () => {
     assert.strictEqual(
       appInstance.getModelOrThrow('User'),

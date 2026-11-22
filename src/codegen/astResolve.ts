@@ -70,6 +70,8 @@ export interface ResolvedController {
   /** Mount path: the literal `getHttpPath()` return, else `/<classname>`. */
   urlPrefix: string;
   routes: RouteInfo[];
+  /** `get routes()` has a return type annotation (see {@link ExtractResult}). */
+  routesAnnotated?: boolean;
   /** Effective middleware (own, or inherited from the nearest defining ancestor). */
   middleware: MiddlewareScope[];
   /** Emittable import for each middleware binding in `middleware`. */
@@ -206,6 +208,7 @@ export async function resolveController(
     className: self.className,
     urlPrefix,
     routes: self.routes,
+    routesAnnotated: self.routesAnnotated,
     middleware,
     imports,
     needsBoot,

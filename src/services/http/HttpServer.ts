@@ -9,6 +9,8 @@ import type {
 } from 'express';
 import express from 'express';
 import type ThttpConfig from '../../config/http.ts';
+import { warmPasswordVerify } from '../../helpers/crypto.ts';
+import { describeThrown } from '../../helpers/logger.ts';
 import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
 import type { IApp, TransformResponseHook } from '../../server.ts';
@@ -23,6 +25,7 @@ import {
   type RegisteredErrorHandler,
   type RegistrableError,
   type ResolvedError,
+  resolvedErrorResponse,
   serverErrorMessage,
   serverErrorResponse,
   toLoggableError,
@@ -36,7 +39,7 @@ import PrepareAppInfoMiddleware from './middleware/PrepareAppInfo.ts';
 import RequestLoggerMiddleware from './middleware/RequestLogger.ts';
 import RequestParserMiddleware from './middleware/RequestParser.ts';
 import { HttpResponse } from './responses.ts';
-import { createExpressAdapter } from './routing/ExpressAdapter.ts';
+import { createExpressAdapter, failure } from './routing/ExpressAdapter.ts';
 import { RouteRegistry } from './routing/RouteRegistry.ts';
 
 export interface FrameworkRequest extends Request {
@@ -140,6 +143,8 @@ class HttpServer extends Base {
    * mounted, so no request reaches a partly built app.
    */
   listen(): Promise<void> {
+    // The dummy hash unknown-account logins compare against; not awaited.
+    warmPasswordVerify();
     const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
     return new Promise((resolve) => {
       const listener = this.httpServer.listen(
@@ -234,13 +239,9 @@ class HttpServer extends Base {
           // Keep the stack — a broken consumer handler is exactly the case
           // where `${err}` (message-only) isn't enough to debug.
           this.logger?.error(
-            `Error handler for ${entry.errorClass.name} threw: ${
-              handlerErr instanceof Error
-                ? (handlerErr.stack ?? handlerErr.message)
-                : handlerErr
-            }`,
+            `Error handler for ${entry.errorClass.name} threw: ${describeThrown(handlerErr)}`,
           );
-          markErrorHandlerFailed(err);
+          markErrorHandlerFailed(req);
           return null;
         }
         if (response) {
@@ -250,7 +251,8 @@ class HttpServer extends Base {
                 body: response.kind === 'json' ? response.body : undefined,
               }
             : (result as ErrorHandlerResult);
-          return { ...legacy, response, logLevel: entry.logLevel };
+          const logLevel = entry.logLevelFor?.(err) ?? entry.logLevel;
+          return { ...legacy, response, logLevel };
         }
       }
     }
@@ -270,7 +272,9 @@ class HttpServer extends Base {
           'Not found',
         ),
       });
-      return this.responseWriter.write(notFound, req, res).catch(next);
+      return this.responseWriter
+        .write(notFound, req, res)
+        .catch((err) => next(failure(err)));
     });
   }
 
@@ -287,7 +291,7 @@ class HttpServer extends Base {
         // nothing can be sent — hand off to the default finalizer instead of
         // crashing with ERR_HTTP_HEADERS_SENT.
         if (res.headersSent) {
-          this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
+          this.logger?.error(`Unhandled request error: ${describeThrown(err)}`);
           return next(err);
         }
         const frameworkReq = req as FrameworkRequest;
@@ -295,11 +299,13 @@ class HttpServer extends Base {
         if (resolved) {
           this.logger?.[resolved.logLevel](toLoggableError(err));
         } else {
-          this.logger?.error(`Unhandled request error: ${err.stack ?? err}`);
+          this.logger?.error(`Unhandled request error: ${describeThrown(err)}`);
         }
         try {
           await this.responseWriter.write(
-            resolved?.response ?? serverErrorResponse(frameworkReq),
+            resolved
+              ? resolvedErrorResponse(resolved)
+              : serverErrorResponse(frameworkReq),
             req,
             res,
           );
@@ -307,13 +313,11 @@ class HttpServer extends Base {
           // The error response itself failed (e.g. a body JSON cannot encode):
           // fall back to the plain 500, without the writer or the transform.
           this.logger?.error(
-            `Error response could not be written: ${
-              writeErr instanceof Error
-                ? (writeErr.stack ?? writeErr.message)
-                : writeErr
-            }`,
+            `Error response could not be written: ${describeThrown(writeErr)}`,
           );
           if (!res.headersSent) {
+            // A type left on res from before must not label the JSON body.
+            res.setHeader('Content-Type', 'application/json');
             res.status(500).json({
               error: FRAMEWORK_ERROR_CODES.serverError,
               message: serverErrorMessage(frameworkReq),

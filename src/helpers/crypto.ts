@@ -211,17 +211,32 @@ export const verifyPassword = async (
 let dummyHashPromise: Promise<string> | null = null;
 
 /**
+ * @internal Start computing the dummy hash {@link burnPasswordVerify} compares against,
+ * so the first unknown-account login after a restart costs one scrypt, not two.
+ * Safe to call without awaiting: a failure is dropped and the next call retries.
+ */
+export const warmPasswordVerify = (): Promise<string> => {
+  if (!dummyHashPromise) {
+    const promise = hashPassword('framework:timing-equalizer');
+    dummyHashPromise = promise;
+    promise.catch(() => {
+      if (dummyHashPromise === promise) {
+        dummyHashPromise = null;
+      }
+    });
+  }
+  return dummyHashPromise;
+};
+
+/**
  * Burn one password-verify's worth of scrypt work, then discard the result.
  * Call this on the "no such user / no password" branch of a login so that a
  * non-existent account is not distinguishable from a wrong password by response
  * latency — i.e. it closes the user-enumeration timing oracle.
  */
 export const burnPasswordVerify = async (password: string): Promise<void> => {
-  if (!dummyHashPromise) {
-    dummyHashPromise = hashPassword('framework:timing-equalizer');
-  }
   try {
-    await verifyPassword(password, await dummyHashPromise);
+    await verifyPassword(password, await warmPasswordVerify());
   } catch {
     // Timing side effect only — any error here is irrelevant.
   }

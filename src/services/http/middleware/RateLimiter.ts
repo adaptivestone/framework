@@ -41,6 +41,9 @@ class RateLimiter extends AbstractMiddleware {
    */
   whenReady: Promise<void> = Promise.resolve();
 
+  /** The shared-bucket warning is logged once per limiter. */
+  #warnedSharedBucket = false;
+
   constructor(app: IApp, params?: Record<string, unknown>) {
     super(app, params);
     const limiterOptions = this.app.getConfig('rateLimiter');
@@ -109,15 +112,27 @@ class RateLimiter extends AbstractMiddleware {
       });
     } catch (e) {
       // Leave `this.limiter` undefined so `middleware()` returns 500 (same as an
-      // unknown driver) rather than crashing — e.g. `@redis/client` not installed.
+      // unknown driver) rather than crashing — e.g. `@redis/client` not
+      // installed, or a malformed `redis.url` the client cannot parse.
       this.logger?.error(
-        `RateLimiter redis init failed (is '@redis/client' installed?): ${e}`,
+        `RateLimiter redis init failed, so its routes answer 500: ${e}. Check that redis.url (REDIS_URI) is a valid redis:// or rediss:// URL and that '@redis/client' is installed.`,
       );
     }
   }
 
   generateConsumeKey(req: FrameworkRequest & GetUserByTokenAppInfo) {
     const { ip, route, user, request } = this.finalOptions.consumeKeyComponents;
+
+    // Concrete URLs are attacker-controlled: aliases and different IDs
+    // must consume the registered route's budget. A global/unmatched limiter
+    // uses one fixed bucket until routing has established a template.
+    const method =
+      req.method === 'HEAD' &&
+      req.route?.methods?.get &&
+      !req.route?.methods?.head
+        ? 'GET'
+        : (req.method ?? 'ALL');
+    const routePath = req.route?.path ?? 'unmatched';
 
     const key = [];
     if (ip) {
@@ -130,19 +145,14 @@ class RateLimiter extends AbstractMiddleware {
       }
     }
     if (route) {
-      // Concrete URLs are attacker-controlled: aliases and different IDs
-      // must consume the registered route's budget. A global/unmatched limiter
-      // uses one fixed bucket until routing has established a template.
-      const method =
-        req.method === 'HEAD' &&
-        req.route?.methods?.get &&
-        !req.route?.methods?.head
-          ? 'GET'
-          : (req.method ?? 'ALL');
-      key.push(`${method}:${req.route?.path ?? 'unmatched'}`);
+      key.push(`${method}:${routePath}`);
     }
+    // Only a truthy id identifies a user (a model with `id: false` has none);
+    // the key keeps the empty part as before.
+    let identified = false;
     if (user && req.appInfo?.user) {
       key.push(req.appInfo?.user.id);
+      identified = Boolean(req.appInfo.user.id);
     }
 
     if (request?.length) {
@@ -166,7 +176,24 @@ class RateLimiter extends AbstractMiddleware {
         key.push(
           createHash('sha256').update(JSON.stringify(fields)).digest('hex'),
         );
+        identified = true;
       }
+    }
+
+    // Without ip, all requests lacking every enabled identity share one
+    // bucket per route. With every identity disabled, that shared bucket is
+    // the intended per-route budget.
+    if (
+      !ip &&
+      (user || request?.length) &&
+      !identified &&
+      !this.#warnedSharedBucket
+    ) {
+      this.#warnedSharedBucket = true;
+      const missing = [...(user ? ['user'] : []), ...(request ?? [])];
+      this.logger?.warn(
+        `RateLimiter on ${method} ${routePath}: ip is disabled and this request has no ${missing.join(' or ')}, so such requests share one rate-limit bucket. Enable ip in consumeKeyComponents, or limit only routes where the identity is always present.`,
+      );
     }
 
     return key.join('_');

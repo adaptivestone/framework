@@ -3,6 +3,11 @@
 **Status**: direction settled under [universal HTTP responses](../active/universal-http-responses.md);
 implementation not started. This file preserves the detailed OpenAPI questions and is subordinate
 to P1q where the two documents overlap.
+**Target**: 5.8, the next release after 5.7.0 (user decision 2026-11-16). It needs P1q phases 0–2
+only, not the middleware rework (P1m).
+**Input from the 5.7.0 reviews (2026-11-17)**: a return annotation's media type is not checked
+against the factory (`HttpResponse.json(200, x)` satisfies `JsonResponse<200, T, 'application/problem+json'>`),
+so the generator must not take the media type from the annotation alone.
 **Depends on**: [openapi-generator](../done/openapi-generator.md) ✅ and
 [universal HTTP responses](../active/universal-http-responses.md) Phases 1–2.
 **Feeds**: a typed client / Swagger "try it"; later reuse by P2c response serialization

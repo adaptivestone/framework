@@ -1,9 +1,15 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { createReadStream } from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { PassThrough, Readable } from 'node:stream';
 import { describe, it, mock } from 'node:test';
-import express, { type Request, type Response } from 'express';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
 import type { IApp } from '../../../server.ts';
 import {
@@ -17,6 +23,7 @@ import {
 } from '../../../tests/assertions.ts';
 import { stubI18n } from '../../../tests/mocks.ts';
 import { builtInResponse } from '../builtInResponse.ts';
+import { ExpressResponseWriter } from '../ExpressResponseWriter.ts';
 import { HttpError } from '../httpErrors.ts';
 import RateLimiter from '../middleware/RateLimiter.ts';
 import { HttpResponse } from '../responses.ts';
@@ -391,6 +398,103 @@ describe('createExpressAdapter — error propagation', () => {
       'mw exploded',
     );
   });
+
+  it('answers a returned stream that fails without a reason through the error path', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/failing', {
+      handler: () =>
+        HttpResponse.stream(
+          200,
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.error();
+            },
+          }),
+        ),
+    });
+    const errors: unknown[] = [];
+    const server = http.createServer(
+      express()
+        .use(createExpressAdapter(r, fakeApp))
+        .use(
+          (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+            errors.push(err);
+            res.status(500).end();
+          },
+        ),
+    );
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/failing`);
+      assert.strictEqual(response.status, 500);
+      assert.strictEqual(errors.length, 1);
+      assert.ok(errors[0] instanceof Error);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  /** Request `method /x` through an app whose error sink answers 500; the errors it saw. */
+  const requestWithErrorSink = async (
+    r: RouteRegistry,
+    method: string,
+    writer?: ExpressResponseWriter,
+  ) => {
+    const errors: unknown[] = [];
+    const server = http.createServer(
+      express()
+        .use(createExpressAdapter(r, fakeApp, writer))
+        .use(
+          (err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+            errors.push(err);
+            res.status(500).end();
+          },
+        ),
+    );
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/x`, { method });
+      return { status: response.status, errors };
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  };
+  const failingStream = (reason?: unknown) =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(reason);
+      },
+    });
+
+  it('answers a returned stream that fails with a falsy reason through the error path', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', {
+      handler: () => HttpResponse.stream(200, failingStream(false)),
+    });
+    const { status, errors } = await requestWithErrorSink(r, 'GET');
+    assert.strictEqual(status, 500);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0] instanceof Error);
+  });
+
+  it('answers a failed 405 write without a reason through the error path', async () => {
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', { handler: () => HttpResponse.empty(204) });
+    const writer = new ExpressResponseWriter({
+      transform: (response) =>
+        response.status === 405
+          ? HttpResponse.stream(405, failingStream())
+          : response,
+    });
+    const { status, errors } = await requestWithErrorSink(r, 'POST', writer);
+    assert.strictEqual(status, 500);
+    assert.strictEqual(errors.length, 1);
+    assert.ok(errors[0] instanceof Error);
+  });
 });
 
 describe('createExpressAdapter — returned HttpResponse', () => {
@@ -440,7 +544,7 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     }
   });
 
-  it('fails loudly when the handler also wrote to res', async () => {
+  it('logs and drops a returned response when the handler also wrote to res', async () => {
     const r = new RouteRegistry();
     r.registerRoute('GET', '/mixed', {
       handler: async (_req: Request, res: Response) => {
@@ -450,10 +554,11 @@ describe('createExpressAdapter — returned HttpResponse', () => {
       },
     });
     const { writer, write } = stubWriter();
+    const { app, error } = makeAppWithLogger();
     const res = makeRes();
     const next = mock.fn();
 
-    await createExpressAdapter(r, fakeApp, writer)(
+    await createExpressAdapter(r, app, writer)(
       makeReq('GET', '/mixed'),
       asExpressRes(res),
       next,
@@ -461,11 +566,206 @@ describe('createExpressAdapter — returned HttpResponse', () => {
 
     assertNotCalled(write);
     assert.deepStrictEqual(res.body, { first: true });
-    assertCalledWith(next, pattern.any(Error));
+    // The response written to res stays intact: no error goes downstream.
+    assertNotCalled(next);
+    assertCalledTimes(error, 1);
     assertTextMatch(
-      next.mock.calls[0]?.arguments[0]?.message,
+      error.mock.calls[0]?.arguments[0],
       /GET \/mixed: the handler both wrote to res and returned an HttpResponse/,
     );
+  });
+
+  it('leaves a returned stream alone when the handler also wrote to res', async () => {
+    // The handler may be sending this same stream through res.
+    let cancels = 0;
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(
+          200,
+          new ReadableStream<Uint8Array>({
+            cancel() {
+              cancels += 1;
+            },
+          }),
+        );
+      },
+    });
+    const { writer, write } = stubWriter();
+    const { app } = makeAppWithLogger();
+    const next = mock.fn();
+
+    await createExpressAdapter(r, app, writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(makeRes()),
+      next,
+    );
+    await flush();
+
+    assertNotCalled(write);
+    assertNotCalled(next);
+    assert.strictEqual(cancels, 0);
+  });
+
+  it('destroys an unread returned Node stream when the handler also wrote to res', async (t) => {
+    const source = createReadStream(
+      new URL('./nonexistent-stream-review-fixture', import.meta.url),
+    );
+    // No test error listener: an unhandled open error must fail this test.
+    const closed = new Promise<void>((resolve) =>
+      source.once('close', resolve),
+    );
+    t.after(() => source.destroy());
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        res.json({ first: true });
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(200, source);
+      },
+    });
+    const { app } = makeAppWithLogger();
+
+    await createExpressAdapter(r, app, stubWriter().writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(makeRes()),
+      mock.fn(),
+    );
+    await closed;
+
+    assert.ok(source.destroyed, 'the unread source is destroyed');
+  });
+
+  it('leaves a Node stream the handler pipes to res running, without crashing on its error', async (t) => {
+    const source = new Readable({ read() {} });
+    t.after(() => source.destroy());
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/mixed', {
+      handler: async (_req: Request, res: Response) => {
+        source.pipe(res);
+        (res as unknown as MockRes).headersSent = true;
+        return HttpResponse.stream(200, source);
+      },
+    });
+    const { app } = makeAppWithLogger();
+    const res = Object.assign(makeRes(), { write: () => true });
+
+    await createExpressAdapter(r, app, stubWriter().writer)(
+      makeReq('GET', '/mixed'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    await flush();
+
+    assert.ok(!source.destroyed, 'the piped source keeps running');
+    assert.strictEqual(source.readableFlowing, true);
+    // No test error listener: an unhandled error must fail this test.
+    const closed = new Promise<void>((resolve) =>
+      source.once('close', resolve),
+    );
+    source.destroy(new Error('source failed'));
+    await closed;
+  });
+
+  it('treats a stream piped into res and also returned as written to res', async () => {
+    const source = new PassThrough();
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/piped', {
+      handler: (_req: Request, res: Response) => {
+        source.pipe(res);
+        setImmediate(() => {
+          source.write('first,');
+          source.end('second');
+        });
+        return HttpResponse.stream(200, source);
+      },
+    });
+    const writer = new ExpressResponseWriter();
+    const write = mock.fn(writer.write.bind(writer));
+    const { app, error } = makeAppWithLogger();
+    const server = http.createServer(
+      express().use(createExpressAdapter(r, app, { write })),
+    );
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const response = await fetch(`http://127.0.0.1:${port}/piped`);
+      assert.strictEqual(await response.text(), 'first,second');
+      assertNotCalled(write);
+      assertCalledTimes(error, 1);
+      assertTextMatch(
+        error.mock.calls[0]?.arguments[0],
+        /both wrote to res and returned an HttpResponse/,
+      );
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+
+  it('writes a returned response when res has an unpipe listener of its own', async () => {
+    const response = HttpResponse.json(200, { ok: true });
+    const r = new RouteRegistry();
+    r.registerRoute('GET', '/x', { handler: async () => response });
+    const { writer, write } = stubWriter();
+    const { app, error } = makeAppWithLogger();
+    const res = makeRes();
+    // Set by an app middleware: not a stream piped into res.
+    res.on('unpipe', () => {});
+
+    await createExpressAdapter(r, app, writer)(
+      makeReq('GET', '/x'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+
+    assertCalledTimes(write, 1);
+    assert.strictEqual(write.mock.calls[0]?.arguments[0], response);
+    assertNotCalled(error);
+    assert.strictEqual(res.listenerCount('pipe'), 0);
+  });
+
+  it('sends a late framework response after a stream piped into res was detached', async () => {
+    const produced = HttpResponse.json(200, { ok: true });
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, produced);
+    };
+    const source = new PassThrough();
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request, res: Response) => {
+        source.pipe(res);
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = asExpressRes(makeRes());
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        res,
+        mock.fn(),
+      );
+      // Detached before it sent anything.
+      source.unpipe(res);
+
+      produce();
+      await flush();
+
+      assertCalledTimes(write, 1);
+      assert.strictEqual(write.mock.calls[0]?.arguments[0], produced);
+    } finally {
+      emitWarning.mock.restore();
+      source.destroy();
+    }
   });
 
   it('passes a writer failure to next(err)', async () => {
@@ -592,6 +892,120 @@ describe('createExpressAdapter — returned HttpResponse', () => {
     await flush();
 
     assertNotCalled(write);
+  });
+
+  it('leaves a late framework response alone when the client disconnected', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+    Object.assign(res, { destroyed: true });
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+  });
+
+  it('passes a late writer failure thrown at once to next(err)', async () => {
+    const failure = new Error('write threw');
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request) => {
+        builtIn(req); // neither awaited nor returned
+      },
+    });
+    const writer = {
+      write: (): Promise<void> => {
+        throw failure;
+      },
+    };
+    const next = mock.fn();
+    const emitWarning = mock.method(process, 'emitWarning', () => {});
+    try {
+      await createExpressAdapter(r, fakeApp, writer)(
+        makeReq('POST', '/login'),
+        asExpressRes(makeRes()),
+        next,
+      );
+      produce();
+      await flush();
+
+      assertCalledWith(next, failure);
+    } finally {
+      emitWarning.mock.restore();
+    }
+  });
+
+  it('lets an override that chained on the framework handler answer first', async () => {
+    let produce = () => {};
+    const ready = new Promise<void>((resolve) => {
+      produce = resolve;
+    });
+    const builtIn = async (req: Request) => {
+      await ready;
+      return builtInResponse(req, HttpResponse.json(200, { ok: true }));
+    };
+    const r = new RouteRegistry();
+    r.registerRoute('POST', '/login', {
+      handler: async (req: Request, res: Response) => {
+        // Not returned: the answer comes from the continuation.
+        builtIn(req).then(() => {
+          res.json({ own: true });
+          (res as unknown as MockRes).headersSent = true;
+        });
+      },
+    });
+    const { writer, write } = stubWriter();
+    const res = makeRes();
+    await createExpressAdapter(r, fakeApp, writer)(
+      makeReq('POST', '/login'),
+      asExpressRes(res),
+      mock.fn(),
+    );
+
+    produce();
+    await flush();
+
+    assertNotCalled(write);
+    assert.deepStrictEqual(res.body, { own: true });
+  });
+
+  it("shows a framework response's status on res", () => {
+    const res = { statusCode: 200, headersSent: false };
+    builtInResponse({ res }, HttpResponse.empty(201));
+    assert.strictEqual(res.statusCode, 201);
+  });
+
+  it('leaves the status of a response that was already sent', () => {
+    const res = { statusCode: 200, headersSent: true };
+    builtInResponse({ res }, HttpResponse.empty(404));
+    assert.strictEqual(res.statusCode, 200);
   });
 
   it('leaves a dropped framework response alone when the override answered itself', async () => {

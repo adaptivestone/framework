@@ -141,6 +141,19 @@ export async function planRouteTypes(
     if (r.isInternal) {
       continue;
     }
+    // The gen file reads schemas through `InstanceType<…>['routes']`, which an
+    // annotation can widen, breaking every request type of this controller.
+    if (
+      r.resolved.routesAnnotated &&
+      r.resolved.routes.some(
+        (route) => route.hasRequest || route.hasQuery || route.hasParams,
+      )
+    ) {
+      logger?.warn?.(
+        `${r.srcPath}: \`get routes()\` has a return type annotation, which can widen the route shapes so generated request types fail to compile. ` +
+          'Remove the annotation, or use `satisfies RouteParams` on the returned object.',
+      );
+    }
     const text = renderResolved(
       r.srcPath,
       r.resolved,

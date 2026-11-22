@@ -1,6 +1,7 @@
 import cluster from 'node:cluster';
 import fs from 'node:fs';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import type { Request, Response } from 'express';
 import { runCluster } from '../../clusterRunner.ts';
@@ -12,6 +13,15 @@ const srcRoot = path.resolve(
   '../..',
 );
 const folder = (...p: string[]) => path.resolve(srcRoot, ...p);
+
+if (cluster.isPrimary) {
+  cluster.on('exit', (worker, code, signal) => {
+    fs.writeSync(
+      1,
+      `WORKER_EXITED:${code}:${signal}:${worker.exitedAfterDisconnect}\n`,
+    );
+  });
+}
 
 await runCluster(
   async () => {
@@ -44,7 +54,15 @@ await runCluster(
     server.app.events.on('shutdown', () => {
       fs.writeSync(1, `SHUTDOWN_EVENT_FIRED:${process.pid}\n`);
     });
+    // An async teardown, like a redis quit() or a logger flush.
+    server.app.events.on('shutdown', async () => {
+      await sleep(200);
+      fs.writeSync(1, `SHUTDOWN_TEARDOWN_DONE:${process.pid}\n`);
+    });
     await server.init({ isSkipModelInit: true });
+    // The worker drains the scrypt warm-up that starts with HTTP before it
+    // exits. Keep it cheap, so the primary's shutdown bound holds under load.
+    server.app.updateConfig('auth', { scrypt: { ln: 12, r: 8, p: 1 } });
     server.app.updateConfig('http', { port });
     await server.startServer();
     fs.writeSync(1, `SERVER_LISTENING:${port}:${process.pid}\n`);

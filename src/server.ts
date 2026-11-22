@@ -1,3 +1,4 @@
+import cluster from 'node:cluster';
 import EventEmitter from 'node:events';
 import path from 'node:path';
 import { hrtime, loadEnvFile } from 'node:process';
@@ -59,8 +60,9 @@ export type FrameworkModelName =
 export type AppModel = TBaseModel;
 
 /**
- * Generated application model-name map. `npm run gen` augments this interface
- * in `genTypes.d.ts`; it is empty before code generation by design.
+ * Generated application model-name map. `node src/cli.ts generatetypes`
+ * augments this interface in `genTypes.d.ts`; it is empty before code
+ * generation by design.
  */
 // biome-ignore lint/suspicious/noEmptyInterface: codegen augmentation target
 export interface AppModelTypes {}
@@ -152,6 +154,9 @@ try {
 // signals and each test file gets an isolated module graph.
 let signalHandlersRegistered = false;
 const CRASH_SENTRY_FLUSH_TIMEOUT_MS = 2_000;
+// Closing sockets takes a round trip, so 3s is generous, and it leaves most of
+// the 10s force-exit budget to the HTTP drain and the 'shutdown' teardown.
+const BEFORE_SHUTDOWN_TIMEOUT_MS = 3_000;
 
 /**
  * Main framework class.
@@ -179,6 +184,12 @@ class Server {
 
   /** Model names already nudged about a plural spelling (warned once each). */
   #pluralWarned = new Set<string>();
+
+  /**
+   * Set while the framework's auto-loaded `UserOld` is unused: the first
+   * `getModel('UserOld')` calls it to emit the deprecation warning.
+   */
+  #warnUserOldOnUse?: () => void;
 
   cli: null | BaseCli = null;
 
@@ -324,9 +335,10 @@ class Server {
 
   /**
    * Wire SIGTERM/SIGINT to a graceful shutdown: stop accepting connections,
-   * drain in-flight requests, then tear down mongo/redis/logger via the
-   * `'shutdown'` event. A single unref'd force-exit timer is the safety net —
-   * the process dies even if draining or a teardown hook hangs.
+   * let `'beforeShutdown'` listeners close long-lived ones, drain in-flight
+   * requests, then tear down mongo/redis/logger via the `'shutdown'` event. A
+   * single unref'd force-exit timer is the safety net — the process dies even
+   * if draining or a teardown hook hangs.
    *
    * Registered here (after HTTP is up), never at import time, so importing the
    * framework for tests/codegen has no process-level side effects. Skipped in
@@ -357,11 +369,15 @@ class Server {
           process.exit(1);
         }, 10_000);
         forceExit.unref();
-        try {
-          await this.app.httpServer?.shutdown();
-        } catch (e) {
+        // Stop accepting first, so a client that reconnects while a listener
+        // closes its stream cannot hold the drain open. Upgraded (WebSocket)
+        // sockets and long-lived requests such as SSE are not idle, so they
+        // stay open, holding the drain until the timer: listeners close them.
+        const drained = this.app.httpServer?.shutdown().catch((e) => {
           this.app.logger.error('Error closing HTTP server on shutdown', e);
-        }
+        });
+        await this.#emitBeforeShutdown();
+        await drained;
         // Tear down mongo/redis/logger. The listeners' async halves (redis
         // quit(), winston flush) outlive the synchronous `emit`, so set the exit
         // code and let the event loop drain naturally rather than `process.exit(0)`
@@ -370,13 +386,56 @@ class Server {
         // leaked handle is force-killed (code 1) by the timer above.
         this.app.events.emit('shutdown');
         process.exitCode = 0;
-        // A cluster worker's IPC channel is itself a live handle. Close it
-        // after HTTP has drained and teardown has started so the primary can
-        // observe the worker's clean exit without waiting for the force timer.
+        // An IPC channel (cluster worker, forked child) is itself a live
+        // handle. Close it after HTTP has drained and teardown has started so
+        // the parent can observe the clean exit without waiting for the force
+        // timer. A cluster worker goes through `cluster.worker.disconnect()`:
+        // on a bare `process.disconnect()` Node exits the worker at once,
+        // cutting the teardown off.
         if (process.connected) {
-          process.disconnect?.();
+          if (cluster.worker) {
+            cluster.worker.disconnect();
+          } else {
+            process.disconnect?.();
+          }
         }
       });
+    }
+  }
+
+  /**
+   * Call the `'beforeShutdown'` listeners as `emit` does (the emitter as
+   * `this`, no arguments, a `once` listener removed) and await them all, for
+   * at most {@link BEFORE_SHUTDOWN_TIMEOUT_MS}. A listener that throws or
+   * rejects is logged; neither it nor one that never settles stops the shutdown.
+   */
+  async #emitBeforeShutdown(): Promise<void> {
+    const { events } = this.app;
+    // Raw: a `once` wrapper removes itself and returns the listener's result.
+    const listeners = events.rawListeners('beforeShutdown');
+    if (listeners.length === 0) {
+      return;
+    }
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = await Promise.race([
+      Promise.all(
+        listeners.map(async (listener) => {
+          try {
+            await listener.call(events);
+          } catch (e) {
+            this.app.logger.error("Error in a 'beforeShutdown' listener", e);
+          }
+        }),
+      ).then(() => false),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => resolve(true), BEFORE_SHUTDOWN_TIMEOUT_MS);
+      }),
+    ]);
+    clearTimeout(timer);
+    if (timedOut) {
+      this.app.logger.warn(
+        `'beforeShutdown' listeners did not finish within ${BEFORE_SHUTDOWN_TIMEOUT_MS}ms, continuing shutdown`,
+      );
     }
   }
 
@@ -540,9 +599,15 @@ class Server {
                 'reinstall, and check your lockfile).',
             );
           } else {
-            this.app.logger.warn(
-              `Model ${modelName} is old type model. Please update it to BaseModel`,
-            );
+            const userOld = await import('./models/UserOld.ts');
+            if (ModelConstructor === userOld.default) {
+              // Loaded for every app: warn when the app asks for it, not here.
+              this.#warnUserOldOnUse = userOld.warnUserOldDeprecated;
+            } else {
+              this.app.logger.warn(
+                `Model ${modelName} is old type model. Please update it to BaseModel`,
+              );
+            }
             const model = new ModelConstructor(this.app) as AbstractModel;
             // Legacy model shape, removed in v6: stored under the BaseModel
             // type — no structural overlap, hence the double cast.
@@ -990,6 +1055,10 @@ class Server {
         `You asked for model ${modelName} that not exists. Please check you codebase `,
       );
       return false;
+    }
+    if (modelName === 'UserOld' && this.#warnUserOldOnUse) {
+      this.#warnUserOldOnUse();
+      this.#warnUserOldOnUse = undefined;
     }
     return model;
   }

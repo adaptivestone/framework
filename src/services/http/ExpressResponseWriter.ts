@@ -1,4 +1,7 @@
+import { Readable } from 'node:stream';
+import { finished } from 'node:stream/promises';
 import type { Request, Response } from 'express';
+import { describeThrown } from '../../helpers/logger.ts';
 import type { TransformResponseHook } from '../../server.ts';
 import type { FrameworkRequest } from './HttpServer.ts';
 import type { ResponseWriter } from './ResponseWriter.ts';
@@ -25,6 +28,25 @@ const HOP_BY_HOP_HEADERS: ReadonlySet<string> = new Set([
   'transfer-encoding',
   'upgrade',
 ]);
+
+/** The codings `fetch` decodes; a body in any other is passed on still encoded. */
+const FETCH_DECODED_CODINGS: ReadonlySet<string> = new Set([
+  'gzip',
+  'x-gzip',
+  'deflate',
+  'br',
+  'zstd',
+]);
+
+/** Headers that describe the encoded bytes, wrong once `fetch` decoded them. */
+const ENCODED_BODY_HEADERS = [
+  'content-encoding',
+  'content-length',
+  'content-digest',
+  'repr-digest',
+  'digest',
+  'content-md5',
+];
 
 /**
  * Renders `HttpResponse` values through Express, so JSON, text and bytes get
@@ -57,10 +79,19 @@ export class ExpressResponseWriter
     const headers = res.getHeaders();
     try {
       const final = this.#transformed(response, req);
-      if (final !== response) {
-        discardReplacedBody(response, final);
+      const replaced = final === response ? undefined : bodySource(response);
+      if (replaced instanceof Readable) {
+        // The replacement may read it late; an error before then must not crash.
+        absorbErrors(replaced);
       }
-      await render(final, req, res);
+      try {
+        await render(final, req, res);
+      } finally {
+        // After rendering: a replacement may wrap the original and read it.
+        if (final !== response) {
+          discardReplacedBody(response, final);
+        }
+      }
     } catch (err) {
       if (!res.headersSent) {
         for (const name of res.getHeaderNames()) {
@@ -94,8 +125,17 @@ export class ExpressResponseWriter
       const isThenable =
         typeof (transformed as { then?: unknown } | null)?.then === 'function';
       if (isThenable) {
-        // Reported below; its rejection must not surface as unhandled.
-        Promise.resolve(transformed).catch(() => {});
+        // Reported below. The late response is not sent, nor stopped: its body
+        // may read the original's source. A Node stream body's error cannot
+        // crash; a rejection must not surface as unhandled.
+        Promise.resolve(transformed)
+          .then((late: unknown) => {
+            const body = HttpResponse.is(late) ? bodySource(late) : undefined;
+            if (body instanceof Readable) {
+              absorbErrors(body);
+            }
+          })
+          .catch(() => {});
       }
       const got = isThenable
         ? 'a Promise (it must be synchronous)'
@@ -107,9 +147,7 @@ export class ExpressResponseWriter
       );
     } catch (err) {
       this.#onTransformError(
-        `transformResponse threw; the original response was sent: ${
-          err instanceof Error ? (err.stack ?? err.message) : err
-        }`,
+        `transformResponse threw; the original response was sent: ${describeThrown(err)}`,
       );
     }
     return response;
@@ -142,7 +180,7 @@ async function render(
     }
     case 'empty':
       start(res, response.status, response.headers);
-      res.end();
+      endWithoutBody(req, res);
       return;
     case 'redirect':
       applyHeaders(res, response.headers);
@@ -155,11 +193,37 @@ async function render(
       });
     case 'native': {
       const native = response.response;
+      // Dropped too: the fields `Connection` names (RFC 9110 7.6.1), and the
+      // encoding, length and digest headers of a fetched response (non-empty
+      // `url`) whose body `fetch` decoded: it has a body, is not a 206, and
+      // every coding it names is one that `fetch` decodes. Bun's `fetch`
+      // decodes a single coding only; it passes stacked codings on encoded.
+      const dropped = new Set(
+        (native.headers.get('connection') ?? '')
+          .split(',')
+          .map((name) => name.trim().toLowerCase()),
+      );
+      const codings = (native.headers.get('content-encoding') ?? '')
+        .split(',')
+        .map((coding) => coding.trim().toLowerCase());
+      if (
+        native.url &&
+        native.body &&
+        native.status !== 206 &&
+        (codings.length === 1 || process.versions.bun === undefined) &&
+        codings.every((coding) => FETCH_DECODED_CODINGS.has(coding))
+      ) {
+        for (const name of ENCODED_BODY_HEADERS) {
+          dropped.add(name);
+        }
+      }
       const commit = () => {
         start(
           res,
           native.status,
-          [...native.headers].filter(([name]) => !HOP_BY_HOP_HEADERS.has(name)),
+          [...native.headers].filter(
+            ([name]) => !HOP_BY_HOP_HEADERS.has(name) && !dropped.has(name),
+          ),
         );
         if (native.statusText) {
           res.statusMessage = native.statusText;
@@ -167,12 +231,39 @@ async function render(
       };
       if (!native.body) {
         commit();
-        res.end();
+        endWithoutBody(req, res);
         return;
       }
       return writeStream(req, res, native.body, commit);
     }
   }
+}
+
+/**
+ * End a response that has no body. A 204 or 304 drops its content headers; a
+ * 205 states a zero length and drops a `Transfer-Encoding`. Any other status
+ * keeps its `Transfer-Encoding`; outside HEAD a `Content-Length` (stated or
+ * already on `res`) becomes 0, so the client does not wait for bytes, and
+ * HEAD keeps its headers as given.
+ */
+function endWithoutBody(req: Request, res: Response): void {
+  if (res.statusCode === 204 || res.statusCode === 304) {
+    res.removeHeader('Content-Type');
+    res.removeHeader('Content-Length');
+    res.removeHeader('Transfer-Encoding');
+  } else if (res.statusCode === 205) {
+    res.setHeader('Content-Length', '0');
+    // Only when set: removing an absent one changes the framing on some runtimes.
+    if (res.getHeader('Transfer-Encoding') !== undefined) {
+      res.removeHeader('Transfer-Encoding');
+    }
+  } else if (
+    req.method !== 'HEAD' &&
+    res.getHeader('Content-Length') !== undefined
+  ) {
+    res.setHeader('Content-Length', '0');
+  }
+  res.end();
 }
 
 function start(res: Response, status: number, headers: ResponseHeaders): void {
@@ -185,7 +276,19 @@ function applyHeaders(res: Response, headers: ResponseHeaders): void {
     if (name === 'set-cookie') {
       res.append('Set-Cookie', value);
     } else if (name === 'vary') {
-      res.vary(value);
+      // Name by name: an empty or loosely spaced list must not fail the response.
+      const names = value
+        .split(',')
+        .map((field) => field.trim())
+        .filter(Boolean);
+      if (names.length > 0) {
+        try {
+          res.vary(names.join(', '));
+        } catch {
+          // Not a list of field names: sent as given, replacing an earlier one.
+          res.setHeader('Vary', value);
+        }
+      }
     } else {
       res.setHeader(name, value);
     }
@@ -217,6 +320,10 @@ function discardReplacedBody(
 /** Stop a byte source that will not be read. A failure to stop is ignored. */
 function cancelSource(body: ByteStream): void {
   try {
+    if (body instanceof Readable) {
+      destroyNodeSource(body);
+      return;
+    }
     const stopped =
       body instanceof ReadableStream
         ? body.cancel()
@@ -225,6 +332,35 @@ function cancelSource(body: ByteStream): void {
   } catch {
     // A source that throws while stopping is already broken; nothing more to do.
   }
+}
+
+/** Iterator.return() neither closes an unread Node stream nor interrupts a pending read. */
+function destroyNodeSource(body: Readable): void {
+  // An asynchronous open/_destroy can still fail after cancellation. Nothing
+  // consumes those errors once the response is discarded (not even an iterator
+  // for HEAD). Even a closed source may still have an error queued for emission.
+  absorbErrors(body);
+  body.destroy();
+}
+
+/**
+ * @internal A response that will not be sent: an unread Node stream body is
+ * destroyed; one being read keeps running, but its error cannot crash.
+ */
+export function releaseUnsentBody(response: HttpResponse): void {
+  const body = bodySource(response);
+  if (body instanceof Readable) {
+    if (body.readableFlowing === null) {
+      destroyNodeSource(body);
+    } else {
+      absorbErrors(body);
+    }
+  }
+}
+
+/** A no-op `'error'` listener, removed once the stream closes; readers still see the error. */
+function absorbErrors(body: Readable): void {
+  void finished(body, { cleanup: true }).catch(() => {});
 }
 
 /** A `ReadableStream` read through its reader, so a disconnect cancels a pending read at once. */
@@ -239,7 +375,17 @@ function iterate(body: ByteStream): AsyncIterator<Uint8Array> {
       },
     };
   }
-  return body[Symbol.asyncIterator]();
+  const source = body[Symbol.asyncIterator]();
+  if (body instanceof Readable) {
+    return {
+      next: () => source.next(),
+      return: async () => {
+        destroyNodeSource(body);
+        return source.return?.() ?? { done: true, value: undefined };
+      },
+    };
+  }
+  return source;
 }
 
 const DISCONNECTED = Symbol('disconnected');

@@ -86,3 +86,35 @@ describe('boot policy (docs 25 + 26)', () => {
     assertTextMatch(out, /npm ls @adaptivestone\/framework/);
   });
 });
+
+describe('UserOld deprecation at boot', () => {
+  // The framework loads its own models with the app's, UserOld included.
+  const bootWithWarnings = (extra: NodeJS.ProcessEnv = {}) => {
+    const env = { ...baseEnv(), ...extra };
+    env.BOOT_MONGO = '1';
+    env.AUTH_SALT = 'set-so-the-salt-check-passes';
+    env.LOGGER_CONSOLE_LEVEL = 'warn';
+    return runBoot(env);
+  };
+  const count = (text: string, pattern: RegExp) =>
+    text.match(new RegExp(pattern, 'g'))?.length ?? 0;
+
+  it('does not warn when the app never uses UserOld', {
+    timeout: 40000,
+  }, async () => {
+    const { code, out } = await bootWithWarnings();
+    assert.strictEqual(code, 0, out);
+    assert.strictEqual(count(out, /ASF_DEP_USEROLD/), 0, out);
+    assert.strictEqual(count(out, /UserOld is old type model/), 0, out);
+  });
+
+  it('warns once for an app model extending UserOld', {
+    timeout: 40000,
+  }, async () => {
+    const { code, out } = await bootWithWarnings({ BOOT_USEROLD_MODEL: '1' });
+    assert.strictEqual(code, 0, out);
+    assert.strictEqual(count(out, /ASF_DEP_USEROLD/), 1, out);
+    assert.strictEqual(count(out, /LegacyUser is old type model/), 1, out);
+    assert.strictEqual(count(out, /UserOld is old type model/), 0, out);
+  });
+});

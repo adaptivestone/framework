@@ -3,12 +3,17 @@ import { describe, it } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import { testEach } from '../../tests/parameterized.ts';
 import {
+  BadGatewayError,
   BadRequestError,
   ConflictError,
   ForbiddenError,
   HttpError,
+  InternalServerError,
   NotFoundError,
+  ServiceUnavailableError,
+  TooManyRequestsError,
   UnauthorizedError,
+  UnprocessableEntityError,
 } from './httpErrors.ts';
 
 describe('httpErrors', () => {
@@ -32,6 +37,11 @@ describe('httpErrors', () => {
       [ForbiddenError, 403, 'Forbidden'],
       [NotFoundError, 404, 'Not found'],
       [ConflictError, 409, 'Conflict'],
+      [UnprocessableEntityError, 422, 'Unprocessable entity'],
+      [TooManyRequestsError, 429, 'Too many requests'],
+      [InternalServerError, 500, 'Internal server error'],
+      [BadGatewayError, 502, 'Bad gateway'],
+      [ServiceUnavailableError, 503, 'Service unavailable'],
     ] as const,
     'subclass fixes status %#',
     (Cls, status, defaultMessage) => {
@@ -149,6 +159,11 @@ describe('httpErrors', () => {
       [ForbiddenError, 403],
       [NotFoundError, 404],
       [ConflictError, 409],
+      [UnprocessableEntityError, 422],
+      [TooManyRequestsError, 429],
+      [InternalServerError, 500],
+      [BadGatewayError, 502],
+      [ServiceUnavailableError, 503],
     ] as const,
     'subclass accepts a details object %#',
     (Cls, status) => {
@@ -161,6 +176,34 @@ describe('httpErrors', () => {
       assert.strictEqual(err.name, Cls.name);
     },
   );
+
+  it('the newer subclasses take no positional body', async () => {
+    const warnings: string[] = [];
+    const onWarning = (w: Error & { code?: string }) =>
+      warnings.push(w.code ?? '');
+    process.on('warning', onWarning);
+    try {
+      // @ts-expect-error only the message or a details object
+      const err = new TooManyRequestsError('Slow down', { retry: 30 });
+      await setTimeout(0);
+      assert.strictEqual(err.body, undefined);
+      assert.deepStrictEqual(warnings, []);
+    } finally {
+      process.off('warning', onWarning);
+    }
+  });
+
+  it('the newer subclasses accept a custom body and headers', () => {
+    const err = new ServiceUnavailableError({
+      message: 'Maintenance',
+      body: { maintenance: true },
+      headers: { 'Retry-After': '120' },
+    });
+    assert.strictEqual(err.status, 503);
+    assert.strictEqual(err.message, 'Maintenance');
+    assert.deepStrictEqual(err.body, { maintenance: true });
+    assert.deepStrictEqual(err.headers, { 'Retry-After': '120' });
+  });
 
   it('a consumer subclass keeps the instanceof chain and its own name', () => {
     class PaymentRequiredError extends HttpError {

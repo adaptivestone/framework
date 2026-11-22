@@ -4,6 +4,7 @@ import { after, before, describe, it, mock } from 'node:test';
 import { setTimeout } from 'node:timers/promises';
 import type { Response } from 'express';
 import { appInstance } from '../../../helpers/appInstance.ts';
+import { assertCalledTimes } from '../../../tests/assertions.ts';
 import { mockRejectedValue, stubI18n } from '../../../tests/mocks.ts';
 import type { TI18n } from '../../i18n/I18n.ts';
 import type { FrameworkRequest } from '../HttpServer.ts';
@@ -134,6 +135,86 @@ describe('rate limiter methods', () => {
         assert.strictEqual(keyFor({ email }), noRequestPart);
       }
       assert.notStrictEqual(keyFor({ email: 0 }), noRequestPart);
+    });
+  });
+
+  describe('shared bucket warning', () => {
+    const setup = (consumeKeyComponents: Record<string, unknown>) => {
+      const limiter = new RateLimiter(appInstance, {
+        driver: 'memory',
+        consumeKeyComponents,
+      });
+      const warn = mock.method(limiter.logger, 'warn', () => {});
+      const keyFor = (appInfo: object, body: object = {}) =>
+        limiter.generateConsumeKey({
+          method: 'POST',
+          route: { path: '/login', methods: { post: true } },
+          appInfo,
+          body,
+        } as unknown as FrameworkRequest);
+      return { keyFor, warn };
+    };
+
+    it('warns once when ip is off and the request has no user', () => {
+      const { keyFor, warn } = setup({ ip: false });
+
+      assert.strictEqual(keyFor({ ip: '10.0.0.1' }), 'POST:/login');
+      assert.strictEqual(keyFor({ ip: '10.0.0.2' }), 'POST:/login');
+
+      assertCalledTimes(warn, 1);
+      assert.strictEqual(
+        warn.mock.calls[0]?.arguments[0],
+        'RateLimiter on POST /login: ip is disabled and this request has no user, so such requests share one rate-limit bucket. Enable ip in consumeKeyComponents, or limit only routes where the identity is always present.',
+      );
+    });
+
+    it('does not warn for a logged-in request', () => {
+      const { keyFor, warn } = setup({ ip: false });
+
+      assert.strictEqual(
+        keyFor({ ip: '10.0.0.1', user: { id: 'u1' } }),
+        'POST:/login_u1',
+      );
+      assertCalledTimes(warn, 0);
+    });
+
+    it('warns for a user without an id, keeping the key unchanged', () => {
+      const { keyFor, warn } = setup({ ip: false });
+
+      // A model with `id: false`: every such user shares this bucket.
+      assert.strictEqual(
+        keyFor({ ip: '10.0.0.1', user: { id: undefined } }),
+        'POST:/login_',
+      );
+      assertCalledTimes(warn, 1);
+    });
+
+    it('does not warn for a global per-route budget', () => {
+      const { keyFor, warn } = setup({ ip: false, user: false, request: [] });
+
+      assert.strictEqual(keyFor({ ip: '10.0.0.1' }), 'POST:/login');
+      assertCalledTimes(warn, 0);
+    });
+
+    it('warns when every configured request field is missing', () => {
+      const { keyFor, warn } = setup({ ip: false, request: ['phone'] });
+
+      assert.strictEqual(keyFor({ ip: '10.0.0.1' }), 'POST:/login');
+      assertCalledTimes(warn, 1);
+      assert.match(
+        String(warn.mock.calls[0]?.arguments[0]),
+        /this request has no user or phone, so such requests share one rate-limit bucket/,
+      );
+    });
+
+    it('does not warn when a request field keys an anonymous request', () => {
+      const { keyFor, warn } = setup({ ip: false, request: ['email'] });
+
+      assert.notStrictEqual(
+        keyFor({ ip: '10.0.0.1' }, { email: 'foo@example.com' }),
+        'POST:/login',
+      );
+      assertCalledTimes(warn, 0);
     });
   });
 

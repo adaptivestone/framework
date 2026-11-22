@@ -70,40 +70,62 @@ export function errorResultResponse({
   body,
   headers,
 }: ErrorHandlerResult): HttpResponse {
-  let contentType: string | undefined;
-  const rest: Record<string, string> = {};
+  // By lower-case name: a later header replaces an earlier one, as `setHeader`
+  // did, but cookies add up. Typed as a string, but a JavaScript app may pass
+  // an array: each cookie stays its own field, other values are joined.
+  const fields = new Map<string, [string, string][]>();
   for (const [name, value] of Object.entries(headers ?? {})) {
-    if (name.toLowerCase() === 'content-type') {
-      contentType = value;
+    const key = name.toLowerCase();
+    if (key === 'set-cookie') {
+      const cookies: unknown[] = Array.isArray(value) ? value : [value];
+      fields.set(key, [
+        ...(fields.get(key) ?? []),
+        ...cookies.map((cookie): [string, string] => [name, String(cookie)]),
+      ]);
     } else {
-      rest[name] = value;
+      fields.set(key, [
+        [name, Array.isArray(value) ? value.join(', ') : value],
+      ]);
     }
   }
   if (body === undefined || NO_BODY_STATUSES.has(status)) {
     // `empty` owns no media type, so the header rides along unchanged.
-    return HttpResponse.empty(status, { headers: headers ?? {} });
+    return HttpResponse.empty(status, { headers: [...fields.values()].flat() });
   }
-  return HttpResponse.json(status, body, { headers: rest, contentType });
-}
-
-/** Errors a registry handler failed on (threw, or returned an invalid result). */
-const failedHandlerErrors = new WeakSet<object>();
-
-/** @internal Record that a registry handler failed on `err`. */
-export function markErrorHandlerFailed(err: unknown): void {
-  if (typeof err === 'object' && err !== null) {
-    failedHandlerErrors.add(err);
-  }
+  const contentType = fields.get('content-type')?.[0]?.[1];
+  fields.delete('content-type');
+  return HttpResponse.json(status, body, {
+    headers: [...fields.values()].flat(),
+    contentType,
+  });
 }
 
 /**
- * @internal Did a registry handler fail on `err`? Such an error answers the
- * generic 500, never a caller's fallback response.
+ * @internal The response to send for a resolved error. A replaced
+ * `resolveError` may return only the legacy fields; it is built from those.
  */
-export function errorHandlerFailed(err: unknown): boolean {
-  return (
-    typeof err === 'object' && err !== null && failedHandlerErrors.has(err)
-  );
+export function resolvedErrorResponse(
+  resolved: ErrorHandlerResult & { response?: HttpResponse },
+): HttpResponse {
+  return resolved.response ?? errorResultResponse(resolved);
+}
+
+/** Requests a registry handler failed for (threw, or returned an invalid result). */
+const failedHandlerRequests = new WeakSet<object>();
+
+/** @internal Record that a registry handler failed for `req`, until `errorHandlerFailed` reads it. */
+export function markErrorHandlerFailed(req: object): void {
+  failedHandlerRequests.add(req);
+}
+
+/**
+ * @internal Did a registry handler fail for `req`? Its error answers the
+ * generic 500, never a caller's fallback response. Kept per request, so
+ * requests that throw the same error instance do not interfere. The read
+ * clears the mark.
+ */
+export function errorHandlerFailed(req: object): boolean {
+  return failedHandlerRequests.delete(req);
 }
 
 /** The generic 500 answered for an error nothing in the registry resolved. */
@@ -140,6 +162,8 @@ export interface RegisteredErrorHandler {
   errorClass: abstract new (...args: never[]) => RegistrableError;
   handler: ErrorHandlerFn<RegistrableError>;
   logLevel: ErrorLogLevel;
+  /** @internal Picks the level per error; wins over `logLevel`. */
+  logLevelFor?: (err: RegistrableError) => ErrorLogLevel;
 }
 
 type MongooseFieldError =
@@ -261,9 +285,12 @@ function safeValidationMessage(error: MongooseFieldError): string {
  * body was sanitized. Rebuild a fresh `Error` that reuses the per-path
  * `safeValidationMessage` texts under the safe static prefix
  * (`<ModelName> validation failed`); its stack is minted here, input-free.
+ * A request `ValidationError` (its `message` is the field payload) becomes
+ * `Request validation failed (<n> fields)`: a path can be a client-supplied
+ * key, so neither paths, values nor per-field texts are logged.
  * Anything else passes through untouched. The UNRESOLVED 500 path deliberately
- * keeps logging the original error in full: that branch is a server-side
- * defect, and the developer needs every detail.
+ * keeps logging the original error in full (a request `ValidationError` aside):
+ * that branch is a server-side defect, and the developer needs every detail.
  */
 export function toLoggableError(err: unknown): unknown {
   // A standalone `CastError` ("Cast to ObjectId failed for value \"<input>\"")
@@ -277,6 +304,15 @@ export function toLoggableError(err: unknown): unknown {
       `Cast failed at path "${err.path}" (safety net, sanitized): ${safeValidationMessage(err)}`,
     );
     sanitized.name = 'CastError';
+    return sanitized;
+  }
+  if (ValidationError.isValidationError(err)) {
+    // Its `message` is the field payload; only the field count is logged.
+    const count = Object.keys(err.message).length;
+    const sanitized = new Error(
+      `Request validation failed (${count} field${count === 1 ? '' : 's'})`,
+    );
+    sanitized.name = err.name;
     return sanitized;
   }
   if (!(err instanceof mongoose.Error.ValidationError)) {
@@ -403,7 +439,8 @@ export function matchedClientCastError(
  * handlers ("yours win"):
  *   1. `HttpError` → its own status, headers and
  *      `body ?? { error?: code, message }`, message translated via `i18nKey`;
- *      `verbose` (deliberate control flow, not a defect).
+ *      `verbose` (deliberate control flow, not a defect), `error` for a 5xx
+ *      (a server failure).
  *   2. Escaped Mongoose `ValidationError` → the safety net above; `warn`
  *      (signals a route schema missing a constraint the model enforces).
  *   3. Standalone Mongoose `CastError` → {@link matchedClientCastError}; `warn`
@@ -450,6 +487,8 @@ export function builtInErrorHandlers(): RegisteredErrorHandler[] {
         return { status, body, ...headers };
       },
       logLevel: 'verbose',
+      logLevelFor: (err) =>
+        (err as HttpError).status >= 500 ? 'error' : 'verbose',
     },
     {
       errorClass: mongoose.Error.ValidationError,

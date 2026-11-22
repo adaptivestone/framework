@@ -40,8 +40,9 @@ export interface HttpErrorBodyDetails {
 export type HttpErrorDetails = HttpErrorContractDetails | HttpErrorBodyDetails;
 
 /**
- * The `error` code of every error response the framework builds itself, so a
- * client can tell them apart without parsing the translated `message`.
+ * The `error` codes of the framework's validation, routing, body-parsing and
+ * server error responses, so a client can tell them apart without parsing the
+ * translated `message`.
  */
 export const FRAMEWORK_ERROR_CODES = {
   /** 400: a `params:`/`request:`/`query:` schema rejected the input (also the Mongoose safety nets). */
@@ -84,9 +85,9 @@ const warnBodyArgument = makeOncePerClassWarner(
  * (`HttpServer.registerErrorHandler`) via a built-in mapper:
  * `status` + `{ error?: code, message, errors? }` (message translated via
  * `i18nKey`, field errors like request validation) or a custom `body`, logged
- * at `verbose` (control flow, not a defect).
+ * at `verbose` (control flow, not a defect), or `error` for a 5xx.
  * Subclass for other statuses, or construct the base directly:
- * `new HttpError(422, 'Unprocessable')`.
+ * `new HttpError(402, 'Payment required')`.
  */
 export class HttpError extends Error {
   readonly status: number;
@@ -200,5 +201,35 @@ export class ConflictError extends HttpError {
   constructor(message: string | HttpErrorDetails | undefined, body: unknown);
   constructor(message: string | HttpErrorDetails = 'Conflict', body?: unknown) {
     super(409, message, body);
+  }
+}
+
+export class UnprocessableEntityError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Unprocessable entity') {
+    super(422, message);
+  }
+}
+
+export class TooManyRequestsError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Too many requests') {
+    super(429, message);
+  }
+}
+
+export class InternalServerError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Internal server error') {
+    super(500, message);
+  }
+}
+
+export class BadGatewayError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Bad gateway') {
+    super(502, message);
+  }
+}
+
+export class ServiceUnavailableError extends HttpError {
+  constructor(message: string | HttpErrorDetails = 'Service unavailable') {
+    super(503, message);
   }
 }

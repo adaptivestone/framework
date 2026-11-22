@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { Response } from 'express';
 import type { FrameworkRequest } from '../services/http/HttpServer.ts';
+import { HttpResponse } from '../services/http/responses.ts';
 import { getTestServerURL } from '../tests/testHelpers.ts';
 import Home from './Home.ts';
 
@@ -26,5 +27,14 @@ describe('home', () => {
       }
     }
     assert.strictEqual(typeof LegacyHome.prototype.home, 'function');
+  });
+
+  it('accepts an override returning another response kind (compile-time check)', () => {
+    class TextHome extends Home {
+      override async home() {
+        return HttpResponse.text(200, 'Hello');
+      }
+    }
+    assert.strictEqual(typeof TextHome.prototype.home, 'function');
   });
 });

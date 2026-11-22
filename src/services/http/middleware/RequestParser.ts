@@ -81,7 +81,13 @@ class RequestParser extends AbstractMiddleware {
     return 'Parses incoming request. Based on Formidable library';
   }
 
-  async middleware(req: FrameworkRequest, res: Response, next: NextFunction) {
+  async middleware(
+    req: FrameworkRequest,
+    res: Response,
+    next: NextFunction,
+  ): // Base return type, so a subclass may still answer with a response.
+  // biome-ignore lint/suspicious/noConfusingVoidType: Express middleware legitimately returns void or Response
+  Promise<void | Response> {
     const time = Date.now();
     this.logger?.verbose(`Parsing request`);
 
@@ -116,27 +122,34 @@ class RequestParser extends AbstractMiddleware {
       ...(plugin ? { enabledPlugins: [plugin] } : {}),
     });
 
-    // JSON/urlencoded parsing buffers the body; multipart and octet-stream
-    // uploads use Formidable's file limits instead. Unknown media types retain
-    // the v5 fallback, bounded below.
-    const maxBodySize =
-      typeof parserOptions.maxFieldsSize === 'number'
+    // JSON/urlencoded parsing buffers the body, bounded by maxFieldsSize, and
+    // unknown media types retain the v5 fallback. Multipart uses Formidable's
+    // file limits. An octet-stream body is one file, but Formidable checks
+    // those limits only on multipart parts, so it is bounded here by them.
+    const { maxFileSize, maxTotalFileSize } = (
+      form as unknown as {
+        options: { maxFileSize: number; maxTotalFileSize: number };
+      }
+    ).options;
+    const limitName = isOctetStream ? 'maxFileSize' : 'maxFieldsSize';
+    const maxBodySize = isOctetStream
+      ? Math.min(maxFileSize, maxTotalFileSize)
+      : typeof parserOptions.maxFieldsSize === 'number'
         ? parserOptions.maxFieldsSize
         : 2 * 1024 * 1024;
     let bodyTooLarge = false;
-    if (!isMultipart && !isOctetStream) {
+    if (!isMultipart) {
       const declaredLength = Number(req.headers?.['content-length']);
       if (Number.isFinite(declaredLength) && declaredLength > maxBodySize) {
         this.logger?.error(
-          `Request body ${declaredLength}B exceeds maxFieldsSize ${maxBodySize}B`,
+          `Request body ${declaredLength}B exceeds ${limitName} ${maxBodySize}B`,
         );
         // Close after the 413 instead of draining the unread body.
         res.setHeader('Connection', 'close');
         return next(this.#entityTooLarge(req));
       }
     }
-    // Also guard chunked buffered bodies. Upload parsers enforce their own file
-    // limits. Pausing (not destroying) the request keeps the socket writable,
+    // Also guard chunked bodies. Multipart enforces its own file limits. Pausing (not destroying) the request keeps the socket writable,
     // so the client receives the 413; its `Connection: close` then ends the
     // connection.
     let rejectOversized: (reason: Error) => void = () => {};
@@ -144,15 +157,10 @@ class RequestParser extends AbstractMiddleware {
       rejectOversized = reject;
     });
     form.on('progress', (bytesReceived: number) => {
-      if (
-        !bodyTooLarge &&
-        !isMultipart &&
-        !isOctetStream &&
-        bytesReceived > maxBodySize
-      ) {
+      if (!bodyTooLarge && !isMultipart && bytesReceived > maxBodySize) {
         bodyTooLarge = true;
         req.pause();
-        rejectOversized(new Error('Request body exceeds maxFieldsSize'));
+        rejectOversized(new Error(`Request body exceeds ${limitName}`));
       }
     });
 
@@ -163,6 +171,16 @@ class RequestParser extends AbstractMiddleware {
     const openedFiles: Array<{ filepath: string }> = [];
     form.on('fileBegin', (_name, file) => {
       openedFiles.push(file as unknown as { filepath: string });
+      // Formidable handles a temp-file write error (disk full, missing
+      // uploadDir) for multipart parts only; for an octet-stream body it was
+      // an uncaught error that crashed the process. Fail the parse instead.
+      if (isOctetStream) {
+        (
+          file as unknown as {
+            on(event: 'error', listener: (err: Error) => void): void;
+          }
+        ).on('error', (err) => form.emit('error', err));
+      }
     });
     let cleaned = false;
     const cleanup = () => {
@@ -184,7 +202,7 @@ class RequestParser extends AbstractMiddleware {
       // Pausing the stream cannot cancel a chunk already inside the parser.
       // Even if that chunk completes parsing, an oversized body must not advance.
       if (bodyTooLarge) {
-        throw new Error('Request body exceeds maxFieldsSize');
+        throw new Error(`Request body exceeds ${limitName}`);
       }
     } catch (err) {
       this.logger?.error(`Parsing failed ${err}`);
@@ -231,6 +249,12 @@ class RequestParser extends AbstractMiddleware {
           ),
         )
       : fields;
+
+    // Formidable lists a field's files as their writes finish; keep the order
+    // they were sent, which is the order they began.
+    for (const list of Object.values(files)) {
+      list?.sort((a, b) => openedFiles.indexOf(a) - openedFiles.indexOf(b));
+    }
 
     req.body = {
       // todo avoid body in next versions

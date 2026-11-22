@@ -372,9 +372,7 @@ describe('token security (doc 01)', () => {
     );
   });
 
-  it('requires an email before generating any auth token', async () => {
-    const UserModel = getUserModel();
-    const user = new UserModel();
+  it('requires an email before generating an emailed token', async () => {
     const helperUser = {
       email: '',
       verificationTokens: [],
@@ -382,7 +380,6 @@ describe('token security (doc 01)', () => {
       save: mock.fn(),
     };
 
-    await assertRejectsLike(user.generateToken(), 'Email is required');
     await assertRejectsLike(
       userHelpers.generateUserVerificationToken(helperUser as never),
       'Email is required',
@@ -392,6 +389,16 @@ describe('token security (doc 01)', () => {
       'Email is required',
     );
     assertNotCalled(helperUser.save);
+  });
+
+  it('issues a session token to a user without an email', async () => {
+    const phoneOnly = await getUserModel().create({ password: 'pw-no-email' });
+
+    const { token } = await phoneOnly.generateToken();
+
+    assertTextMatch(token, /^[A-Za-z0-9_-]{43}$/);
+    const stored = await getUserModel().findById(phoneOnly._id).orFail();
+    assert.ok(stored.sessionTokens.some((t) => t.token === hashToken(token)));
   });
 
   it('initializes a missing session-token array before appending', async () => {

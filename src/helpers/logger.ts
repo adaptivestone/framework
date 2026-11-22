@@ -36,4 +36,14 @@ const consoleLogger = (level: LogLevel, message: string) => {
   }
 };
 
-export { consoleLogger, levels, noopLogger };
+/** @internal A thrown value as log text: its stack if it has one, else its string form. Never throws. */
+const describeThrown = (value: unknown): string => {
+  try {
+    const stack = (value as { stack?: unknown } | null | undefined)?.stack;
+    return typeof stack === 'string' ? stack : String(value);
+  } catch {
+    return '[unprintable value]';
+  }
+};
+
+export { consoleLogger, describeThrown, levels, noopLogger };

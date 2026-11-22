@@ -394,6 +394,39 @@ describe('codegen discovery — folder prefix & merge (doc 06)', () => {
     assert.ok(payTs.includes("from './GuardTs.ts'"));
     assert.ok(payTs.includes('typeof Guard'));
   });
+
+  it('warns once for a `get routes()` return type annotation and still generates', async () => {
+    const getter = (name: string, annotation: string, entry: string) =>
+      `class ${name} {\n  get routes()${annotation} {\n    return { post: { '/a': ${entry}, '/b': ${entry} } };\n  }\n  h() {}\n}\nexport default ${name};\n`;
+    const withSchema = '{ handler: this.h, request: {} }';
+    const dir = await makeControllers({
+      'Annotated.ts': getter('Annotated', ': RouteParams', withSchema),
+      'Literal.ts': getter('Literal', '', withSchema),
+      // No schema → the gen file never navigates `routes`, nothing to break.
+      'NoSchema.ts': getter('NoSchema', ': RouteParams', '{ handler: this.h }'),
+    });
+    const warnings: string[] = [];
+    const logger = {
+      info() {},
+      warn: (m: string) => warnings.push(m),
+      error() {},
+    };
+
+    await generateRouteTypesViaAst(appFor(dir), logger);
+
+    assert.strictEqual(warnings.length, 1, warnings.join('\n'));
+    assert.ok(
+      warnings[0]?.endsWith(
+        'Annotated.ts: `get routes()` has a return type annotation, which can widen the route shapes so generated request types fail to compile. ' +
+          'Remove the annotation, or use `satisfies RouteParams` on the returned object.',
+      ),
+      warnings[0],
+    );
+    const files = await readdir(dir);
+    for (const name of ['Annotated', 'Literal', 'NoSchema']) {
+      assert.ok(files.includes(`${name}.routes.gen.ts`), name);
+    }
+  });
 });
 
 describe('generateAll — atomicity & --check (doc 08)', () => {

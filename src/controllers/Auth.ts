@@ -1,5 +1,9 @@
 import type { Response } from 'express';
 import mongoose from 'mongoose';
+import {
+  PASSWORD_EN,
+  passwordPolicyIssuesFor,
+} from '../helpers/passwordPolicy.ts';
 import { translateWithDefault } from '../helpers/translate.ts';
 import type { TUser } from '../models/User.ts';
 import { hashToken } from '../models/User.ts';
@@ -41,9 +45,7 @@ type AuthAnswer = HttpResponse | Response;
 const EN = {
   'auth.emailProvided': 'Email must be provided',
   'auth.emailValid': 'Email is not valid',
-  'auth.passwordProvided': 'Password must be provided',
-  'auth.passwordTooShort': 'Password must be at least {{min}} characters',
-  'auth.passwordTooLong': 'Password must be at most {{max}} characters',
+  ...PASSWORD_EN,
   'auth.passwordRecoveryTokenProvided':
     'Password recovery token must be provided',
   'auth.nickNameValid': 'Nick name is not valid,only a-z,A-Z,0-9',
@@ -108,54 +110,6 @@ const pushEmailIssues = (email: unknown, issues: ValidationIssue[]) => {
   }
 };
 
-/** Shared registration/reset policy; login intentionally keeps legacy compatibility. */
-const pushPasswordIssues = (
-  password: unknown,
-  issues: ValidationIssue[],
-  authConfig: Record<string, unknown>,
-) => {
-  if (isMissing(password) || typeof password !== 'string') {
-    issues.push({
-      message: 'auth.passwordProvided',
-      path: ['password'],
-      params: { defaultValue: EN['auth.passwordProvided'] },
-    });
-    return;
-  }
-  const policy = authConfig.passwordPolicy as
-    | { minLength?: number; maxLength?: number }
-    | undefined;
-  const min = policy?.minLength ?? 15;
-  const max = policy?.maxLength ?? 128;
-  if (
-    !Number.isInteger(min) ||
-    min < 1 ||
-    !Number.isInteger(max) ||
-    max < min
-  ) {
-    throw new Error(
-      'Invalid auth.passwordPolicy: require 1 <= minLength <= maxLength',
-    );
-  }
-  // Count Unicode code points, without normalizing or truncating the secret.
-  const length = Array.from(password).length;
-  if (length < min || length > max) {
-    const message =
-      length < min ? 'auth.passwordTooShort' : 'auth.passwordTooLong';
-    issues.push({
-      message,
-      path: ['password'],
-      params: {
-        min,
-        max,
-        defaultValue: EN[message]
-          .replace('{{min}}', String(min))
-          .replace('{{max}}', String(max)),
-      },
-    });
-  }
-};
-
 // Back-compat: the auth config key was misspelled `isAuthWithVefificationFlow`
 // through 5.0.0-rc. The corrected key is `isAuthWithVerificationFlow`. The
 // default config now ships only the corrected key; an explicit old-spelling
@@ -191,6 +145,7 @@ class Auth extends AbstractController {
               const password = coerceStr(v.password);
               const issues: ValidationIssue[] = [];
               pushEmailIssues(email, issues);
+              // No password policy here: existing passwords stay valid at login.
               if (isMissing(password) || typeof password !== 'string') {
                 issues.push({
                   message: 'auth.passwordProvided',
@@ -227,7 +182,9 @@ class Auth extends AbstractController {
             const lastName = coerceStr(v.lastName);
             const issues: ValidationIssue[] = [];
             pushEmailIssues(email, issues);
-            pushPasswordIssues(password, issues, this.app.getConfig('auth'));
+            issues.push(
+              ...passwordPolicyIssuesFor(this.app.getConfig('auth'), password),
+            );
             // nickName is optional, but an empty string is invalid (matches the
             // old yup `.matches()` behavior — only `null`/`undefined` skip).
             if (
@@ -296,7 +253,9 @@ class Auth extends AbstractController {
             const password = coerceStr(v.password);
             const passwordRecoveryToken = coerceStr(v.passwordRecoveryToken);
             const issues: ValidationIssue[] = [];
-            pushPasswordIssues(password, issues, this.app.getConfig('auth'));
+            issues.push(
+              ...passwordPolicyIssuesFor(this.app.getConfig('auth'), password),
+            );
             if (isMissing(passwordRecoveryToken)) {
               issues.push({
                 message: 'auth.passwordRecoveryTokenProvided',
@@ -334,7 +293,7 @@ class Auth extends AbstractController {
     };
   }
 
-  async postLogin(req: PostLoginRequest, _res?: Response): Promise<AuthAnswer> {
+  async postLogin(req: PostLoginRequest, res?: Response): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     const userResult = await User.getUserByEmailAndPassword(
       req.appInfo.request.email, // we do a request casting
@@ -350,6 +309,7 @@ class Auth extends AbstractController {
             EN['auth.errorUPValid'],
           ),
         }),
+        res,
       );
     }
     // TypeScript now knows userResult is not false, so it has the instance methods
@@ -370,6 +330,7 @@ class Auth extends AbstractController {
           // @deprecated in favor of `error`; removed in v6.
           notVerified: true,
         }),
+        res,
       );
     }
     // A password changed meanwhile rejects with the wrong-password 400.
@@ -378,12 +339,13 @@ class Auth extends AbstractController {
     return builtInResponse(
       req,
       HttpResponse.json(200, { data: { token, user: user.getPublic() } }),
+      res,
     );
   }
 
   async postRegister(
     req: PostRegisterRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     // NOTE: registration intentionally reports when an email or nickname is
@@ -404,6 +366,7 @@ class Auth extends AbstractController {
             EN['email.registered'],
           ),
         }),
+        res,
       );
     }
     if (req.appInfo.request.nickName) {
@@ -420,6 +383,7 @@ class Auth extends AbstractController {
               EN['auth.nicknameExists'],
             ),
           }),
+          res,
         );
       }
     }
@@ -451,6 +415,7 @@ class Auth extends AbstractController {
               EN['email.registered'],
             ),
           }),
+          res,
         );
       }
       if (dupFields?.includes('name.nick')) {
@@ -463,6 +428,7 @@ class Auth extends AbstractController {
               EN['auth.nicknameExists'],
             ),
           }),
+          res,
         );
       }
       throw err;
@@ -478,12 +444,12 @@ class Auth extends AbstractController {
           this.logger?.error(e);
         });
     }
-    return builtInResponse(req, HttpResponse.empty(201));
+    return builtInResponse(req, HttpResponse.empty(201), res);
   }
 
   async postLogout(
     req: PostLogoutRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const user = req.appInfo.user;
     if (user) {
@@ -500,12 +466,12 @@ class Auth extends AbstractController {
         );
       }
     }
-    return builtInResponse(req, HttpResponse.json(200, { message: 'Ok' }));
+    return builtInResponse(req, HttpResponse.json(200, { message: 'Ok' }), res);
   }
 
   async verifyUser(
     req: VerifyUserRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     let user: UserInstance;
@@ -526,6 +492,7 @@ class Auth extends AbstractController {
             EN['email.alreadyVerifiedOrWrongToken'],
           ),
         }),
+        res,
       );
     }
     this.logger?.debug(`Verify user ${user?.id}`);
@@ -539,6 +506,7 @@ class Auth extends AbstractController {
             EN['email.alreadyVerifiedOrWrongToken'],
           ),
         }),
+        res,
       );
     }
 
@@ -560,16 +528,17 @@ class Auth extends AbstractController {
               EN['email.alreadyVerifiedOrWrongToken'],
             ),
           }),
+          res,
         );
       }
       throw err;
     }
-    return builtInResponse(req, HttpResponse.empty(200));
+    return builtInResponse(req, HttpResponse.empty(200), res);
   }
 
   async sendPasswordRecoveryEmail(
     req: SendPasswordRecoveryEmailRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = req.appInfo.app.getModel('User') as unknown as TUser;
     // Uniform response whether or not the account exists — the old 400-vs-200
@@ -595,12 +564,13 @@ class Auth extends AbstractController {
           EN['auth.recoveryEmailSent'],
         ),
       }),
+      res,
     );
   }
 
   async recoverPassword(
     req: RecoverPasswordRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     // Consume the token in the same write as the new password, so a failed
@@ -622,6 +592,7 @@ class Auth extends AbstractController {
             EN['password.wrongToken'],
           ),
         }),
+        res,
       );
     }
 
@@ -650,16 +621,17 @@ class Auth extends AbstractController {
               EN['password.wrongToken'],
             ),
           }),
+          res,
         );
       }
       throw err;
     }
-    return builtInResponse(req, HttpResponse.empty(200));
+    return builtInResponse(req, HttpResponse.empty(200), res);
   }
 
   async sendVerification(
     req: SendVerificationRequest,
-    _res?: Response,
+    res?: Response,
   ): Promise<AuthAnswer> {
     const User = this.app.getModel('User') as unknown as TUser;
     // Uniform response + fire-and-forget dispatch — no existence oracle and no
@@ -683,6 +655,7 @@ class Auth extends AbstractController {
           EN['auth.verificationEmailSent'],
         ),
       }),
+      res,
     );
   }
 

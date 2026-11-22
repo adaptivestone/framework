@@ -1,9 +1,9 @@
 # P1q — Universal typed HTTP responses (v5.x bridge → v6 cutover)
 
-**Status**: 🔄 active · Phases 0–1 implemented 2026-10-31 (unreleased), Phase 2 next · design direction settled 2026-07-18 · `transformResponse` hook folded in 2026-08-10  
-**Target**: the next minor (5.7; 5.6.0 shipped without it), additive; ordinary controller `res` removal is v6
+**Status**: 🔄 active · Phases 0–2 ship in 5.7.0 (prepared 2026-11-16) · Phase 3 (OpenAPI) next, as 5.8 · design direction settled 2026-07-18 · `transformResponse` hook folded in 2026-08-10  
+**Target**: phases 0–2 in 5.7.0, Phase 3 in 5.8; additive; ordinary controller `res` removal is v6
 **Depends on**: [tree-router](../done/tree-router.md) ✅, [error-handler-registry](../done/error-handler-registry.md) ✅  
-**Feeds**: [OpenAPI responses](../queued/openapi-responses.md), [async middleware](../queued/async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) ships in the same v5.6 minor and returns `HttpResponse` through this plan's writer** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
+**Feeds**: [OpenAPI responses](../queued/openapi-responses.md), [async middleware](../queued/async-middleware.md) — **co-designed: P1m's v2 middleware contract (opt-in `static contractVersion = 2`) returns `HttpResponse` through this plan's writer; it is not part of 5.7.0 and ships later** —, [NodeAdapter](../later/node-adapter.md), eventual [drop Express](../later/drop-express.md)  
 **Origin**: an authorized file-delivery workaround exposed the immediate stream/file gap. The wider design discussion showed that a file-only helper would preserve the real problem: controllers would still use Express for JSON, statuses, headers, redirects, and errors.
 
 ## Goal
@@ -299,7 +299,7 @@ runs in CI. Docs: written 2026-10-31 on branch `docs/http-responses` of the docu
 `06-Controllers/05-responses.md`; error handling, routes and testing pages updated; site build
 passes), not merged.
 
-### Phase 2 — framework and error migration (implemented 2026-10-31, except `Auth`)
+### Phase 2 — framework and error migration ✅ 2026-10-31 (`Auth` included)
 
 - Route framework-generated responses and error-registry results through the writer.
 - Migrate `Home`/`Auth` framework controllers to returned descriptors as fixtures for consumers.
@@ -348,6 +348,18 @@ As built:
   handler answered meanwhile). Not bridged, disclosed in the changelog: the response of an awaited
   call is sent when the override finishes, so code after the call delays it, and a throw there
   answers with the error response.
+  **Extended 2026-11-17 (Opus review):** the bridge also shows the produced status on `res`
+  (`req.res.statusCode`), because a 5.6 override could only learn the outcome there
+  (`await super.postRegister(req, res); if (res.statusCode === 201) …`); and the late send waits one
+  tick, so an override that chained on the handler's promise (`super.x(req, res).then(…res.json…)`)
+  answers first. Not bridged, documented as a rule: an override that answers through `res` after it
+  has returned gets the built-in response sent first.
+  **Extended 2026-11-17 (third review):** the response is recorded under both `req` and `res`, so it
+  is found when the override passes a copy of `req` or a wrapper of `res`. A wrapper no longer
+  intercepts the answer (the handlers do not call `res.json`); that is disclosed, not bridged.
+  **Extended 2026-11-21 (fourth review):** also recorded under `req.res`, so a copy of `req` with a
+  wrapper of `res` is found; the status shown on `res` is best effort. Fifth review: also under the
+  given `res`'s `req`; the records live on `globalThis`, shared between copies of the module.
 - **Not routed (yet):** the CORS preflight 204 (global middleware writes `Content-Length: 0`
   itself; a transform would pass an empty response through unchanged anyway) and `RateLimiter`'s
   "not initialised" 500 (registry middleware — moves with P1m).
@@ -359,6 +371,15 @@ As built:
   Mongoose safety nets), `MALFORMED_URL`, `MALFORMED_BODY`, `NOT_FOUND`, `METHOD_NOT_ALLOWED`,
   `PAYLOAD_TOO_LARGE`, `UNSUPPORTED_CONTENT_TYPE`, `SERVER_ERROR`. Additive for clients;
   whole-body test assertions in apps change (as with the 5.5 codes).
+
+### Additional release review fixes (2026-11-17)
+
+- Node `Readable` cancellation destroys the source on HEAD, client disconnect,
+  or discarded bodies, handling asynchronous open/destroy errors until close.
+- The transitional built-in bridge uses the explicitly supplied Express response
+  as a stable key when an override forwards a copied request; request-only calls
+  remain supported. Both keys share one claim. Status mirroring and next-tick
+  late sends remain unchanged; a disconnected client receives no late send.
 
 ### Phase 3 — OpenAPI/type integration
 

@@ -4,10 +4,14 @@ import i18next from 'i18next';
 import mongoose from 'mongoose';
 import { stubI18n } from '../../tests/mocks.ts';
 import { testEach } from '../../tests/parameterized.ts';
+import { ValidationError } from '../validate/ValidationError.ts';
 import {
   builtInErrorHandlers,
   type ErrorHandlerResult,
+  type ErrorLogLevel,
+  errorHandlerFailed,
   errorResultResponse,
+  markErrorHandlerFailed,
   matchedClientCastError,
   matchedClientValidationErrors,
   toLoggableError,
@@ -241,6 +245,66 @@ describe('toLoggableError', () => {
       'Validation failed (safety net, sanitized): field: Required',
     );
   });
+
+  it('rebuilds a request ValidationError as a field count only', () => {
+    // A path can be a client-supplied key (a record keyed by e-mail).
+    const error = new ValidationError({
+      'SECRET_KEY@example.com': ['SECRET_INPUT is not an email'],
+      password: 'Too short',
+    });
+
+    const result = toLoggableError(error);
+
+    assert.ok(result instanceof Error);
+    assert.notStrictEqual(result, error);
+    assert.strictEqual((result as Error).name, 'ValidationError');
+    assert.strictEqual(
+      (result as Error).message,
+      'Request validation failed (2 fields)',
+    );
+    for (const secret of ['SECRET_KEY', 'SECRET_INPUT', 'Too short']) {
+      assert.ok(!(result as Error).stack?.includes(secret));
+    }
+    assert.strictEqual(
+      (toLoggableError(new ValidationError({ name: 'Required' })) as Error)
+        .message,
+      'Request validation failed (1 field)',
+    );
+  });
+
+  it('rebuilds a request ValidationError from another copy of the framework', () => {
+    const error = Object.assign(new Error(), {
+      name: 'ValidationError',
+      message: { 'SECRET_KEY@example.com': ['SECRET_INPUT is not an email'] },
+      issues: [{ message: 'SECRET_INPUT is not an email' }],
+    });
+    assert.ok(!(error instanceof ValidationError));
+
+    const result = toLoggableError(error);
+
+    assert.notStrictEqual(result, error);
+    assert.strictEqual(
+      (result as Error).message,
+      'Request validation failed (1 field)',
+    );
+  });
+
+  it('passes an app error with an object message through unchanged', () => {
+    const error = new Error();
+    (error as { message: unknown }).message = { reason: 'quota' };
+    assert.strictEqual(toLoggableError(error), error);
+  });
+});
+
+describe('errorHandlerFailed', () => {
+  it('reads the failure mark of a request once', () => {
+    const req = request();
+    markErrorHandlerFailed(req);
+
+    assert.strictEqual(errorHandlerFailed(request()), false);
+    assert.strictEqual(errorHandlerFailed(req), true);
+    assert.strictEqual(errorHandlerFailed(req), false);
+  });
 });
 
 describe('builtInErrorHandlers', () => {
@@ -251,6 +315,13 @@ describe('builtInErrorHandlers', () => {
       await httpHandler?.handler(new HttpError(418, 'Teapot'), request()),
       { status: 418, body: { message: 'Teapot' } },
     );
+  });
+
+  it('keeps logLevel a plain ErrorLogLevel', () => {
+    // Also a compile-time check (`npm run check:types:tests`).
+    const level: ErrorLogLevel | undefined =
+      builtInErrorHandlers()[0]?.logLevel;
+    assert.strictEqual(level, 'verbose');
   });
 
   describe('coded HttpError', () => {
@@ -421,6 +492,25 @@ describe('errorResultResponse', () => {
     const notModified = errorResultResponse({ status: 304, body: { a: 1 } });
     assert.strictEqual(notModified.kind, 'empty');
     assert.strictEqual(notModified.status, 304);
+  });
+
+  it('lets a later header replace one whose name differs only by case', () => {
+    const headers = {
+      'Retry-After': '120',
+      'retry-after': '30',
+      'Set-Cookie': 'a=1',
+      'set-cookie': 'b=2',
+    };
+    for (const body of [{ message: 'Slow down' }, undefined]) {
+      assert.deepStrictEqual(
+        errorResultResponse({ status: 429, body, headers }).headers,
+        [
+          ['retry-after', '30'],
+          ['set-cookie', 'a=1'],
+          ['set-cookie', 'b=2'],
+        ],
+      );
+    }
   });
 
   it('throws on a status no response can carry', () => {
