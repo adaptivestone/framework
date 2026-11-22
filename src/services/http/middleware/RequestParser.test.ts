@@ -5,7 +5,7 @@ import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import { Readable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { describe, it } from 'node:test';
 import type { Handler, NextFunction, Response } from 'express';
 import express from 'express';
@@ -336,6 +336,35 @@ d\r
         params: { maxFileSize: 8192, maxTotalFileSize: 1024 },
       });
       assert.strictEqual(status, 413);
+    });
+
+    it('keeps the files of one field in the order they were sent', async () => {
+      const part = (name: string) =>
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="media"; filename="${name}"\r\n` +
+        `Content-Type: text/plain\r\n\r\n` +
+        `${name}\r\n`;
+      // The first file's write finishes last, so formidable reports it last.
+      const fileWriteStreamHandler = (file: { originalFilename?: string }) =>
+        new Writable({
+          write(_chunk, _encoding, callback) {
+            callback();
+          },
+          final(callback) {
+            setTimeout(callback, file.originalFilename === 'a.txt' ? 50 : 0);
+          },
+        });
+      const { status, body } = await postToParser({
+        body: `${part('a.txt')}${part('b.txt')}--${boundary}--\r\n`,
+        contentType: multipartCT,
+        params: { fileWriteStreamHandler },
+      });
+      assert.strictEqual(status, 200);
+      const media = body.media as { originalFilename: string }[];
+      assert.deepStrictEqual(
+        media.map((f) => f.originalFilename),
+        ['a.txt', 'b.txt'],
+      );
     });
 
     it('normalizes a single urlencoded field to a scalar (fixes GetUserByToken)', async () => {

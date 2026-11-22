@@ -240,6 +240,12 @@ class RequestParser extends AbstractMiddleware {
         )
       : fields;
 
+    // Formidable lists a field's files as their writes finish; keep the order
+    // they were sent, which is the order they began.
+    for (const list of Object.values(files)) {
+      list?.sort((a, b) => openedFiles.indexOf(a) - openedFiles.indexOf(b));
+    }
+
     req.body = {
       // todo avoid body in next versions
       ...(req.body || {}),
