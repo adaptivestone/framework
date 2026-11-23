@@ -14,7 +14,7 @@
 #                                            own Server exactly as under Node)
 #
 # `--experimental-test-module-mocks` has NO Bun equivalent: `mock.module()`
-# throws ERR_NOT_IMPLEMENTED (oven-sh/bun#5090). The four files that depend on
+# throws ERR_NOT_IMPLEMENTED (oven-sh/bun#5090). The six files that depend on
 # it are excluded below and named in README.md; nothing else is skipped.
 #
 # Mongo: an in-memory replica set is started here (the suite's change-stream
@@ -85,6 +85,7 @@ bun test \
   --path-ignore-patterns='**/UserOld.test.ts' \
   --path-ignore-patterns='**/redisConnection.failure.test.ts' \
   --path-ignore-patterns='**/RateLimiter.redisSetup.test.ts' \
+  --path-ignore-patterns='**/HttpServer.timingHash.test.ts' \
   --path-ignore-patterns='**/I18n.missing.test.ts' \
   src/ \
   ./src/tests/nodeRunner.node-test.ts \

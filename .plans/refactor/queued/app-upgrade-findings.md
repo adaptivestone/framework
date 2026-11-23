@@ -85,9 +85,12 @@ needs a decision. Versions are targets, not promises.
   (TH7); a schema helper carrying the same keys is optional.
 - **Session tokens (FW15 remainder).** Per-token TTL, metadata, a revocation
   helper and "log out everywhere".
-- **Timing-equalizer hash.** An opt-out for processes that never verify
-  passwords (5.7.0 computes it when the HTTP server starts), and a fresh hash
-  when the configured cost changes (the cached one keeps the old cost).
+- **Timing-equalizer hash.** Open: a fresh hash when the configured cost
+  changes (the cached one keeps the old cost). Done (Unreleased): the opt-out
+  for processes that never verify passwords or run their own login;
+  `auth.precomputeLoginTimingHash: false` skips the hash when the HTTP server
+  starts, and the built-in login computes it on the first unknown-account
+  login instead.
 
 ## Logging
 

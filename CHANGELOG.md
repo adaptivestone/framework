@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Added
+
+- **`auth.precomputeLoginTimingHash: false` skips the login-timing hash at start.** Since 5.7.0 every start of the HTTP server, test servers included, computes one password hash at the configured cost, so that a login for an unknown account takes as long as a wrong password. Apps with their own login can turn it off. The built-in login still equalizes the timing: it computes the hash on the first unknown-account login, which is then slower, as in 5.6. The default is `true`. An app's own `config/auth.ts` replaces the framework's, so set the key there; without it the hash is computed at start.
+
 ### Fixed
 
 - **A list sent to a trimmed yup string no longer hides the other fields' errors.** Since 5.7.0 such a request (an array or object for `string().trim()`, `.lowercase()` or `.uppercase()`) answers the validation 400, but the 400 named only that field: an error in another field, such as a missing required field, was left out. The 400 now also reports the other fields, as a normal validation does. On these requests the schema is checked once more without the rejected values, so its `.test()` functions run again; one that throws there still ends in the 500.
