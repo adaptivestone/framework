@@ -260,7 +260,22 @@ describe('yupDriver.validate', () => {
     );
   });
 
-  it('rethrows the original TypeError when a custom test throws on the re-check', async () => {
+  it('answers many rejected items without slowing down per item', async () => {
+    const schema = object({ items: array(string().trim().required()) });
+    const items = Array.from({ length: 20_000 }, () => []);
+
+    const started = performance.now();
+    const err = await rejection(schema, { items });
+    const elapsed = performance.now() - started;
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.strictEqual(err.issues.length, 20_000);
+    // A few seconds at most; work that grows with the square of the list
+    // takes about a minute here.
+    assert.ok(elapsed < 8000, `took ${Math.round(elapsed)} ms`);
+  });
+
+  it('answers the list alone when the re-check throws', async () => {
     const schema = object({
       name: string().trim().required(),
       nick: string().test(
@@ -275,8 +290,11 @@ describe('yupDriver.validate', () => {
 
     const err = await rejection(schema, { name: ['a'], nick: 'n' });
 
-    assert.ok(err instanceof TypeError);
-    assertTextMatch(err.message, /trim/);
+    assert.ok(ValidationError.isValidationError(err));
+    assert.deepStrictEqual(
+      err.issues.map((issue) => issue.path),
+      [['name']],
+    );
   });
 
   it('does not carry one validation input into the next', async () => {
