@@ -8,7 +8,6 @@ import type {
   Response,
 } from 'express';
 import express from 'express';
-import type TauthConfig from '../../config/auth.ts';
 import type ThttpConfig from '../../config/http.ts';
 import { warmPasswordVerify } from '../../helpers/crypto.ts';
 import { describeThrown } from '../../helpers/logger.ts';
@@ -145,13 +144,7 @@ class HttpServer extends Base {
    */
   listen(): Promise<void> {
     // The dummy hash unknown-account logins compare against; not awaited.
-    // Absent in an app's own `config/auth.ts`, it defaults to on.
-    const { precomputeLoginTimingHash } = this.app.getConfig(
-      'auth',
-    ) as typeof TauthConfig;
-    if (precomputeLoginTimingHash !== false) {
-      warmPasswordVerify();
-    }
+    warmPasswordVerify();
     const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
     return new Promise((resolve) => {
       const listener = this.httpServer.listen(

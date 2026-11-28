@@ -16,9 +16,4 @@ export default {
   // Tests lower this for speed; scrypt is memory-hard, so the production value
   // makes parallel hashing expensive on purpose.
   scrypt: { ln: 17, r: 8, p: 1 },
-  // Compute the hash that unknown-account logins are checked against (so they
-  // take as long as a wrong password) when the HTTP server starts. `false`
-  // skips it, e.g. for apps with their own login: the first unknown-account
-  // login computes it instead and is slower.
-  precomputeLoginTimingHash: true,
 };

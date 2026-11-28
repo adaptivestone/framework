@@ -6,14 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
-### Added
-
-- **`auth.precomputeLoginTimingHash: false` skips the login-timing hash at start.** Since 5.7.0 every start of the HTTP server, test servers included, computes one password hash at the configured cost, so that a login for an unknown account takes as long as a wrong password. Apps with their own login can turn it off. The built-in login still equalizes the timing: it computes the hash on the first unknown-account login, which is then slower, as in 5.6. The default is `true`. An app's own `config/auth.ts` replaces the framework's, so set the key there; without it the hash is computed at start.
-
 ### Fixed
 
-- **The `File` type from `types.js` no longer turns into `any` in apps.** Since 5.7.0 it is built from formidable's types, but `@types/formidable` was only a development dependency of the framework, so an app without its own copy got `any` with no error under `skipLibCheck: true` (with `skipLibCheck: false`, a missing-declaration error inside the framework). `@types/formidable` is now a dependency, like `formidable` itself; apps that added it only for this can remove it. The packaging smoke test checks `File` in a consumer without it.
-- **The request types work without `@types/express` in the app.** `FrameworkRequest` and the other public request and handler types extend express's types, but `@types/express` was only a development dependency of the framework: an app without its own copy lost them (`req.method` and every other request field failed to type-check, or became `any`). `@types/express` is now a dependency, like `express` itself; apps may keep their own `@types/express` 5.
 - **A list sent to a trimmed yup string no longer hides the other fields' errors.** Since 5.7.0 such a request (an array or object for `string().trim()`, `.lowercase()` or `.uppercase()`) answers the validation 400, but the 400 named only that field: an error in another field, such as a missing required field, was left out. The 400 now also reports the other fields, as a normal validation does. On these requests the schema is checked once more without the rejected values, so its `.test()` functions run again; one that throws there still ends in the 500.
 
 ## [5.7.0] - 2026-11-22

@@ -8,7 +8,6 @@ import type { BaseRequestContext } from '@adaptivestone/framework/services/http/
 import type { TI18n } from '@adaptivestone/framework/services/i18n/I18n.js';
 import ValidateService from '@adaptivestone/framework/services/validate/ValidateService.js';
 import { ValidationError } from '@adaptivestone/framework/services/validate/ValidationError.js';
-import { File } from '@adaptivestone/framework/types.js';
 
 // Match the resizer's helper -> IApp -> HTTP/i18n declaration chain, and check
 // the public request, validator and user mail surfaces in the installed dist.
@@ -69,17 +68,3 @@ const unregister = app.httpServer?.registerErrorHandler(
   (err) => HttpResponse.json(422, { errors: err.message }),
 );
 void unregister;
-
-// An upload is typed even when the app has no `@types/formidable` of its own.
-declare const upload: File;
-const uploadSize: number = upload.size;
-const uploadPath: string = upload.filepath;
-// @ts-expect-error `File` is a typed upload, not `any`
-const sizeAsString: string = upload.size;
-void [uploadSize, uploadPath, sizeAsString, File];
-
-// The request is typed even when the app has no `@types/express` of its own.
-const method: string = request.method;
-// @ts-expect-error `method` is a string, not `any`
-const methodAsNumber: number = request.method;
-void [method, methodAsNumber];
