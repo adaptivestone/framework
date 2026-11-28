@@ -77,3 +77,9 @@ const uploadPath: string = upload.filepath;
 // @ts-expect-error `File` is a typed upload, not `any`
 const sizeAsString: string = upload.size;
 void [uploadSize, uploadPath, sizeAsString, File];
+
+// The request is typed even when the app has no `@types/express` of its own.
+const method: string = request.method;
+// @ts-expect-error `method` is a string, not `any`
+const methodAsNumber: number = request.method;
+void [method, methodAsNumber];

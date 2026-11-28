@@ -40,10 +40,10 @@ writeFileSync('package.json', JSON.stringify({
   private: true,
   type: 'module',
   dependencies: { [framework.name]: `file:${process.argv[3]}` },
-  // No `@types/formidable`: the framework's public `File` type needs it, so it
-  // must arrive with the framework, not from the app.
+  // No `@types/express` or `@types/formidable`: the framework's public request
+  // and `File` types need them, so they must arrive with the framework.
   devDependencies: Object.fromEntries(
-    ['@types/node', '@types/express'].map(
+    ['@types/node'].map(
       (name) => [name, framework.devDependencies[name]],
     ),
   ),
