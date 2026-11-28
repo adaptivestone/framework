@@ -37,10 +37,7 @@ export const yupDriver: ValidatorDriver = {
 
   async validate(body: unknown, data: unknown): Promise<unknown> {
     try {
-      return await (body as YupSchemaLike).validate(data, {
-        stripUnknown: true,
-        abortEarly: false,
-      });
+      return await (body as YupSchemaLike).validate(data, validateOptions());
     } catch (e: unknown) {
       if (isYupValidationError(e)) {
         throw fromYupError(e);
@@ -67,6 +64,9 @@ export const yupDriver: ValidatorDriver = {
   },
 };
 
+// A new object per call: yup writes its state (`originalValue`, …) into it.
+const validateOptions = () => ({ stripUnknown: true, abortEarly: false });
+
 type YupSchemaLike = {
   validate: (
     data: unknown,
@@ -87,32 +87,142 @@ interface YupValidationErrorShape {
 
 /**
  * A transform that assumes its type (`string().trim()`, `.lowercase()`) throws
- * a `TypeError` when a client sends an array or object. Re-check without
- * transforms: type errors on such values become a `ValidationError`. Anything
- * else (e.g. a `.test()` that throws again) yields `undefined`, so the caller
- * rethrows its original error.
+ * a `TypeError` when a client sends an array or object. A check without
+ * transforms finds those values; the normal validation then runs again with
+ * them taken out, for the other fields' issues. Anything else (e.g. a `.test()`
+ * that throws) yields `undefined`, so the caller rethrows its original error.
  */
 async function shapeTypeErrors(
   schema: YupSchemaLike,
   data: unknown,
 ): Promise<ValidationError | undefined> {
+  let strictError: YupValidationErrorShape;
   try {
     await schema.validate(data, { strict: true, abortEarly: false });
+    return undefined;
   } catch (e: unknown) {
     if (!isYupValidationError(e)) {
       return undefined;
     }
-    // Strict mode also rejects castable input (`'42'` for `number()`), so keep
-    // only the values no cast accepts.
-    const inner = (e.inner ?? []).filter(
-      (issue) =>
-        issue.type === 'typeError' && isArrayOrPlainObject(issue.value),
-    );
-    if (inner.length > 0) {
-      return fromYupError({ ...e, inner });
+    strictError = e;
+  }
+  // Strict mode also rejects castable input (`'42'` for `number()`), so keep
+  // only the values no cast accepts.
+  const typeIssues = leafErrors(strictError).filter(
+    (issue) => issue.type === 'typeError' && isArrayOrPlainObject(issue.value),
+  );
+  if (typeIssues.length === 0) {
+    return undefined;
+  }
+  const answer = (inner: YupValidationErrorShape[]) =>
+    fromYupError({ ...strictError, inner });
+
+  const copies = new WeakSet<object>();
+  let rest = data;
+  for (const issue of typeIssues) {
+    const next = withoutValue(rest, issue.path ?? '', issue.value, copies);
+    if (!next) {
+      // A path that cannot be followed (a key such as `tags[]`): the type
+      // issues alone still answer 400.
+      return answer(typeIssues);
+    }
+    rest = next.data;
+  }
+  try {
+    await schema.validate(rest, validateOptions());
+  } catch (e: unknown) {
+    // Any other failure (a test or transform that needed a removed value)
+    // leaves the type issues alone to answer.
+    if (isYupValidationError(e)) {
+      const typePaths = new Set(typeIssues.map((issue) => issue.path ?? ''));
+      const others = leafErrors(e).filter(
+        (issue) => !isAtOrUnder(issue.path ?? '', typePaths),
+      );
+      return answer([...typeIssues, ...others]);
     }
   }
-  return undefined;
+  return answer(typeIssues);
+}
+
+function leafErrors(e: YupValidationErrorShape): YupValidationErrorShape[] {
+  return Array.isArray(e.inner) && e.inner.length > 0 ? e.inner : [e];
+}
+
+/** Yup paths: `a.b`, `a[0]`, `a["key.with.dots"]`; `''` is the root. */
+function isAtOrUnder(path: string, parents: Set<string>): boolean {
+  if (parents.has('') || parents.has(path)) {
+    return true;
+  }
+  for (let i = 0; i < path.length; i += 1) {
+    if ((path[i] === '.' || path[i] === '[') && parents.has(path.slice(0, i))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const PATH_SEGMENT = /\["(.*?)"\]|\[(\d+)\]|\.?([^.[]+)/y;
+
+/**
+ * `data` with the value at a yup `path` set to `undefined` (transforms skip
+ * it), copying only the containers on the way: a deep clone would turn
+ * uploads (class instances) into plain objects. A container in `copies` is
+ * already a copy and is reused, so each one is copied once. `undefined` when
+ * the path does not lead to `expected`.
+ */
+function withoutValue(
+  data: unknown,
+  path: string,
+  expected: unknown,
+  copies: WeakSet<object>,
+): { data: unknown } | undefined {
+  const segments: string[] = [];
+  PATH_SEGMENT.lastIndex = 0;
+  while (PATH_SEGMENT.lastIndex < path.length) {
+    const match = PATH_SEGMENT.exec(path);
+    if (!match) {
+      return undefined;
+    }
+    segments.push(match[1] ?? match[2] ?? match[3]);
+  }
+  if (segments.length === 0) {
+    return data === expected ? { data: undefined } : undefined;
+  }
+  const root = copyContainer(data, copies);
+  let container = root;
+  for (const [i, key] of segments.entries()) {
+    if (!container || !Object.hasOwn(container, key)) {
+      return undefined;
+    }
+    if (i === segments.length - 1) {
+      if (container[key] !== expected) {
+        return undefined;
+      }
+      container[key] = undefined;
+    } else {
+      const child = copyContainer(container[key], copies);
+      container[key] = child;
+      container = child;
+    }
+  }
+  return { data: root };
+}
+
+function copyContainer(
+  value: unknown,
+  copies: WeakSet<object>,
+): Record<string, unknown> | undefined {
+  if (!isArrayOrPlainObject(value)) {
+    return undefined;
+  }
+  if (copies.has(value as object)) {
+    return value as Record<string, unknown>;
+  }
+  const copy = (
+    Array.isArray(value) ? [...value] : { ...(value as object) }
+  ) as Record<string, unknown>;
+  copies.add(copy);
+  return copy;
 }
 
 function isArrayOrPlainObject(value: unknown): boolean {

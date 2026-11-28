@@ -14,7 +14,7 @@
 #                                            own Server exactly as under Node)
 #
 # `--experimental-test-module-mocks` has NO Bun equivalent: `mock.module()`
-# throws ERR_NOT_IMPLEMENTED (oven-sh/bun#5090). The four files that depend on
+# throws ERR_NOT_IMPLEMENTED (oven-sh/bun#5090). The five files that depend on
 # it are excluded below and named in README.md; nothing else is skipped.
 #
 # Mongo: an in-memory replica set is started here (the suite's change-stream

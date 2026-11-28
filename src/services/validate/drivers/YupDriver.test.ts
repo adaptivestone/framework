@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { array, boolean, date, number, object, ref, string } from 'yup';
+import { assertTextMatch } from '../../../tests/assertions.ts';
 import { ValidationError } from '../ValidationError.ts';
 import { yupDriver } from './YupDriver.ts';
 
@@ -164,6 +165,147 @@ describe('yupDriver.validate', () => {
 
     assert.ok(err instanceof TypeError);
     assert.strictEqual(err.message, 'fetch failed 1');
+  });
+
+  it('reports the other fields next to a list sent to a trimmed string', async () => {
+    const schema = object({
+      name: string().trim().required(),
+      email: string().required(),
+    });
+
+    const err = await rejection(schema, { name: ['a', 'b'], email: undefined });
+    const plain = await rejection(schema, { name: 'a' });
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.ok(ValidationError.isValidationError(plain));
+    assert.deepStrictEqual(
+      err.issues.map((issue) => issue.path),
+      [['name'], ['email']],
+    );
+    // `email` is reported exactly as a normal validation reports it.
+    assert.deepStrictEqual(err.issues[1], plain.issues[0]);
+  });
+
+  it('reports nested and indexed paths without changing the input', async () => {
+    const schema = object({
+      profile: object({
+        city: string().trim().required(),
+        zip: string().required(),
+      }),
+      items: array(
+        object({
+          label: string().lowercase().required(),
+          qty: number().required(),
+        }),
+      ),
+      'a.b': string().trim(),
+    });
+    const data = {
+      profile: { city: { x: 1 } },
+      items: [{ label: 'ok', qty: '3' }, { label: ['x'] }],
+      'a.b': ['y'],
+    };
+
+    const err = await rejection(schema, data);
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.deepStrictEqual(err.issues.map((issue) => issue.path).sort(), [
+      ['["a.b"]'],
+      ['items[1].label'],
+      ['items[1].qty'],
+      ['profile.city'],
+      ['profile.zip'],
+    ]);
+    assert.deepStrictEqual(data, {
+      profile: { city: { x: 1 } },
+      items: [{ label: 'ok', qty: '3' }, { label: ['x'] }],
+      'a.b': ['y'],
+    });
+  });
+
+  it('reports only the list when the rest is valid, castable values and uploads included', async () => {
+    class Upload {}
+    const schema = object({
+      name: string().trim().required(),
+      age: number().required(),
+      upload: array()
+        .required()
+        .test('files', 'not a file', (files) =>
+          (files ?? []).every((file) => file instanceof Upload),
+        ),
+    });
+
+    const err = await rejection(schema, {
+      name: ['a'],
+      age: '42',
+      upload: [new Upload()],
+    });
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.deepStrictEqual(
+      err.issues.map((issue) => issue.path),
+      [['name']],
+    );
+  });
+
+  it('still answers a list in a field whose path cannot be followed', async () => {
+    const schema = object({ 'tags[]': string().trim(), email: string() });
+
+    const err = await rejection(schema, { 'tags[]': ['a'] });
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.deepStrictEqual(
+      err.issues.map((issue) => issue.path),
+      [['tags[]']],
+    );
+  });
+
+  it('answers many rejected items without slowing down per item', async () => {
+    const schema = object({ items: array(string().trim().required()) });
+    const items = Array.from({ length: 20_000 }, () => []);
+
+    const started = performance.now();
+    const err = await rejection(schema, { items });
+    const elapsed = performance.now() - started;
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.strictEqual(err.issues.length, 20_000);
+    // A few seconds at most; work that grows with the square of the list
+    // takes about a minute here.
+    assert.ok(elapsed < 8000, `took ${Math.round(elapsed)} ms`);
+  });
+
+  it('answers the list alone when the re-check throws', async () => {
+    const schema = object({
+      name: string().trim().required(),
+      nick: string().test(
+        'reads-name',
+        'needs a name',
+        // Assumes the sibling is set: throws once the list is taken out.
+        function () {
+          return (this.parent as { name: string[] }).name.length > 0;
+        },
+      ),
+    });
+
+    const err = await rejection(schema, { name: ['a'], nick: 'n' });
+
+    assert.ok(ValidationError.isValidationError(err));
+    assert.deepStrictEqual(
+      err.issues.map((issue) => issue.path),
+      [['name']],
+    );
+  });
+
+  it('does not carry one validation input into the next', async () => {
+    const schema = object({ age: number() });
+
+    await rejection(schema, { age: 'first-input' });
+    const err = await rejection(schema, { age: 'second-input' });
+
+    assert.ok(ValidationError.isValidationError(err));
+    assertTextMatch(err.issues[0].message, /second-input/);
+    assert.doesNotMatch(JSON.stringify(err.issues), /first-input/);
   });
 
   it('still trims a valid string', async () => {

@@ -1,10 +1,7 @@
-import { type File as ParsedFile, PersistentFile } from 'formidable';
+import { PersistentFile } from 'formidable';
 
 /**
- * Uploaded-file type. Today it aliases formidable's `PersistentFile`; the
- * future transport-neutral parser swap (P3) re-points it at the web-standard
- * `File`. Import this instead of the concrete parser class so your file
- * validation survives that swap untouched.
+ * An uploaded file, saved to a temporary file on disk.
  *
  * Validate uploads with an `instanceof` check. A file field always arrives as
  * an array; check the array as a whole, so an error stays under the field name
@@ -20,14 +17,17 @@ import { type File as ParsedFile, PersistentFile } from 'formidable';
  * A missing field fails these checks; for an optional one, let `files` also
  * accept `undefined`.
  *
- * `File` is both a value (the parser's class, for `instanceof`) and a type
- * (an upload with `filepath`, `mimetype`, `originalFilename`, `size`, …).
+ * `File` is both a value, for `instanceof`, and the type of an upload.
  */
-export type File = InstanceType<typeof PersistentFile> & ParsedFile;
-
-interface FileClass {
-  new (...args: ConstructorParameters<typeof PersistentFile>): File;
-  readonly prototype: File;
+export interface File {
+  /** Path of the temporary file that holds the upload. */
+  filepath: string;
+  /** File name the client sent, if any. */
+  originalFilename: string | null | undefined;
+  /** Media type the client sent, if any. */
+  mimetype: string | null;
+  /** Size in bytes. */
+  size: number;
 }
 
-export const File = PersistentFile as unknown as FileClass;
+export const File = PersistentFile as unknown as abstract new () => File;

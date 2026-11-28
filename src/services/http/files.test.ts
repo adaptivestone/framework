@@ -5,14 +5,15 @@ import { z } from 'zod';
 import { File } from '../../types.ts';
 
 describe('File', () => {
+  // An upload as the request parser creates it.
   const upload = () =>
-    new File({
+    new PersistentFile({
       filepath: '/tmp/upload-1',
       newFilename: 'upload-1',
       originalFilename: 'avatar.png',
       mimetype: 'image/png',
       hashAlgorithm: false,
-    } as ConstructorParameters<typeof File>[0]);
+    } as ConstructorParameters<typeof PersistentFile>[0]) as unknown as File;
 
   it('is the parser file class, so instanceof matches an upload', () => {
     assert.strictEqual(File, PersistentFile);
@@ -35,5 +36,19 @@ describe('File', () => {
       originalFilename: 'avatar.png',
       size: 0,
     });
+  });
+
+  it('types a missing file name as possibly undefined', () => {
+    // An octet-stream upload without `X-File-Name` has no name at all.
+    const nameOf = (file: File) => {
+      // @ts-expect-error `originalFilename` may be `undefined`
+      const name: string | null = file.originalFilename;
+      return name;
+    };
+
+    assert.strictEqual(
+      nameOf({ ...upload(), originalFilename: undefined }),
+      undefined,
+    );
   });
 });

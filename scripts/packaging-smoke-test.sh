@@ -10,7 +10,8 @@
 #   - a Server constructs from the published dist;
 #   - optional peers stay absent, and framework messages still answer in English
 #     without `i18next` installed;
-#   - core declarations compile with skipLibCheck: false without the i18n peers.
+#   - core declarations compile with skipLibCheck: false without the i18n peers
+#     or the upload parser's types.
 #
 set -euo pipefail
 
@@ -40,8 +41,10 @@ writeFileSync('package.json', JSON.stringify({
   private: true,
   type: 'module',
   dependencies: { [framework.name]: `file:${process.argv[3]}` },
+  // No `@types/formidable`: the upload parser is internal, so no public type
+  // may need it.
   devDependencies: Object.fromEntries(
-    ['@types/node', '@types/express', '@types/formidable'].map(
+    ['@types/node', '@types/express'].map(
       (name) => [name, framework.devDependencies[name]],
     ),
   ),
@@ -64,7 +67,7 @@ cat > tsconfig.json <<'EOF'
 }
 EOF
 
-echo "→ Type-checking the installed core declarations without i18n peers"
+echo "→ Type-checking the installed core declarations without i18n peers or parser types"
 node --input-type=module <<'EOF'
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -73,7 +76,11 @@ for (const from of [
   import.meta.resolve('@adaptivestone/framework/package.json'),
 ]) {
   const require = createRequire(from);
-  for (const peer of ['i18next', 'i18next-fs-backend']) {
+  for (const peer of [
+    'i18next',
+    'i18next-fs-backend',
+    '@types/formidable/package.json',
+  ]) {
     assert.throws(() => require.resolve(peer), { code: 'MODULE_NOT_FOUND' });
   }
 }

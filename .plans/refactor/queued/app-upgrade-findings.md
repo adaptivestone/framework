@@ -85,9 +85,10 @@ needs a decision. Versions are targets, not promises.
   (TH7); a schema helper carrying the same keys is optional.
 - **Session tokens (FW15 remainder).** Per-token TTL, metadata, a revocation
   helper and "log out everywhere".
-- **Timing-equalizer hash.** An opt-out for processes that never verify
-  passwords (5.7.0 computes it when the HTTP server starts), and a fresh hash
-  when the configured cost changes (the cached one keeps the old cost).
+- **Timing-equalizer hash.** A fresh hash when the configured cost changes
+  (the cached one keeps the old cost). Since 5.7.1 the server no longer
+  computes it at start: the first unknown-account login does, at the cost of
+  one password check.
 
 ## Logging
 

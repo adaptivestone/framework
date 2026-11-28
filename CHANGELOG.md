@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- **A list sent to a trimmed yup string no longer hides the other fields' errors.** Since 5.7.0 such a request (an array or object for `string().trim()`, `.lowercase()` or `.uppercase()`) answers the validation 400, but the 400 named only that field: an error in another field, such as a missing required field, was left out. The 400 now also reports the other fields, as a normal validation does. On these requests the schema is checked once more without the rejected values, so its `.test()` functions run again; if that second check fails in any other way, the 400 names only the rejected fields.
+- **Starting the server no longer computes a password hash.** 5.7.0 computed the hash that makes an unknown-account login as slow as a wrong password whenever the HTTP server started: one scrypt per start, test servers included, also in apps that never use the built-in login. Now the first unknown-account login computes it instead of checking against it, at the same cost of one scrypt, so nothing runs at start and there is nothing to configure.
+- **The `File` type from `types.js` no longer turns into `any` in apps.** Since 5.7.0 it was built from the upload parser's types, which the framework has only as a development dependency, so an app without `@types/formidable` got `any` with no error under `skipLibCheck: true` (with `skipLibCheck: false`, a missing-declaration error inside the framework). `File` is now the framework's own type, with `filepath`, `originalFilename`, `mimetype` and `size` (`originalFilename` is `undefined` for an octet-stream upload without `X-File-Name`); apps that added `@types/formidable` only for it can remove it. The parser's other members (`newFilename`, `hash`, `toJSON()`, …) are no longer on the type, and `new File(…)` no longer compiles; `instanceof File` works as before.
+
 ## [5.7.0] - 2026-11-22
 
 ### Added
