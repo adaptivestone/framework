@@ -208,7 +208,7 @@ export const verifyPassword = async (
 
 // A throwaway v2 hash at the current cost, used only to equalize timing. The
 // comparison result is discarded.
-let dummyHash: Promise<string> | null = null;
+let dummyHash: string | null = null;
 
 /**
  * Burn one password-verify's worth of scrypt work, then discard the result.
@@ -219,18 +219,11 @@ let dummyHash: Promise<string> | null = null;
 export const burnPasswordVerify = async (password: string): Promise<void> => {
   try {
     if (dummyHash) {
-      await verifyPassword(password, await dummyHash);
-      return;
+      await verifyPassword(password, dummyHash);
+    } else {
+      // Until one is stored, each call computes the hash: the same one scrypt.
+      dummyHash = await hashPassword('framework:timing-equalizer');
     }
-    // The first call computes the hash instead: the same one scrypt.
-    const computing = hashPassword('framework:timing-equalizer');
-    dummyHash = computing;
-    computing.catch(() => {
-      if (dummyHash === computing) {
-        dummyHash = null;
-      }
-    });
-    await computing;
   } catch {
     // Timing side effect only — any error here is irrelevant.
   }

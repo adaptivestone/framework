@@ -187,6 +187,22 @@ describe('burnPasswordVerify', { skip }, () => {
     assert.strictEqual(await countScrypt(burn), 1);
   });
 
+  it('does not make a concurrent first call wait for the other', async () => {
+    const crypto = await freshCrypto();
+    const calls: Promise<void>[] = [];
+
+    // Only the scrypt calls started before either call finishes.
+    const started = await countScrypt(async () => {
+      calls.push(
+        crypto.burnPasswordVerify('not the password'),
+        crypto.burnPasswordVerify('not the password'),
+      );
+    });
+    await Promise.all(calls);
+
+    assert.strictEqual(started, 2);
+  });
+
   it('computes the dummy hash again after a failed attempt', async () => {
     const crypto = await freshCrypto();
     const auth = appInstance.getConfig('auth') as { saltSecret?: string };
