@@ -40,8 +40,10 @@ writeFileSync('package.json', JSON.stringify({
   private: true,
   type: 'module',
   dependencies: { [framework.name]: `file:${process.argv[3]}` },
+  // No `@types/formidable`: the upload parser is internal, so no public type
+  // may need it.
   devDependencies: Object.fromEntries(
-    ['@types/node', '@types/express', '@types/formidable'].map(
+    ['@types/node', '@types/express'].map(
       (name) => [name, framework.devDependencies[name]],
     ),
   ),

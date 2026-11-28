@@ -5,14 +5,15 @@ import { z } from 'zod';
 import { File } from '../../types.ts';
 
 describe('File', () => {
+  // An upload as the request parser creates it.
   const upload = () =>
-    new File({
+    new PersistentFile({
       filepath: '/tmp/upload-1',
       newFilename: 'upload-1',
       originalFilename: 'avatar.png',
       mimetype: 'image/png',
       hashAlgorithm: false,
-    } as ConstructorParameters<typeof File>[0]);
+    } as ConstructorParameters<typeof PersistentFile>[0]) as unknown as File;
 
   it('is the parser file class, so instanceof matches an upload', () => {
     assert.strictEqual(File, PersistentFile);
