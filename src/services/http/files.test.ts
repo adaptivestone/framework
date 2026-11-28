@@ -37,4 +37,18 @@ describe('File', () => {
       size: 0,
     });
   });
+
+  it('types a missing file name as possibly undefined', () => {
+    // An octet-stream upload without `X-File-Name` has no name at all.
+    const nameOf = (file: File) => {
+      // @ts-expect-error `originalFilename` may be `undefined`
+      const name: string | null = file.originalFilename;
+      return name;
+    };
+
+    assert.strictEqual(
+      nameOf({ ...upload(), originalFilename: undefined }),
+      undefined,
+    );
+  });
 });

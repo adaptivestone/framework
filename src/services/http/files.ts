@@ -23,7 +23,7 @@ export interface File {
   /** Path of the temporary file that holds the upload. */
   filepath: string;
   /** File name the client sent, if any. */
-  originalFilename: string | null;
+  originalFilename: string | null | undefined;
   /** Media type the client sent, if any. */
   mimetype: string | null;
   /** Size in bytes. */
