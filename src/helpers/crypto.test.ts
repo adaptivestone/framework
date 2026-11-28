@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHook } from 'node:async_hooks';
 import { describe, it } from 'node:test';
-import { assertRejectsLike, assertTextMatch } from '../tests/assertions.ts';
+import { assertRejectsLike } from '../tests/assertions.ts';
 import { appInstance } from './appInstance.ts';
 import {
   hashPassword,
@@ -149,40 +150,59 @@ describe('timingSafeEqualStrings', () => {
   });
 });
 
-describe('warmPasswordVerify', () => {
-  // A fresh module per test: the shared one was already warmed at boot.
+/** How many scrypt derivations `run` starts. */
+const countScrypt = async (run: () => Promise<unknown>): Promise<number> => {
+  let count = 0;
+  const hook = createHook({
+    init(_id, type) {
+      if (type === 'SCRYPTREQUEST') {
+        count += 1;
+      }
+    },
+  }).enable();
+  try {
+    await run();
+  } finally {
+    hook.disable();
+  }
+  return count;
+};
+
+// Bun runs no async hooks, so it cannot count scrypt calls.
+const skip = process.versions.bun !== undefined && 'Bun has no async hooks';
+
+describe('burnPasswordVerify', { skip }, () => {
+  // A fresh module per test, with no dummy hash yet.
   let importSequence = 0;
   const freshCrypto = async (): Promise<typeof import('./crypto.ts')> => {
     importSequence += 1;
-    return import(`./crypto.ts?warm=${importSequence}`);
+    return import(`./crypto.ts?burn=${importSequence}`);
   };
 
-  it('starts the dummy hash that the first burnPasswordVerify reuses', async () => {
+  it('costs one scrypt, the first call included', async () => {
     const crypto = await freshCrypto();
-    const warmed = crypto.warmPasswordVerify();
+    const burn = () => crypto.burnPasswordVerify('not the password');
 
-    assert.strictEqual(crypto.warmPasswordVerify(), warmed);
-    await crypto.burnPasswordVerify('not the password');
-    assert.strictEqual(crypto.warmPasswordVerify(), warmed);
-    assertTextMatch(await warmed, /^v2:scrypt:/);
+    assert.strictEqual(await countScrypt(burn), 1);
+    assert.strictEqual(await countScrypt(burn), 1);
   });
 
-  it('lets burnPasswordVerify recompute the hash after a failed warm-up', async () => {
+  it('computes the dummy hash again after a failed attempt', async () => {
     const crypto = await freshCrypto();
     const auth = appInstance.getConfig('auth') as { saltSecret?: string };
     const original = auth.saltSecret;
     auth.saltSecret = '';
-    let failed: Promise<string>;
+    let failed: Promise<void>;
     try {
-      failed = crypto.warmPasswordVerify();
+      failed = crypto.burnPasswordVerify('not the password');
     } finally {
       auth.saltSecret = original;
     }
-    await assertRejectsLike(failed, 'AUTH_SALT is not defined');
+    await failed;
 
-    await crypto.burnPasswordVerify('not the password');
-    const recomputed = crypto.warmPasswordVerify();
-    assert.notStrictEqual(recomputed, failed);
-    assertTextMatch(await recomputed, /^v2:scrypt:/);
+    assert.strictEqual(
+      await countScrypt(() => crypto.burnPasswordVerify('not the password')),
+      1,
+    );
   });
 });

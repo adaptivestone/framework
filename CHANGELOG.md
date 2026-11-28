@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - **A list sent to a trimmed yup string no longer hides the other fields' errors.** Since 5.7.0 such a request (an array or object for `string().trim()`, `.lowercase()` or `.uppercase()`) answers the validation 400, but the 400 named only that field: an error in another field, such as a missing required field, was left out. The 400 now also reports the other fields, as a normal validation does. On these requests the schema is checked once more without the rejected values, so its `.test()` functions run again; one that throws there still ends in the 500.
+- **Starting the server no longer computes a password hash.** 5.7.0 computed the hash that makes an unknown-account login as slow as a wrong password whenever the HTTP server started: one scrypt per start, test servers included, also in apps that never use the built-in login. Now the first unknown-account login computes it, and that takes as long as checking a wrong password, so the timing stays equal with no work at start and nothing to configure.
 
 ## [5.7.0] - 2026-11-22
 

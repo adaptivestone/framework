@@ -9,7 +9,6 @@ import type {
 } from 'express';
 import express from 'express';
 import type ThttpConfig from '../../config/http.ts';
-import { warmPasswordVerify } from '../../helpers/crypto.ts';
 import { describeThrown } from '../../helpers/logger.ts';
 import { translateWithDefault } from '../../helpers/translate.ts';
 import Base from '../../modules/Base.ts';
@@ -143,8 +142,6 @@ class HttpServer extends Base {
    * mounted, so no request reaches a partly built app.
    */
   listen(): Promise<void> {
-    // The dummy hash unknown-account logins compare against; not awaited.
-    warmPasswordVerify();
     const httpConfig = this.app.getConfig('http') as typeof ThttpConfig;
     return new Promise((resolve) => {
       const listener = this.httpServer.listen(

@@ -206,27 +206,9 @@ export const verifyPassword = async (
   }
 };
 
-// A throwaway v2 hash, computed once at the current cost, used only to equalize
-// timing. The comparison result is discarded.
-let dummyHashPromise: Promise<string> | null = null;
-
-/**
- * @internal Start computing the dummy hash {@link burnPasswordVerify} compares against,
- * so the first unknown-account login after a restart costs one scrypt, not two.
- * Safe to call without awaiting: a failure is dropped and the next call retries.
- */
-export const warmPasswordVerify = (): Promise<string> => {
-  if (!dummyHashPromise) {
-    const promise = hashPassword('framework:timing-equalizer');
-    dummyHashPromise = promise;
-    promise.catch(() => {
-      if (dummyHashPromise === promise) {
-        dummyHashPromise = null;
-      }
-    });
-  }
-  return dummyHashPromise;
-};
+// A throwaway v2 hash at the current cost, used only to equalize timing. The
+// comparison result is discarded.
+let dummyHash: Promise<string> | null = null;
 
 /**
  * Burn one password-verify's worth of scrypt work, then discard the result.
@@ -236,7 +218,19 @@ export const warmPasswordVerify = (): Promise<string> => {
  */
 export const burnPasswordVerify = async (password: string): Promise<void> => {
   try {
-    await verifyPassword(password, await warmPasswordVerify());
+    if (dummyHash) {
+      await verifyPassword(password, await dummyHash);
+      return;
+    }
+    // The first call computes the hash instead: the same one scrypt.
+    const computing = hashPassword('framework:timing-equalizer');
+    dummyHash = computing;
+    computing.catch(() => {
+      if (dummyHash === computing) {
+        dummyHash = null;
+      }
+    });
+    await computing;
   } catch {
     // Timing side effect only — any error here is irrelevant.
   }

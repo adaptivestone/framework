@@ -34,11 +34,12 @@ Node-only, as of Bun 1.4:
   under Bun (or put the process manager outside the app).
 - **Node's test-runner CLI.** Bun implements the `node:test` _API_ but not
   `node --test`, so a Bun project runs its suite with `bun test` and the
-  framework preloads rather than the flags the Node docs show. Four framework
+  framework preloads rather than the flags the Node docs show. Five framework
   test files need `mock.module()` (Node's `--experimental-test-module-mocks`),
   which Bun does not implement ([oven-sh/bun#5090][bun-5090]), and are the only
   thing excluded from the Bun run: `cluster.test.ts`, `models/UserOld.test.ts`,
   `helpers/redis/redisConnection.failure.test.ts`,
+  `services/http/middleware/RateLimiter.redisSetup.test.ts`,
   `services/i18n/I18n.missing.test.ts`. Everything else passes on both runtimes.
 - **`assert.deepStrictEqual` against a Mongoose array.** Bun 1.4 reports any
   `Proxy` — which is what a Mongoose array is — as unequal. Spread it first
