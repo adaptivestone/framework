@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- **The `File` type from `types.js` no longer turns into `any` in apps.** Since 5.7.0 it is built from formidable's types, but `@types/formidable` was only a development dependency of the framework, so an app without its own copy got `any` with no error under `skipLibCheck: true` (with `skipLibCheck: false`, a missing-declaration error inside the framework). `@types/formidable` is now a dependency, like `formidable` itself; apps that added it only for this can remove it. The packaging smoke test checks `File` in a consumer without it.
 - **A list sent to a trimmed yup string no longer hides the other fields' errors.** Since 5.7.0 such a request (an array or object for `string().trim()`, `.lowercase()` or `.uppercase()`) answers the validation 400, but the 400 named only that field: an error in another field, such as a missing required field, was left out. The 400 now also reports the other fields, as a normal validation does. On these requests the schema is checked once more without the rejected values, so its `.test()` functions run again; one that throws there still ends in the 500.
 
 ## [5.7.0] - 2026-11-22
